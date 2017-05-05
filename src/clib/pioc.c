@@ -24,6 +24,11 @@ static int counter = 0;
 static bool fortran_order = false;
 #endif
 
+#if PIO_SAVE_DECOMPS
+static int counter = 0;
+static bool fortran_order = false;
+#endif
+
 /** The default error handler used when iosystem cannot be located. */
 int default_error_handler = PIO_INTERNAL_ERROR;
 
