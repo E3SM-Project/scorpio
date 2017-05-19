@@ -160,7 +160,7 @@ contains
      end if
   end subroutine CheckMPIreturn
 
-  subroutine pio_writedof (file, DOF, comm, punit)
+  subroutine pio_writedof (file, DOF, comm, gdims, punit)
     !-----------------------------------------------------------------------
     ! Purpose:
     !
@@ -178,10 +178,11 @@ contains
     character(len=*),intent(in) :: file
     integer(kind=pio_offset)  ,intent(in) :: dof(:)
     integer         ,intent(in) :: comm
+    integer, intent(in) :: gdims(:)
     integer,optional,intent(in) :: punit
 
     character(len=*), parameter :: subName=modName//'::pio_writedof'
-    integer ierr, myrank, npes, m, n, unit
+    integer ierr, myrank, npes, ndims, m, n, unit
     integer(kind=pio_offset), pointer :: wdof(:)
     integer(kind=pio_offset), pointer :: sdof1d(:)
     integer(kind=pio_offset) :: sdof, sdof_tmp(1)
@@ -206,6 +207,8 @@ contains
     call CheckMPIReturn(subName,ierr)
     sdof = size(dof)
 
+    ndims = size(gdims)
+
     allocate(sdof1d(0:npes-1))
     sdof1d = -1
     sdof_tmp(1) = sdof
@@ -224,7 +227,10 @@ contains
     if (myrank == masterproc) then
        write(6,*) subName,': writing file ',trim(file),' unit=',unit
        open(unit,file=file)
-       write(unit,*) versno,npes
+       write(unit,*) "version ", versno, " npes ", npes, " ndims ", ndims
+       do n=1,ndims
+          write(unit,*) gdims(n)
+       end do
     endif
 
     do n = 0,npes-1
@@ -274,6 +280,7 @@ contains
   end subroutine pio_writedof
 
   subroutine pio_readdof (file, DOF, comm, punit)
+    use pio_types
     !-----------------------------------------------------------------------
     ! Purpose:
     !
@@ -300,7 +307,9 @@ contains
     character(len=*), parameter :: subName=modName//'::pio_readdof'
     integer :: ierr, myrank, npes, m, n, unit, rn
     integer(kind=pio_offset) :: sdof
-    integer :: rversno, rnpes
+    integer :: rversno, rnpes,rndims
+    character(len=pio_max_name) :: verstr, npesstr, ndimsstr
+    integer, dimension(:), allocatable :: rgdims
     integer(kind=pio_offset), pointer :: wdof(:)
     integer, parameter :: masterproc = 0
     integer :: status(MPI_STATUS_SIZE)
@@ -328,11 +337,16 @@ contains
     if (myrank == masterproc) then
        write(6,*) subName,': reading file ',trim(file),' unit=',unit
        open(unit,file=file,status='old')
-       read(unit,*) rversno,rnpes
-       write(6,*) subName,': reading file ',trim(file),' versno=',rversno
+       read(unit,*) verstr,rversno,npesstr,rnpes,ndimsstr,rndims
+       write(6,*) subName,': reading file ',trim(file),' versno=',rversno,&
+                  ' npes=', rnpes, ' ndims=', rndims
        if (rnpes /= npes) then
           call piodie(__PIO_FILE__,__LINE__,'pio_readdof npes incorrect')
        endif
+       allocate(rgdims(rndims))
+       do n=1,rndims
+          read(unit,*) rgdims(n)
+       end do
 
        do n = 0,npes-1
           read(unit,*) rn,sdof
