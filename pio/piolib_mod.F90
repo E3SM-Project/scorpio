@@ -1228,7 +1228,7 @@ contains
     call dupiodesc2(iodesc%write,iodesc%read)
 
 #ifdef SAVE_DECOMPS
-    call dumpiodesc(iosystem, iodesc, compdof, ndims)
+    call dumpiodesc(iosystem, iodesc, compdof, dims)
 #endif
 
     if (associated(displace)) then
@@ -1412,7 +1412,7 @@ contains
     call dupiodesc2(iodesc%write,iodesc%read)
 
 #ifdef SAVE_DECOMPS
-    call dumpiodesc(iosystem, iodesc, compdof, ndims)
+    call dumpiodesc(iosystem, iodesc, compdof, dims)
 #endif
     
 #ifdef MEMCHK	
@@ -1445,23 +1445,26 @@ contains
     dest%n_words = src%n_words
   end subroutine dupiodesc2
 
-  subroutine dumpiodesc(iosystem, iodesc, compdof, ndims)
+  subroutine dumpiodesc(iosystem, iodesc, compdof, gdims)
     use pio_types
     use pio_support
     type(iosystem_desc_t), intent(in) :: iosystem
     type(io_desc_t), intent(in) :: iodesc
     integer(kind=pio_offset), intent(in) :: compdof(:)
-    integer, intent(in) :: ndims
+    integer, intent(in) :: gdims(:)
 
     character(len=PIO_MAX_NAME) :: fname
+    integer :: ndims
     integer, save :: counter = 0
+
+    ndims = size(gdims)
     write(fname,"(A9,I6.6,A5,I6.6,A2,I6.6,A4,I6.6,A4)") "piodecomp",&
                                 iosystem%num_tasks, "tasks",&
                                 iosystem%num_iotasks, "io",&
                                 ndims, "dims",&
                                 counter, ".dat" 
     counter = counter + 1
-    call pio_writedof(fname, compdof, iosystem%union_comm)
+    call pio_writedof(fname, compdof, iosystem%union_comm, gdims)
   end subroutine dumpiodesc
 
   !************************************
