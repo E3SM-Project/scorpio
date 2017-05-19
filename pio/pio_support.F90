@@ -229,8 +229,9 @@ contains
        open(unit,file=file)
        write(unit,*) "version ", versno, " npes ", npes, " ndims ", ndims
        do n=1,ndims
-          write(unit,*) gdims(n)
+          write(unit,"(I6)",ADVANCE="NO") gdims(n)
        end do
+       write(unit,*) ""
     endif
 
     do n = 0,npes-1
@@ -265,8 +266,9 @@ contains
        if (myrank == masterproc) then
           write(unit,*) n,sdof1d(n)
           do m = 1,sdof1d(n)
-             write(unit,*) wdof(m)
+             write(unit,"(I6)",ADVANCE="NO") wdof(m)
           enddo
+          write(unit,*) ""
           deallocate(wdof)
        endif
     enddo
