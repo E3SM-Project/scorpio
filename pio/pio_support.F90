@@ -50,7 +50,7 @@ module pio_support
   logical, public :: Debug=.FALSE.
   logical, public :: DebugIO=.FALSE.
   logical, public :: DebugAsync=.FALSE.
-  integer,private,parameter :: versno = 1001
+  integer,private,parameter :: versno = 2001
 
   character(len=*), parameter :: modName='pio_support'
 
