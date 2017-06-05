@@ -1454,14 +1454,18 @@ contains
     integer, intent(in) :: gdims(:)
 
     character(len=PIO_MAX_NAME) :: fname
+    integer :: rank, ierr
     integer :: ndims
     integer, save :: counter = 0
 
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
     ndims = size(gdims)
-    write(fname,"(A9,I6.6,A5,I6.6,A2,I6.6,A4,I6.6,A4)") "piodecomp",&
+    write(fname,"(A9,I6.6,A5,I6.6,A2,I2.2,A4,I6.6,A5,I6.6,A4)") "piodecomp",&
                                 iosystem%num_tasks, "tasks",&
                                 iosystem%num_iotasks, "io",&
                                 ndims, "dims",&
+                                rank, "wrank",&
                                 counter, ".dat" 
     counter = counter + 1
     call pio_writedof(fname, compdof, iosystem%union_comm, gdims)
