@@ -1479,7 +1479,7 @@ contains
                                 rank, "wrank",&
                                 counter, ".dat" 
     counter = counter + 1
-    call pio_writedof(fname, compdof, iosystem%union_comm, gdims)
+    call pio_writedof(fname, compdof, iodesc, iosystem%union_comm, gdims)
   end subroutine dumpiodesc
 
   !************************************
