@@ -87,6 +87,7 @@ module piolib_mod
 !<
   integer :: lastrss=0
 #endif
+  integer (i4), save :: iodesc_nxt_ioid = 1
 
   !eop
   !boc
@@ -550,7 +551,8 @@ contains
     integer (kind=pio_offset) :: lengthr, lengthw
     integer (kind=pio_offset), pointer :: displacer(:),displacew(:)
 
-
+    iodesc%ioid = iodesc_nxt_ioid
+    iodesc_nxt_ioid = iodesc_nxt_ioid + 1
     nullify(iodesc%start)
     nullify(iodesc%count)
 
@@ -811,6 +813,10 @@ contains
 #ifdef MEMCHK
     integer :: msize, rss, mshare, mtext, mstack
 #endif
+
+    iodesc%ioid = iodesc_nxt_ioid
+    iodesc_nxt_ioid = iodesc_nxt_ioid + 1
+
     nullify(iodesc%start)
     nullify(iodesc%count)
 
@@ -1030,6 +1036,8 @@ contains
 
     nullify(displace)
 
+    iodesc%ioid = iodesc_nxt_ioid
+    iodesc_nxt_ioid = iodesc_nxt_ioid + 1
 #ifdef TIMING
     call t_startf("PIO:PIO_initdecomp_dof")
 #endif
@@ -1283,6 +1291,9 @@ contains
 #endif
 
     integer ierror
+
+    iodesc%ioid = iodesc_nxt_ioid
+    iodesc_nxt_ioid = iodesc_nxt_ioid + 1
 
     nullify(iodesc%start)
     nullify(iodesc%count)
@@ -2429,7 +2440,9 @@ contains
     type (io_desc_t), intent(in) :: src
     type (io_desc_t), intent(inout) :: dest
 
-
+    ! The ioid in dest should ideally be different, but for now
+    ! we don't care about distinguishing btw dup iodescs
+    dest%ioid = src%ioid
     dest%glen        =  src%glen
     if(associated(src%start)) then
        n = size(src%start)
