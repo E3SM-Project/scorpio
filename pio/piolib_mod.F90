@@ -2712,6 +2712,7 @@ contains
     if(ierr==0) file%file_is_open=.true.
 	
     if(debug .and. file%iosystem%io_rank==0) print *,__PIO_FILE__,__LINE__,'open: ',file%fh, myfname
+    file%name = myfname
     deallocate(myfname)
 #ifdef TIMING
     call t_stopf("PIO:PIO_createfile")
@@ -2874,6 +2875,7 @@ contains
     end select
     if(Debug .and. file%iosystem%io_rank==0) print *,__PIO_FILE__,__LINE__,'open: ',file%fh, myfname
     if(ierr==0) file%file_is_open=.true.
+    file%name = myfname
     deallocate(myfname)
 #ifdef TIMING
     call t_stopf("PIO:PIO_openfile")
