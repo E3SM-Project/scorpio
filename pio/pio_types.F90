@@ -241,6 +241,7 @@ module pio_types
         integer,pointer :: stype(:)=> NULL()   ! stype(num_iotasks)=mpi type for sends
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        integer(i4) :: ioid
         integer(i4) :: async_id
 
 
