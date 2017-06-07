@@ -9,7 +9,7 @@ module piodarray
   use pio_types, only : file_desc_t, io_desc_t, var_desc_t, pio_noerr, iosystem_desc_t, &
 	pio_iotype_pbinary, pio_iotype_binary, pio_iotype_direct_pbinary, &
 	pio_iotype_netcdf, pio_iotype_pnetcdf, pio_iotype_netcdf4p, pio_iotype_netcdf4c, &
-        PIO_MAX_VAR_DIMS, pio_iotype_vdc2
+        PIO_MAX_VAR_DIMS, pio_iotype_vdc2, PIO_MAX_NAME
   use pio_kinds
   use pio_support
   use pionfwrite_mod, only : write_nf
@@ -409,6 +409,42 @@ contains
 
   end subroutine read_darray_{DIMS}d_{TYPE}
 
+  subroutine dump_io_info(File, varDesc, ioDesc, tstamp, rearrTime, wrTime, mode)
+
+    type(file_desc_t), intent(in) :: File
+    type(var_desc_t), intent(in) :: varDesc
+    type(io_desc_t), intent(in) :: ioDesc
+    real(r8), intent(in) :: tstamp
+    real(r8), intent(in) :: rearrTime
+    real(r8), intent(in) :: wrTime
+    character, intent(in) :: mode
+
+    integer, parameter :: DUMP_IO_INFO_FUNIT = 300
+    integer, save :: unit = DUMP_IO_INFO_FUNIT
+    logical, save :: unit_exists = .true.
+    character(len=PIO_MAX_NAME) :: fname
+    integer :: rank, ierr
+
+    if(File%iosystem%io_rank == 0) then
+      ! Find a valid unit number to use
+      do while(unit_exists)
+        unit = unit + 1
+        inquire(unit=unit, opened=unit_exists)
+      end do
+
+      call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+      write(fname,"(A8,I6.6,A9)") "piowinfo", rank, "wrank.dat"
+
+      open(unit=unit,file=fname,access='APPEND',action='WRITE')
+      write(unit,"(A1,1F30.10,A50,A30,I6,1F15.10,1F15.10)") mode, tstamp,&
+                        File%name(1:len_trim(File%name)),&
+                        varDesc%name(1:len_trim(varDesc%name)),&
+                        ioDesc%ioid, rearrTime, wrTime
+      close(unit)
+    end if
+  end subroutine dump_io_info
+
 ! TYPE real,int,double
 !>
 !! @private
@@ -449,6 +485,7 @@ contains
     integer(i4), intent(out) :: iostat
     integer :: request
     integer :: fndims
+    real(r8) :: startTime, endTime, rearrTime, wrTime
     !EOP
     !BOC
     !-----------------------------------------------------------------------
@@ -480,6 +517,7 @@ contains
 #ifdef TIMING
     call t_startf("PIO:pio_write_darray")
 #endif
+    startTime = MPI_Wtime()
     ! -----------------------------------------------------
     ! pull information from file_desc_t data structure
     ! -----------------------------------------------------
@@ -536,6 +574,8 @@ contains
        ! "array" is comp data
 
        call rearrange_comp2io(File%iosystem,iodesc, array, iobuf)
+       endTime = MPI_Wtime()
+       rearrTime = endTime - startTime
 
 #if DEBUG_REARR
        call alloc_check(array2,size(array),'array2')
@@ -643,6 +683,11 @@ contains
     call t_startf("PIO:pio_write_nf")
 #endif
     ierr = write_nf(File,IOBUF,varDesc,iodesc,start,count, request) 
+    endTime = MPI_WTime()
+#ifdef SAVE_DECOMPS
+    call dump_io_info(File, varDesc, iodesc, startTime,&
+            rearrTime, endTime - startTime - rearrTime, "w")
+#endif
 #ifdef TIMING
     call t_stopf("PIO:pio_write_nf")
 #endif
@@ -921,6 +966,7 @@ contains
     logical(log_kind) :: UseRearranger
     integer :: fndims
     integer(i4) :: ierr
+    real(r8) :: startTime, endTime, rearrTime
 #if DEBUG_REARR
     {VTYPE}, dimension(:), pointer :: iobuf2
     integer i
@@ -928,6 +974,7 @@ contains
 #ifdef TIMING
     call t_startf("PIO:pio_read_darray")
 #endif
+    startTime = MPI_Wtime()
 
     ! -----------------------------------------------------
     ! pull information from file_desc_t data structure
@@ -1002,6 +1049,8 @@ contains
     call t_startf("PIO:pio_read_nf")
 #endif
     ierr = read_nf(File,IOBUF,varDesc,iodesc,start(1:ndims),count(1:ndims))
+    endTime = MPI_Wtime()
+    rearrTime = endTime - startTime
 #ifdef TIMING
     call t_stopf("PIO:pio_read_nf")
 #endif
@@ -1021,6 +1070,11 @@ contains
        ! "array" is comp data
        call rearrange_io2comp(File%iosystem,iodesc,IOBUF,array) 
 
+        endTime = MPI_WTime()
+#ifdef SAVE_DECOMPS
+        call dump_io_info(File, varDesc, iodesc, startTime,&
+                rearrTime, endTime - startTime - rearrTime, "r")
+#endif
 #if DEBUG_REARR
        call alloc_check(iobuf2,size(IOBUF),'iobuf2')
 
