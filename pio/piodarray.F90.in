@@ -438,7 +438,7 @@ contains
       write(fname,"(A8,I6.6,A9)") "piowinfo", rank, "wrank.dat"
 
       open(unit=unit,file=fname,access='APPEND',action='WRITE')
-      write(unit,"(A1,1F30.10,A50,A30,I6,I6,1F15.10,1F15.10)") mode, tstamp,&
+      write(unit,"(A1,1F30.10,A128,A30,I20,I6,1F30.10,1F30.10)") mode, tstamp,&
                         File%name(1:len_trim(File%name)),&
                         varDesc%name(1:len_trim(varDesc%name)),&
                         vlen, ioDesc%ioid, rearrTime, wrTime
