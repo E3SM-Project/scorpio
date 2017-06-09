@@ -409,11 +409,12 @@ contains
 
   end subroutine read_darray_{DIMS}d_{TYPE}
 
-  subroutine dump_io_info(File, varDesc, ioDesc, tstamp, rearrTime, wrTime, mode)
+  subroutine dump_io_info(File, varDesc, ioDesc, vlen, tstamp, rearrTime, wrTime, mode)
 
     type(file_desc_t), intent(in) :: File
     type(var_desc_t), intent(in) :: varDesc
     type(io_desc_t), intent(in) :: ioDesc
+    integer(kind=pio_offset), intent(in) :: vlen
     real(r8), intent(in) :: tstamp
     real(r8), intent(in) :: rearrTime
     real(r8), intent(in) :: wrTime
@@ -437,10 +438,10 @@ contains
       write(fname,"(A8,I6.6,A9)") "piowinfo", rank, "wrank.dat"
 
       open(unit=unit,file=fname,access='APPEND',action='WRITE')
-      write(unit,"(A1,1F30.10,A50,A30,I6,1F15.10,1F15.10)") mode, tstamp,&
+      write(unit,"(A1,1F30.10,A50,A30,I6,I6,1F15.10,1F15.10)") mode, tstamp,&
                         File%name(1:len_trim(File%name)),&
                         varDesc%name(1:len_trim(varDesc%name)),&
-                        ioDesc%ioid, rearrTime, wrTime
+                        vlen, ioDesc%ioid, rearrTime, wrTime
       close(unit)
     end if
   end subroutine dump_io_info
@@ -486,6 +487,7 @@ contains
     integer :: request
     integer :: fndims
     real(r8) :: startTime, endTime, rearrTime, wrTime
+    integer(pio_offset) :: reclen = 0
     !EOP
     !BOC
     !-----------------------------------------------------------------------
@@ -685,8 +687,13 @@ contains
     ierr = write_nf(File,IOBUF,varDesc,iodesc,start,count, request) 
     endTime = MPI_WTime()
 #ifdef SAVE_DECOMPS
-    call dump_io_info(File, varDesc, iodesc, startTime,&
-            rearrTime, endTime - startTime - rearrTime, "w")
+    if(len > 0) then
+      reclen = iodesc%glen * c_sizeof(IOBUF(1))
+    else
+      reclen = 0
+    end if
+    call dump_io_info(File, varDesc, iodesc, reclen,&
+            startTime, rearrTime, endTime - startTime - rearrTime, "w")
 #endif
 #ifdef TIMING
     call t_stopf("PIO:pio_write_nf")
@@ -967,6 +974,7 @@ contains
     integer :: fndims
     integer(i4) :: ierr
     real(r8) :: startTime, endTime, rearrTime
+    integer(pio_offset) :: reclen = 0
 #if DEBUG_REARR
     {VTYPE}, dimension(:), pointer :: iobuf2
     integer i
@@ -1072,8 +1080,13 @@ contains
 
         endTime = MPI_WTime()
 #ifdef SAVE_DECOMPS
-        call dump_io_info(File, varDesc, iodesc, startTime,&
-                rearrTime, endTime - startTime - rearrTime, "r")
+        if(len > 0) then
+          reclen = iodesc%glen * c_sizeof(IOBUF(1))
+        else
+          reclen = 0
+        end if
+        call dump_io_info(File, varDesc, iodesc, reclen,&
+                startTime, rearrTime, endTime - startTime - rearrTime, "r")
 #endif
 #if DEBUG_REARR
        call alloc_check(iobuf2,size(IOBUF),'iobuf2')
