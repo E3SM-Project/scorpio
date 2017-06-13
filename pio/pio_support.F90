@@ -160,7 +160,8 @@ contains
      end if
   end subroutine CheckMPIreturn
 
-  subroutine pio_writedof (file, DOF, comm, gdims, punit)
+  subroutine pio_writedof (file, DOF, iodesc, comm, gdims, punit)
+    use pio_types
     !-----------------------------------------------------------------------
     ! Purpose:
     !
@@ -177,6 +178,7 @@ contains
     !
     character(len=*),intent(in) :: file
     integer(kind=pio_offset)  ,intent(in) :: dof(:)
+    type(io_desc_t), intent(in) :: iodesc
     integer         ,intent(in) :: comm
     integer, intent(in) :: gdims(:)
     integer,optional,intent(in) :: punit
@@ -274,6 +276,8 @@ contains
     enddo
 
     if (myrank == masterproc) then
+       write(unit,*) "Obtained no stack frames"
+       write(unit,"(A4,I6)") "ioid", iodesc%ioid
        close(unit)
     endif
 

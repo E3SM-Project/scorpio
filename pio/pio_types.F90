@@ -184,21 +184,6 @@ module pio_types
     end type io_data_list
 
      
-!> 
-!! @defgroup file_desc_t
-!! File descriptor returned by \ref PIO_openfile or \ref PIO_createfile (see pio_types)
-!! 
-!>
-    type, public :: File_desc_t
-       type(iosystem_desc_t), pointer :: iosystem => null()
-       type(io_data_list), pointer :: data_list_top  => null()  ! used for non-blocking pnetcdf calls
-       integer :: buffsize=0
-       integer(i4) :: fh
-       integer(kind=PIO_OFFSET) :: offset             ! offset into file
-       integer(i4)              :: iotype             ! Type of IO to perform see parameter statement below     
-       logical                  :: file_is_open = .false.
-    end type File_desc_t
-
 
     !------------------------------------------------------
     !  data structure to describe a data movement operator
@@ -256,6 +241,7 @@ module pio_types
         integer,pointer :: stype(:)=> NULL()   ! stype(num_iotasks)=mpi type for sends
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        integer(i4) :: ioid
         integer(i4) :: async_id
 
 
@@ -268,23 +254,6 @@ module pio_types
         integer(i4)         :: ndof
         integer(i4)         :: padding
     end type
-
-!>
-!! @public
-!! @defgroup var_desc_t 
-!! @brief A variable descriptor returned from @ref PIO_def_var (see pio_types) 
-!<
-    type, public :: Var_desc_t
-#ifdef SEQUENCE
-	sequence
-#endif	
-        integer(i4)     :: varID
-        integer(i4)     :: rec   ! This is a record number or pointer into the unlim dimension of the	    
-                                 ! netcdf file
-	integer(i4)     :: type
-        integer(i4)     :: ndims ! number of dimensions as defined on the netcdf file.
-	character(len=50) :: name ! vdc needed variable
-    end type 
 
 !>
 !! @defgroup PIO_iotype PIO_iotype
@@ -413,5 +382,39 @@ module pio_types
 #endif
 #endif
    integer, public, parameter :: PIO_num_OST =  16
+
+!>
+!! @public
+!! @defgroup var_desc_t 
+!! @brief A variable descriptor returned from @ref PIO_def_var (see pio_types) 
+!<
+    type, public :: Var_desc_t
+#ifdef SEQUENCE
+	sequence
+#endif	
+        integer(i4)     :: varID
+        integer(i4)     :: rec   ! This is a record number or pointer into the unlim dimension of the	    
+                                 ! netcdf file
+        integer(i4)     :: type
+        integer(i4)     :: ndims ! number of dimensions as defined on the netcdf file.
+        character(len=PIO_MAX_NAME) :: name ! vdc needed variable
+    end type 
+
+!> 
+!! @defgroup file_desc_t
+!! File descriptor returned by \ref PIO_openfile or \ref PIO_createfile (see pio_types)
+!! 
+!>
+    type, public :: File_desc_t
+       type(iosystem_desc_t), pointer :: iosystem => null()
+       type(io_data_list), pointer :: data_list_top  => null()  ! used for non-blocking pnetcdf calls
+       integer :: buffsize=0
+       integer(i4) :: fh
+       integer(kind=PIO_OFFSET) :: offset             ! offset into file
+       integer(i4)              :: iotype             ! Type of IO to perform see parameter statement below     
+       logical                  :: file_is_open = .false.
+       character(len=PIO_MAX_NAME) :: name ! filename
+    end type File_desc_t
+
 
 end module pio_types
