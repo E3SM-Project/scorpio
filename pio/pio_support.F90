@@ -268,7 +268,7 @@ contains
        if (myrank == masterproc) then
           write(unit,*) n,sdof1d(n)
           do m = 1,sdof1d(n)
-             write(unit,"(I6)",ADVANCE="NO") wdof(m)
+             write(unit,"(I20)",ADVANCE="NO") wdof(m)
           enddo
           write(unit,*) ""
           deallocate(wdof)
