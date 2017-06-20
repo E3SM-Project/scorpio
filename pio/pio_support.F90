@@ -195,6 +195,7 @@ contains
     integer, save :: saved_ioids(MAX_CACHED_IOIDS)
     integer, save :: saved_ioids_max_idx = 0
     logical :: ioid_was_saved
+    real(r8) :: start_time, end_time
     integer :: i
 
     integer :: pio_offset_kind                     ! kind of pio_offset
@@ -253,6 +254,7 @@ contains
        sdof1d, 1, PIO_OFFSET_KIND,masterproc,comm)
 
     if (myrank == masterproc) then
+       start_time = MPI_Wtime()
        write(6,*) subName,': writing file ',trim(file),' unit=',unit
        open(unit,file=file)
        write(unit,*) "version ", versno, " npes ", npes, " ndims ", ndims
@@ -305,6 +307,8 @@ contains
        write(unit,*) "Obtained no stack frames"
        write(unit,"(A4,I6)") "ioid", iodesc%ioid
        close(unit)
+       end_time = MPI_Wtime()
+       write(6, *) "Done writing unit=", unit, ", took ", end_time-start_time, " s"
     endif
 
     deallocate(sdof1d)
