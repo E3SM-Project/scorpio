@@ -190,6 +190,12 @@ contains
     integer(kind=pio_offset) :: sdof, sdof_tmp(1)
     integer          :: status(MPI_STATUS_SIZE)
     integer, parameter :: masterproc = 0
+    integer, parameter :: MAX_CACHED_IOIDS = 2048
+    ! A simple array to save ioids already written out
+    integer, save :: saved_ioids(MAX_CACHED_IOIDS)
+    integer, save :: saved_ioids_max_idx = 0
+    logical :: ioid_was_saved
+    integer :: i
 
     integer :: pio_offset_kind                     ! kind of pio_offset
 #ifndef _NO_FLOW_CONTROL
@@ -197,6 +203,26 @@ contains
       rcv_request    ,&! request id
       hs = 1           ! MPI handshaking variable
 #endif
+
+    ! Check if the dof, ioid, is already saved
+    ioid_was_saved = .false.
+    do i=1,saved_ioids_max_idx
+      if(saved_ioids(i) == iodesc%ioid) then
+        ioid_was_saved = .true.
+        exit
+      end if
+    end do
+    ! Only save new iodesc/dofs
+    if(ioid_was_saved) then
+      return
+    else
+      if(saved_ioids_max_idx + 1 <= MAX_CACHED_IOIDS) then
+        saved_ioids_max_idx = saved_ioids_max_idx + 1
+        saved_ioids(saved_ioids_max_idx) = iodesc%ioid
+      else
+        print *, "No longer caching written out ioids (cache space exhausted)"
+      end if
+    end if
 
     unit = 81
     if (present(punit)) then
