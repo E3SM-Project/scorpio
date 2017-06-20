@@ -259,7 +259,7 @@ contains
        open(unit,file=file)
        write(unit,*) "version ", versno, " npes ", npes, " ndims ", ndims
        do n=1,ndims
-          write(unit,"(I6)",ADVANCE="NO") gdims(n)
+          write(unit,"(I10)",ADVANCE="NO") gdims(n)
        end do
        write(unit,*) ""
     endif
@@ -305,7 +305,7 @@ contains
 
     if (myrank == masterproc) then
        write(unit,*) "Obtained no stack frames"
-       write(unit,"(A4,I6)") "ioid", iodesc%ioid
+       write(unit,"(A4,I10)") "ioid", iodesc%ioid
        close(unit)
        end_time = MPI_Wtime()
        write(6, *) "Done writing unit=", unit, ", took ", end_time-start_time, " s"
