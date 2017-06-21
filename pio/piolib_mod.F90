@@ -1468,6 +1468,10 @@ contains
     integer :: rank, ierr
     integer :: ndims
     integer, save :: counter = 0
+    ! Waiting for decomps from 8 procs should not be large
+    ! enough that we need significantly more mem for writing
+    ! out the dof
+    integer, parameter :: NPROCS_BATCH_WAIT = 8
 
     call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
 
@@ -1479,7 +1483,8 @@ contains
                                 rank, "wrank",&
                                 counter, ".dat" 
     counter = counter + 1
-    call pio_writedof(fname, compdof, iodesc, iosystem%union_comm, gdims)
+    call pio_writedof(fname, compdof, iodesc, iosystem%union_comm, gdims,&
+                      batch_wait_nprocs=NPROCS_BATCH_WAIT)
   end subroutine dumpiodesc
 
   !************************************
