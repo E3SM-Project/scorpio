@@ -686,7 +686,7 @@ contains
 #endif
     ierr = write_nf(File,IOBUF,varDesc,iodesc,start,count, request) 
     endTime = MPI_WTime()
-#ifdef SAVE_DECOMPS
+#ifdef PIO_MICRO_TIMING
     if(len > 0) then
       reclen = iodesc%glen * c_sizeof(IOBUF(1))
     else
@@ -1079,7 +1079,7 @@ contains
        call rearrange_io2comp(File%iosystem,iodesc,IOBUF,array) 
 
         endTime = MPI_WTime()
-#ifdef SAVE_DECOMPS
+#ifdef PIO_MICRO_TIMING
         if(len > 0) then
           reclen = iodesc%glen * c_sizeof(IOBUF(1))
         else
