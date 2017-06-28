@@ -428,7 +428,9 @@ contains
     integer :: rank, ierr
 
     totTime = rearrTime + wrTime
-    call MPI_Reduce(totTime, totTimeMax, 1, MPI_DOUBLE, MPI_MAX, 0, File%iosystem%io_comm, ierr)
+    if(File%iosystem%IOproc) then
+      call MPI_Reduce(totTime, totTimeMax, 1, MPI_DOUBLE, MPI_MAX, 0, File%iosystem%io_comm, ierr)
+    end if
     if(File%iosystem%io_rank == 0) then
       ! Find a valid unit number to use
       do while(unit_exists)
