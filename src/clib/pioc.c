@@ -763,6 +763,11 @@ int PIOc_InitDecomp_bc(int iosysid, int pio_type, int ndims, const int *gdimlen,
                            &rearr, NULL, NULL);
 }
 
+#ifdef _ADIOS
+    /* Initialize ADIOS once */
+    static int adios_init_ref_cnt = 0;
+#endif
+
 /**
  * Library initialization used when IO tasks are a subset of compute
  * tasks.
@@ -837,6 +842,14 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
         LOG((1, "Initializing PIO micro timers failed"));
         return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__);
     }
+#endif
+#ifdef _ADIOS
+    /* Initialize ADIOS once */
+    if (!adios_init_ref_cnt)
+    {
+        adios_init_noxml(comp_comm);
+    }
+    adios_init_ref_cnt++;
 #endif
 
     /* Find the number of computation tasks. */
@@ -1156,6 +1169,13 @@ int PIOc_finalize(int iosysid)
     {
         /* log and continue */
         LOG((1, "Finalizing micro timers failed"));
+    }
+#endif
+#ifdef _ADIOS
+    --adios_init_ref_cnt;
+    if (!adios_init_ref_cnt)
+    {
+        adios_finalize(ios->comp_rank);
     }
 #endif
 
