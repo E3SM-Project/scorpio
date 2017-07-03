@@ -25,6 +25,7 @@ option (PIO_USE_MPIIO        "Enable support for MPI-IO auto detect"        ON)
 option (PIO_USE_MPISERIAL    "Enable mpi-serial support (instead of MPI)"   OFF)
 option (PIO_USE_MALLOC       "Use native malloc (instead of bget package)"  OFF)
 option (WITH_PNETCDF         "Require the use of PnetCDF"                   ON)
+option (WITH_ADIOS           "Require the use of ADIOS"                     ON)
 
 # Set a variable that appears in the config.h.in file.
 if(PIO_USE_MALLOC)
