@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 2.8.12)
-project (PIO C Fortran)
+project (PIO C Fortran CXX)
 #cmake_policy(VERSION 3.5.2)
 
 # The project version number.
@@ -182,6 +182,9 @@ add_custom_target (tests)
 # Custom "check" target that depends upon "tests"
 add_custom_target (check COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies (check tests)
+
+# Tools
+add_subdirectory(tools)
 
 # Tests
 if (PIO_ENABLE_TESTS)
