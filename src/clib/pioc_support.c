@@ -1943,6 +1943,8 @@ int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filena
             memset(file->dim_names, 0, sizeof(file->dim_names));
             file->num_dim_vars = 0;
             file->num_vars = 0;
+            int64_t vid = adios_define_var(file->adios_group, "info/nproc", "", adios_integer, "","","");
+            adios_write_byid(file->adios_fh, vid, &ios->num_iotasks);
             break;
 #endif
         }
@@ -2732,3 +2734,27 @@ const char *get_var_desc_str(int ncid, int varid, const char *desc_prefix)
 
     return file->varlist[varid].vdesc;
 }
+
+#ifdef _ADIOS
+enum ADIOS_DATATYPES PIOc_get_adios_type(nc_type xtype)
+{
+    enum ADIOS_DATATYPES t;
+    switch (xtype)
+    {
+    case NC_BYTE:   t = adios_byte; break;
+    case NC_CHAR:   t = adios_byte; break;
+    case NC_SHORT:  t = adios_short; break;
+    case NC_INT:    t = adios_integer; break;
+    case NC_FLOAT:  t = adios_real; break;
+    case NC_DOUBLE: t = adios_double; break;
+    case NC_UBYTE:  t = adios_unsigned_byte; break;
+    case NC_USHORT: t = adios_unsigned_short; break;
+    case NC_UINT:   t = adios_unsigned_integer; break;
+    case NC_INT64:  t = adios_long; break;
+    case NC_UINT64: t = adios_unsigned_long; break;
+    case NC_STRING: t = adios_string; break;
+    default: t = adios_byte;
+    }
+    return t;
+}
+#endif
