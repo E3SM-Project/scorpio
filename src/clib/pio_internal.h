@@ -357,10 +357,6 @@ extern "C" {
                                 int *num_tasks, int **task_maplen, int *max_maplen, int **map, char *title,
                                 char *history, char *source, char *version, int *fortran_order);
 
-#   ifdef _ADIOS
-    enum ADIOS_DATATYPES PIOc_get_adios_type(nc_type xtype);
-#   endif
-
 #if defined(__cplusplus)
 }
 #endif
