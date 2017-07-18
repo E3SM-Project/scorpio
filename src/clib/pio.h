@@ -792,6 +792,11 @@ enum PIO_ERROR_HANDLERS
 #define PIO_FIRST_ERROR_CODE (-500)
 #define PIO_EBADIOTYPE  (-500)
 
+#ifdef _ADIOS
+/** Define error codes for ADIOS. */
+#define PIO_EADIOSREAD  (-300)
+#endif
+
 /** ??? */
 #define PIO_REQ_NULL (NC_REQ_NULL-1)
 

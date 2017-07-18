@@ -838,6 +838,13 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
     pioassert(iodesc->rearranger == PIO_REARR_BOX || iodesc->rearranger == PIO_REARR_SUBSET,
               "unknown rearranger", __FILE__, __LINE__);
 
+#ifdef _ADIOS
+    if (file->iotype == PIO_IOTYPE_ADIOS)
+    {
+        return pio_err(ios, file, PIO_EADIOSREAD, __FILE__, __LINE__);
+    }
+#endif
+
     /* ??? */
     if (ios->iomaster == MPI_ROOT)
         rlen = iodesc->maxiobuflen;
