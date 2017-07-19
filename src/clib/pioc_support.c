@@ -76,6 +76,9 @@ int PIOc_strerror(int pioerr, char *errmsg)
         case PIO_EBADIOTYPE:
             strcpy(errmsg, "Bad IO type");
             break;
+        case PIO_EADIOSREAD:
+             strcpy(errmsg, "ADIOS IO type does not support read operations");
+             break;
         default:
             strcpy(errmsg, "Unknown Error: Unrecognized error code");
         }
@@ -1811,6 +1814,32 @@ int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filena
                 ierr = ncmpi_buffer_attach(file->fh, pio_buffer_size_limit);
             break;
 #endif
+#ifdef _ADIOS
+        case PIO_IOTYPE_ADIOS:
+            LOG((2, "Calling adios_open mode = %d", file->mode));
+            /* Create a new ADIOS variable group, names the same as the filename for
+             * lack of better solution here */
+            adios_declare_group(&file->adios_group, filename, NULL, adios_stat_default);
+            int do_aggregate = (ios->num_comptasks != ios->num_iotasks);
+            if (do_aggregate)
+            {
+                sprintf(file->transport,"%s","MPI_AGGREGATE");
+                sprintf(file->params,"num_aggregators=%d,striping=0", ios->num_iotasks);
+            }
+            else
+            {
+                sprintf(file->transport,"%s","POSIX");
+                file->params[0] = '\0';
+            }
+            adios_select_method(file->adios_group,file->transport,file->params,"");
+            ierr = adios_open(&file->adios_fh,filename,filename,"w", ios->io_comm);
+            memset(file->dim_names, 0, sizeof(file->dim_names));
+            file->num_dim_vars = 0;
+            file->num_vars = 0;
+            int64_t vid = adios_define_var(file->adios_group, "/__pio__/info/nproc", "", adios_integer, "","","");
+            adios_write_byid(file->adios_fh, vid, &ios->num_iotasks);
+            break;
+#endif
         }
     }
 
@@ -2253,7 +2282,7 @@ int pioc_change_def(int ncid, int is_enddef)
                 ierr = ncmpi_redef(file->fh);
         }
 #endif /* _PNETCDF */
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
         {
             if (is_enddef)
             {
@@ -2302,6 +2331,11 @@ int iotype_is_valid(int iotype)
         ret++;
 #ifdef _PNETCDF
 #endif /* _PNETCDF */
+
+#ifdef _ADIOS
+    if (iotype == PIO_IOTYPE_ADIOS)
+            ret++;
+#endif
 
     return ret;
 }
@@ -2368,3 +2402,51 @@ int PIOc_set_rearr_opts(int iosysid, int comm_type, int fcd, bool enable_hs_c2i,
 
     return PIO_NOERR;
 }
+
+
+#ifdef _ADIOS
+enum ADIOS_DATATYPES PIOc_get_adios_type(nc_type xtype)
+{
+    enum ADIOS_DATATYPES t;
+    switch (xtype)
+    {
+    case NC_BYTE:   t = adios_byte; break;
+    case NC_CHAR:   t = adios_string; break;
+    case NC_SHORT:  t = adios_short; break;
+    case NC_INT:    t = adios_integer; break;
+    case NC_FLOAT:  t = adios_real; break;
+    case NC_DOUBLE: t = adios_double; break;
+    case NC_UBYTE:  t = adios_unsigned_byte; break;
+    case NC_USHORT: t = adios_unsigned_short; break;
+    case NC_UINT:   t = adios_unsigned_integer; break;
+    case NC_INT64:  t = adios_long; break;
+    case NC_UINT64: t = adios_unsigned_long; break;
+    case NC_STRING: t = adios_string; break;
+    default: t = adios_byte;
+    }
+    return t;
+}
+
+nc_type PIOc_get_nctype_from_adios_type(enum ADIOS_DATATYPES atype)
+{
+    nc_type t;
+    switch (atype)
+    {
+    case adios_byte:                t = NC_BYTE; break;
+    case adios_short:               t = NC_SHORT; break;
+    case adios_integer:             t = NC_INT; break;
+    case adios_real:                t = NC_FLOAT; break;
+    case adios_double:              t = NC_DOUBLE; break;
+    case adios_unsigned_byte:       t = NC_UBYTE; break;
+    case adios_unsigned_short:      t = NC_USHORT; break;
+    case adios_unsigned_integer:    t = NC_UINT; break;
+    case adios_long:                t = NC_INT64; break;
+    case adios_unsigned_long:       t = NC_UINT64; break;
+    case adios_string:              t = NC_CHAR; break;
+    default:                        t = NC_BYTE;
+    }
+    return t;
+}
+
+
+#endif

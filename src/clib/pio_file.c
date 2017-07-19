@@ -254,6 +254,27 @@ int PIOc_closefile(int ncid)
             ierr = ncmpi_close(file->fh);
             break;
 #endif
+#ifdef _ADIOS
+        case PIO_IOTYPE_ADIOS:
+            // Already closed in PIOc_sync()
+            adios_free_group(file->adios_group);
+            for (int i=0; i<file->num_dim_vars; i++)
+            {
+                free (file->dim_names[i]);
+                file->dim_names[i] = NULL;
+            }
+            file->num_dim_vars = 0;
+            for (int i=0; i<file->num_vars; i++)
+            {
+                free(file->adios_vars[file->num_vars].name);
+                file->adios_vars[file->num_vars].name = NULL;
+                free(file->adios_vars[file->num_vars].gdimids);
+                file->adios_vars[file->num_vars].gdimids = NULL;
+            }
+            file->num_vars = 0;
+            ierr = 0;
+            break;
+#endif
         default:
             return pio_err(ios, file, PIO_EBADIOTYPE, __FILE__, __LINE__);
         }
@@ -367,6 +388,24 @@ int PIOc_sync(int ncid)
         return pio_err(NULL, NULL, ierr, __FILE__, __LINE__);
     ios = file->iosystem;
 
+#ifdef _ADIOS
+    if (file->iotype == PIO_IOTYPE_ADIOS)
+    {
+        if (file->adios_fh != -1)
+        {
+            ierr = adios_close(file->adios_fh);
+            file->adios_fh = -1;
+        }
+        else
+        {
+            ierr = 0;
+        }
+    }
+    else
+    {
+#endif
+
+
     /* Flush data buffers on computational tasks. */
     if (!ios->async || !ios->ioproc)
     {
@@ -447,6 +486,10 @@ int PIOc_sync(int ncid)
         }
         LOG((2, "PIOc_sync ierr = %d", ierr));
     }
+
+#ifdef _ADIOS
+    }
+#endif
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
