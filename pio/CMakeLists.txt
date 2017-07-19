@@ -190,5 +190,8 @@ endif()
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../testpio)
   ADD_SUBDIRECTORY(../testpio testpio)
 endif()
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../tests/performance)
+  ADD_SUBDIRECTORY(../tests/performance performance)
+endif()
 
 
