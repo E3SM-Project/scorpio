@@ -438,9 +438,7 @@ contains
              call piodie(__PIO_FILE__,__LINE__,'pio_readdof rn out of sync')
           endif
           allocate(wdof(sdof))
-          do m = 1,sdof
-             read(unit,*) wdof(m)
-          enddo
+          read(unit, *) wdof
           if (n == masterproc) then
              deallocate(dof)
              allocate(dof(sdof))
