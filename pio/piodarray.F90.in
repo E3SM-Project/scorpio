@@ -420,12 +420,17 @@ contains
     real(r8), intent(in) :: wrTime
     character, intent(in) :: mode
 
+    real(r8) :: totTime, totTimeMax
     integer, parameter :: DUMP_IO_INFO_FUNIT = 300
     integer, save :: unit = DUMP_IO_INFO_FUNIT
     logical, save :: unit_exists = .true.
     character(len=PIO_MAX_NAME) :: fname
     integer :: rank, ierr
 
+    !totTime = rearrTime + wrTime
+    !if(File%iosystem%IOproc) then
+    !  call MPI_Reduce(totTime, totTimeMax, 1, MPI_DOUBLE, MPI_MAX, 0, File%iosystem%io_comm, ierr)
+    !end if
     if(File%iosystem%io_rank == 0) then
       ! Find a valid unit number to use
       do while(unit_exists)
@@ -437,7 +442,7 @@ contains
 
       write(fname,"(A8,I6.6,A9)") "piowinfo", rank, "wrank.dat"
 
-      open(unit=unit,file=fname,access='APPEND',action='WRITE')
+      open(unit=unit,file=fname,position='APPEND',action='WRITE')
       write(unit,"(A1,1F30.10,A128,A30,I20,I6,1F30.10,1F30.10)") mode, tstamp,&
                         File%name(1:len_trim(File%name)),&
                         varDesc%name(1:len_trim(varDesc%name)),&
@@ -686,7 +691,7 @@ contains
 #endif
     ierr = write_nf(File,IOBUF,varDesc,iodesc,start,count, request) 
     endTime = MPI_WTime()
-#ifdef SAVE_DECOMPS
+#ifdef PIO_MICRO_TIMING
     if(len > 0) then
       reclen = iodesc%glen * c_sizeof(IOBUF(1))
     else
@@ -1079,7 +1084,7 @@ contains
        call rearrange_io2comp(File%iosystem,iodesc,IOBUF,array) 
 
         endTime = MPI_WTime()
-#ifdef SAVE_DECOMPS
+#ifdef PIO_MICRO_TIMING
         if(len > 0) then
           reclen = iodesc%glen * c_sizeof(IOBUF(1))
         else

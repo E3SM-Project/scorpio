@@ -160,7 +160,8 @@ contains
      end if
   end subroutine CheckMPIreturn
 
-  subroutine pio_writedof (file, DOF, iodesc, comm, gdims, punit)
+  subroutine pio_writedof (file, DOF, iodesc, comm, gdims,&
+      punit, batch_wait_nprocs)
     use pio_types
     !-----------------------------------------------------------------------
     ! Purpose:
@@ -182,21 +183,59 @@ contains
     integer         ,intent(in) :: comm
     integer, intent(in) :: gdims(:)
     integer,optional,intent(in) :: punit
+    integer,optional,intent(in) :: batch_wait_nprocs
+
+    type alloc_arr
+      integer(kind=pio_offset), pointer :: arr(:)
+    end type
+    type(alloc_arr), pointer :: wdof_nprocs(:)
 
     character(len=*), parameter :: subName=modName//'::pio_writedof'
     integer ierr, myrank, npes, ndims, m, n, unit
-    integer(kind=pio_offset), pointer :: wdof(:)
+    integer :: bwait_nprocs
+    !integer(kind=pio_offset), pointer :: wdof(:)
     integer(kind=pio_offset), pointer :: sdof1d(:)
     integer(kind=pio_offset) :: sdof, sdof_tmp(1)
     integer          :: status(MPI_STATUS_SIZE)
     integer, parameter :: masterproc = 0
+    integer, parameter :: MAX_CACHED_IOIDS = 2048
+    ! A simple array to save ioids already written out
+    integer, save :: saved_ioids(MAX_CACHED_IOIDS)
+    integer, save :: saved_ioids_max_idx = 0
+    logical :: ioid_was_saved
+    real(r8) :: start_time, end_time
+    integer :: i
 
     integer :: pio_offset_kind                     ! kind of pio_offset
 #ifndef _NO_FLOW_CONTROL
-    integer :: &
-      rcv_request    ,&! request id
-      hs = 1           ! MPI handshaking variable
+    integer :: hs = 1           ! MPI handshaking variable
+    integer, allocatable :: rcv_requests(:)
 #endif
+
+    bwait_nprocs = 1
+    if(present(batch_wait_nprocs)) then
+      bwait_nprocs = batch_wait_nprocs
+    end if
+
+    ! Check if the dof, ioid, is already saved
+    ioid_was_saved = .false.
+    do i=1,saved_ioids_max_idx
+      if(saved_ioids(i) == iodesc%ioid) then
+        ioid_was_saved = .true.
+        exit
+      end if
+    end do
+    ! Only save new iodesc/dofs
+    if(ioid_was_saved) then
+      return
+    else
+      if(saved_ioids_max_idx + 1 <= MAX_CACHED_IOIDS) then
+        saved_ioids_max_idx = saved_ioids_max_idx + 1
+        saved_ioids(saved_ioids_max_idx) = iodesc%ioid
+      else
+        print *, "No longer caching written out ioids (cache space exhausted)"
+      end if
+    end if
 
     unit = 81
     if (present(punit)) then
@@ -226,66 +265,105 @@ contains
     call pio_fc_gather_offset(sdof_tmp, 1, PIO_OFFSET_KIND, &
        sdof1d, 1, PIO_OFFSET_KIND,masterproc,comm)
 
+    ! Write header
     if (myrank == masterproc) then
+       start_time = MPI_Wtime()
        write(6,*) subName,': writing file ',trim(file),' unit=',unit
        open(unit,file=file)
        write(unit,*) "version ", versno, " npes ", npes, " ndims ", ndims
        do n=1,ndims
-          write(unit,"(I6)",ADVANCE="NO") gdims(n)
+          write(unit,"(I10)",ADVANCE="NO") gdims(n)
        end do
        write(unit,*) ""
     endif
 
-    do n = 0,npes-1
+    allocate(rcv_requests(bwait_nprocs))
+    ! Gather dofs from procs in batches, each batch of bwait_procs
+    n = 0
+    do while(n <= npes-1)
+       if(n + bwait_nprocs-1 > npes-1) then
+         ! Not enough procs to batch wait, the last batch to wait on
+         ! - adjust number of procs to wait = rem procs
+         bwait_nprocs = npes - n
+       end if
        if (myrank == masterproc) then
-          allocate(wdof(sdof1d(n)))
+          allocate(wdof_nprocs(0:bwait_nprocs-1))
+          do i=0,bwait_nprocs-1
+            allocate(wdof_nprocs(i)%arr(0:sdof1d(n+i)))
+          end do
        endif
-       if (myrank == masterproc .and. n == masterproc) then
-          wdof = dof
-       else
-          if (myrank == n .and. sdof > 0) then
+       ! Post recv and send hs
+       rcv_requests = MPI_REQUEST_NULL
+       do i=0,bwait_nprocs-1
+         if (myrank == masterproc .and. n+i == masterproc) then
+            ! Nothing to be done here
+         else
+            if (myrank == masterproc .and. sdof1d(n+i) > 0) then
 #ifndef _NO_FLOW_CONTROL
-             call MPI_RECV(hs,1,MPI_INTEGER,masterproc,n,comm,status,ierr)
-             if (ierr /= MPI_SUCCESS) call piodie(__PIO_FILE__,__LINE__,' pio_writedof mpi_recv')
+               call MPI_IRECV(wdof_nprocs(i)%arr,int(sdof1d(n+i)),PIO_OFFSET_KIND,n+i,n+i,comm,rcv_requests(i+1), ierr)
+               if (ierr /= MPI_SUCCESS) call piodie(__PIO_FILE__,__LINE__,' pio_writedof mpi_irecv')
+               call MPI_SEND(hs,1,MPI_INTEGER,n+i,n+i,comm,ierr)
+               if (ierr /= MPI_SUCCESS) call piodie(__PIO_FILE__,__LINE__,' pio_writedof mpi_send')
 #endif
-             call MPI_SEND(dof,int(sdof),PIO_OFFSET_KIND,masterproc,n,comm,ierr)
-             if (ierr /= MPI_SUCCESS) call piodie(__PIO_FILE__,__LINE__,' pio_writedof mpi_send')
-          endif
-          if (myrank == masterproc .and. sdof1d(n) > 0) then
-#ifndef _NO_FLOW_CONTROL
-             call MPI_IRECV(wdof,int(sdof1d(n)),PIO_OFFSET_KIND,n,n,comm,rcv_request,ierr)
-             if (ierr /= MPI_SUCCESS) call piodie(__PIO_FILE__,__LINE__,' pio_writedof mpi_irecv')
-             call MPI_SEND(hs,1,MPI_INTEGER,n,n,comm,ierr)
-             if (ierr /= MPI_SUCCESS) call piodie(__PIO_FILE__,__LINE__,' pio_writedof mpi_send')
-             call MPI_WAIT(rcv_request,status,ierr)
-             if (ierr /= MPI_SUCCESS) call piodie(__PIO_FILE__,__LINE__,' pio_writedof mpi_wait')
-#else
-             call MPI_RECV(wdof,int(sdof1d(n)),PIO_OFFSET_KIND,n,n,comm,status,ierr)
-             if (ierr /= MPI_SUCCESS) call piodie(__PIO_FILE__,__LINE__,' pio_writedof mpi_recv')
-#endif
-          endif
-       endif
-       if (myrank == masterproc) then
-          write(unit,*) n,sdof1d(n)
-          do m = 1,sdof1d(n)
-             write(unit,"(I6)",ADVANCE="NO") wdof(m)
-          enddo
-          write(unit,*) ""
-          deallocate(wdof)
-       endif
-    enddo
+            endif
+         endif
+       end do ! do i=0,bwait_nprocs-1
 
+       ! Gather the dof from procs to masterproc
+       do i=0,bwait_nprocs-1
+         if (myrank == masterproc .and. n+i == masterproc) then
+            wdof_nprocs(i)%arr = dof
+         else
+            if (myrank == n+i .and. sdof > 0) then
+#ifndef _NO_FLOW_CONTROL
+               call MPI_RECV(hs,1,MPI_INTEGER,masterproc,n+i,comm,status,ierr)
+               if (ierr /= MPI_SUCCESS) call piodie(__PIO_FILE__,__LINE__,' pio_writedof mpi_recv')
+#endif
+               call MPI_SEND(dof,int(sdof),PIO_OFFSET_KIND,masterproc,n+i,comm,ierr)
+               if (ierr /= MPI_SUCCESS) call piodie(__PIO_FILE__,__LINE__,' pio_writedof mpi_send')
+            endif
+            if (myrank == masterproc .and. sdof1d(n+i) > 0) then
+#ifdef _NO_FLOW_CONTROL
+               call MPI_RECV(wdof_nprocs(i)%arr,int(sdof1d(n+i)),PIO_OFFSET_KIND,n+i,n+i,comm,status,ierr)
+               if (ierr /= MPI_SUCCESS) call piodie(__PIO_FILE__,__LINE__,' pio_writedof mpi_recv')
+#endif
+            endif
+         endif
+       end do ! do i=0,bwait_nprocs-1
+#ifndef _NO_FLOW_CONTROL
+       call MPI_WAITALL(bwait_nprocs, rcv_requests, MPI_STATUSES_IGNORE, ierr)
+       if (ierr /= MPI_SUCCESS) call piodie(__PIO_FILE__,__LINE__,' pio_writedof mpi_wait')
+#endif
+       if (myrank == masterproc) then
+          do i=0,bwait_nprocs-1
+            write(unit,*) n+i,sdof1d(n+i)
+            do m = 0,sdof1d(n+i)-1
+               write(unit,"(I20)",ADVANCE="NO") wdof_nprocs(i)%arr(m)
+            enddo
+            write(unit,*) ""
+            deallocate(wdof_nprocs(i)%arr)
+          end do
+          deallocate(wdof_nprocs)
+       endif
+       n = n + bwait_nprocs
+    enddo ! do while(n <= npes-1)
+
+    deallocate(rcv_requests)
+
+    ! Write trailer
     if (myrank == masterproc) then
        write(unit,*) "Obtained no stack frames"
-       write(unit,"(A4,I6)") "ioid", iodesc%ioid
+       write(unit,"(A4,I10)") "ioid", iodesc%ioid
        close(unit)
+       end_time = MPI_Wtime()
+       write(6, *) "Done writing unit=", unit, ", took ", end_time-start_time, " s"
     endif
 
     deallocate(sdof1d)
 
   end subroutine pio_writedof
 
-  subroutine pio_readdof (file, DOF, comm, punit)
+  subroutine pio_readdof (file, ndims, gdims, DOF, comm, punit)
     use pio_types
     !-----------------------------------------------------------------------
     ! Purpose:
@@ -306,6 +384,8 @@ contains
     ! Arguments
     !
     character(len=*),intent(in) :: file
+    integer, intent(out) :: ndims
+    integer, pointer :: gdims(:)
     integer(kind=pio_offset),pointer:: dof(:)
     integer         ,intent(in) :: comm
     integer,optional,intent(in) :: punit
@@ -313,9 +393,8 @@ contains
     character(len=*), parameter :: subName=modName//'::pio_readdof'
     integer :: ierr, myrank, npes, m, n, unit, rn
     integer(kind=pio_offset) :: sdof
-    integer :: rversno, rnpes,rndims
+    integer :: rversno, rnpes
     character(len=pio_max_name) :: verstr, npesstr, ndimsstr
-    integer, dimension(:), allocatable :: rgdims
     integer(kind=pio_offset), pointer :: wdof(:)
     integer, parameter :: masterproc = 0
     integer :: status(MPI_STATUS_SIZE)
@@ -340,29 +419,39 @@ contains
 
     allocate(dof(0))   ! default for pes with no dof
 
+    ! Read header
     if (myrank == masterproc) then
        write(6,*) subName,': reading file ',trim(file),' unit=',unit
        open(unit,file=file,status='old')
-       read(unit,*) verstr,rversno,npesstr,rnpes,ndimsstr,rndims
+       read(unit,*) verstr,rversno,npesstr,rnpes,ndimsstr,ndims
        write(6,*) subName,': reading file ',trim(file),' versno=',rversno,&
-                  ' npes=', rnpes, ' ndims=', rndims
+                  ' npes=', rnpes, ' ndims=', ndims
        if (rnpes /= npes) then
           call piodie(__PIO_FILE__,__LINE__,'pio_readdof npes incorrect')
        endif
-       allocate(rgdims(rndims))
-       do n=1,rndims
-          read(unit,*) rgdims(n)
+       allocate(gdims(ndims))
+       do n=1,ndims
+          read(unit,*) gdims(n)
        end do
+    endif
 
+    call MPI_BCAST(ndims, 1, MPI_INTEGER, masterproc, comm, ierr)
+    if (myrank /= masterproc) then
+      allocate(gdims(ndims))
+    endif
+    call MPI_BCAST(gdims, ndims, MPI_INTEGER, masterproc, comm, ierr)
+
+    ! Read the compdof from masterproc and send it to other procs
+    if (myrank == masterproc) then
        do n = 0,npes-1
           read(unit,*) rn,sdof
+          !print *, "npes=", npes, ", dim= ", rn, ", sdof=", sdof
           if (rn /= n) then
              call piodie(__PIO_FILE__,__LINE__,'pio_readdof rn out of sync')
           endif
           allocate(wdof(sdof))
-          do m = 1,sdof
-             read(unit,*) wdof(m)
-          enddo
+          read(unit, *) wdof
+          !print *, wdof
           if (n == masterproc) then
              deallocate(dof)
              allocate(dof(sdof))

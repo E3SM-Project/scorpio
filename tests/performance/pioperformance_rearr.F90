@@ -626,7 +626,7 @@ contains
     else
        ! Changed to support PIO1 as well
 #ifdef _PIO1
-       call pio_readdof(filename, compmap, MPI_COMM_WORLD, 81)
+       call pio_readdof(filename, ndims, gdims, compmap, MPI_COMM_WORLD, 81)
 #else
        call pio_readdof(filename, ndims, gdims, compmap, MPI_COMM_WORLD)
 #endif
