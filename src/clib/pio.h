@@ -716,6 +716,8 @@ typedef struct adios_var_desc_t
     int ndims;
     /** Global dims (dim var ids) */
     int * gdimids;
+    /** Number of attributes defined for this variable */
+    int nattrs;
 } adios_var_desc_t;
 /**
  * File descriptor structure.
@@ -742,6 +744,7 @@ typedef struct file_desc_t
     char params[128];
     /** Need to store the dim names for finding them and using them when defining variables */
     char *dim_names[100];
+    PIO_Offset dim_values[100];
     /** Number of dim vars defined */
     int num_dim_vars;
     /** Variable information, max PIO_MAX_VARS variables allowed */
