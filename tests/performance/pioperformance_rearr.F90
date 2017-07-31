@@ -7,7 +7,9 @@ program pioperformance_rearr
 #ifndef NO_MPIMOD
   use mpi
 #endif
+#ifdef TIMING
   use perf_mod, only : t_initf, t_finalizef
+#endif
   use pio, only : pio_iotype_netcdf, pio_iotype_pnetcdf, pio_iotype_netcdf4p, &
        pio_iotype_netcdf4c, pio_rearr_subset, pio_rearr_box, PIO_MAX_NAME,&
         pio_rearr_opt_t, pio_rearr_comm_p2p, pio_rearr_comm_coll,&
@@ -40,7 +42,9 @@ program pioperformance_rearr
 #ifdef BGQTRY
   external :: print_memusage
 #endif
+#ifdef TIMING
   external :: gptlinitialize, gptlfinalize
+#endif
 #ifdef _PIO1
   integer, parameter :: PIO_FILL_INT   = 02147483647
   real, parameter    :: PIO_FILL_FLOAT = 9.969209968E+36
@@ -77,9 +81,9 @@ program pioperformance_rearr
         rearr_opts, ierr)
 
   inquire(file=PIO_NML_FNAME,exist=nml_file_exists)
-  if(nml_file_exists) then
-    use_gptl = .false.
-  else
+  use_gptl = .false.
+#ifdef TIMING
+  if(.not. nml_file_exists) then
     use_gptl = .true.
   end if
   if(use_gptl) then
@@ -88,6 +92,7 @@ program pioperformance_rearr
     call t_initf(PIO_NML_FNAME, LogPrint=.false.,&
       mpicom=MPI_COMM_WORLD, MasterTask=MasterTask)
   end if
+#endif
   niotypes = 0
   do i=1,MAX_PIO_TYPES
      if (piotypes(i) > -1) niotypes = niotypes+1
@@ -113,11 +118,13 @@ program pioperformance_rearr
      enddo
   enddo
 
+#ifdef TIMING
   if(use_gptl) then
     call gptlfinalize()
   else
     call t_finalizef()
   end if
+#endif
 
   call MPI_Finalize(ierr)
 contains
@@ -560,15 +567,25 @@ contains
   end subroutine read_user_input
 
   subroutine get_tstamp(wall, sys, usr)
+#ifdef TIMING
     use perf_mod
+#endif
     double precision, intent(out) :: wall, sys, usr
     external :: gptlstamp
 
+#ifdef TIMING
     if(use_gptl) then
       call gptlstamp(wall, sys, usr)
     else
       call t_stampf(wall, sys, usr)
     end if
+#else
+    ! We don't get detailed info, like with gptl, when using
+    ! MPI timers but we only care about walltime (wall) here
+    wall = MPI_Wtime()
+    usr = wall
+    sys = 0
+#endif
   end subroutine get_tstamp
 
   subroutine pioperformance_rearrtest(filename, piotypes, mype, npe_base, &
@@ -576,7 +593,6 @@ contains
        unlimdimindof)
     use pio
     use pio_support, only : pio_readdof
-    use perf_mod
     character(len=*), intent(in) :: filename
     integer, intent(in) :: mype, npe_base
     integer, intent(in) :: piotypes(:)
