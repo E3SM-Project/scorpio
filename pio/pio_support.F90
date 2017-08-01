@@ -430,9 +430,8 @@ contains
           call piodie(__PIO_FILE__,__LINE__,'pio_readdof npes incorrect')
        endif
        allocate(gdims(ndims))
-       do n=1,ndims
-          read(unit,*) gdims(n)
-       end do
+       read(unit,*) gdims
+       print *, "gdims = ", gdims
     endif
 
     call MPI_BCAST(ndims, 1, MPI_INTEGER, masterproc, comm, ierr)
