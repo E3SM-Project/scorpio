@@ -289,7 +289,7 @@ contains
        if (myrank == masterproc) then
           allocate(wdof_nprocs(0:bwait_nprocs-1))
           do i=0,bwait_nprocs-1
-            allocate(wdof_nprocs(i)%arr(0:sdof1d(n+i)))
+            allocate(wdof_nprocs(i)%arr(sdof1d(n+i)))
           end do
        endif
        ! Post recv and send hs
@@ -337,7 +337,7 @@ contains
        if (myrank == masterproc) then
           do i=0,bwait_nprocs-1
             write(unit,*) n+i,sdof1d(n+i)
-            do m = 0,sdof1d(n+i)-1
+            do m = 1,sdof1d(n+i)
                write(unit,"(I20)",ADVANCE="NO") wdof_nprocs(i)%arr(m)
             enddo
             write(unit,*) ""
