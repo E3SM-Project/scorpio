@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 2.8.12)
-project (PIO C Fortran)
+project (PIO C Fortran CXX)
 #cmake_policy(VERSION 3.5.2)
 
 # The project version number.
@@ -26,6 +26,7 @@ option (PIO_USE_MPISERIAL    "Enable mpi-serial support (instead of MPI)"   OFF)
 option (PIO_USE_MALLOC       "Use native malloc (instead of bget package)"  OFF)
 option (PIO_SAVE_DECOMPS     "Dump the decomposition information"           OFF)
 option (WITH_PNETCDF         "Require the use of PnetCDF"                   ON)
+option (WITH_ADIOS           "Require the use of ADIOS"                     ON)
 
 # Set a variable that appears in the config.h.in file.
 if(PIO_USE_MALLOC)
@@ -188,6 +189,9 @@ add_custom_target (tests)
 # Custom "check" target that depends upon "tests"
 add_custom_target (check COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies (check tests)
+
+# Tools
+add_subdirectory(tools)
 
 # Tests
 if (PIO_ENABLE_TESTS)

@@ -727,6 +727,11 @@ int PIOc_InitDecomp_bc(int iosysid, int pio_type, int ndims, const int *gdimlen,
                            &rearr, NULL, NULL);
 }
 
+#ifdef _ADIOS
+    /* Initialize ADIOS once */
+    static int adios_init_ref_cnt = 0;
+#endif
+
 /**
  * Library initialization used when IO tasks are a subset of compute
  * tasks.
@@ -782,6 +787,15 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
 
     /* Turn on the logging system. */
     pio_init_logging();
+
+#ifdef _ADIOS
+    /* Initialize ADIOS once */
+    if (!adios_init_ref_cnt)
+    {
+        adios_init_noxml(comp_comm);
+    }
+    adios_init_ref_cnt++;
+#endif
 
     /* Find the number of computation tasks. */
     if ((mpierr = MPI_Comm_size(comp_comm, &num_comptasks)))
@@ -1085,6 +1099,14 @@ int PIOc_finalize(int iosysid)
     /* Free the MPI Info object. */
     if (ios->info != MPI_INFO_NULL)
         MPI_Info_free(&ios->info);
+
+#ifdef _ADIOS
+    --adios_init_ref_cnt;
+    if (!adios_init_ref_cnt)
+    {
+        adios_finalize(ios->comp_rank);
+    }
+#endif
 
     /* Delete the iosystem_desc_t data associated with this id. */
     LOG((2, "About to delete iosysid %d.", iosysid));

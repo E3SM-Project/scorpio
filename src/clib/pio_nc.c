@@ -94,6 +94,13 @@ int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
                 LOG((2, "PIOc_inq returned from ncmpi_inq unlimdimid = %d", *unlimdimidp));
         }
 #endif /* _PNETCDF */
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            ierr = 0;
+        }
+#endif
         if (file->iotype == PIO_IOTYPE_NETCDF && file->do_io)
         {
             LOG((2, "PIOc_inq calling classic nc_inq"));
@@ -117,7 +124,7 @@ int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
             if (unlimdimidp)
                 LOG((2, "classic unlimdimid = %d", *unlimdimidp));
         }
-        else if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+        else if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
         {
             LOG((2, "PIOc_inq calling netcdf-4 nc_inq"));
             ierr = nc_inq(file->fh, ndimsp, nvarsp, ngattsp, unlimdimidp);
@@ -318,7 +325,13 @@ int PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
             }
         }
 #endif /* _NETCDF4 */
-
+#ifdef _ADIOS
+        else if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            ierr = 0;
+        }
+#endif
         LOG((2, "PIOc_inq_unlimdims netcdf call returned %d", ierr));
     }
 
@@ -403,8 +416,19 @@ int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
         if (file->iotype == PIO_IOTYPE_PNETCDF)
             ierr = pioc_pnetcdf_inq_type(ncid, xtype, name, sizep);
 #endif /* _PNETCDF */
-
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            if (sizep)
+            {
+                enum ADIOS_DATATYPES atype = PIOc_get_adios_type(xtype);
+                int asize = adios_type_size(atype,NULL);
+                *sizep = (PIO_Offset) asize;
+            }
+            ierr = 0;
+        }
+#endif
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_inq_type(file->fh, xtype, name, (size_t *)sizep);
         LOG((2, "PIOc_inq_type netcdf call returned %d", ierr));
     }
@@ -487,8 +511,14 @@ int PIOc_inq_format(int ncid, int *formatp)
         if (file->iotype == PIO_IOTYPE_PNETCDF)
             ierr = ncmpi_inq_format(file->fh, formatp);
 #endif /* _PNETCDF */
-
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            *formatp = 1;
+            ierr = 0;
+        }
+#endif
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_inq_format(file->fh, formatp);
         LOG((2, "PIOc_inq netcdf call returned %d", ierr));
     }
@@ -576,8 +606,16 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
             ierr = ncmpi_inq_dim(file->fh, dimid, name, lenp);;
         }
 #endif /* _PNETCDF */
-
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            char * dimname  = file->dim_names[dimid];
+            *lenp = file->dim_values[dimid];
+            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            ierr = 0;
+        }
+#endif
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
         {
             LOG((2, "calling nc_inq_dim"));
             ierr = nc_inq_dim(file->fh, dimid, name, (size_t *)lenp);;
@@ -712,7 +750,13 @@ int PIOc_inq_dimid(int ncid, const char *name, int *idp)
         if (file->iotype == PIO_IOTYPE_PNETCDF)
             ierr = ncmpi_inq_dimid(file->fh, name, idp);
 #endif /* _PNETCDF */
-
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            ierr = 0;
+        }
+#endif
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
             ierr = nc_inq_dimid(file->fh, name, idp);
     }
@@ -819,7 +863,25 @@ int PIOc_inq_var(int ncid, int varid, char *name, nc_type *xtypep, int *ndimsp,
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            if (varid < file->num_vars)
+            {
+                if (name)    strcpy(name, file->adios_vars[varid].name);
+                if (xtypep)  *xtypep = file->adios_vars[varid].nc_type;
+                if (ndimsp)  *ndimsp = file->adios_vars[varid].ndims;
+                if (dimidsp)
+                    memcpy(dimidsp, file->adios_vars[varid].gdimids,
+                            file->adios_vars[varid].ndims * sizeof(int));
+                if (nattsp)  *nattsp = file->adios_vars[varid].nattrs;
+                ierr = 0;
+            }
+            else ierr = PIO_EBADID;
+        }
+#endif
+
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
         {
             ierr = nc_inq_varndims(file->fh, varid, &ndims);
             LOG((3, "nc_inq_varndims called ndims = %d", ndims));
@@ -1035,8 +1097,30 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
         if (file->iotype == PIO_IOTYPE_PNETCDF)
             ierr = ncmpi_inq_varid(file->fh, name, varidp);
 #endif /* _PNETCDF */
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            if (file->num_vars > 0) // in create/write mode we have variables, in open/read mode, we don't
+            {
+                int i;
+                for (i=0; i < file->num_vars; i++)
+                {
+                    if (!strcmp(name, file->adios_vars[i].name))
+                    {
+                        *varidp = i;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                LOG((2,"ADIOS Read mode missing %s:%s\n", __FILE__, __func__));
+            }
+            ierr = 0;
+        }
+#endif
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_inq_varid(file->fh, name, varidp);
     }
 
@@ -1130,8 +1214,14 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
         if (file->iotype == PIO_IOTYPE_PNETCDF)
             ierr = ncmpi_inq_att(file->fh, varid, name, xtypep, lenp);
 #endif /* _PNETCDF */
-
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            ierr = 0;
+        }
+#endif
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_inq_att(file->fh, varid, name, xtypep, (size_t *)lenp);
         LOG((2, "PIOc_inq netcdf call returned %d", ierr));
     }
@@ -1250,8 +1340,14 @@ int PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
         if (file->iotype == PIO_IOTYPE_PNETCDF)
             ierr = ncmpi_inq_attname(file->fh, varid, attnum, name);
 #endif /* _PNETCDF */
-
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            ierr = 0;
+        }
+#endif
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_inq_attname(file->fh, varid, attnum, name);
         LOG((2, "PIOc_inq_attname netcdf call returned %d", ierr));
     }
@@ -1347,8 +1443,14 @@ int PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
         if (file->iotype == PIO_IOTYPE_PNETCDF)
             ierr = ncmpi_inq_attid(file->fh, varid, name, idp);
 #endif /* _PNETCDF */
-
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            ierr = 0;
+        }
+#endif
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_inq_attid(file->fh, varid, name, idp);
         LOG((2, "PIOc_inq_attname netcdf call returned %d", ierr));
     }
@@ -1436,8 +1538,14 @@ int PIOc_rename_dim(int ncid, int dimid, const char *name)
         if (file->iotype == PIO_IOTYPE_PNETCDF)
             ierr = ncmpi_rename_dim(file->fh, dimid, name);
 #endif /* _PNETCDF */
-
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            ierr = 0;
+        }
+#endif
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_rename_dim(file->fh, dimid, name);
         LOG((2, "PIOc_inq netcdf call returned %d", ierr));
     }
@@ -1521,8 +1629,14 @@ int PIOc_rename_var(int ncid, int varid, const char *name)
         if (file->iotype == PIO_IOTYPE_PNETCDF)
             ierr = ncmpi_rename_var(file->fh, varid, name);
 #endif /* _PNETCDF */
-
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            ierr = 0;
+        }
+#endif
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_rename_var(file->fh, varid, name);
         LOG((2, "PIOc_inq netcdf call returned %d", ierr));
     }
@@ -1612,8 +1726,14 @@ int PIOc_rename_att(int ncid, int varid, const char *name,
         if (file->iotype == PIO_IOTYPE_PNETCDF)
             ierr = ncmpi_rename_att(file->fh, varid, name, newname);
 #endif /* _PNETCDF */
-
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            ierr = 0;
+        }
+#endif
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_rename_att(file->fh, varid, name, newname);
     }
 
@@ -1695,8 +1815,14 @@ int PIOc_del_att(int ncid, int varid, const char *name)
         if (file->iotype == PIO_IOTYPE_PNETCDF)
             ierr = ncmpi_del_att(file->fh, varid, name);
 #endif /* _PNETCDF */
-
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            ierr = 0;
+        }
+#endif
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_del_att(file->fh, varid, name);
     }
 
@@ -1776,8 +1902,15 @@ int PIOc_set_fill(int ncid, int fillmode, int *old_modep)
             ierr = ncmpi_set_fill(file->fh, fillmode, old_modep);
         }
 #endif /* _PNETCDF */
-
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            if (old_modep) *old_modep = file->fillmode;
+            file->fillmode = fillmode;
+            ierr = 0;
+        }
+#endif
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_set_fill(file->fh, fillmode, old_modep);
     }
 
@@ -1904,8 +2037,23 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
         if (file->iotype == PIO_IOTYPE_PNETCDF)
             ierr = ncmpi_def_dim(file->fh, name, len, idp);
 #endif /* _PNETCDF */
-
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS define dimension %s with size %llu, id = %d\n",
+                    name, (unsigned long long)len, file->num_dim_vars));
+            char dimname[128];
+            snprintf(dimname, sizeof(dimname), "/__pio__/dim/%s", name);
+            adios_define_var(file->adios_group, dimname, "", adios_unsigned_long, "","","");
+            file->dim_names[file->num_dim_vars] = strdup(name);
+            file->dim_values[file->num_dim_vars] = len;
+            *idp = file->num_dim_vars;
+            ++file->num_dim_vars;
+            adios_write(file->adios_fh,dimname,&len);
+            ierr = 0;
+        }
+#endif
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_def_dim(file->fh, name, (size_t)len, idp);
     }
 
@@ -1998,8 +2146,23 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
         if (file->iotype == PIO_IOTYPE_PNETCDF)
             ierr = ncmpi_def_var(file->fh, name, xtype, ndims, dimidsp, varidp);
 #endif /* _PNETCDF */
-
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS pre-define variable %s (%d dimensions, type %d)\n", name, ndims, xtype));
+            file->adios_vars[file->num_vars].name = strdup(name);
+            file->adios_vars[file->num_vars].nc_type = xtype;
+            file->adios_vars[file->num_vars].adios_type = PIOc_get_adios_type(xtype);
+            file->adios_vars[file->num_vars].nattrs = 0;
+            file->adios_vars[file->num_vars].ndims = ndims;
+            file->adios_vars[file->num_vars].gdimids = (int*) malloc(ndims*sizeof(int));
+            memcpy(file->adios_vars[file->num_vars].gdimids, dimidsp, ndims*sizeof(int));
+            *varidp = file->num_vars;
+            file->num_vars++;
+            ierr = 0;
+        }
+#endif
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_def_var(file->fh, name, xtype, ndims, dimidsp, varidp);
 #ifdef _NETCDF4
         /* For netCDF-4 serial files, turn on compression for this variable. */
@@ -2056,8 +2219,8 @@ int PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_value
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
-    nc_type xtype;         /* The type of the variable (and fill value att). */
-    PIO_Offset type_size;  /* Size in bytes of this variable's type. */
+    nc_type xtype;         /* The adios_type of the variable (and fill value att). */
+    PIO_Offset type_size;  /* Size in bytes of this variable's adios_type. */
     int ierr;              /* Return code from function calls. */
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function codes. */
 
@@ -2076,7 +2239,7 @@ int PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_value
 
     /* Run this on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. Get the size of this vars
-     * type. */
+     * adios_type. */
     if (!ios->async || !ios->ioproc)
     {
         if ((ierr = PIOc_inq_vartype(ncid, varid, &xtype)))
@@ -2147,6 +2310,13 @@ int PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_value
             if (file->do_io)
                 ierr = nc_def_var_fill(file->fh, varid, fill_mode, fill_valuep);
 #endif
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            ierr = 0;
+        }
+#endif
         }
         LOG((2, "after def_var_fill ierr = %d", ierr));
     }
@@ -2184,7 +2354,7 @@ int PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     nc_type xtype;         /* Type of variable and its _FillValue attribute. */
-    PIO_Offset type_size;  /* Size in bytes of this variable's type. */
+    PIO_Offset type_size;  /* Size in bytes of this variable's adios_type. */
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function codes. */
     int ierr = PIO_NOERR;  /* Return code from function calls. */
 
@@ -2198,7 +2368,7 @@ int PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
 
     /* Run this on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. Get the size of this vars
-     * type. */
+     * adios_type. */
     if (!ios->async || !ios->ioproc)
     {
         if ((ierr = PIOc_inq_vartype(ncid, varid, &xtype)))
@@ -2315,6 +2485,13 @@ int PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
                 ierr = nc_inq_var_fill(file->fh, varid, no_fill, fill_valuep);
 #endif /* _NETCDF */
         }
+#ifdef _ADIOS
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            ierr = 0;
+        }
+#endif
         LOG((2, "after call to inq_var_fill, ierr = %d", ierr));
     }
 
@@ -2354,7 +2531,7 @@ int PIOc_get_att(int ncid, int varid, const char *name, void *ip)
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     int ierr;              /* Return code from function calls. */
-    nc_type atttype;       /* The type of the attribute. */
+    nc_type atttype;       /* The adios_type of the attribute. */
 
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
