@@ -259,19 +259,23 @@ int pio_num_iosystem(int *niosysid)
 int pio_add_to_iodesc_list(io_desc_t *iodesc)
 {
     io_desc_t *ciodesc;
-    int imax = 512;
+    static int imax = 511; // ADIOS needs a unique ID for the entire run
 
     iodesc->next = NULL;
     if (pio_iodesc_list == NULL)
+    {
+        // this may happen multiple times in a run if someone deletes unused decompositions
+        // before creating new ones
         pio_iodesc_list = iodesc;
+    }
     else
     {
-        imax++;
         for (ciodesc = pio_iodesc_list; ciodesc->next;
              ciodesc = ciodesc->next, imax = ciodesc->ioid + 1)
             ;
         ciodesc->next = iodesc;
     }
+    ++imax;
     iodesc->ioid = imax;
     current_iodesc = iodesc;
 
