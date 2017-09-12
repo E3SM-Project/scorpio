@@ -609,9 +609,8 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
 #ifdef _ADIOS
         if (file->iotype == PIO_IOTYPE_ADIOS)
         {
-            char * dimname  = file->dim_names[dimid];
-            *lenp = file->dim_values[dimid];
-            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            if (name) strcpy(name, file->dim_names[dimid]);
+            if (lenp) *lenp = file->dim_values[dimid];
             ierr = 0;
         }
 #endif
