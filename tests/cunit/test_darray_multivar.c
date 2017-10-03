@@ -333,13 +333,13 @@ int test_multivar_darray(int iosysid, int ioid, int num_flavors, int *flavor,
                 ERR(ret);
 
             /* Reopen the file. */
-            if ((ret = PIOc_openfile(iosysid, &ncid2, &flavor[fmt], filename, PIO_NOWRITE)))
+            if ((ret = PIOc_openfile2(iosysid, &ncid2, &flavor[fmt], filename, PIO_NOWRITE)))
                 ERR(ret);
 
             for (int v = 0; v < NUM_VAR; v++)
             {
                 /* Read the data. */
-                if ((ret = PIOc_read_darray(ncid2, varid[0], ioid, arraylen, test_data_in)))
+                if ((ret = PIOc_read_darray(ncid2, varid[v], ioid, arraylen, test_data_in)))
                     ERR(ret);
                 
                 /* Check the results. */
