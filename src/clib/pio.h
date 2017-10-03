@@ -105,8 +105,15 @@
  */
 typedef struct var_desc_t
 {
-    /** The unlimited dimension in the netCDF file (typically the time
-     * dimension). -1 if there is no unlimited dimension. */
+    /* Variable ID. */
+    int varid;
+    
+    /* Non-zero if this is a record var (i.e. uses unlimited
+     * dimension). */
+    int rec_var;
+    
+    /** The record number to be written. Ignored if there is no
+     * unlimited dimension. */
     int record;
 
     /** ID of each outstanding pnetcdf request for this variable. */
@@ -131,8 +138,8 @@ typedef struct var_desc_t
      * missing sections of data when using the subset rearranger. */
     void *fillbuf;
 
-    /** Data buffer for this variable. */
-    void *iobuf;
+    /** Pointer to next var in list. */
+    struct var_desc_t *next;
 } var_desc_t;
 
 /**
@@ -538,14 +545,20 @@ typedef struct file_desc_t
     int iotype;
 
     /** List of variables in this file. */
+    struct var_desc_t *varlist2;
+
+    /** List of variables in this file (deprecated). */
     struct var_desc_t varlist[PIO_MAX_VARS];
 
-    /** ??? */
+    /** Mode used when file was opened. */
     int mode;
 
     /** The wmulti_buffer is used to aggregate multiple variables with
      * the same communication pattern prior to a write. */
     struct wmulti_buffer buffer;
+
+    /** Data buffer for this file. */
+    void *iobuf;
 
     /** Pointer to the next file_desc_t in the list of open files. */
     struct file_desc_t *next;
@@ -829,6 +842,7 @@ extern "C" {
     int PIOc_createfile(int iosysid, int *ncidp,  int *iotype, const char *fname, int mode);
     int PIOc_create(int iosysid, const char *path, int cmode, int *ncidp);
     int PIOc_openfile(int iosysid, int *ncidp, int *iotype, const char *fname, int mode);
+    int PIOc_openfile2(int iosysid, int *ncidp, int *iotype, const char *fname, int mode);
     int PIOc_open(int iosysid, const char *path, int mode, int *ncidp);
     int PIOc_closefile(int ncid);
     int PIOc_inq_format(int ncid, int *formatp);
@@ -837,6 +851,7 @@ extern "C" {
     int PIOc_inq_nvars(int ncid, int *nvarsp);
     int PIOc_inq_natts(int ncid, int *ngattsp);
     int PIOc_inq_unlimdim(int ncid, int *unlimdimidp);
+    int PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp);
     int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep);
     int PIOc_set_blocksize(int newblocksize);
     int PIOc_File_is_Open(int ncid);

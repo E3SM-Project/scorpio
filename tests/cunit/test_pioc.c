@@ -798,6 +798,12 @@ int check_metadata(int ncid, int my_rank, int flavor)
         return ret;
     if (ndims != NDIM || nvars != 1 || ngatts != 0 || unlimdimid != 0)
         return ERR_AWFUL;
+    int num_unlimdims;
+    int unlimdimid2;
+    if ((ret = PIOc_inq_unlimdims(ncid, &num_unlimdims, &unlimdimid2)))
+        return ret;
+    if (unlimdimid2 != 0)
+        return ERR_AWFUL;        
 
     /* Check the dimensions. */
     for (int d = 0; d < NDIM; d++)
@@ -1120,7 +1126,7 @@ int test_deletefile(int iosysid, int num_flavors, int *flavor, int my_rank)
 
         /* Make sure it is gone. Openfile will now return an error
          * code when I try to open the file. */
-        if (!PIOc_openfile(iosysid, &ncid, &(flavor[fmt]), filename, PIO_NOWRITE))
+        if (!PIOc_openfile2(iosysid, &ncid, &(flavor[fmt]), filename, PIO_NOWRITE))
             ERR(ERR_WRONG);
     }
 
@@ -1554,7 +1560,7 @@ int test_scalar(int iosysid, int num_flavors, int *flavor, int my_rank, int asyn
             ERR(ret);
 
         /* Reopen the file. */
-        if ((ret = PIOc_openfile(iosysid, &ncid, &(flavor[fmt]), filename, PIO_NOWRITE)))
+        if ((ret = PIOc_openfile2(iosysid, &ncid, &(flavor[fmt]), filename, PIO_NOWRITE)))
             ERR(ret);
 
         /* Check the scalar var again. */
