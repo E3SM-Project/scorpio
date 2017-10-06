@@ -16,8 +16,3 @@ SET(SRC examplePio.f90)
 ADD_EXECUTABLE(examplePio_f90 ${SRC})
 TARGET_LINK_LIBRARIES(examplePio_f90 piof pioc)
 
-if (WITH_ADIOS)
-  SET(SRC examplePioADIOS.f90)
-  ADD_EXECUTABLE(examplePioADIOS_f90 ${SRC})
-  TARGET_LINK_LIBRARIES(examplePioADIOS_f90 piof pioc)
-endif(WITH_ADIOS)
