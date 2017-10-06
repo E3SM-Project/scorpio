@@ -26,6 +26,7 @@
 #endif
 #ifdef _ADIOS
 #include <adios.h>
+#include <adios_read.h> // we only need adios_type_size() at the moment
 #endif
 
 #ifndef MPI_OFFSET
@@ -140,9 +141,6 @@ typedef struct var_desc_t
     /** Buffer that contains the holegrid fill values used to fill in
      * missing sections of data when using the subset rearranger. */
     void *fillbuf;
-
-    /** Data buffer for this variable. */
-    void *iobuf;
 
     /** Pointer to next var in list. */
     struct var_desc_t *next;
@@ -530,6 +528,7 @@ typedef struct wmulti_buffer
     struct wmulti_buffer *next;
 } wmulti_buffer;
 
+#ifdef _ADIOS
 /** Variable definition information saved at pioc_def_var,
  * so that ADIOS can define the variable at write time when
  * local dimensions and offsets are known.
@@ -546,7 +545,14 @@ typedef struct adios_var_desc_t
     int ndims;
     /** Global dims (dim var ids) */
     int * gdimids;
+    /** Number of attributes defined for this variable */
+    int nattrs;
+    /** ADIOS varID, if it has already been defined.
+     * We avoid defining again when writing multiple records over time
+     */
+    int64_t adios_varid; // 0: undefined yet
 } adios_var_desc_t;
+#endif
 /**
  * File descriptor structure.
  *
@@ -561,6 +567,8 @@ typedef struct file_desc_t
      * (netcdf or pnetcdf). */
     int fh;
 #ifdef _ADIOS
+    /** Save the filename, now just for printing it at close */
+    char *filename;
     /** ADIOS file handler is 64bit integer */
     int64_t adios_fh;
     /** Handler for ADIOS group (of variables) */
@@ -572,12 +580,19 @@ typedef struct file_desc_t
     char params[128];
     /** Need to store the dim names for finding them and using them when defining variables */
     char *dim_names[100];
+    PIO_Offset dim_values[100];
     /** Number of dim vars defined */
     int num_dim_vars;
     /** Variable information, max PIO_MAX_VARS variables allowed */
     struct adios_var_desc_t adios_vars[PIO_MAX_VARS];
     /** Number of vars defined */
     int num_vars;
+    /** Number of global attributes defined. Needed to support PIOc_inq_nattrs() */
+    int num_gattrs;
+    int fillmode;
+    /** array for decompositions that has been written already (must write only once) */
+    int n_written_ioids;
+    int written_ioids[100]; // written_ioids[N] = ioid if that decomp has been already written,
 #endif
 
     /** The ncid that will be returned to the user. */
@@ -598,6 +613,9 @@ typedef struct file_desc_t
     /** The wmulti_buffer is used to aggregate multiple variables with
      * the same communication pattern prior to a write. */
     struct wmulti_buffer buffer;
+
+    /** Data buffer for this file. */
+    void *iobuf;
 
     /** Pointer to the next file_desc_t in the list of open files. */
     struct file_desc_t *next;
@@ -1251,6 +1269,9 @@ extern "C" {
 #   ifdef _ADIOS
     enum ADIOS_DATATYPES PIOc_get_adios_type(nc_type xtype);
     nc_type PIOc_get_nctype_from_adios_type(enum ADIOS_DATATYPES atype);
+#      ifndef strdup
+    char *strdup(const char *str);
+#      endif
 #   endif
 
 

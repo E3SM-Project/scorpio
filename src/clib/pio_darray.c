@@ -98,6 +98,7 @@ PIO_Offset PIOc_set_buffer_size_limit(PIO_Offset limit)
  * @param flushtodisk non-zero to cause buffers to be flushed to disk.
  * @return 0 for success, error code otherwise.
  * @ingroup PIO_write_darray
+ * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
                             PIO_Offset arraylen, void *array, const int *frame,
@@ -209,10 +210,10 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
     }
 
     /* if the buffer is already in use in pnetcdf we need to flush first */
-    if (file->iotype == PIO_IOTYPE_PNETCDF && vdesc0->iobuf)
+    if (file->iotype == PIO_IOTYPE_PNETCDF && file->iobuf)
 	flush_output_buffer(file, 1, 0);
 
-    pioassert(!vdesc0->iobuf, "buffer overwrite",__FILE__, __LINE__);
+    pioassert(!file->iobuf, "buffer overwrite",__FILE__, __LINE__);
 
     /* Determine total size of aggregated data (all vars/records).
      * For netcdf serial writes we collect the data on io nodes and
@@ -228,7 +229,7 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
     if (rlen > 0)
     {
         /* Allocate memory for the buffer for all vars/records. */
-        if (!(vdesc0->iobuf = bget(iodesc->mpitype_size * (size_t)rlen)))
+        if (!(file->iobuf = bget(iodesc->mpitype_size * (size_t)rlen)))
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__);
         LOG((3, "allocated %lld bytes for variable buffer", (size_t)rlen * iodesc->mpitype_size));
 
@@ -239,7 +240,7 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
             LOG((3, "inerting fill values iodesc->maxiobuflen = %d", iodesc->maxiobuflen));
             for (int nv = 0; nv < nvars; nv++)
                 for (int i = 0; i < iodesc->maxiobuflen; i++)
-                    memcpy(&((char *)vdesc0->iobuf)[iodesc->mpitype_size * (i + nv * iodesc->maxiobuflen)],
+                    memcpy(&((char *)file->iobuf)[iodesc->mpitype_size * (i + nv * iodesc->maxiobuflen)],
                            &((char *)fillvalue)[nv * iodesc->mpitype_size], iodesc->mpitype_size);
         }
     }
@@ -248,13 +249,13 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
 	/* this assures that iobuf is allocated on all iotasks thus
 	 assuring that the flush_output_buffer call above is called
 	 collectively (from all iotasks) */
-        if (!(vdesc0->iobuf = bget(1)))
+        if (!(file->iobuf = bget(1)))
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__);
         LOG((3, "allocated token for variable buffer"));
     }
 
     /* Move data from compute to IO tasks. */
-    if ((ierr = rearrange_comp2io(ios, iodesc, array, vdesc0->iobuf, nvars)))
+    if ((ierr = rearrange_comp2io(ios, iodesc, array, file->iobuf, nvars)))
         return pio_err(ios, file, ierr, __FILE__, __LINE__);
 
     /* Write the darray based on the iotype. */
@@ -282,11 +283,11 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
     if (file->iotype != PIO_IOTYPE_PNETCDF)
     {
         /* Release resources. */
-        if (vdesc0->iobuf)
+        if (file->iobuf)
         {
 	    LOG((3,"freeing variable buffer in pio_darray"));
-            brel(vdesc0->iobuf);
-            vdesc0->iobuf = NULL;
+            brel(file->iobuf);
+            file->iobuf = NULL;
         }
     }
 
@@ -368,7 +369,8 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
  * @param vdesc pointer to var_desc_t info for this var.
  * @returns 0 for success, non-zero error code for failure.
  * @ingroup PIO_write_darray
- */
+ * @author Ed Hartnett 
+*/
 int find_var_fillvalue(file_desc_t *file, int varid, var_desc_t *vdesc)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */    
@@ -406,7 +408,22 @@ int find_var_fillvalue(file_desc_t *file, int varid, var_desc_t *vdesc)
 
 #ifdef _ADIOS
 
-void PIOc_write_decomp_adios(file_desc_t *file, int ioid)
+static int needs_to_write_decomp(file_desc_t *file, int ioid)
+{
+    int ret = 1; // yes
+    for (int i=0; i < file->n_written_ioids; i++)
+        if (file->written_ioids[i] == ioid)
+            ret = 0;
+    return ret;
+}
+
+static void register_decomp(file_desc_t *file, int ioid)
+{
+    file->written_ioids[file->n_written_ioids] = ioid;
+    ++file->n_written_ioids;
+}
+
+static void PIOc_write_decomp_adios(file_desc_t *file, int ioid)
 {
     io_desc_t *iodesc = pio_get_iodesc_from_id(ioid);
     char name[32], ldim[32];
@@ -416,53 +433,126 @@ void PIOc_write_decomp_adios(file_desc_t *file, int ioid)
     if (sizeof(PIO_Offset) == 8)
        type = adios_long;
     int64_t vid = adios_define_var(file->adios_group, name, "", type, ldim,"","");
-    adios_define_attribute_byvalue(file->adios_group,"piotype",name,adios_integer,1,&iodesc->piotype);
-    adios_define_attribute_byvalue(file->adios_group,"ndims",name,adios_integer,1,&iodesc->ndims);
-    adios_define_attribute_byvalue(file->adios_group,"dimlen",name,adios_integer,iodesc->ndims,iodesc->dimlen);
     adios_write_byid(file->adios_fh, vid, iodesc->map);
-    PIOc_get_adios_type(iodesc->piotype);
+    if (file->iosystem->iomaster == MPI_ROOT)
+    {
+        adios_define_attribute_byvalue(file->adios_group,"piotype",name,adios_integer,1,&iodesc->piotype);
+        adios_define_attribute_byvalue(file->adios_group,"ndims",name,adios_integer,1,&iodesc->ndims);
+        adios_define_attribute_byvalue(file->adios_group,"dimlen",name,adios_integer,iodesc->ndims,iodesc->dimlen);
+    }
 }
 
-
-int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid, PIO_Offset arraylen, void *array,
-                      void *fillvalue)
+static int PIOc_write_darray_adios(
+        file_desc_t *file, int varid, int ioid, io_desc_t *iodesc,
+        PIO_Offset arraylen, void *array, void *fillvalue)
 {
     int ierr = PIO_NOERR;
     if (varid < 0 || varid >= file->num_vars)
         return pio_err(file->iosystem, file, PIO_EBADID, __FILE__, __LINE__);
-    /* First we need to define the variable now that we know it's decomposition */
+
     adios_var_desc_t * av = &(file->adios_vars[varid]);
-    /*char gdims[256];
-    gdims[0] = '\0';
-    for (int d=0; d < av->ndims; d++)
+    if (av->adios_varid == 0)
     {
-        strcat(gdims,file->dim_names[av->gdimids[d]]);
-        if (d < av->ndims-1)
-            strcat(gdims,",");
-    }*/
-    char varname[256];
-    char ldim[32];
-    sprintf(varname,"darray/%s", av->name);
-    sprintf(ldim, "%lld", arraylen);
-    int64_t vid = adios_define_var(file->adios_group, av->name, "", av->adios_type, ldim,"","");
+        /* First we need to define the variable now that we know it's decomposition */
+        char ldims[256];
+        sprintf(ldims, "%lld", arraylen);
+        enum ADIOS_DATATYPES atype = av->adios_type;
 
-    adios_define_attribute_byvalue(file->adios_group,"__pio__/ndims",av->name,adios_integer,1,&av->ndims);
-    adios_define_attribute_byvalue(file->adios_group,"__pio__/nctype",av->name,adios_integer,1,&av->nc_type);
-    char* dimnames[6];
-    for (int i = 0; i < av->ndims; i++)
-    {
-        dimnames[i] = file->dim_names[av->gdimids[i]];
+        /* ACME history data special handling: down-conversion from double to float */
+        if (iodesc->piotype != av->nc_type)
+        {
+            if (iodesc->piotype == PIO_DOUBLE && av->nc_type == PIO_FLOAT)
+            {
+                if (file->iosystem->iomaster == MPI_ROOT)
+                    LOG((2,"Darray '%s' decomp type is %d (size=%d) but target type is %d. We need conversion\n",
+                            file->adios_vars[varid].name, iodesc->piotype, iodesc->piotype_size,
+                            av->nc_type));
+            }
+            else
+            {
+                atype = PIOc_get_adios_type(iodesc->piotype);
+                if (file->iosystem->iomaster == MPI_ROOT)
+                    LOG((2,"Darray '%s' decomp type is %d (size=%d) but target type is %d. "
+                            "ADIOS cannot do type conversion and therefore the data will be "
+                            "corrupt for this variable when converting from .bp to .nc with adios2pio\n",
+                            file->adios_vars[varid].name, iodesc->piotype, iodesc->piotype_size,
+                            av->nc_type));
+            }
+        }
+
+        av->adios_varid = adios_define_var(file->adios_group, av->name, "", atype, ldims,"","");
+
+        if (file->iosystem->iomaster == MPI_ROOT)
+        {
+            adios_define_attribute_byvalue(file->adios_group,"__pio__/ndims",av->name,adios_integer,1,&av->ndims);
+            adios_define_attribute_byvalue(file->adios_group,"__pio__/nctype",av->name,adios_integer,1,&av->nc_type);
+            char* dimnames[6];
+            for (int i = 0; i < av->ndims; i++)
+            {
+                dimnames[i] = file->dim_names[av->gdimids[i]];
+            }
+            adios_define_attribute_byvalue(file->adios_group,"__pio__/dims",av->name,adios_string_array,av->ndims,dimnames);
+            char decompname[32];
+            sprintf(decompname, "%d", ioid);
+            adios_define_attribute(file->adios_group, "__pio__/decomp", av->name, adios_string, decompname, NULL);
+            adios_define_attribute(file->adios_group, "__pio__/ncop", av->name, adios_string, "darray", NULL);
+         }
+
+        if (needs_to_write_decomp(file, ioid))
+        {
+            PIOc_write_decomp_adios(file,ioid);
+            register_decomp(file, ioid);
+        }
     }
-    adios_define_attribute_byvalue(file->adios_group,"__pio__/dims",av->name,adios_string_array,av->ndims,dimnames);
-    char decompname[32];
-    sprintf(decompname, "%d", ioid);
-    adios_define_attribute(file->adios_group, "__pio__/decomp", av->name, adios_string, decompname, NULL);
-    adios_define_attribute(file->adios_group, "__pio__/ncop", av->name, adios_string, "darray", NULL);
 
-    adios_write_byid(file->adios_fh, vid, array);
+    /* ACME history data special handling: down-conversion from double to float */
+    void *buf = array;
+    int buf_needs_free = 0;
+    if (iodesc->piotype != av->nc_type)
+    {
+        if (iodesc->piotype == PIO_DOUBLE && av->nc_type == PIO_FLOAT)
+        {
+            double *d = (double *)array;
+            float *f = (float *)malloc(arraylen*sizeof(float));
+            if (f)
+            {
+                for (int i=0; i<arraylen; ++i)
+                {
+                    f[i] = (float)d[i];
+                }
+                buf = f;
+                buf_needs_free = 1;
+            }
+            else
+            {
+                if (file->iosystem->iomaster == MPI_ROOT)
+                    LOG((2,"Darray '%s' decomp type is double but the target type is float. "
+                            "ADIOS cannot do type conversion because memory could not be allocated."
+                            "Therefore the data will be corrupt for this variable in the .bp output\n",
+                            file->adios_vars[varid].name));
+            }
+        }
+    }
 
+#if 0
+    /* DEBUG printout */
+    if (!strcmp(file->adios_vars[varid].name,"foo"))
+    {
+        /* Print the first few longitude values */
+        float *lon = (float*)buf;
+        printf("Values of '%s' addr %p..%p: [ ", file->adios_vars[varid].name, (float*)buf, ((float*)buf)+10);
+        for (int i=0; i<10; i++)
+        {
+            printf("%6.3f ", lon[i]);
+        }
+        printf("\n");
+    }
+#endif
 
-    PIOc_write_decomp_adios(file,ioid);
+    adios_write_byid(file->adios_fh, av->adios_varid, buf);
+
+    if (buf_needs_free)
+        free(buf);
 
     return PIO_NOERR;
 }
@@ -515,6 +605,7 @@ int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid, PIO_Offset a
  * data.
  * @returns 0 for success, non-zero error code for failure.
  * @ingroup PIO_write_darray
+ * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *array,
                       void *fillvalue)
@@ -587,7 +678,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
 #ifdef _ADIOS
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
-        ierr = PIOc_write_darray_adios(file, varid, ioid, arraylen, array, fillvalue);
+        ierr = PIOc_write_darray_adios(file, varid, ioid, iodesc, arraylen, array, fillvalue);
         return ierr;
     }
 #endif
@@ -817,6 +908,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
  * processor.
  * @return 0 for success, error code otherwise.
  * @ingroup PIO_read_darray
+ * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
                      void *array)

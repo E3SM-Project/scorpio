@@ -21,8 +21,8 @@ elseif ("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 
-SET(SRC adios2pio.cxx)
-ADD_EXECUTABLE(adios2pio ${SRC})
-TARGET_LINK_LIBRARIES(adios2pio pioc)
+SET(SRC adios2pio-nm.cxx)
+ADD_EXECUTABLE(adios2pio-nm ${SRC})
+TARGET_LINK_LIBRARIES(adios2pio-nm pioc)
 
 

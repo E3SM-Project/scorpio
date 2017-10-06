@@ -117,6 +117,7 @@ int PIOc_open(int iosysid, const char *path, int mode, int *ncidp)
  * @param mode The netcdf mode for the create operation.
  * @returns 0 for success, error code otherwise.
  * @ingroup PIO_createfile
+ * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_createfile(int iosysid, int *ncidp, int *iotype, const char *filename,
                     int mode)
@@ -157,6 +158,7 @@ int PIOc_createfile(int iosysid, int *ncidp, int *iotype, const char *filename,
  * @param ncidp : A pio file descriptor (output)
  * @return 0 for success, error code otherwise.
  * @ingroup PIO_create
+ * @author Ed Hartnett
  */
 int PIOc_create(int iosysid, const char *filename, int cmode, int *ncidp)
 {
@@ -186,6 +188,7 @@ int PIOc_create(int iosysid, const char *filename, int cmode, int *ncidp)
  *
  * @param ncid: the file pointer
  * @returns PIO_NOERR for success, error code otherwise.
+ * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_closefile(int ncid)
 {
@@ -256,8 +259,18 @@ int PIOc_closefile(int ncid)
 #endif
 #ifdef _ADIOS
         case PIO_IOTYPE_ADIOS:
-            // Already closed in PIOc_sync()
-            adios_free_group(file->adios_group);
+            if (file->adios_fh != -1)
+            {
+                LOG((2,"ADIOS close file %s\n", file->filename));
+                adios_define_attribute_byvalue(file->adios_group,"/__pio__/fillmode","",adios_integer,1,&file->fillmode);
+                ierr = adios_close(file->adios_fh);
+                file->adios_fh = -1;
+            }
+            if (file->adios_group != -1)
+            {
+                adios_free_group(file->adios_group);
+                file->adios_group = -1;
+            }
             for (int i=0; i<file->num_dim_vars; i++)
             {
                 free (file->dim_names[i]);
@@ -272,6 +285,7 @@ int PIOc_closefile(int ncid)
                 file->adios_vars[file->num_vars].gdimids = NULL;
             }
             file->num_vars = 0;
+            free(file->filename);
             ierr = 0;
             break;
 #endif
@@ -298,6 +312,7 @@ int PIOc_closefile(int ncid)
  * @param iosysid a pio system handle.
  * @param filename a filename.
  * @returns PIO_NOERR for success, error code otherwise.
+ * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_deletefile(int iosysid, const char *filename)
 {
@@ -373,6 +388,7 @@ int PIOc_deletefile(int iosysid, const char *filename)
  *
  * @param ncid the ncid of the file to sync.
  * @returns PIO_NOERR for success, error code otherwise.
+ * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_sync(int ncid)
 {
@@ -389,19 +405,7 @@ int PIOc_sync(int ncid)
     ios = file->iosystem;
 
 #ifdef _ADIOS
-    if (file->iotype == PIO_IOTYPE_ADIOS)
-    {
-        if (file->adios_fh != -1)
-        {
-            ierr = adios_close(file->adios_fh);
-            file->adios_fh = -1;
-        }
-        else
-        {
-            ierr = 0;
-        }
-    }
-    else
+    if (file->iotype != PIO_IOTYPE_ADIOS)
     {
 #endif
 
