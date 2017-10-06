@@ -1829,19 +1829,23 @@ int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filena
             if (do_aggregate)
             {
                 sprintf(file->transport,"%s","MPI_AGGREGATE");
-                sprintf(file->params,"num_aggregators=%d,striping=0", ios->num_iotasks);
+                sprintf(file->params,"num_aggregators=%d,striping=0,have_metadata_file=0", ios->num_iotasks);
             }
             else
             {
-                sprintf(file->transport,"%s","POSIX");
-                file->params[0] = '\0';
+                sprintf(file->transport,"%s","MPI_AGGREGATE");
+                sprintf(file->params,"num_aggregators=%d,striping=0,have_metadata_file=0", ios->num_comptasks/16);
+                /*sprintf(file->transport,"%s","POSIX");
+                file->params[0] = '\0';*/
             }
-            //adios_set_time_aggregation(file->adios_group,100000000,NULL);
+            /*adios_set_time_aggregation(file->adios_group,100000000,NULL);*/
             adios_select_method(file->adios_group,file->transport,file->params,"");
+            /*adios_set_max_buffer_size(32);*/
             ierr = adios_open(&file->adios_fh,file->filename,file->filename,"w", ios->io_comm);
             memset(file->dim_names, 0, sizeof(file->dim_names));
             file->num_dim_vars = 0;
             file->num_vars = 0;
+            file->num_gattrs = 0;
             file->fillmode = NC_NOFILL;
             file->n_written_ioids = 0;
             int64_t vid = adios_define_var(file->adios_group, "/__pio__/info/nproc", "", adios_integer, "","","");

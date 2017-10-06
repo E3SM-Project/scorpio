@@ -312,7 +312,7 @@ int check_file(int ntasks, char *filename) {
 	      ntasks == 8 || ntasks == 16))
 	    fprintf(stderr, "Number of processors must be 1, 2, 4, 8, or 16!\n");
 	if (verbose)
-	    printf("%d: ParallelIO Library example1 running on %d processors.\n",
+	    printf("%d: ParallelIO Library example3 running on %d processors.\n",
 		   my_rank, ntasks);
 
 	/* keep things simple - 1 iotask per MPI process */    
@@ -350,7 +350,7 @@ int check_file(int ntasks, char *filename) {
     /* Create the PIO decomposition for this example. */
     if (verbose)
         printf("rank: %d Creating decomposition for bar...\n", my_rank);
-    if ((ret = PIOc_InitDecomp(iosysid, PIO_INT, NDIM, dim_len_bar, (PIO_Offset)elements_per_pe_bar,
+    if ((ret = PIOc_InitDecomp(iosysid, PIO_FLOAT, NDIM, dim_len_bar, (PIO_Offset)elements_per_pe_bar,
                    compdof, &ioid_bar, NULL, NULL, NULL)))
         ERR(ret);
     free(compdof);
@@ -373,7 +373,7 @@ int check_file(int ntasks, char *filename) {
 	for (int fmt = 0; fmt < num_flavors; fmt++) 
 	{
 	    /* Create a filename. */
-	    sprintf(filename, "example1_%d.nc", fmt);
+	    sprintf(filename, "example3_%d.nc", fmt);
             
 	    /* Create the netCDF output file. */
 	    if (verbose)
@@ -415,15 +415,39 @@ int check_file(int ntasks, char *filename) {
         for (int i = 0; i < elements_per_pe_bar; i++)
             buffer_bar[i] = (float) START_DATA_VAL*1.0 + my_rank*1.0;
 
-	    /* Write data to the file. */
-	    if (verbose)
-	        printf("rank: %d Writing sample data...\n", my_rank);
-	    int test_varid = -1;
+        /* Some tests */
+ 	    int test_varid = -1;
 	    PIOc_inq_varid(ncid,VAR_NAME_FOO,&test_varid);
 	    if (varid_foo != test_varid) {
 	        printf("rank: %d PIOc_inq_varid(%s) returned wrong varid=%d, expected=%d\n",
 	                my_rank, VAR_NAME_FOO, test_varid, varid_foo);
 	    }
+
+	    int test_dimid = -1;
+        PIOc_inq_dimid(ncid,DIM_NAME_FOO,&test_dimid);
+        if (dimid_foo != test_dimid) {
+            printf("rank: %d PIOc_inq_dimid(%s) returned wrong dimid=%d, expected=%d\n",
+                    my_rank, DIM_NAME_FOO, test_dimid, dimid_foo);
+        }
+
+        char test_dimname[] = "wrongdimname";
+        PIOc_inq_dimname(ncid,dimid_bar,test_dimname);
+        if (strcmp(DIM_NAME_BAR, test_dimname))
+        {
+            printf("rank: %d PIOc_inq_dim(%d) returned wrong dim name = '%s', expected='%s'\n",
+                    my_rank, dimid_bar, test_dimname, DIM_NAME_FOO);
+        }
+
+        PIO_Offset test_dimvalue[1];
+        PIOc_inq_dimlen(ncid,dimid_bar,test_dimvalue);
+        if ((PIO_Offset)dim_len_bar[0] != test_dimvalue[0]) {
+            printf("rank: %d PIOc_inq_dimid(%s) returned wrong dimension size =%lld, expected=%d\n",
+                    my_rank, DIM_NAME_BAR, (long long)test_dimvalue[0], dim_len_bar[0]);
+        }
+
+        /* Write data to the file. */
+        if (verbose)
+            printf("rank: %d Writing sample data...\n", my_rank);
 
 	    if ((ret = PIOc_write_darray(ncid, varid_foo, ioid_foo, (PIO_Offset)elements_per_pe_foo,
 	    			     buffer_foo, NULL)))
@@ -467,7 +491,7 @@ int check_file(int ntasks, char *filename) {
 	if (!my_rank)
 	    for (int fmt = 0; fmt < num_flavors; fmt++)
 	    {
-	        sprintf(filename, "example1_%d.nc", fmt);
+	        sprintf(filename, "example3_%d.nc", fmt);
 	        if (format[fmt] != PIO_IOTYPE_ADIOS &&
 	            (ret = check_file(ntasks, filename)))
 	            ERR(ret);

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <iomanip>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <map>
 #include <stdexcept>
@@ -64,6 +65,28 @@ void TimerReport(MPI_Comm comm)
 }
 void TimerFinalize() {}
 
+struct Dimension {
+    int dimid;
+    PIO_Offset dimvalue;
+};
+
+using DimensionMap = std::map<std::string,Dimension>;
+
+struct Variable {
+    int nc_varid;
+    bool is_timed;
+    nc_type nctype;
+};
+
+using VariableMap = std::map<std::string,Variable>;
+
+struct Decomposition {
+    int ioid;
+    int piotype;
+};
+
+using DecompositionMap = std::map<std::string,Decomposition>;
+
 void InitPIO()
 {
     if (PIOc_Init_Intracomm(comm, nproc, 1,
@@ -77,6 +100,19 @@ void FlushStdout(MPI_Comm comm)
     usleep((useconds_t)100);
     MPI_Barrier(comm);
 }
+
+/* Set the currently encountered max number of steps if argument is given.
+ * Return the max step currently
+ */
+int GlobalMaxSteps(int nsteps_in=0)
+{
+    static int nsteps_current = 1;
+    if (nsteps_in > nsteps_current)
+        nsteps_current = nsteps_in;
+    return nsteps_current;
+}
+
+
 
 std::vector<int> AssignWriteRanks(int n_bp_writers)
 {
@@ -160,79 +196,117 @@ void ProcessGlobalAttributes(ADIOS_FILE *infile, int ncid)
     }
 }
 
-std::map<std::string,int> ProcessDecompositions(ADIOS_FILE * infile, int ncid, std::vector<int>& wblocks)
+Decomposition ProcessOneDecomposition(ADIOS_FILE * infile, int ncid, const char *varname, std::vector<int>& wblocks,
+        int forced_type=NC_NAT)
 {
-    std::map<std::string,int> decomp_map;
+    /* Read all decomposition blocks assigned to this process,
+     * create one big array from them and
+     * create a single big decomposition with PIO
+     */
+
+    /* Sum the sizes of blocks assigned to this process */
+    TimerStart(read);
+    ADIOS_VARINFO *vi = adios_inq_var(infile, varname);
+    adios_inq_var_blockinfo(infile, vi);
+
+    uint64_t nelems = 0;
+    for (auto wb : wblocks)
+    {
+        nelems += vi->blockinfo[wb].count[0];
+    }
+    std::vector<PIO_Offset> d(nelems);
+    uint64_t offset = 0;
+    for (auto wb : wblocks)
+    {
+        cout << "    rank " << mpirank << ": read decomp wb = " << wb <<
+                " start = " << offset <<
+                " elems = " << vi->blockinfo[wb].count[0] << endl;
+        ADIOS_SELECTION *wbsel = adios_selection_writeblock(wb);
+        int ret = adios_schedule_read(infile, wbsel, varname, 0, 1,
+                d.data()+offset);
+        adios_perform_reads(infile, 1);
+        offset += vi->blockinfo[wb].count[0];
+    }
+    adios_free_varinfo(vi);
+
+    string attname;
+    int asize;
+    int *piotype;
+    ADIOS_DATATYPES atype;
+    if (forced_type == NC_NAT)
+    {
+        attname = string(varname) + "/piotype";
+        adios_get_attr(infile, attname.c_str(), &atype, &asize, (void**)&piotype);
+    }
+    else
+    {
+        piotype = (int*) malloc(sizeof(int));
+        *piotype = forced_type;
+    }
+    attname = string(varname) + "/ndims";
+    int *decomp_ndims;
+    adios_get_attr(infile, attname.c_str(), &atype, &asize, (void**)&decomp_ndims);
+
+    int *decomp_dims;
+    attname = string(varname) + "/dimlen";
+    adios_get_attr(infile, attname.c_str(), &atype, &asize, (void**)&decomp_dims);
+    TimerStop(read);
+
+    TimerStart(write);
+    int ioid;
+    PIOc_InitDecomp(iosysid, *piotype, *decomp_ndims, decomp_dims, (PIO_Offset)nelems,
+            d.data(), &ioid, NULL, NULL, NULL);
+    TimerStop(write);
+
+    free(piotype);
+    free(decomp_ndims);
+    free(decomp_dims);
+
+    return Decomposition{ioid, *piotype};
+}
+
+DecompositionMap ProcessDecompositions(ADIOS_FILE * infile, int ncid, std::vector<int>& wblocks)
+{
+    DecompositionMap decomp_map;
     for (int i = 0; i < infile->nvars; i++)
     {
         string v = infile->var_namelist[i];
         if (v.find("/__pio__/decomp/") != string::npos)
         {
-            /* Read all decomposition blocks assigned to this process,
-             * create one big array from them and
-             * create a single big decomposition with PIO
-             */
             string decompname = v.substr(16);
             if (!mpirank) cout << "Process decomposition " << decompname << endl;
-
-            /* Sum the sizes of blocks assigned to this process */
-            TimerStart(read);
-            ADIOS_VARINFO *vi = adios_inq_var(infile, infile->var_namelist[i]);
-            adios_inq_var_blockinfo(infile, vi);
-
-            uint64_t nelems = 0;
-            for (auto wb : wblocks)
-            {
-                nelems += vi->blockinfo[wb].count[0];
-            }
-            std::vector<PIO_Offset> d(nelems);
-            uint64_t offset = 0;
-            for (auto wb : wblocks)
-            {
-                cout << "    rank " << mpirank << ": read decomp wb = " << wb <<
-                        " start = " << offset <<
-                        " elems = " << vi->blockinfo[wb].count[0] << endl;
-                ADIOS_SELECTION *wbsel = adios_selection_writeblock(wb);
-                int ret = adios_schedule_read(infile, wbsel, infile->var_namelist[i], 0, 1,
-                        d.data()+offset);
-                adios_perform_reads(infile, 1);
-                offset += vi->blockinfo[wb].count[0];
-            }
-            adios_free_varinfo(vi);
-            string attname = string(infile->var_namelist[i]) + "/piotype";
-            int asize;
-            int *piotype;
-            ADIOS_DATATYPES atype;
-            adios_get_attr(infile, attname.c_str(), &atype, &asize, (void**)&piotype);
-
-            attname = string(infile->var_namelist[i]) + "/ndims";
-            int *decomp_ndims;
-            adios_get_attr(infile, attname.c_str(), &atype, &asize, (void**)&decomp_ndims);
-
-            int *decomp_dims;
-            attname = string(infile->var_namelist[i]) + "/dimlen";
-            adios_get_attr(infile, attname.c_str(), &atype, &asize, (void**)&decomp_dims);
-            TimerStop(read);
-
-            TimerStart(write);
-            int ioid;
-            PIOc_InitDecomp(iosysid, *piotype, *decomp_ndims, decomp_dims, (PIO_Offset)nelems,
-                           d.data(), &ioid, NULL, NULL, NULL);
-            TimerStop(write);
-
-            free(piotype);
-            free(decomp_ndims);
-            free(decomp_dims);
-            decomp_map[decompname] = ioid;
+            Decomposition d = ProcessOneDecomposition(infile, ncid, infile->var_namelist[i], wblocks);
+            decomp_map[decompname] = d;
         }
         FlushStdout(comm);
     }
     return decomp_map;
 }
 
-std::map<std::string,int> ProcessDimensions(ADIOS_FILE * infile, int ncid)
+Decomposition GetNewDecomposition(DecompositionMap& decompmap, string decompname,
+        ADIOS_FILE * infile, int ncid, std::vector<int>& wblocks, int nctype)
 {
-    std::map<std::string,int> dimensions_map;
+    stringstream ss;
+    ss << decompname << "_" << nctype;
+    string key = ss.str();
+    auto it = decompmap.find(key);
+    Decomposition d;
+    if (it == decompmap.end())
+    {
+        string varname = "/__pio__/decomp/" + decompname;
+        d = ProcessOneDecomposition(infile, ncid, varname.c_str(), wblocks, nctype);
+        decompmap[key] = d;
+    }
+    else
+    {
+        d = it->second;
+    }
+    return d;
+}
+
+DimensionMap ProcessDimensions(ADIOS_FILE * infile, int ncid)
+{
+    DimensionMap dimensions_map;
     for (int i = 0; i < infile->nvars; i++)
     {
         string v = infile->var_namelist[i];
@@ -251,16 +325,16 @@ std::map<std::string,int> ProcessDimensions(ADIOS_FILE * infile, int ncid)
             TimerStart(write);
             PIOc_def_dim(ncid, dimname.c_str(), (PIO_Offset)dimval, &dimid);
             TimerStop(write);
-            dimensions_map[dimname] = dimid;
+            dimensions_map[dimname] = Dimension{dimid,(PIO_Offset)dimval};
         }
         FlushStdout(comm);
     }
     return dimensions_map;
 }
 
-std::map<std::string,int> ProcessVariableDefinitions(ADIOS_FILE * infile, int ncid, std::map<std::string,int>& dimensions_map)
+VariableMap ProcessVariableDefinitions(ADIOS_FILE * infile, int ncid, DimensionMap& dimension_map)
 {
-    std::map<std::string,int> vars_map;
+    VariableMap vars_map;
     for (int i = 0; i < infile->nvars; i++)
     {
         string v = infile->var_namelist[i];
@@ -282,6 +356,7 @@ std::map<std::string,int> ProcessVariableDefinitions(ADIOS_FILE * infile, int nc
 
             char **dimnames = NULL;
             int dimids[MAX_NC_DIMS];
+            bool timed = false;
             if (*ndims)
             {
                 attname = string(infile->var_namelist[i]) + "/__pio__/dims";
@@ -290,7 +365,11 @@ std::map<std::string,int> ProcessVariableDefinitions(ADIOS_FILE * infile, int nc
                 for (int d=0; d < *ndims; d++)
                 {
                     //cout << "Dim " << d << " = " <<  dimnames[d] << endl;
-                    dimids[d] = dimensions_map[dimnames[d]];
+                    dimids[d] = dimension_map[dimnames[d]].dimid;
+                    if (dimension_map[dimnames[d]].dimvalue == PIO_UNLIMITED)
+                    {
+                        timed = true;
+                    }
                 }
             }
             TimerStop(read);
@@ -299,10 +378,9 @@ std::map<std::string,int> ProcessVariableDefinitions(ADIOS_FILE * infile, int nc
             int varid;
             PIOc_def_var(ncid, v.c_str(), *nctype, *ndims, dimids, &varid);
             TimerStop(write);
-            vars_map[v] = varid;
+            vars_map[v] = Variable{varid,timed,*nctype};
 
-            if (!mpirank)
-                ProcessVarAttributes(infile, i, v, ncid, varid);
+            ProcessVarAttributes(infile, i, v, ncid, varid);
 
             free(nctype);
             free(ndims);
@@ -314,7 +392,102 @@ std::map<std::string,int> ProcessVariableDefinitions(ADIOS_FILE * infile, int nc
     return vars_map;
 }
 
-int ConvertVariablePutVar(ADIOS_FILE * infile, int adios_varid, int ncid, int nc_varid)
+int put_var(int ncid, int varid, int nctype, enum ADIOS_DATATYPES memtype, const void* buf)
+{
+    int ret = 0;
+    switch(memtype)
+    {
+    case adios_byte:
+        ret = PIOc_put_var_schar(ncid, varid, (const signed char*)buf);
+        break;
+    case adios_short:
+        ret = PIOc_put_var_short(ncid, varid, (const signed short*)buf);
+        break;
+    case adios_integer:
+        ret = PIOc_put_var_int(ncid, varid, (const signed int*)buf);
+        break;
+    case adios_real:
+        ret = PIOc_put_var_float(ncid, varid, (const float *)buf);
+        break;
+    case adios_double:
+        ret = PIOc_put_var_double(ncid, varid, (const double *)buf);
+        break;
+    case adios_unsigned_byte:
+        ret = PIOc_put_var_uchar(ncid, varid, (const unsigned char *)buf);
+        break;
+    case adios_unsigned_short:
+        ret = PIOc_put_var_ushort(ncid, varid, (const unsigned short *)buf);
+        break;
+    case adios_unsigned_integer:
+        ret = PIOc_put_var_uint(ncid, varid, (const unsigned int *)buf);
+        break;
+    case adios_long:
+        ret = PIOc_put_var_longlong(ncid, varid, (const signed long long *)buf);
+        break;
+    case adios_unsigned_long:
+        ret = PIOc_put_var_ulonglong(ncid, varid, (const unsigned long long *)buf);
+        break;
+    case adios_string:
+        ret = PIOc_put_var_text(ncid, varid, (const char *)buf);
+        break;
+    default:
+        /* We can't do anything here, hope for the best, i.e. memtype equals to nctype */
+        ret = PIOc_put_var(ncid, varid, buf);
+        break;
+    }
+    return ret;
+}
+
+int put_vara(int ncid, int varid, int nctype, enum ADIOS_DATATYPES memtype, PIO_Offset *start, PIO_Offset *count, const void* buf)
+{
+    int ret = 0;
+    switch(memtype)
+    {
+    case adios_byte:
+        if (nctype == PIO_BYTE)
+            ret = PIOc_put_vara_schar(ncid, varid, start, count, (const signed char*)buf);
+        else
+            ret = PIOc_put_vara_text(ncid, varid, start, count, (const char*)buf);
+        break;
+    case adios_short:
+        ret = PIOc_put_vara_short(ncid, varid, start, count, (const signed short*)buf);
+        break;
+    case adios_integer:
+        ret = PIOc_put_vara_int(ncid, varid, start, count, (const signed int*)buf);
+        break;
+    case adios_real:
+        ret = PIOc_put_vara_float(ncid, varid, start, count, (const float *)buf);
+        break;
+    case adios_double:
+        ret = PIOc_put_vara_double(ncid, varid, start, count, (const double *)buf);
+        break;
+    case adios_unsigned_byte:
+        ret = PIOc_put_vara_uchar(ncid, varid, start, count, (const unsigned char *)buf);
+        break;
+    case adios_unsigned_short:
+        ret = PIOc_put_vara_ushort(ncid, varid, start, count, (const unsigned short *)buf);
+        break;
+    case adios_unsigned_integer:
+        ret = PIOc_put_vara_uint(ncid, varid, start, count, (const unsigned int *)buf);
+        break;
+    case adios_long:
+        ret = PIOc_put_vara_longlong(ncid, varid, start, count, (const signed long long *)buf);
+        break;
+    case adios_unsigned_long:
+        ret = PIOc_put_vara_ulonglong(ncid, varid, start, count, (const unsigned long long *)buf);
+        break;
+    case adios_string:
+        ret = PIOc_put_vara_text(ncid, varid, start, count, (const char *)buf);
+        break;
+    default:
+        /* We can't do anything here, hope for the best, i.e. memtype equals to nctype */
+        ret = PIOc_put_vara(ncid, varid, start, count, buf);
+        break;
+    }
+    return ret;
+}
+
+int ConvertVariablePutVar(ADIOS_FILE * infile, int adios_varid, int ncid, Variable& var)
 {
     TimerStart(read);
     int ret = 0;
@@ -323,15 +496,12 @@ int ConvertVariablePutVar(ADIOS_FILE * infile, int adios_varid, int ncid, int nc
     if (vi->ndim == 0)
     {
         /* Scalar variable */
-        //if (!mpirank)
-        {
-            TimerStart(write);
-            int ret = PIOc_put_var(ncid, nc_varid, vi->value);
-            if (ret != PIO_NOERR)
-                cout << "ERROR in PIOc_put_var(), code = " << ret
-                     << " at " << __func__ << ":" << __LINE__ << endl;
-            TimerStop(write);
-        }
+        TimerStart(write);
+        int ret = put_var(ncid, var.nc_varid, var.nctype, vi->type, vi->value);
+        if (ret != PIO_NOERR)
+            cout << "ERROR in PIOc_put_var(), code = " << ret
+            << " at " << __func__ << ":" << __LINE__ << endl;
+        TimerStop(write);
     }
     else
     {
@@ -379,7 +549,7 @@ int ConvertVariablePutVar(ADIOS_FILE * infile, int adios_varid, int ncid, int nc
             start[d] = (PIO_Offset) offsets[d];
             count[d] = (PIO_Offset) mydims[d];
         }
-        PIOc_put_vara(ncid, nc_varid, start, count, buf);
+        ret = put_vara(ncid, var.nc_varid, var.nctype, vi->type, start, count, buf);
         if (ret != PIO_NOERR)
             cout << "rank " << mpirank << ":ERROR in PIOc_put_vara(), code = " << ret
                  << " at " << __func__ << ":" << __LINE__ << endl;
@@ -390,8 +560,122 @@ int ConvertVariablePutVar(ADIOS_FILE * infile, int adios_varid, int ncid, int nc
     return ret;
 }
 
-int ConvertVariableDarray(ADIOS_FILE * infile, int adios_varid, int ncid, int nc_varid,
-        std::vector<int>& wblocks, std::map<std::string,int>& decomp_map)
+int ConvertVariableTimedPutVar(ADIOS_FILE * infile, int adios_varid, int ncid, Variable& var, int nblocks_per_step)
+{
+    TimerStart(read);
+    int ret = 0;
+    ADIOS_VARINFO *vi = adios_inq_var(infile, infile->var_namelist[adios_varid]);
+
+    if (vi->ndim == 0)
+    {
+        /* Scalar variable over time */
+        /* Written by only one process, so steps = number of blocks in file */
+        int nsteps = vi->nblocks[0];
+        TimerStart(read);
+        adios_inq_var_stat(infile, vi, 0, 1);
+        TimerStart(read);
+        PIO_Offset start[1], count[1];
+        for (int ts=0; ts < nsteps; ++ts)
+        {
+            TimerStart(write);
+            start[0] = ts;
+            count[0] = 1;
+            //cout << "DBG: " << infile->var_namelist[adios_varid] << " step " << ts
+            //     << " value = " << *(int*) vi->statistics->blocks->mins[ts] << endl;
+            int ret = PIOc_put_vara(ncid, var.nc_varid, start, count, vi->statistics->blocks->mins[ts]);
+            if (ret != PIO_NOERR)
+                cout << "ERROR in PIOc_put_var(), code = " << ret
+                << " at " << __func__ << ":" << __LINE__ << endl;
+            TimerStop(write);
+        }
+    }
+    else
+    {
+        /* calculate how many records/steps we have for this variable */
+        int nsteps = 1;
+        if (var.is_timed)
+        {
+            nsteps = vi->nblocks[0] / nblocks_per_step;
+        }
+        if (vi->nblocks[0] != nsteps * nblocks_per_step)
+        {
+            cout << "rank " << mpirank << ":ERROR in processing variable '" << infile->var_namelist[adios_varid]
+                 << "'. Number of blocks = " << vi->nblocks[0]
+                 << " does not equal the number of steps * number of writers = "
+                 << nsteps << " * " << nblocks_per_step << " = " << nsteps*nblocks_per_step
+                 << endl;
+        }
+
+        /* Is this a local array written by each process, or a truly distributed global array */
+        TimerStart(read);
+        adios_inq_var_blockinfo(infile, vi);
+        TimerStart(read);
+        bool local_array = true;
+        for (int d = 0; d < vi->ndim; d++)
+        {
+            if (vi->blockinfo[0].count[d] != vi->dims[d])
+            {
+                local_array = false;
+                break;
+            }
+        }
+        if (var.nctype == PIO_CHAR && vi->ndim == 1)
+        {
+            /* Character array over time may have longer dimension declaration than the actual content */
+            local_array = true;
+        }
+
+        if (local_array)
+        {
+            /* Just read the arrays written by rank 0 (on every process here) and
+             * write it collectively.
+             */
+            for (int ts=0; ts < nsteps; ++ts)
+            {
+                TimerStart(read);
+                int elemsize = adios_type_size(vi->type,NULL);
+                uint64_t nelems = 1;
+                for (int d = 0; d < vi->ndim; d++)
+                {
+                    nelems *= vi->dims[d];
+                }
+                std::vector<char> d(nelems * elemsize);
+                ADIOS_SELECTION *wbsel = adios_selection_writeblock(ts);
+                int ret = adios_schedule_read(infile, wbsel, infile->var_namelist[adios_varid],
+                        0, 1, d.data());
+                adios_perform_reads(infile, 1);
+                TimerStop(read);
+
+                TimerStart(write);
+                PIO_Offset start[vi->ndim+1], count[vi->ndim+1];
+                start[0] = ts;
+                count[0] = 1;
+                for (int d = 0; d < vi->ndim; d++)
+                {
+                    start[d+1] = 0;
+                    count[d+1] = vi->dims[d];
+                }
+                if ((ret = PIOc_put_vara(ncid, var.nc_varid, start, count, d.data())))
+                if (ret != PIO_NOERR)
+                    cout << "ERROR in PIOc_put_var(), code = " << ret
+                    << " at " << __func__ << ":" << __LINE__ << endl;
+                TimerStop(write);
+            }
+        }
+        else
+        {
+            cout << "ERROR: put_vara of arrays over time is not supported yet. "
+                    << "Variable \"" << infile->var_namelist[adios_varid] << "\" is a "
+                    << vi->ndim << "D array including the unlimited dimension"
+                    << endl;
+        }
+    }
+    adios_free_varinfo(vi);
+    return ret;
+}
+
+int ConvertVariableDarray(ADIOS_FILE * infile, int adios_varid, int ncid, Variable& var,
+        std::vector<int>& wblocks, DecompositionMap& decomp_map, int nblocks_per_step)
 {
     int ret = 0;
     string attname = string(infile->var_namelist[adios_varid]) + "/__pio__/decomp";
@@ -399,44 +683,113 @@ int ConvertVariableDarray(ADIOS_FILE * infile, int adios_varid, int ncid, int nc
     ADIOS_DATATYPES atype;
     char *decompname;
     adios_get_attr(infile, attname.c_str(), &atype, &asize, (void**)&decompname);
-    int decompid = decomp_map[decompname];
+    Decomposition decomp = decomp_map[decompname];
+    if (decomp.piotype != var.nctype)
+    {
+        /* Type conversion may happened at writing. Now we make a new decomposition
+         * for this nctype
+         */
+        decomp = GetNewDecomposition(decomp_map, decompname, infile, ncid, wblocks, var.nctype);
+    }
     free(decompname);
 
-    /* Sum the sizes of blocks assigned to this process */
+    //attname = string(infile->var_namelist[adios_varid]) + "/__pio__/timed";
+    //char *is_timed_val;
+    //adios_get_attr(infile, attname.c_str(), &atype, &asize, (void**)&is_timed_val);
+    //char is_timed = *is_timed_val;
+    //free(is_timed_val);
+
     ADIOS_VARINFO *vi = adios_inq_var(infile, infile->var_namelist[adios_varid]);
     adios_inq_var_blockinfo(infile, vi);
-    uint64_t nelems = 0;
-    for (auto wb : wblocks)
+
+    /* calculate how many records/steps we have for this variable */
+    int nsteps = 1;
+    int ts = 0; /* loop from ts to nsteps, below ts may become the last step */
+    if (var.is_timed)
     {
-        if (wb < vi->nblocks[0])
-            nelems += vi->blockinfo[wb].count[0];
-    }
-    int elemsize = adios_type_size(vi->type,NULL);
-    std::vector<char> d(nelems * elemsize);
-    uint64_t offset = 0;
-    for (auto wb : wblocks)
-    {
-        if (wb < vi->nblocks[0])
+        nsteps = vi->nblocks[0] / nblocks_per_step;
+        if (vi->nblocks[0] != nsteps * nblocks_per_step)
         {
-            cout << "    rank " << mpirank << ": read var = " << wb <<
-                    " start byte = " << offset <<
-                    " elems = " << vi->blockinfo[wb].count[0] << endl;
-            ADIOS_SELECTION *wbsel = adios_selection_writeblock(wb);
-            int ret = adios_schedule_read(infile, wbsel, infile->var_namelist[adios_varid], 0, 1,
-                    d.data()+offset);
-            adios_perform_reads(infile, 1);
-            offset += vi->blockinfo[wb].count[0] * elemsize;
+            cout << "rank " << mpirank << ":ERROR in processing darray '" << infile->var_namelist[adios_varid]
+                 << "'. Number of blocks = " << vi->nblocks[0]
+                 << " does not equal the number of steps * number of writers = "
+                 << nsteps << " * " << nblocks_per_step << " = " << nsteps*nblocks_per_step
+                 << endl;
         }
     }
-    TimerStop(read);
-
-    TimerStart(write);
-    if (wblocks[0] < vi->nblocks[0])
+    else
     {
-        ret = PIOc_write_darray(ncid, nc_varid, decompid, (PIO_Offset)nelems,
-                d.data(), NULL);
+        /* Silly apps may still write a non-timed variable every step, basically overwriting the variable.
+         * But we have too many blocks in the adios file in such case and we need to deal with them
+         */
+        nsteps = vi->nblocks[0] / nblocks_per_step;
+        int maxSteps = GlobalMaxSteps();
+        if (vi->nblocks[0] != nsteps * nblocks_per_step)
+        {
+            cout << "rank " << mpirank << ":ERROR in processing darray '" << infile->var_namelist[adios_varid]
+                 << "' which has no unlimited dimension. Number of blocks = " << vi->nblocks[0]
+                 << " does not equal the number of steps * number of writers = "
+                 << nsteps << " * " << nblocks_per_step << " = " << nsteps*nblocks_per_step
+                 << endl;
+        }
+        else if (maxSteps != 1 && nsteps > maxSteps)
+        {
+            cout << "rank " << mpirank << ":ERROR in processing darray '" << infile->var_namelist[adios_varid]
+                 << "'. A variable without unlimited dimension was written multiple times."
+                 << " The " << nsteps << " steps however does not equal to the number of steps "
+                 << "of other variables that indeed have unlimited dimensions (" << maxSteps << ")."
+                 << endl;
+        }
+        else if (nsteps > 1)
+        {
+            cout << "rank " << mpirank << ":WARNING in processing darray '" << infile->var_namelist[adios_varid]
+                 << "'. A variable without unlimited dimension was written " << nsteps << " times. "
+                 << "We will write only the last occurence."
+                 << endl;
+        }
+        ts = nsteps-1;
+
     }
-    TimerStop(write);
+
+    for (; ts < nsteps; ++ts)
+    {
+        /* Sum the sizes of blocks assigned to this process */
+        uint64_t nelems = 0;
+        for (auto wb : wblocks)
+        {
+            if (wb < vi->nblocks[0])
+                nelems += vi->blockinfo[wb*nsteps+ts].count[0];
+        }
+        int elemsize = adios_type_size(vi->type,NULL);
+        std::vector<char> d(nelems * elemsize);
+        uint64_t offset = 0;
+        for (auto wb : wblocks)
+        {
+            int blockid = wb*nsteps+ts;
+            if (blockid < vi->nblocks[0])
+            {
+                cout << "    rank " << mpirank << ": read var = " << blockid <<
+                        " start byte = " << offset <<
+                        " elems = " << vi->blockinfo[blockid].count[0] << endl;
+                ADIOS_SELECTION *wbsel = adios_selection_writeblock(blockid);
+                int ret = adios_schedule_read(infile, wbsel, infile->var_namelist[adios_varid], 0, 1,
+                        d.data()+offset);
+                adios_perform_reads(infile, 1);
+                offset += vi->blockinfo[blockid].count[0] * elemsize;
+            }
+        }
+        TimerStop(read);
+
+        TimerStart(write);
+        if (wblocks[0] < nblocks_per_step)
+        {
+            if (var.is_timed)
+                PIOc_setframe(ncid, var.nc_varid, ts);
+            ret = PIOc_write_darray(ncid, var.nc_varid, decomp.ioid, (PIO_Offset)nelems,
+                    d.data(), NULL);
+        }
+        TimerStop(write);
+    }
     adios_free_varinfo(vi);
 
     return ret;
@@ -464,7 +817,7 @@ void ConvertBPFile(string infilename, string outfilename, int pio_iotype)
         wblocks = AssignWriteRanks(n_bp_writers);
 
         /* First process decompositions */
-        std::map<std::string,int> decomp_map = ProcessDecompositions(infile, ncid, wblocks);
+        DecompositionMap decomp_map = ProcessDecompositions(infile, ncid, wblocks);
 
         /* Create output file */
         TimerStart(write);
@@ -477,10 +830,10 @@ void ConvertBPFile(string infilename, string outfilename, int pio_iotype)
         ProcessGlobalFillmode(infile, ncid);
 
         /* Next process dimensions */
-        std::map<std::string,int> dimensions_map = ProcessDimensions(infile, ncid);
+        DimensionMap dimension_map = ProcessDimensions(infile, ncid);
 
         /* For each variable, define a variable with PIO */
-        std::map<string, int> vars_map = ProcessVariableDefinitions(infile, ncid, dimensions_map);
+        VariableMap vars_map = ProcessVariableDefinitions(infile, ncid, dimension_map);
 
         /* Process the global attributes */
         ProcessGlobalAttributes(infile, ncid);
@@ -497,6 +850,7 @@ void ConvertBPFile(string infilename, string outfilename, int pio_iotype)
             {
                 /* For each variable, read with ADIOS then write with PIO */
                 if (!mpirank) cout << "Convert variable " << v << endl;
+                Variable& var = vars_map[v];
 
                 TimerStart(read);
                 string attname = string(infile->var_namelist[i]) + "/__pio__/ncop";
@@ -509,12 +863,19 @@ void ConvertBPFile(string infilename, string outfilename, int pio_iotype)
                 std::string op(ncop);
                 if (op == "put_var")
                 {
-                    ConvertVariablePutVar(infile, i, ncid, vars_map[v]);
+                    if (var.is_timed)
+                    {
+                        ConvertVariableTimedPutVar(infile, i, ncid, var, n_bp_writers);
+                    }
+                    else
+                    {
+                        ConvertVariablePutVar(infile, i, ncid, var);
+                    }
                 }
                 else if (op == "darray")
                 {
                     /* Variable was written with pio_write_darray() with a decomposition */
-                    ConvertVariableDarray(infile, i, ncid, vars_map[v], wblocks, decomp_map);
+                    ConvertVariableDarray(infile, i, ncid, var, wblocks, decomp_map, n_bp_writers);
                 }
                 else
                 {
@@ -524,6 +885,7 @@ void ConvertBPFile(string infilename, string outfilename, int pio_iotype)
                 free(ncop);
             }
             FlushStdout(comm);
+            PIOc_sync(ncid); /* FIXME: flush after each variable until development is done. Remove for efficiency */
         }
         TimerStart(write);
         ret = PIOc_sync(ncid);

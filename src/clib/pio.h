@@ -547,6 +547,10 @@ typedef struct adios_var_desc_t
     int * gdimids;
     /** Number of attributes defined for this variable */
     int nattrs;
+    /** ADIOS varID, if it has already been defined.
+     * We avoid defining again when writing multiple records over time
+     */
+    int64_t adios_varid; // 0: undefined yet
 } adios_var_desc_t;
 #endif
 /**
@@ -583,6 +587,8 @@ typedef struct file_desc_t
     struct adios_var_desc_t adios_vars[PIO_MAX_VARS];
     /** Number of vars defined */
     int num_vars;
+    /** Number of global attributes defined. Needed to support PIOc_inq_nattrs() */
+    int num_gattrs;
     int fillmode;
     /** array for decompositions that has been written already (must write only once) */
     int n_written_ioids;

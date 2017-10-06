@@ -98,7 +98,18 @@ int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
 #ifdef _ADIOS
         if (file->iotype == PIO_IOTYPE_ADIOS)
         {
-            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            if (ndimsp) *ndimsp = file->num_dim_vars;
+            if (nvarsp) *nvarsp = file->num_vars;
+            if (ngattsp) *ngattsp = file->num_gattrs;
+            if (unlimdimidp)
+            {
+                *unlimdimidp = -1;
+                for (int i=0; i < file->num_dim_vars; ++i)
+                {
+                    if (file->dim_values[i] == PIO_UNLIMITED)
+                        *unlimdimidp = i;
+                }
+            }
             ierr = 0;
         }
 #endif
@@ -619,9 +630,8 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
 #ifdef _ADIOS
         if (file->iotype == PIO_IOTYPE_ADIOS)
         {
-            char * dimname  = file->dim_names[dimid];
-            *lenp = file->dim_values[dimid];
-            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            if (name) strcpy(name, file->dim_names[dimid]);
+            if (lenp) *lenp = file->dim_values[dimid];
             ierr = 0;
         }
 #endif
@@ -766,11 +776,26 @@ int PIOc_inq_dimid(int ncid, const char *name, int *idp)
 #ifdef _ADIOS
         if (file->iotype == PIO_IOTYPE_ADIOS)
         {
-            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
+            if (file->num_dim_vars > 0) // in create/write mode we have dimensions, in open/read mode, we don't
+            {
+                int i;
+                for (i=0; i < file->num_dim_vars; i++)
+                {
+                    if (!strcmp(name, file->dim_names[i]))
+                    {
+                        *idp = i;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                LOG((2,"ADIOS Read mode missing %s:%s\n", __FILE__, __func__));
+            }
             ierr = 0;
         }
 #endif
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             ierr = nc_inq_dimid(file->fh, name, idp);
     }
     LOG((3, "nc_inq_dimid call complete ierr = %d", ierr));
@@ -2215,6 +2240,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
             file->adios_vars[file->num_vars].adios_type = PIOc_get_adios_type(xtype);
             file->adios_vars[file->num_vars].nattrs = 0;
             file->adios_vars[file->num_vars].ndims = ndims;
+            file->adios_vars[file->num_vars].adios_varid = 0;
             file->adios_vars[file->num_vars].gdimids = (int*) malloc(ndims*sizeof(int));
             memcpy(file->adios_vars[file->num_vars].gdimids, dimidsp, ndims*sizeof(int));
             *varidp = file->num_vars;
