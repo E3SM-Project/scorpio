@@ -338,7 +338,14 @@ int create_mpi_datatypes(MPI_Datatype mpitype, int msgcnt,
         if (mcount[i] > 0)
         {
             int len = mcount[i] / blocksize;
-            int displace[len];
+#ifdef _USE_MALLOC_
+			int *displace = (int*)malloc(sizeof(int)*len); 
+			if (!displace) 
+				return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__);	
+#else
+            int displace[len]; 
+#endif
+	
             LOG((3, "blocksize = %d i = %d mcount[%d] = %d len = %d", blocksize, i, i,
                  mcount[i], len));
             if (blocksize == 1)
@@ -379,6 +386,10 @@ int create_mpi_datatypes(MPI_Datatype mpitype, int msgcnt,
             if ((mpierr = MPI_Type_create_indexed_block(len, blocksize, displace,
                                                         mpitype, &mtype[i])))
                 return check_mpi(NULL, mpierr, __FILE__, __LINE__);
+
+#ifdef _USE_MALLOC_
+			if (displace) free(displace);
+#endif
 
             if (mtype[i] == PIO_DATATYPE_NULL)
                 return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__);
@@ -1895,7 +1906,14 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
         }
 
         /* Allocate and initialize a grid to fill in missing values. ??? */
-        PIO_Offset grid[thisgridsize[ios->io_rank]];
+#ifdef _USE_MALLOC_
+		PIO_Offset *grid = (PIO_Offset*)malloc(sizeof(PIO_Offset)*thisgridsize[ios->io_rank]);
+		if (!grid)
+			return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__);
+#else
+        PIO_Offset grid[thisgridsize[ios->io_rank]]; 
+#endif
+
         for (i = 0; i < thisgridsize[ios->io_rank]; i++)
             grid[i] = 0;
 
@@ -1951,6 +1969,10 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
             maxregions = iodesc->maxfillregions;
         }
 
+#ifdef _USE_MALLOC_
+		if (grid) free(grid);
+#endif
+
         /* Get the max maxregions, and distribute it to all tasks in
          * the IO communicator. */
         if ((mpierr = MPI_Allreduce(MPI_IN_PLACE, &maxregions, 1, MPI_INT, MPI_MAX,
@@ -1960,7 +1982,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
 
         /* Get the max maxholegridsize, and distribute it to all tasks
          * in the IO communicator. */
-	iodesc->maxholegridsize = iodesc->holegridsize;
+		iodesc->maxholegridsize = iodesc->holegridsize;
         if ((mpierr = MPI_Allreduce(MPI_IN_PLACE, &(iodesc->maxholegridsize), 1, MPI_INT,
                                     MPI_MAX, ios->io_comm)))
             return check_mpi(NULL, mpierr, __FILE__, __LINE__);
