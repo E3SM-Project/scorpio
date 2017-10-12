@@ -813,6 +813,9 @@ enum PIO_ERROR_HANDLERS
 #ifdef _ADIOS
 /** Define error codes for ADIOS. */
 #define PIO_EADIOSREAD  (-300)
+
+/** Define dynamic memory allocation */
+#define _USE_MALLOC_    1
 #endif
 
 /** ??? */

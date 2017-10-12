@@ -19,11 +19,9 @@
 
 using namespace std;
 
-
 MPI_Comm comm = MPI_COMM_WORLD;
 int mpirank;
 int nproc;
-
 
 /** The ID for the parallel I/O system. It is set by
  * PIOc_Init_Intracomm(). It references an internal structure
@@ -114,8 +112,6 @@ int GlobalMaxSteps(int nsteps_in=0)
     return nsteps_current;
 }
 
-
-
 std::vector<int> AssignWriteRanks(int n_bp_writers)
 {
     if (!mpirank) cout << "The BP file was written by " << n_bp_writers << " processes\n";
@@ -146,6 +142,8 @@ void ProcessGlobalFillmode(ADIOS_FILE **infile, int ncid)
     adios_get_attr(infile[0], "/__pio__/fillmode", &atype, &asize, &fillmode);
     cout << "    set fillmode: " << *(int*)fillmode << std::endl;
     PIOc_set_fill(ncid, *(int*)fillmode, NULL);
+    // int fill_value = 256;
+    // PIOc_set_fill(ncid, *(int*)fillmode, &fill_value);
     free(fillmode);
 }
 
@@ -237,6 +235,7 @@ Decomposition ProcessOneDecomposition(ADIOS_FILE **infile, int ncid, const char 
        		 	int ret = adios_schedule_read(infile[i], wbsel, varname, 0, 1, d.data()+offset);
        		 	adios_perform_reads(infile[i], 1);
 				offset += vb->blockinfo[j].count[0];
+				adios_selection_delete(wbsel);
 	   		}
 	   		adios_free_varinfo(vb);
 		}
@@ -501,23 +500,17 @@ int ConvertVariablePutVar(ADIOS_FILE **infile, std::vector<int> wblocks, int adi
 {
     TimerStart(read);
     int ret = 0;
-    ADIOS_VARINFO *vi = adios_inq_var(infile[0], infile[0]->var_namelist[adios_varid]);
+	char *varname     = infile[0]->var_namelist[adios_varid];
+    ADIOS_VARINFO *vi = adios_inq_var(infile[0], varname);
 
     if (vi->ndim == 0)
     {
         /* Scalar variable */
         TimerStart(write);
-		/* Read the variable from the files assigned to this processor */
-		for (int i=0;i<=wblocks.size();i++) {
-			ADIOS_VARINFO *vb = adios_inq_var(infile[i], infile[i]->var_namelist[adios_varid]);
-            if (vb) {
-        		int ret = put_var(ncid, var.nc_varid, var.nctype, vb->type, vb->value);
-        		if (ret != PIO_NOERR)
-            			cout << "ERROR in PIOc_put_var(), code = " << ret
-            				<< " at " << __func__ << ":" << __LINE__ << endl;
-				adios_free_varinfo(vb);
-			}
-		}
+        int ret = put_var(ncid, var.nc_varid, var.nctype, vi->type, vi->value);
+        if (ret != PIO_NOERR)
+                cout << "ERROR in PIOc_put_var(), code = " << ret
+                     << " at " << __func__ << ":" << __LINE__ << endl;
         TimerStop(write);
     }
     else
@@ -531,7 +524,7 @@ int ConvertVariablePutVar(ADIOS_FILE **infile, std::vector<int> wblocks, int adi
 		int l_wbsize = 0;
 		int g_wbsize = 0;
 		for (int i=1;i<=wblocks.size();i++) {
-			ADIOS_VARINFO *vb = adios_inq_var(infile[i], infile[i]->var_namelist[adios_varid]);
+			ADIOS_VARINFO *vb = adios_inq_var(infile[i], varname);
 			if (vb) {
 				l_wbsize += vb->nblocks[0];
 				adios_free_varinfo(vb);
@@ -548,21 +541,20 @@ int ConvertVariablePutVar(ADIOS_FILE **infile, std::vector<int> wblocks, int adi
 		size_t mysize = 0;
 		char *buf = NULL;
 		for (int i=1;i<=wblocks.size();i++) {
-       		ADIOS_VARINFO *vb = adios_inq_var(infile[i], infile[i]->var_namelist[adios_varid]);
+       		ADIOS_VARINFO *vb = adios_inq_var(infile[i], varname);
 			if (vb) {
 				adios_inq_var_blockinfo(infile[i], vb);
-				for (int j=0;j<vb->nblocks[0];i++) {
+				for (int j=0;j<vb->nblocks[0];j++) {
 					mysize = 0;
 					for (int d=0;d<vb->ndim;d++) 
 						mysize += (size_t)vb->blockinfo[j].count[d];
 					mysize = mysize*adios_type_size(vb->type,NULL);
-        			buf = (char *)malloc(mysize); 
-					if (!buf) { 
+        			if ((buf = (char *)malloc(mysize))==NULL) {
 						printf("ERROR: cannot allocate memory: %ld\n",mysize);
 						return 1;
 					}
 					ADIOS_SELECTION *wbsel = adios_selection_writeblock(j);
-       		 		int ret = adios_schedule_read(infile[i], wbsel, infile[i]->var_namelist[adios_varid], 0, 1, buf);
+       		 		int ret = adios_schedule_read(infile[i], wbsel, varname, 0, 1, buf);
        		 		adios_perform_reads(infile[i], 1);
 
 					for (int d=0;d<vb->ndim;d++) {
@@ -577,9 +569,9 @@ int ConvertVariablePutVar(ADIOS_FILE **infile, std::vector<int> wblocks, int adi
 					}
         			adios_selection_delete(wbsel);
 					free(buf);
-					adios_free_varinfo(vb);
 					k++;
 				}
+				adios_free_varinfo(vb);
 			}
 		}
 		mysize = 0;
@@ -587,7 +579,10 @@ int ConvertVariablePutVar(ADIOS_FILE **infile, std::vector<int> wblocks, int adi
        		start[d] = (PIO_Offset) 0;
     		count[d] = (PIO_Offset) 0;
         }
-		buf = (char *)malloc(mysize+1);
+		if ((buf = (char *)malloc(mysize+1))==NULL) {
+			printf("ERROR: cannot allocate memory: %ld\n",mysize+1);
+			return 1;
+		}
 		for (;k<g_wbsize;k++) {
 			ret = put_vara(ncid, var.nc_varid, var.nctype, vi->type, start, count, buf);
         	if (ret != PIO_NOERR) {
@@ -599,6 +594,7 @@ int ConvertVariablePutVar(ADIOS_FILE **infile, std::vector<int> wblocks, int adi
         TimerStop(write);
 		free(buf);
     }
+
     adios_free_varinfo(vi);
     return ret;
 }
@@ -607,7 +603,10 @@ int ConvertVariableTimedPutVar(ADIOS_FILE **infile, std::vector<int> wblocks, in
 {
     TimerStart(read);
     int ret = 0;
-    ADIOS_VARINFO *vi = adios_inq_var(infile[0], infile[0]->var_namelist[adios_varid]);
+	char *varname = infile[0]->var_namelist[adios_varid];
+    ADIOS_VARINFO *vi = adios_inq_var(infile[0], varname);
+
+	printf("TIMED_VARIABLE: %s\n",varname);
 
     if (vi->ndim == 0)
     {
@@ -641,7 +640,7 @@ int ConvertVariableTimedPutVar(ADIOS_FILE **infile, std::vector<int> wblocks, in
 		int l_nblocks = 0;
 		int g_nblocks = 0;
 		for (int i=1;i<=wblocks.size();i++) {
-    		ADIOS_VARINFO *vb = adios_inq_var(infile[i], infile[i]->var_namelist[adios_varid]);
+    		ADIOS_VARINFO *vb = adios_inq_var(infile[i], varname);
 			if (vb) {
 				l_nblocks += vb->nblocks[0];
 				adios_free_varinfo(vb);
@@ -655,7 +654,7 @@ int ConvertVariableTimedPutVar(ADIOS_FILE **infile, std::vector<int> wblocks, in
         }
         if (g_nblocks != nsteps * nblocks_per_step)
         {
-            cout << "rank " << mpirank << ":ERROR in processing variable '" << infile[0]->var_namelist[adios_varid]
+            cout << "rank " << mpirank << ":ERROR in processing variable '" << varname 
                  << "'. Number of blocks = " << g_nblocks
                  << " does not equal the number of steps * number of writers = "
                  << nsteps << " * " << nblocks_per_step << " = " << nsteps*nblocks_per_step
@@ -697,8 +696,7 @@ int ConvertVariableTimedPutVar(ADIOS_FILE **infile, std::vector<int> wblocks, in
                 }
                 std::vector<char> d(nelems * elemsize);
                 ADIOS_SELECTION *wbsel = adios_selection_writeblock(ts);
-                int ret = adios_schedule_read(infile[0], wbsel, infile[0]->var_namelist[adios_varid],
-                        0, 1, d.data());
+                int ret = adios_schedule_read(infile[0], wbsel, varname, 0, 1, d.data());
                 adios_perform_reads(infile[0], 1);
                 TimerStop(read);
 
@@ -716,14 +714,72 @@ int ConvertVariableTimedPutVar(ADIOS_FILE **infile, std::vector<int> wblocks, in
                     cout << "ERROR in PIOc_put_var(), code = " << ret
                     << " at " << __func__ << ":" << __LINE__ << endl;
                 TimerStop(write);
+				adios_selection_delete(wbsel);
             }
         }
         else
         {
+			/* PIOc_put_vara_ writes out from processor 0       */
+			/* Read in infile[0] and output using PIOc_put_vara */
+			if (mpirank==0) {
+				for (int ts=0; ts < nsteps; ++ts)
+           		{
+               		TimerStart(read);
+               		int elemsize = adios_type_size(vi->type,NULL);
+               		uint64_t nelems = 1;
+               		for (int d = 0; d < vi->ndim; d++) {
+               	    	nelems *= vi->dims[d];
+               		}
+               		std::vector<char> d(nelems * elemsize);
+               		ADIOS_SELECTION *wbsel = adios_selection_writeblock(ts);
+               		int ret = adios_schedule_read(infile[0], wbsel, varname, 0, 1, d.data());
+               		adios_perform_reads(infile[0], 1);
+               		TimerStop(read);
+	
+   	            	TimerStart(write);
+   	            	PIO_Offset start[vi->ndim+1], count[vi->ndim+1];
+   	            	start[0] = ts;
+   	            	count[0] = 1;
+   	            	for (int d = 0; d < vi->ndim; d++) {
+						start[d+1] = 0;
+   	                	count[d+1] = vi->dims[d];
+   	            	}
+	
+   	            	if ((ret = PIOc_put_vara(ncid, var.nc_varid, start, count, d.data())))
+   	            	if (ret != PIO_NOERR)
+   	                	cout << "ERROR in PIOc_put_var(), code = " << ret
+   	                	<< " at " << __func__ << ":" << __LINE__ << endl;
+   	            	TimerStop(write);
+					adios_selection_delete(wbsel);
+   	        	}
+			} else {
+				for (int ts=0; ts < nsteps; ++ts)
+           		{
+               		TimerStart(read);
+               		int elemsize = adios_type_size(vi->type,NULL);
+               		uint64_t nelems = 1;
+               		std::vector<char> d(nelems * elemsize);
+
+   	            	PIO_Offset start[vi->ndim+1], count[vi->ndim+1];
+   	            	start[0] = 0;
+   	            	count[0] = 0;
+   	            	for (int d = 0; d < vi->ndim; d++) {
+						start[d+1] = 0;
+   	                	count[d+1] = 0; 
+   	            	}
+	
+   	            	if ((ret = PIOc_put_vara(ncid, var.nc_varid, start, count, d.data())))
+   	            	if (ret != PIO_NOERR)
+   	                	cout << "ERROR in PIOc_put_var(), code = " << ret
+   	                	<< " at " << __func__ << ":" << __LINE__ << endl;
+   	        	}
+			}
+			/*
             cout << "ERROR: put_vara of arrays over time is not supported yet. "
-                    << "Variable \"" << infile[0]->var_namelist[adios_varid] << "\" is a "
+                    << "Variable \"" << varname << "\" is a "
                     << vi->ndim << "D array including the unlimited dimension"
                     << endl;
+			*/
         }
     }
     adios_free_varinfo(vi);
@@ -735,7 +791,8 @@ int ConvertVariableDarray(ADIOS_FILE **infile, int adios_varid, int ncid, Variab
 {
     int ret = 0;
 
-    string attname = string(infile[0]->var_namelist[adios_varid]) + "/__pio__/decomp";
+	char *varname = infile[0]->var_namelist[adios_varid];
+    string attname = string(varname) + "/__pio__/decomp";
     int asize;
     ADIOS_DATATYPES atype;
     char *decompname;
@@ -751,7 +808,7 @@ int ConvertVariableDarray(ADIOS_FILE **infile, int adios_varid, int ncid, Variab
     }
     free(decompname);
 
-    ADIOS_VARINFO *vi = adios_inq_var(infile[0], infile[0]->var_namelist[adios_varid]);
+    ADIOS_VARINFO *vi = adios_inq_var(infile[0], varname);
     adios_inq_var_blockinfo(infile[0], vi);
 
     /* calculate how many records/steps we have for this variable */
@@ -762,20 +819,23 @@ int ConvertVariableDarray(ADIOS_FILE **infile, int adios_varid, int ncid, Variab
 	int l_nblocks = 0;
 	int g_nblocks = 0;
 	for (int i=1;i<=wblocks.size();i++) {
-   		ADIOS_VARINFO *vb = adios_inq_var(infile[i], infile[i]->var_namelist[adios_varid]);
+   		ADIOS_VARINFO *vb = adios_inq_var(infile[i], varname);
 		if (vb) {
+			printf("VARNAME: %s %d %d mpirank: %d\n",varname,i,vb->nblocks[0],mpirank); fflush(stdout);
 			l_nblocks += vb->nblocks[0];
 			adios_free_varinfo(vb);
 		}
 	}
 	MPI_Allreduce(&l_nblocks,&g_nblocks,1,MPI_INT,MPI_SUM,comm); 
+
+	printf("LNBLOCKS: %d GNBLOCKS: %d\n",l_nblocks,g_nblocks); fflush(stdout);
 		
     if (var.is_timed)
     {
         nsteps = g_nblocks / nblocks_per_step;
         if (g_nblocks != nsteps * nblocks_per_step)
         {
-            cout << "rank " << mpirank << ":ERROR in processing darray '" << infile[0]->var_namelist[adios_varid]
+            cout << "rank " << mpirank << ":ERROR in processing darray '" << varname 
                  << "'. Number of blocks = " << g_nblocks 
                  << " does not equal the number of steps * number of writers = "
                  << nsteps << " * " << nblocks_per_step << " = " << nsteps*nblocks_per_step
@@ -791,7 +851,7 @@ int ConvertVariableDarray(ADIOS_FILE **infile, int adios_varid, int ncid, Variab
         int maxSteps = GlobalMaxSteps();
         if (g_nblocks != nsteps * nblocks_per_step)
         {
-            cout << "rank " << mpirank << ":ERROR in processing darray '" << infile[0]->var_namelist[adios_varid]
+            cout << "rank " << mpirank << ":ERROR in processing darray '" << varname 
                  << "' which has no unlimited dimension. Number of blocks = " << g_nblocks 
                  << " does not equal the number of steps * number of writers = "
                  << nsteps << " * " << nblocks_per_step << " = " << nsteps*nblocks_per_step
@@ -799,7 +859,7 @@ int ConvertVariableDarray(ADIOS_FILE **infile, int adios_varid, int ncid, Variab
         }
         else if (maxSteps != 1 && nsteps > maxSteps)
         {
-            cout << "rank " << mpirank << ":ERROR in processing darray '" << infile[0]->var_namelist[adios_varid]
+            cout << "rank " << mpirank << ":ERROR in processing darray '" << varname 
                  << "'. A variable without unlimited dimension was written multiple times."
                  << " The " << nsteps << " steps however does not equal to the number of steps "
                  << "of other variables that indeed have unlimited dimensions (" << maxSteps << ")."
@@ -807,13 +867,15 @@ int ConvertVariableDarray(ADIOS_FILE **infile, int adios_varid, int ncid, Variab
         }
         else if (nsteps > 1)
         {
-            cout << "rank " << mpirank << ":WARNING in processing darray '" << infile[0]->var_namelist[adios_varid]
+            cout << "rank " << mpirank << ":WARNING in processing darray '" << varname 
                  << "'. A variable without unlimited dimension was written " << nsteps << " times. "
                  << "We will write only the last occurence."
                  << endl;
         }
         ts = nsteps-1;
     }
+
+	printf("NSTEPS: %d %d\n",ts,nsteps);
 
 	// TAHSIN -- THIS IS GETTING CONFUSING. NEED TO THINK ABOUT time steps. 
     for (; ts < nsteps; ++ts)
@@ -823,7 +885,7 @@ int ConvertVariableDarray(ADIOS_FILE **infile, int adios_varid, int ncid, Variab
         uint64_t nelems = 0;
 		int l_nwriters  = 0;
 		for (int i=1;i<=wblocks.size();i++) {
-        	ADIOS_VARINFO *vb = adios_inq_var(infile[i], infile[i]->var_namelist[adios_varid]);
+        	ADIOS_VARINFO *vb = adios_inq_var(infile[i], varname);
         	if (vb) {
 				adios_inq_var_blockinfo(infile[i], vb);
 				l_nwriters = vb->nblocks[0]/nsteps;
@@ -840,22 +902,23 @@ int ConvertVariableDarray(ADIOS_FILE **infile, int adios_varid, int ncid, Variab
         std::vector<char> d(nelems * elemsize);
         uint64_t offset = 0;
 		for (int i=1;i<=wblocks.size();i++) {
-            ADIOS_VARINFO *vb = adios_inq_var(infile[i], infile[i]->var_namelist[adios_varid]);
+            ADIOS_VARINFO *vb = adios_inq_var(infile[i], varname);
             if (vb) {
                 adios_inq_var_blockinfo(infile[i], vb);
                 l_nwriters = vb->nblocks[0]/nsteps;
                 for (int j=0;j<l_nwriters;j++) {
 					int blockid = j*nsteps+ts;
                     if (blockid<vb->nblocks[0]) {
-						cout << "    rank " << mpirank << ": read var = " << blockid <<
-                        		" start byte = " << offset <<
-                        		" elems = " << vb->blockinfo[blockid].count[0] << endl;
+						// cout << "    rank " << mpirank << ": read var = " << blockid <<
+                        // 		" start byte = " << offset <<
+                        // 		" elems = " << vb->blockinfo[blockid].count[0] << endl;
                 		ADIOS_SELECTION *wbsel = adios_selection_writeblock(blockid);
                 		int ret = adios_schedule_read(infile[i], wbsel, 
-										infile[i]->var_namelist[adios_varid], 0, 1,
+										varname, 0, 1,
                         				d.data()+offset);
                 		adios_perform_reads(infile[i], 1);
                 		offset += vb->blockinfo[blockid].count[0] * elemsize;
+        				adios_selection_delete(wbsel);
 					}
                 }
                 adios_free_varinfo(vb);
@@ -943,9 +1006,9 @@ void ConvertBPFile(string infilename, string outfilename, int pio_iotype)
 			throw std::runtime_error("Invalid BP file: missing '/__pio__/info/nproc' variable\n");
 		adios_perform_reads(infile[0], 1);
 		if (n_bp_writers!=n_bp_files) {
-			std::cout  << "ERROR: #writers ("<< n_bp_writers 
-					   << ") != #files (" << n_bp_files << std::endl;
-			throw std::runtime_error("#writers has to be equal to #files.\n");
+			std::cout  << "WARNING: #writers (" 
+					<< n_bp_writers << ") != #files (" 
+					<< n_bp_files << ")" << std::endl;
 		} else {
 			std::cout << "n_bp_writers: " << n_bp_writers 
 					  << " n_bp_files: " << n_bp_files << std::endl;
@@ -967,7 +1030,7 @@ void ConvertBPFile(string infilename, string outfilename, int pio_iotype)
 
 		/* Create output file */
 		TimerStart(write);
-		ret = PIOc_createfile(iosysid, &ncid, &pio_iotype, outfilename.c_str(), PIO_CLOBBER);
+		ret = PIOc_createfile(iosysid, &ncid, &pio_iotype, outfilename.c_str(), PIO_64BIT_OFFSET);
 		TimerStop(write);
 		if (ret)
 			throw std::runtime_error("Could not create output file " + outfilename + "\n");
@@ -1009,12 +1072,15 @@ void ConvertBPFile(string infilename, string outfilename, int pio_iotype)
 				std::string op(ncop);
 				if (op == "put_var") {
 					if (var.is_timed) {
+						printf("ConvertVariableTimedPutVar: %d\n",mpirank); fflush(stdout);
 						ConvertVariableTimedPutVar(infile, wblocks, i, ncid, var, n_bp_writers);
 					} else {
+						// printf("ConvertVariablePutVar: %d\n",mpirank); fflush(stdout);
 						ConvertVariablePutVar(infile, wblocks, i, ncid, var);
 					}
 				} else if (op == "darray") {
 					/* Variable was written with pio_write_darray() with a decomposition */
+					printf("ConvertVariableDarray: %d\n",mpirank); fflush(stdout);
 					ConvertVariableDarray(infile, i, ncid, var, wblocks, decomp_map, n_bp_writers);
 				} else {
 					if (!mpirank)
@@ -1023,6 +1089,7 @@ void ConvertBPFile(string infilename, string outfilename, int pio_iotype)
 				free(ncop);
 			}
 			FlushStdout(comm);
+			printf("PIOc_sync: %d\n",mpirank); fflush(stdout);
 			PIOc_sync(ncid); /* FIXME: flush after each variable until development is done. Remove for efficiency */
 		}
 		TimerStart(write);
@@ -1030,6 +1097,8 @@ void ConvertBPFile(string infilename, string outfilename, int pio_iotype)
 		ret = PIOc_closefile(ncid);
 		TimerStop(write);
 		TimerStart(read);
+		printf("I am before adios_read_close: %d\n",mpirank); fflush(stdout);
+		MPI_Barrier(MPI_COMM_WORLD);
 		for (int i=0;i<num_infiles;i++) 
 			adios_read_close(infile[i]);
 		TimerStop(read);
