@@ -2001,6 +2001,10 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
             maxregions = iodesc->maxfillregions;
         }
 
+#ifdef _USE_MALLOC_
+		if (grid) free(grid);
+#endif
+
         /* Get the max maxregions, and distribute it to all tasks in
          * the IO communicator. */
         if ((mpierr = MPI_Allreduce(MPI_IN_PLACE, &maxregions, 1, MPI_INT, MPI_MAX,
@@ -2010,7 +2014,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
 
         /* Get the max maxholegridsize, and distribute it to all tasks
          * in the IO communicator. */
-	iodesc->maxholegridsize = iodesc->holegridsize;
+		iodesc->maxholegridsize = iodesc->holegridsize;
         if ((mpierr = MPI_Allreduce(MPI_IN_PLACE, &(iodesc->maxholegridsize), 1, MPI_INT,
                                     MPI_MAX, ios->io_comm)))
             return check_mpi(NULL, mpierr, __FILE__, __LINE__);
