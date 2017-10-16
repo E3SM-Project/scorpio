@@ -1159,12 +1159,14 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
         {
             if (file->num_vars > 0) // in create/write mode we have variables, in open/read mode, we don't
             {
+                ierr = PIO_ENOTVAR;
                 int i;
                 for (i=0; i < file->num_vars; i++)
                 {
                     if (!strcmp(name, file->adios_vars[i].name))
                     {
                         *varidp = i;
+                        ierr = 0;
                         break;
                     }
                 }
@@ -1172,8 +1174,9 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
             else
             {
                 LOG((2,"ADIOS Read mode missing %s:%s\n", __FILE__, __func__));
+                ierr = 0;
             }
-            ierr = 0;
+
         }
 #endif
 
