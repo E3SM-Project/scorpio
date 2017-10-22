@@ -453,10 +453,14 @@ int put_vara(int ncid, int varid, int nctype, enum ADIOS_DATATYPES memtype, PIO_
     switch(memtype)
     {
     case adios_byte:
-        if (nctype == PIO_BYTE)
+        if (nctype == PIO_BYTE) {
+			printf("Writing schar\n");
             ret = PIOc_put_vara_schar(ncid, varid, start, count, (const signed char*)buf);
-        else
+		}
+        else {
+			printf("Writing text...\n");
             ret = PIOc_put_vara_text(ncid, varid, start, count, (const char*)buf);
+		}
         break;
     case adios_short:
         ret = PIOc_put_vara_short(ncid, varid, start, count, (const signed short*)buf);
@@ -545,9 +549,9 @@ int ConvertVariablePutVar(ADIOS_FILE **infile, std::vector<int> wfiles, int adio
 			if (vb) {
 				adios_inq_var_blockinfo(infile[i], vb);
 				for (int j=0;j<vb->nblocks[0];j++) {
-					mysize = 0;
+					mysize = 1;
 					for (int d=0;d<vb->ndim;d++) 
-						mysize += (size_t)vb->blockinfo[j].count[d];
+						mysize *= (size_t)vb->blockinfo[j].count[d];
 					mysize = mysize*adios_type_size(vb->type,NULL);
         			if ((buf = (char *)malloc(mysize))==NULL) {
 						printf("ERROR: cannot allocate memory: %ld\n",mysize);
@@ -579,7 +583,7 @@ int ConvertVariablePutVar(ADIOS_FILE **infile, std::vector<int> wfiles, int adio
        		start[d] = (PIO_Offset) 0;
     		count[d] = (PIO_Offset) 0;
         }
-		if ((buf = (char *)malloc(mysize+1))==NULL) {
+		if ((buf = (char *)malloc(1))==NULL) {
 			printf("ERROR: cannot allocate memory: %ld\n",mysize+1);
 			return 1;
 		}
