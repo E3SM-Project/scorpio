@@ -453,14 +453,10 @@ int put_vara(int ncid, int varid, int nctype, enum ADIOS_DATATYPES memtype, PIO_
     switch(memtype)
     {
     case adios_byte:
-        if (nctype == PIO_BYTE) {
-			printf("Writing schar\n");
+        if (nctype == PIO_BYTE) 
             ret = PIOc_put_vara_schar(ncid, varid, start, count, (const signed char*)buf);
-		}
-        else {
-			printf("Writing text...\n");
+        else 
             ret = PIOc_put_vara_text(ncid, varid, start, count, (const char*)buf);
-		}
         break;
     case adios_short:
         ret = PIOc_put_vara_short(ncid, varid, start, count, (const signed short*)buf);
