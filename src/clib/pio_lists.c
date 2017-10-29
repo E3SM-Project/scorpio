@@ -270,10 +270,17 @@ int pio_add_to_iodesc_list(io_desc_t *iodesc)
     }
     else
     {
+#ifdef _ADIOS  // ADIOS needs a unique ID. The IDs should not be reused
+		for (ciodesc = pio_iodesc_list; ciodesc->next;
+             ciodesc = ciodesc->next)
+            ;
+        ciodesc->next = iodesc;
+#else
         for (ciodesc = pio_iodesc_list; ciodesc->next;
              ciodesc = ciodesc->next, imax = ciodesc->ioid + 1)
             ;
         ciodesc->next = iodesc;
+#endif 
     }
     ++imax;
     iodesc->ioid = imax;
