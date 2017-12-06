@@ -51,6 +51,13 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
     LOG((1, "PIOc_put_att_tc ncid = %d varid = %d name = %s atttype = %d len = %d memtype = %d",
          ncid, varid, name, atttype, len, memtype));
 
+	/*
+	if (ios->io_rank==0) {
+		printf("PUT_ATT VARIABLE: %s varid: %d ios->ioproc: %d io_rank: %d master: %d iotype: %d file: %d adios_group: %ld adios_file: %ld filename: %s\n",
+		name,varid,ios->ioproc,ios->io_rank,ios->iomaster,file->iotype,file->fh,file->adios_group,file->adios_fh,file->filename); fflush(stdout);
+	}
+	*/
+
     /* Run these on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. */
     if (!ios->async || !ios->ioproc)
@@ -160,6 +167,13 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 #ifdef _ADIOS
         if (file->iotype == PIO_IOTYPE_ADIOS)
         {
+			/*
+			if (ios->io_rank==0) {
+				printf("ADIOS: PROCESSING GLOBAL VARIABLE: %s varid: %d ios->ioproc: %d rank: %d %d\n",
+					name,varid,ios->ioproc,ios->io_rank,ios->iomaster); fflush(stdout);
+			}
+			*/
+
             LOG((2,"ADIOS define attribute %s, varid %d, type %d\n", name, varid, atttype));
             enum ADIOS_DATATYPES adios_type = PIOc_get_adios_type(atttype);
             char path[256];
@@ -174,6 +188,29 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                 strncpy(path,"pio_global", sizeof(path));
                 file->num_gattrs++;
             }
+
+			/* Tack attributes */
+			int num_attrs = file->num_attrs;
+			if (num_attrs>=PIO_MAX_VARS) {
+				fprintf(stderr, "ERROR: Num of attributes exceeds maximum (%d).\n",PIO_MAX_VARS);
+				fflush(stderr);
+				return PIO_EMAXATTS;
+			}
+			file->adios_attrs[num_attrs].att_name = strdup(name); 
+			file->adios_attrs[num_attrs].att_len = len;
+			file->adios_attrs[num_attrs].att_type = atttype;	
+			file->adios_attrs[num_attrs].att_varid = varid;
+			file->adios_attrs[num_attrs].att_ncid = ncid;
+			file->adios_attrs[num_attrs].adios_type = adios_type;
+			file->num_attrs++;
+
+			/*
+			if (ios->io_rank==0) {
+				printf("ADIOS: ATTRIBUTE %d: %s %d\n",num_attrs,name,len);
+				fflush(stdout);
+			}
+			*/
+
             //Workaround for adios 1.12.0, where adios_define_attribute_byvalue
             //  throws an error on a string attribute of ""
             if (adios_type == adios_string || atttype == NC_CHAR)
@@ -235,6 +272,13 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             }
         }
     }
+
+	/*
+	if (ios->io_rank==0) {
+			printf("BROADCASTING VARIABLE: %s varid: %d ios->ioproc: %d rank: %d %d\n",
+				name,varid,ios->ioproc,ios->io_rank,ios->iomaster); fflush(stdout);
+	}
+	*/
 
     /* Broadcast and check the return code. */
     if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))

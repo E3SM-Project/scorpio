@@ -1281,8 +1281,19 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
 #ifdef _ADIOS
         if (file->iotype == PIO_IOTYPE_ADIOS)
         {
-            LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__));
-            ierr = 0;
+            /* LOG((2,"ADIOS missing %s:%s\n", __FILE__, __func__)); */
+			/* Track attributes */
+            ierr = PIO_ENOTATT;
+			for (int i=0;i<file->num_attrs;i++) {
+				if (!strcmp(name,file->adios_attrs[i].att_name) && 
+					file->adios_attrs[i].att_varid==varid &&
+					file->adios_attrs[i].att_ncid==ncid) {
+					ierr    = PIO_NOERR;
+					*xtypep = (nc_type) (file->adios_attrs[i].att_type);
+					*lenp   = (PIO_Offset) (file->adios_attrs[i].att_len);
+					i = file->num_attrs+1;
+				}
+			}
         }
 #endif
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
