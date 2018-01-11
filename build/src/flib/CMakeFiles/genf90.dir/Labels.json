@@ -1,0 +1,51 @@
+
+{
+	"sources" : 
+	[
+		
+		{
+			"file" : "/home/tkurc/codar/acme/ParallelIO/build/src/flib/CMakeFiles/genf90"
+		},
+		
+		{
+			"file" : "/home/tkurc/codar/acme/ParallelIO/build/src/flib/CMakeFiles/genf90.rule"
+		},
+		
+		{
+			"file" : "/home/tkurc/codar/acme/ParallelIO/build/src/flib/CMakeFiles/genf90-complete.rule"
+		},
+		
+		{
+			"file" : "/home/tkurc/codar/acme/ParallelIO/build/src/flib/genf90/src/genf90-stamp/genf90-install.rule"
+		},
+		
+		{
+			"file" : "/home/tkurc/codar/acme/ParallelIO/build/src/flib/genf90/src/genf90-stamp/genf90-mkdir.rule"
+		},
+		
+		{
+			"file" : "/home/tkurc/codar/acme/ParallelIO/build/src/flib/genf90/src/genf90-stamp/genf90-download.rule"
+		},
+		
+		{
+			"file" : "/home/tkurc/codar/acme/ParallelIO/build/src/flib/genf90/src/genf90-stamp/genf90-update.rule"
+		},
+		
+		{
+			"file" : "/home/tkurc/codar/acme/ParallelIO/build/src/flib/genf90/src/genf90-stamp/genf90-patch.rule"
+		},
+		
+		{
+			"file" : "/home/tkurc/codar/acme/ParallelIO/build/src/flib/genf90/src/genf90-stamp/genf90-configure.rule"
+		},
+		
+		{
+			"file" : "/home/tkurc/codar/acme/ParallelIO/build/src/flib/genf90/src/genf90-stamp/genf90-build.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : [ "genf90" ],
+		"name" : "genf90"
+	}
+}
