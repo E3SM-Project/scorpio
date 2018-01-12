@@ -2,6 +2,7 @@
 #define _ADIOS2PIO_NM_LIB_H_ 
 
 #include <string>
+#include <mpi.h>
 
 using namespace std;
 
