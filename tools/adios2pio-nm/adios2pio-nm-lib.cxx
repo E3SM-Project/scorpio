@@ -1127,16 +1127,14 @@ void ConvertBPFile(string infilepath, string outfilename, int pio_iotype, int io
     }
 }
 
-void usage(string prgname, int mpirank)
+void usage(string prgname)
 {
-    if (!mpirank && debug_out) {
         cout << "Usage: " << prgname << " bp_file  nc_file  pio_io_type\n";
         cout << "   bp file   :  data produced by PIO with ADIOS format\n";
         cout << "   nc file   :  output file name after conversion\n";
         cout << "   pio format:  output PIO_IO_TYPE. Supported parameters:\n";
         cout << "                pnetcdf  netcdf  netcdf4c  netcdf4p   or:\n";
         cout << "                   1       2        3         4\n";
-    }
 }
 
 enum PIO_IOTYPE GetIOType(string t)
@@ -1165,13 +1163,13 @@ enum PIO_IOTYPE GetIOType(string t)
     return iotype;
 }
 
-int ConvertBPToNC(string infilepath, string outfilename, string piotype)
+int ConvertBPToNC(string infilepath, string outfilename, string piotype, MPI_Comm comm_in)
 {
 	int ret = 0;
 	int iosysid = 0;
 
-	MPI_Comm comm   = MPI_COMM_WORLD;
-	MPI_Comm w_comm = MPI_COMM_WORLD;
+	MPI_Comm comm   = comm_in;
+	MPI_Comm w_comm = comm_in;
 	int mpirank, w_mpirank;
 	int nproc, w_nproc;
 
