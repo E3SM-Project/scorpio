@@ -119,7 +119,7 @@ int run_spmd_tests(MPI_Comm test_comm)
 
             /* Run the swapm function. */
             if ((ret = pio_swapm(sbuf, sendcounts, sdispls, sendtypes, rbuf, recvcounts,
-                                 rdispls, recvtypes, test_comm, &fc)))
+                                 rdispls, recvtypes, NULL, test_comm, &fc)))
                 return ret;
 
             /* Print results. */
