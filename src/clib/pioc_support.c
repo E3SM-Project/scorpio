@@ -2430,6 +2430,21 @@ int iotype_is_valid(int iotype)
 }
 
 /**
+ * Free a pio swapm user request
+ * @param p pointer to the pio swapm user request
+ */
+void pio_swapm_req_free(void *p)
+{
+    pio_swapm_req *ureq = (pio_swapm_req *)p;
+    if(ureq != NULL)
+    {
+        free(ureq->rcvids);
+        free(ureq->sndids);
+        free(ureq);
+    }
+}
+
+/**
  * Set the rearranger options associated with an iosystem
  *
  * @param comm_type Type of communication (pt2pt/coll) used

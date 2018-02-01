@@ -95,6 +95,16 @@ extern "C" {
         bool isend;
     } pio_swapm_defaults;
 
+    /** swapm request */
+    typedef struct pio_swapm_req
+    {
+        MPI_Request *rcvids;
+        int nrcvids;
+
+        MPI_Request *sndids;
+        int nsndids;
+    } pio_swapm_req;
+
     /* Handle an error in the PIO library. */
     int pio_err(iosystem_desc_t *ios, file_desc_t *file, int err_num, const char *fname,
                 int line);
@@ -188,6 +198,7 @@ extern "C" {
     /* Like MPI_Alltoallw(), but with flow control. */
     int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendtypes,
                   void *recvbuf, int *recvcounts, int *rdispls, MPI_Datatype *recvtypes,
+                  pio_swapm_req *ureq,
                   MPI_Comm comm, rearr_comm_fc_opt_t *fc);
 
     long long lgcd_array(int nain, long long* ain);
@@ -356,6 +367,9 @@ extern "C" {
 
     /* Handle end and re-defs. */
     int pioc_change_def(int ncid, int is_enddef);
+
+    /* Free a pio swapm user request */
+    void pio_swapm_req_free(void *);
 
     /* Initialize and finalize logging. */
     void pio_init_logging(void);
