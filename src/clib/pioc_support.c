@@ -3273,6 +3273,21 @@ int check_and_reset_rearr_opts(rearr_opt_t *rearr_opt)
     return PIO_NOERR;
 }
 
+/*
+ * Free a pio swapm user request
+ * @param p pointer to the pio swapm user request
+ */
+void pio_swapm_req_free(void *p)
+{
+    pio_swapm_req *ureq = (pio_swapm_req *)p;
+    if(ureq != NULL)
+    {
+        free(ureq->rcvids);
+        free(ureq->sndids);
+        free(ureq);
+    }
+}
+
 /**
  * Set the rearranger options associated with an iosystem
  *

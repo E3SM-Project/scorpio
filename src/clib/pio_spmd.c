@@ -68,6 +68,12 @@ int pair(int np, int p, int k)
  * to place the incoming data from process i.
  * @param recvtypes array of datatypes (of length ntasks). Entry i
  * specifies the type of data received from process i.
+ * @param rcvids array of requests corresponding to data recieved from
+ * each rank. If NULL, the function internally allocates the array
+ * @param nrcvids Size of the rcvids array
+ * @param sndids array of requests corresponding to data sent to
+ * each rank. If NULL, the function internally allocates the array
+ * @param nsndids Size of the sndids array
  * @param comm MPI communicator for the MPI_Alltoallw call.
  * @param fc pointer to the struct that provided flow control options.
  * @returns 0 for success, error code otherwise.
@@ -75,6 +81,7 @@ int pair(int np, int p, int k)
  */
 int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendtypes,
               void *recvbuf, int *recvcounts, int *rdispls, MPI_Datatype *recvtypes,
+              pio_swapm_req *ureq,
               MPI_Comm comm, rearr_comm_fc_opt_t *fc)
 {
     int ntasks;  /* Number of tasks in communicator comm. */
@@ -90,6 +97,7 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
     int hs = 1; /* Used for handshaking. */
     void *ptr;
     MPI_Status status; /* Not actually used - replace with MPI_STATUSES_IGNORE. */
+    bool ureq_from_usr = true;
     int mpierr;  /* Return code from MPI functions. */
 
 #ifdef TIMING
@@ -108,9 +116,8 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
 
     /* Now we know the size of these arrays. */
     int swapids[ntasks];
-    MPI_Request rcvids[ntasks];
-    MPI_Request sndids[ntasks];
     MPI_Request hs_rcvids[ntasks];
+
 
     /* Print some debugging info, if logging is enabled. */
 #if PIO_ENABLE_LOGGING
@@ -144,6 +151,7 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
     if (sendcounts[my_rank] > 0)
     {
         void *sptr, *rptr;
+        MPI_Request rcvid;
         tag = my_rank + offset_t;
         sptr = (char *)sendbuf + sdispls[my_rank];
         rptr = (char *)recvbuf + rdispls[my_rank];
@@ -164,13 +172,13 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
 #else
         if ((mpierr = MPI_Irecv(rptr, recvcounts[my_rank], recvtypes[my_rank],
-                                my_rank, tag, comm, rcvids)))
+                                my_rank, tag, comm, &rcvid)))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Send(sptr, sendcounts[my_rank], sendtypes[my_rank],
                                my_rank, tag, comm)))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
 
-        if ((mpierr = MPI_Wait(rcvids, &status)))
+        if ((mpierr = MPI_Wait(&rcvid, &status)))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
 #endif
     }
@@ -189,13 +197,8 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
 
     for (int i = 0; i < ntasks; i++)
     {
-        rcvids[i] = MPI_REQUEST_NULL;
         swapids[i] = 0;
     }
-
-    if (fc->isend)
-        for (int i = 0; i < ntasks; i++)
-            sndids[i] = MPI_REQUEST_NULL;
 
     if (fc->hs)
         for (int i = 0; i < ntasks; i++)
@@ -251,6 +254,43 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
 
     LOG((2, "fc->max_pend_req=%d, maxreq=%d, maxreqh=%d", fc->max_pend_req, maxreq, maxreqh));
 
+    if(ureq == NULL)
+    {
+        ureq_from_usr = false;
+        ureq = (pio_swapm_req *)calloc(1, sizeof(pio_swapm_req));
+        if(ureq == NULL)
+        {
+            return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                            "Error exchanging data among processes. Unable to allocate memory (%lld bytes) for caching user requests", (unsigned long long) (sizeof(pio_swapm_req)));
+        }
+    }
+
+    ureq->rcvids = (MPI_Request *)malloc(steps * sizeof(MPI_Request));
+    if(ureq->rcvids == NULL)
+    {
+        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Error exchanging data among processes. Unable to allocate memory (%lld bytes) for caching MPI requests for recvs", (unsigned long long) (steps * sizeof(MPI_Request)));
+    }
+    for(int i=0; i<steps; i++)
+    {
+        ureq->rcvids[i] = MPI_REQUEST_NULL;
+    }
+    ureq->nrcvids = steps;
+    if (fc->isend)
+    {
+        ureq->sndids = (MPI_Request *)malloc(steps * sizeof(MPI_Request));
+        if(ureq->sndids == NULL)
+        {
+            return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                            "Error exchanging data among processes. Unable to allocate memory (%lld bytes) for caching MPI requests for sends", (unsigned long long) (steps * sizeof(MPI_Request)));
+        }
+        for (int i = 0; i < steps; i++)
+        {
+            ureq->sndids[i] = MPI_REQUEST_NULL;
+        }
+        ureq->nsndids = steps;
+    }
+
     /* If handshaking is in use, do a nonblocking recieve to listen
      * for it. */
     if (fc->hs)
@@ -277,7 +317,7 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
             ptr = (char *)recvbuf + rdispls[p];
 
             if ((mpierr = MPI_Irecv(ptr, recvcounts[p], recvtypes[p], p, tag, comm,
-                                    rcvids + istep)))
+                                    ureq->rcvids + istep)))
                 return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
 
             if (fc->hs)
@@ -315,18 +355,18 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
             {
 #ifndef _USE_MPI_RSEND
                 if ((mpierr = MPI_Isend(ptr, sendcounts[p], sendtypes[p], p, tag, comm,
-                                        sndids + istep)))
+                                        ureq->sndids + istep)))
                     return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
 #else
                 if ((mpierr = MPI_Irsend(ptr, sendcounts[p], sendtypes[p], p, tag, comm,
-                                         sndids + istep)))
+                                         ureq->sndids + istep)))
                     return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
 #endif
             }
             else if (fc->isend)
             {
                 if ((mpierr = MPI_Isend(ptr, sendcounts[p], sendtypes[p], p, tag, comm,
-                                         sndids + istep)))
+                                         ureq->sndids + istep)))
                     return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
             }
             else
@@ -341,11 +381,11 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
         if (istep > maxreqh - 1)
         {
             p = istep - maxreqh;
-            if (rcvids[p] != MPI_REQUEST_NULL)
+            if (ureq->rcvids[p] != MPI_REQUEST_NULL)
             {
-                if ((mpierr = MPI_Wait(rcvids + p, &status)))
+                if ((mpierr = MPI_Wait(ureq->rcvids + p, &status)))
                     return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-                rcvids[p] = MPI_REQUEST_NULL;
+                ureq->rcvids[p] = MPI_REQUEST_NULL;
             }
             if (rstep < steps)
             {
@@ -361,7 +401,7 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
                     tag = p + offset_t;
 
                     ptr = (char *)recvbuf + rdispls[p];
-                    if ((mpierr = MPI_Irecv(ptr, recvcounts[p], recvtypes[p], p, tag, comm, rcvids + rstep)))
+                    if ((mpierr = MPI_Irecv(ptr, recvcounts[p], recvtypes[p], p, tag, comm, ureq->rcvids + rstep)))
                         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
                     if (fc->hs)
                         if ((mpierr = MPI_Send(&hs, 1, MPI_INT, p, tag, comm)))
@@ -377,11 +417,16 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
     if (steps > 0)
     {
         LOG((2, "Waiting for outstanding msgs"));
-        if ((mpierr = MPI_Waitall(steps, rcvids, MPI_STATUSES_IGNORE)))
+        if ((mpierr = MPI_Waitall(ureq->nrcvids, ureq->rcvids, MPI_STATUSES_IGNORE)))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
         if (fc->isend)
-            if ((mpierr = MPI_Waitall(steps, sndids, MPI_STATUSES_IGNORE)))
+            if ((mpierr = MPI_Waitall(ureq->nsndids, ureq->sndids, MPI_STATUSES_IGNORE)))
                 return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
+    }
+
+    if(!ureq_from_usr)
+    {
+        pio_swapm_req_free((void *) ureq);
     }
 
 #ifdef TIMING

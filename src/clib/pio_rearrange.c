@@ -682,8 +682,8 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
     /* Share the iodesc->scount from each compute task to all IO
      * tasks. The scounts will end up in array recv_buf. */
     if ((ierr = pio_swapm(iodesc->scount, send_counts, send_displs, sr_types,
-                          recv_buf, recv_counts, recv_displs, sr_types, ios->union_comm,
-                          &iodesc->rearr_opts.comp2io)))
+                          recv_buf, recv_counts, recv_displs, sr_types,
+                          NULL, ios->union_comm, &iodesc->rearr_opts.comp2io)))
     {
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                         "Calculating the amount/offset of data transferred between compute and I/O processes failed. pio_swapm() call failed to transfer the amount of data transferred between compute and I/O processes");
@@ -842,8 +842,8 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
     /* s2rindex is the list of indeces on each compute task */
     LOG((3, "sending mapping"));
     if ((ierr = pio_swapm(s2rindex, send_counts, send_displs, sr_types, iodesc->rindex,
-                          recv_counts, recv_displs, sr_types, ios->union_comm,
-                          &iodesc->rearr_opts.comp2io)))
+                          recv_counts, recv_displs, sr_types,
+                          NULL, ios->union_comm, &iodesc->rearr_opts.comp2io)))
     {
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                         "Calculating the amount/offset of data transferred between compute and I/O processes failed. pio_swapm() call failed to exchange offset/index of data transferred.");
@@ -1034,8 +1034,8 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
     /* Data in sbuf on the compute nodes is sent to rbuf on the ionodes */
     LOG((2, "about to call pio_swapm for sbuf"));
     if ((ret = pio_swapm(sbuf, sendcounts, sdispls, sendtypes,
-                         rbuf, recvcounts, rdispls, recvtypes, mycomm,
-                         &iodesc->rearr_opts.comp2io)))
+                         rbuf, recvcounts, rdispls, recvtypes,
+                         NULL, mycomm, &iodesc->rearr_opts.comp2io)))
     {
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Rearranging data from compute to I/O processes failed. pio_swapm() call failed to exchange data");
@@ -1178,7 +1178,8 @@ int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
 
     /* Data in sbuf on the ionodes is sent to rbuf on the compute nodes */
     if ((ret = pio_swapm(sbuf, sendcounts, sdispls, sendtypes, rbuf, recvcounts,
-                         rdispls, recvtypes, mycomm, &iodesc->rearr_opts.io2comp)))
+                          rdispls, recvtypes, NULL,
+                          mycomm, &iodesc->rearr_opts.io2comp)))
     {
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Rearranging data from I/O to compute processes failed. pio_swapm() call failed to transfer data between the processes");
@@ -1469,7 +1470,7 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
     LOG((3, "about to call pio_swapm with start/count from iotask ndims = %d",
          ndims));
     if ((ret = pio_swapm(sc_info_msg_send, sendcounts, sdispls, dtypes, sc_info_msg_recv,
-                         recvcounts, rdispls, dtypes, ios->union_comm,
+                         recvcounts, rdispls, dtypes, NULL, ios->union_comm,
                          &iodesc->rearr_opts.io2comp)))
     {
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
@@ -1739,7 +1740,8 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
     LOG((3, "calling pio_swapm to allgather llen into array iomaplen, ndims = %d dtypes[0] = %d",
          ndims, dtypes));
     if ((ret = pio_swapm(&iodesc->llen, sendcounts, sdispls, dtypes, iomaplen, recvcounts,
-                         rdispls, dtypes, ios->union_comm, &iodesc->rearr_opts.io2comp)))
+                          rdispls, dtypes, NULL,
+                          ios->union_comm, &iodesc->rearr_opts.io2comp)))
     {
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Creating BOX rearranger failed for I/O decomposition (ioid=%d) on iosytem (iosysid=%d). pio_swapm() failed to exchange the I/O decomposition map length across processes", iodesc->ioid, ios->iosysid);
@@ -1800,7 +1802,7 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
             LOG((3, "about to call pio_swapm with start/count from iotask %d ndims = %d",
                  i, ndims));
             if ((ret = pio_swapm(start_count_send, sendcounts, sdispls, dtypes, start_count_recv,
-                                 recvcounts, rdispls, dtypes, ios->union_comm,
+                                 recvcounts, rdispls, dtypes, NULL, ios->union_comm,
                                  &iodesc->rearr_opts.io2comp)))
             {
                 return pio_err(ios, NULL, ret, __FILE__, __LINE__,
