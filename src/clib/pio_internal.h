@@ -219,6 +219,12 @@ extern "C" {
                   pio_swapm_req *ureq,
                   MPI_Comm comm, rearr_comm_fc_opt_t *fc);
 
+    /* Non blocking wait for pio swapm user request */
+    int pio_swapm_iwait(pio_swapm_req *ureq, int *flag);
+
+    /* Blocking wait for pio swapm user request */
+    int pio_swapm_wait(pio_swapm_req *ureq);
+
     long long lgcd_array(int nain, long long* ain);
 
     void PIO_Offset_size(MPI_Datatype *dtype, int *tsize);
