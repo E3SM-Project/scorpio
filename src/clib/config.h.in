@@ -34,4 +34,7 @@
 /** Maximum number of non-contiguous regions cached in a single IO process. */
 #define PIO_MAX_CACHED_IO_REGIONS @PIO_MAX_CACHED_IO_REGIONS@
 
+/** Enable (if set to a non-zero value) asynchronous rearrangement during write */
+#define PIO_ENABLE_ASYNC_WR_REARR @ENABLE_ASYNC_WR_REARR@
+
 #endif /* _PIO_CONFIG_ */
