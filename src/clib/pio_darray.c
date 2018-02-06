@@ -274,8 +274,16 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
     }
 
     /* Move data from compute to IO tasks. */
-    if ((ierr = rearrange_comp2io(ios, iodesc, array, file->iobuf, nvars)))
+    if ((ierr = rearrange_comp2io(ios, iodesc, file, array, file->iobuf, nvars)))
         return pio_err(ios, file, ierr, __FILE__, __LINE__);
+
+#if PIO_ENABLE_ASYNC_WR_REARR
+    ierr = pio_file_async_pend_ops_wait(file);
+    if(ierr != PIO_NOERR)
+    {
+        return pio_err(ios, file, ierr, __FILE__, __LINE__);
+    }
+#endif
 
 #ifdef PIO_MICRO_TIMING
     double rearr_time = 0;
