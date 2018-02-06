@@ -296,11 +296,20 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
     }
 
     /* Move data from compute to IO tasks. */
-    if ((ierr = rearrange_comp2io(ios, iodesc, array, file->iobuf[ioid - PIO_IODESC_START_ID], nvars)))
+    if ((ierr = rearrange_comp2io(ios, iodesc, file, array, file->iobuf[ioid - PIO_IODESC_START_ID], nvars)))
     {
         return pio_err(ios, file, ierr, __FILE__, __LINE__,
                         "Writing multiple variables to file (%s, ncid=%d) failed. Error rearranging and moving data from compute tasks to I/O tasks", pio_get_fname_from_file(file), ncid);
     }
+
+#if PIO_ENABLE_ASYNC_WR_REARR
+    ierr = pio_file_async_pend_ops_wait(file);
+    if(ierr != PIO_NOERR)
+    {
+        return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                        "Writing multiple variables to file (%s, ncid=%d) failed. Error waiting on pending asynchronous operations associated with the file", pio_get_fname_from_file(file), ncid);
+    }
+#endif
 
 #ifdef PIO_MICRO_TIMING
     double rearr_time = 0;

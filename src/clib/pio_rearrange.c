@@ -861,14 +861,16 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
  *
  * @param ios pointer to the iosystem_desc_t struct.
  * @param iodesc a pointer to the io_desc_t struct.
+ * @param file a pointer to the file_desc_t struct.
  * @param sbuf send buffer. May be NULL.
  * @param rbuf receive buffer. May be NULL.
  * @param nvars number of variables.
  * @returns 0 on success, error code otherwise.
  * @author Jim Edwards
  */
-int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
-                      void *rbuf, int nvars)
+int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc,
+                      file_desc_t *file, void *sbuf, void *rbuf,
+                      int nvars)
 {
     int ntasks;       /* Number of tasks in communicator. */
     int niotasks;     /* Number of IO tasks. */
@@ -1033,13 +1035,53 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
     
     /* Data in sbuf on the compute nodes is sent to rbuf on the ionodes */
     LOG((2, "about to call pio_swapm for sbuf"));
+    pio_swapm_req *ureq = NULL;
+    rearr_comm_fc_opt_t *prearr_opts = &(iodesc->rearr_opts.comp2io);
+
+#if PIO_ENABLE_ASYNC_WR_REARR
+    /* We override user specified rearranger optios because we need
+     * tp make sure that all communication between processes is
+     * initiated in a single call
+     * Since the asynchronous ops need to be associated with a file,
+     * enable asynchronous writes only when the file is valid
+     */
+    rearr_comm_fc_opt_t async_rearr_opts =
+        { false, true, PIO_REARR_COMM_UNLIMITED_PEND_REQ };
+    if(file != NULL)
+    {
+        prearr_opts = &(async_rearr_opts);
+        ureq = (pio_swapm_req *)calloc(1, sizeof(pio_swapm_req));
+        if(ureq == NULL)
+        {
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                            "Rearranging data from compute to I/O processes failed. pio_swapm() call failed to exchange data. Unable to allocate %lld bytes to cache the user requests", (unsigned long long) (sizeof(pio_swapm_req)));
+        }
+    }
+    else
+    {
+        LOG((1, "file is NULL, cannot perform async writes"));
+    }
+#endif
+
     if ((ret = pio_swapm(sbuf, sendcounts, sdispls, sendtypes,
                          rbuf, recvcounts, rdispls, recvtypes,
-                         NULL, mycomm, &iodesc->rearr_opts.comp2io)))
+                         ureq, mycomm, prearr_opts)))
     {
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Rearranging data from compute to I/O processes failed. pio_swapm() call failed to exchange data");
     }
+
+#if PIO_ENABLE_ASYNC_WR_REARR
+    if(file != NULL)
+    {
+        ret = pio_file_async_pend_op_add(file, PIO_ASYNC_REARR_OP, ureq);
+        if(ret != PIO_NOERR)
+        {
+            return pio_err(ios, file, ret, __FILE__, __LINE__,
+                            "Rearranging data from compute to I/O processes failed. pio_swapm() call failed to exchange data. Unable to add asynchronous rearrangement operation to file (%s, ncid=%d)", pio_get_fname_from_file(file), file->pio_ncid);
+        }
+    }
+#endif
 
     /* Free the MPI types. */
     for (int i = 0; i < ntasks; i++)
@@ -2668,7 +2710,7 @@ void performance_tune_rearranger(iosystem_desc_t *ios, io_desc_t *iodesc)
     if ((mpierr = MPI_Barrier(mycomm)))
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
     GPTLstamp(&wall[0], &usr[0], &sys[0]);
-    rearrange_comp2io(ios, iodesc, cbuf, ibuf, 1);
+    rearrange_comp2io(ios, iodesc, NULL, cbuf, ibuf, 1);
     rearrange_io2comp(ios, iodesc, ibuf, cbuf);
     GPTLstamp(&wall[1], &usr[1], &sys[1]);
     mintime = wall[1]-wall[0];
@@ -2701,7 +2743,7 @@ void performance_tune_rearranger(iosystem_desc_t *ios, io_desc_t *iodesc)
                 if ((mpierr = MPI_Barrier(mycomm)))
                     return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
                 GPTLstamp(wall, usr, sys);
-                rearrange_comp2io(ios, iodesc, cbuf, ibuf, 1);
+                rearrange_comp2io(ios, iodesc, NULL, cbuf, ibuf, 1);
                 rearrange_io2comp(ios, iodesc, ibuf, cbuf);
                 GPTLstamp(wall+1, usr, sys);
                 wall[1] -= wall[0];

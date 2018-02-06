@@ -289,7 +289,7 @@ extern "C" {
     int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf, void *rbuf);
 
     /* Move data from compute tasks to IO tasks. */
-    int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf, void *rbuf,
+    int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file, void *sbuf, void *rbuf,
                           int nvars);
 
     /* Allocate and initialize storage for decomposition information. */

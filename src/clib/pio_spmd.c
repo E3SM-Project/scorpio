@@ -412,9 +412,10 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
         }
     }
 
-    /* If steps > 0 there could still be outstanding messages, wait for
+    /* There could still be outstanding messages, wait for
      * them here. */
-    if (steps > 0)
+    /* But if user provided the request don't wait */
+    if(!ureq_from_usr)
     {
         LOG((2, "Waiting for outstanding msgs"));
         if ((mpierr = MPI_Waitall(ureq->nrcvids, ureq->rcvids, MPI_STATUSES_IGNORE)))
@@ -422,10 +423,6 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
         if (fc->isend)
             if ((mpierr = MPI_Waitall(ureq->nsndids, ureq->sndids, MPI_STATUSES_IGNORE)))
                 return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-    }
-
-    if(!ureq_from_usr)
-    {
         pio_swapm_req_free((void *) ureq);
     }
 
