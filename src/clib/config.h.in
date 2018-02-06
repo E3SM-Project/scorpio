@@ -28,4 +28,7 @@
 /** Set to non-zero to dump the decomposition information from PIO programs. */
 #define PIO_SAVE_DECOMPS @SAVE_DECOMPS@
 
+/** Enable (if set to a non-zero value) asynchronous rearrangement during write */
+#define PIO_ENABLE_ASYNC_WR_REARR @ENABLE_ASYNC_WR_REARR@
+
 #endif /* _PIO_CONFIG_ */
