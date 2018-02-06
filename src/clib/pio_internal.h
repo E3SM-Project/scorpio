@@ -220,10 +220,10 @@ extern "C" {
                   MPI_Comm comm, rearr_comm_fc_opt_t *fc);
 
     /* Non blocking wait for pio swapm user request */
-    int pio_swapm_iwait(pio_swapm_req *ureq, int *flag);
+    int pio_swapm_iwait(void *p, int *flag);
 
     /* Blocking wait for pio swapm user request */
-    int pio_swapm_wait(pio_swapm_req *ureq);
+    int pio_swapm_wait(void *p);
 
     long long lgcd_array(int nain, long long* ain);
 

@@ -437,14 +437,15 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
 
 /**
  * Non-blocking wait on swapm request
- * @param ureq User swapm request (the request passed to pio_swapm() call)
+ * @param p User swapm request (the request passed to pio_swapm() call)
  * @param flag Pointer to a flag that holds the status of the user request.
  * The flag is 0 if the request is pending and 1 if the request is completed
  * @returns PIO_NOERR on success, a pio error code otherwise
  * - Similar to MPI_Testall(), makes progress on all requests
  */
-int pio_swapm_iwait(pio_swapm_req *ureq, int *flag)
+int pio_swapm_iwait(void *p, int *flag)
 {
+    pio_swapm_req *ureq = (pio_swapm_req *)p;
     int mpierr;
 
     assert((ureq != NULL) && (flag != NULL));
@@ -482,12 +483,13 @@ int pio_swapm_iwait(pio_swapm_req *ureq, int *flag)
 
 /**
  * Blocking wait on user swapm request
- * @param ureq User swapm request (the request passed to pio_swapm() call)
+ * @param p User swapm request (the request passed to pio_swapm() call)
  * @returns PIO_NOERR on success, a pio error code otherwise
  * - Similar to MPI_Waitall(), waits for the request to complete
  */
-int pio_swapm_wait(pio_swapm_req *ureq)
+int pio_swapm_wait(void *p)
 {
+    pio_swapm_req *ureq = (pio_swapm_req *)p;
     int mpierr;
 
     assert(ureq != NULL);
