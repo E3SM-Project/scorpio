@@ -3739,3 +3739,75 @@ char *strdup(const char *str)
 #endif
 
 #endif /* _ADIOS */
+
+/* Wait for pending asynchronous operations on this file
+ * @param file Pointer to the file_desc for the file
+ * Returns PIO_NOERR on success, a pio error code otherwise
+ */
+int pio_file_async_pend_ops_wait(file_desc_t *file)
+{
+    int ret;
+    assert(file != NULL);
+
+    if(file->nasync_pend_ops == 0)
+    {
+        return PIO_NOERR;
+    }
+
+    pio_async_op_t *p = file->async_pend_ops, *q=NULL;
+    while(p)
+    {
+        LOG((2, "Waiting on async op, kind = %s",
+            (p->op_type == PIO_ASYNC_REARR_OP) ? "PIO_ASYNC_REARR_OP" : "UNKNOWN"));
+        ret = p->wait(p->pdata);
+        if(ret != PIO_NOERR)
+        {
+            return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
+                            "Error waiting for pending asynchronous operation on file, %s (ncid = %d)", pio_get_fname_from_file(file), file->pio_ncid);
+        }
+        q = p;
+        p = p->next;
+        q->free(q->pdata);
+        free(q);
+    }
+    file->async_pend_ops = NULL;
+    file->nasync_pend_ops = 0;
+
+    return PIO_NOERR;
+}
+
+/* Add an async op to the list of pending ops for a file
+ * @param file Pointer to the file_desc for the file
+ * @param op_type Type of asynchronous operation added
+ * @param pdata Pointer to user defined data for this async op
+ * Returns PIO_NOERR on success, a pio error code otherwise
+ */
+int pio_file_async_pend_op_add(file_desc_t *file,
+      pio_async_op_type_t op_type, void *pdata)
+{
+    assert(file != NULL);
+    assert(op_type == PIO_ASYNC_REARR_OP);
+    assert(pdata != NULL);
+
+    pio_async_op_t *pnew = (pio_async_op_t *) malloc(sizeof(pio_async_op_t));
+    if(pnew == NULL)
+    {
+        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Adding an asynchronous operation to file (%s, ncid=%d) failed. Unable to allocate %lld bytes to cache the asynchronous operation", pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long) (sizeof(pio_async_op_t)));
+    }
+
+    pnew->op_type = op_type;
+    pnew->pdata = pdata;
+    if(op_type == PIO_ASYNC_REARR_OP)
+    {
+        pnew->wait = pio_swapm_wait;
+        pnew->poke = pio_swapm_iwait;
+        pnew->free = pio_swapm_req_free;
+    }
+    pnew->next = file->async_pend_ops;
+
+    file->async_pend_ops = pnew;
+    file->nasync_pend_ops++;
+
+    return PIO_NOERR;
+}

@@ -225,6 +225,14 @@ extern "C" {
     /* Blocking wait for pio swapm user request */
     int pio_swapm_wait(void *p);
 
+    /* Wait on all async pending operations on a file */
+    int pio_file_async_pend_ops_wait(file_desc_t *file);
+
+    /* Add a pending async operation on a file */
+    int pio_file_async_pend_op_add(file_desc_t *file,
+          pio_async_op_type_t op_type, void *pdata);
+
+
     long long lgcd_array(int nain, long long* ain);
 
     void PIO_Offset_size(MPI_Datatype *dtype, int *tsize);
