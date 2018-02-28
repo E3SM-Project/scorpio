@@ -1036,12 +1036,24 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
                 LOG((2, "PIOc_put_vars_tc calling pnetcdf function"));
                 vdesc = &file->varlist[varid];
+#if PIO_ENABLE_ASYNC_WR_REARR
+                viobuf_cache_t *pviobuf = (viobuf_cache_t *) calloc(1, sizeof(viobuf_cache_t));
+                if(!pviobuf)
+                {
+                    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__);
+                }
+                pviobuf->rec_num = -1;
+                pviobuf->vdesc = vdesc;
+                request = &(pviobuf->req);
+                *request = NC_REQ_NULL;
+#else
                 if (vdesc->nreqs % PIO_REQUEST_ALLOC_CHUNK == 0)
                     if (!(vdesc->request = realloc(vdesc->request,
                                                    sizeof(int) * (vdesc->nreqs + PIO_REQUEST_ALLOC_CHUNK))))
                         return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__);
                 request = vdesc->request + vdesc->nreqs;
                 LOG((2, "PIOc_put_vars_tc request = %d", vdesc->request));
+#endif
 
                 /* Only the IO master actually does the call. */
                 if (ios->iomaster == MPI_ROOT)
@@ -1075,9 +1087,25 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     LOG((2, "PIOc_put_vars_tc io_rank 0 done with pnetcdf call, ierr=%d", ierr));
                 }
                 else
+                {
+#if !PIO_ENABLE_ASYNC_WR_REARR
                     *request = PIO_REQ_NULL;
+#endif
+                }
 
+#if PIO_ENABLE_ASYNC_WR_REARR
+                ierr = pio_file_async_pend_op_add(file,
+                          PIO_ASYNC_PNETCDF_WRITE_OP,
+                          (void *)pviobuf);
+                if(ierr != PIO_NOERR)
+                {
+                    LOG((1, "Adding pnetcdf write op for ncmpi_bput* failed"));
+                    return pio_err(ios, file, ierr, __FILE__, __LINE__);
+                }
+#else
                 vdesc->nreqs++;
+#endif /* PIO_ENABLE_ASYNC_WR_REARR */
+
                 flush_output_buffer(file, false, 0);
                 LOG((2, "PIOc_put_vars_tc flushed output buffer"));
 

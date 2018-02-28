@@ -207,8 +207,30 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
         int ndims = iodesc->ndims;
         PIO_Offset *startlist[num_regions]; /* Array of start arrays for ncmpi_iput_varn(). */
         PIO_Offset *countlist[num_regions]; /* Array of count  arrays for ncmpi_iput_varn(). */
-
         LOG((3, "num_regions = %d", num_regions));
+
+#if PIO_ENABLE_ASYNC_WR_REARR
+        /* Since we write data for all variables per region, this
+         * array keeps track of cached viobufs for the variables
+         * (init'ed when reading the first region on the variable)
+         */
+        viobuf_cache_t **viobufs = NULL;
+        if(file->iotype == PIO_IOTYPE_NETCDF4P)
+        {
+            /* If we are writing fillvalues, we don't need to cache
+             * viobufs (for freeing) since fillbuf corresponding to
+             * the first vdesc is used for these writes
+             */ 
+            if(!fill)
+            {
+                viobufs = (viobuf_cache_t **)calloc(nvars, sizeof(viobuf_cache_t *));
+                if(!viobufs)
+                {
+                    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__);
+                }
+            }
+        }
+#endif
 
         /* Process each region of data to be written. */
         for (int regioncnt = 0; regioncnt < num_regions; regioncnt++)
@@ -227,12 +249,35 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                 {
                     /* Set the start of the record dimension. (Hasn't
                      * this already been set above ???) */
+                    int cur_frame = -1;
                     if (vdesc->record >= 0 && ndims < fndims)
-                        start[0] = frame[nv];
+                    {
+                        cur_frame = frame[nv];
+                        start[0] = cur_frame;
+                    }
+
 
                     /* If there is data for this region, get a pointer to it. */
                     if (region)
+                    {
                         bufptr = (void *)((char *)iobuf + iodesc->mpitype_size * (nv * llen + region->loffset));
+#if PIO_ENABLE_ASYNC_WR_REARR
+                        if(!fill)
+                        {
+                            if(!viobufs[nv])
+                            {
+                                ierr = pio_var_rem_cache_data(file->varlist + varids[nv],
+                                          cur_frame, &(viobufs[nv]));
+                                if(ierr != PIO_NOERR)
+                                {
+                                    LOG((1, "Failed to get var cache for var"));
+                                    return pio_err(ios, file, ierr, __FILE__, __LINE__);
+                                }
+                            }
+                            bufptr = (void *) ((char *)(viobufs[nv]->iobuf) + iodesc->mpitype_size * region->loffset);
+                        }
+#endif
+                    }
 
                     /* Ensure collective access. */
                     ierr = nc_var_par_access(file->fh, varids[nv], NC_COLLECTIVE);
@@ -331,12 +376,51 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
 
                         /* If this is a record var, set the start for
                          * the record dimension. */
+                        int cur_frame = -1;
                         if (vdesc->record >= 0 && ndims < fndims)
+                        {
+                            cur_frame = frame[nv];
                             for (int rc = 0; rc < rrcnt; rc++)
-                                startlist[rc][0] = frame[nv];
+                                startlist[rc][0] = cur_frame;
+                        }
 
                         /* Get a pointer to the data. */
                         bufptr = (void *)((char *)iobuf + nv * iodesc->mpitype_size * llen);
+#if PIO_ENABLE_ASYNC_WR_REARR
+                        viobuf_cache_t *pviobuf;
+                        if(!fill)
+                        {
+                            ierr = pio_var_rem_cache_data(file->varlist + varids[nv],
+                                      cur_frame, &pviobuf);
+                            if(ierr != PIO_NOERR)
+                            {
+                                LOG((1, "Failed to get var cache for var"));
+                                return pio_err(ios, file, ierr, __FILE__, __LINE__);
+                            }
+                            bufptr = pviobuf->iobuf;
+                        }
+                        else{
+                            /* Writing out fillvalues using the fillbuf associated
+                             * with the first vdesc. No rearrangement was needed,
+                             * so no existing viobufs in var cache (var viobuf
+                             * list). Create a dummy viobuf for this write with
+                             * a NULL iobuf
+                             */
+                            pviobuf = (viobuf_cache_t *)calloc(1, sizeof(viobuf_cache_t));
+                            if(!pviobuf)
+                            {
+                                return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__);
+                            }
+                            pviobuf->rec_num = cur_frame;
+                            /* We are using fillbuf from the first var in the list */
+                            pviobuf->vdesc = file->varlist + varids[0];
+                        }
+                        /* Write, in non-blocking fashion, a list of subarrays. */
+                        LOG((3, "about to call ncmpi_iput_varn() varids[%d] = %d rrcnt = %d, llen = %d",
+                             nv, varids[nv], rrcnt, llen));
+                        ierr = ncmpi_iput_varn(file->fh, varids[nv], rrcnt, startlist, countlist,
+                                               bufptr, llen, iodesc->mpitype, &(pviobuf->req));
+#else
 
                         if (vdesc->nreqs % PIO_REQUEST_ALLOC_CHUNK == 0)
                         {
@@ -353,11 +437,23 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                              nv, varids[nv], rrcnt, llen));
                         ierr = ncmpi_iput_varn(file->fh, varids[nv], rrcnt, startlist, countlist,
                                                bufptr, llen, iodesc->mpitype, vdesc->request + vdesc->nreqs);
-
+                        /* FIXME : We need to check the return value */
                         /* keeps wait calls in sync */
                         if (vdesc->request[vdesc->nreqs] == NC_REQ_NULL)
                             vdesc->request[vdesc->nreqs] = PIO_REQ_NULL;
+#endif
 
+#if PIO_ENABLE_ASYNC_WR_REARR
+                        /* Add an async op for the write */
+                        ierr = pio_file_async_pend_op_add(file,
+                                  PIO_ASYNC_PNETCDF_WRITE_OP,
+                                  (void *)pviobuf);
+                        if(ierr != PIO_NOERR)
+                        {
+                            LOG((1, "Adding pnetcdf write async op failed"));
+                            break;
+                        }
+#endif
                         vdesc->nreqs++;
                     }
 
@@ -378,6 +474,20 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
             if (region)
                 region = region->next;
         } /* next regioncnt */
+#if PIO_ENABLE_ASYNC_WR_REARR
+        /* Free the viobuf caches here since NetCDF4P writes are blocking */
+        if(file->iotype == PIO_IOTYPE_NETCDF4P)
+        {
+            if(!fill)
+            {
+                for(int i=0; i<nvars; i++)
+                {
+                    pio_viobuf_free(viobufs[i]);
+                }
+                free(viobufs);
+            }
+        }
+#endif
     } /* endif (ios->ioproc) */
 
     /* Check the return code from the netCDF/pnetcdf call. */
@@ -787,7 +897,6 @@ int write_darray_multi_serial(file_desc_t *file, int nvars, int fndims, const in
     int num_regions = fill ? iodesc->maxfillregions: iodesc->maxregions;
     io_region *region = fill ? iodesc->fillregion : iodesc->firstregion;
     PIO_Offset llen = fill ? iodesc->holegridsize : iodesc->llen;
-    void *iobuf = fill ? vdesc->fillbuf : file->iobuf; 
 
 #ifdef TIMING
     /* Start timing this function. */
@@ -808,7 +917,32 @@ int write_darray_multi_serial(file_desc_t *file, int nvars, int fndims, const in
                                          tmp_start, tmp_count)))
             return pio_err(ios, file, ierr, __FILE__, __LINE__);
 
+#if PIO_ENABLE_ASYNC_WR_REARR
+        /* Copy data corresponding to all variables into a single buffer,
+         * file->iobuf
+         */
+        if(!fill)
+        {
+            /* FIXME : We only need iodesc->mpitype_size * llen * nvars */
+            size_t file_iobuf_sz = iodesc->mpitype_size * iodesc->maxiobuflen * nvars;
+            file->iobuf = bget(file_iobuf_sz);
+            if(!file->iobuf)
+            {
+                return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__);
+            }
+            ierr = pio_file_compact_and_copy_rearr_data(file->iobuf,
+                      file_iobuf_sz, iodesc, file, varids, frame, nvars);
+            if(ierr != PIO_NOERR)
+            {
+                return pio_err(ios, file, ierr, __FILE__, __LINE__);
+            }
+        }
+        
+#endif /* PIO_ENABLE_ASYNC_WR_REARR */
+
         /* Tasks other than 0 will send their data to task 0. */
+        void *iobuf = fill ? vdesc->fillbuf : file->iobuf; 
+
         if (ios->io_rank > 0)
         {
             /* Send the tmp_start and tmp_count arrays from this IO task
@@ -825,6 +959,13 @@ int write_darray_multi_serial(file_desc_t *file, int nvars, int fndims, const in
                                             tmp_start, tmp_count, iobuf)))
                 return pio_err(ios, file, ierr, __FILE__, __LINE__);
         }
+#if PIO_ENABLE_ASYNC_WR_REARR
+        if(!fill)
+        {
+            brel(file->iobuf);
+            file->iobuf = NULL;
+        }
+#endif /* PIO_ENABLE_ASYNC_WR_REARR */
     }
 
 #ifdef TIMING
@@ -1369,8 +1510,66 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
  * @param addsize additional size to add to buffer (in bytes)
  * @return 0 for success, error code otherwise.
  * @ingroup PIO_write_darray
- * @author Jim Edwards, Ed Hartnett
  */
+#if PIO_ENABLE_ASYNC_WR_REARR
+int flush_output_buffer(file_desc_t *file, bool force, PIO_Offset addsize)
+{
+    int mpierr;  /* Return code from MPI functions. */
+    int ierr = PIO_NOERR;
+
+#ifdef TIMING
+    GPTLstart("PIO:flush_output_buffer");
+#endif
+#ifdef _PNETCDF
+    PIO_Offset usage = 0;
+
+    /* Check inputs. */
+    pioassert(file, "invalid input", __FILE__, __LINE__);
+
+    /* Find out the buffer usage. */
+    if ((ierr = ncmpi_inq_buffer_usage(file->fh, &usage)))
+    /* allow the buffer to be undefined */
+    if (ierr != NC_ENULLABUF)
+        return pio_err(NULL, file, PIO_EBADID, __FILE__, __LINE__);
+
+    /* If we are not forcing a flush, spread the usage to all IO
+     * tasks. */
+    if (!force && file->iosystem->io_comm != MPI_COMM_NULL)
+    {
+        usage += addsize;
+        if ((mpierr = MPI_Allreduce(MPI_IN_PLACE, &usage, 1,  MPI_OFFSET,  MPI_MAX,
+                                    file->iosystem->io_comm)))
+            return check_mpi(file, mpierr, __FILE__, __LINE__);
+    }
+
+    /* Keep track of the maximum usage. */
+    if (usage > maxusage)
+        maxusage = usage;
+
+    /* If the user forces it, or the buffer has exceeded the size
+     * limit, then flush to disk. */
+    if (force || usage >= pio_buffer_size_limit)
+    {
+        /* Wait for pending asynchronous pnetcdf writes */
+        ierr = pio_file_async_pend_ops_kwait(file, PIO_ASYNC_PNETCDF_WRITE_OP);
+        if(ierr != PIO_NOERR)
+        {
+            LOG((1, "Waiting for pending async pnetcdf writes failed"));
+            return ierr;
+        }
+        file->wb_pend = 0;
+        file->npend_ops = 0;
+    }
+
+#endif /* _PNETCDF */
+#ifdef TIMING
+    GPTLstop("PIO:flush_output_buffer");
+#endif
+    return ierr;
+}
+
+#else /* PIO_ENABLE_ASYNC_WR_REARR */
+
 int flush_output_buffer(file_desc_t *file, bool force, PIO_Offset addsize)
 {
     int mpierr;  /* Return code from MPI functions. */
@@ -1587,6 +1786,7 @@ int flush_output_buffer(file_desc_t *file, bool force, PIO_Offset addsize)
             }
         }
         file->wb_pend = 0;
+        file->npend_ops = 0;
     }
 
 #endif /* _PNETCDF */
@@ -1595,6 +1795,8 @@ int flush_output_buffer(file_desc_t *file, bool force, PIO_Offset addsize)
 #endif
     return ierr;
 }
+
+#endif /* PIO_ENABLE_ASYNC_WR_REARR */
 
 /**
  * Print out info about the buffer for debug purposes. This should
