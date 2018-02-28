@@ -1265,6 +1265,18 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         {
             LOG((2, "PIOc_put_vars_tc calling pnetcdf function"));
             vdesc = &file->varlist[varid];
+#if PIO_ENABLE_ASYNC_WR_REARR
+            viobuf_cache_t *pviobuf = (viobuf_cache_t *) calloc(1, sizeof(viobuf_cache_t));
+            if(!pviobuf)
+            {
+                return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                    "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory, allocating memory (%lld bytes) for keeping track of variable I/O buffer cache", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, (unsigned long long) (sizeof(viobuf_cache_t)));
+            }
+            pviobuf->rec_num = -1;
+            pviobuf->vdesc = vdesc;
+            request = &(pviobuf->req);
+            *request = NC_REQ_NULL;
+#else
             if (vdesc->nreqs % PIO_REQUEST_ALLOC_CHUNK == 0)
                 if (!(vdesc->request = realloc(vdesc->request,
                                                sizeof(int) * (vdesc->nreqs + PIO_REQUEST_ALLOC_CHUNK))))
@@ -1274,6 +1286,7 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 }
             request = vdesc->request + vdesc->nreqs;
             LOG((2, "PIOc_put_vars_tc request = %d", vdesc->request));
+#endif
 
             /* Scalars have to be handled differently. */
             if (ndims == 0)
@@ -1375,9 +1388,25 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     LOG((2, "PIOc_put_vars_tc io_rank 0 done with pnetcdf call, ierr=%d", ierr));
                 }
                 else
+                {
+#if !PIO_ENABLE_ASYNC_WR_REARR
                     *request = PIO_REQ_NULL;
+#endif
+                }
 
+#if PIO_ENABLE_ASYNC_WR_REARR
+                ierr = pio_file_async_pend_op_add(file,
+                          PIO_ASYNC_PNETCDF_WRITE_OP,
+                          (void *)pviobuf);
+                if(ierr != PIO_NOERR)
+                {
+                    return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                    "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed for the PIO_IOTYPE_PNETCDF iotype. Adding an asynchronous operation to write data (ncmpi_bput_*) failed for the variable", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
+                }
+#else
                 vdesc->nreqs++;
+#endif /* PIO_ENABLE_ASYNC_WR_REARR */
+
                 flush_output_buffer(file, false, 0);
                 LOG((2, "PIOc_put_vars_tc flushed output buffer"));
 

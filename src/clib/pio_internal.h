@@ -232,6 +232,13 @@ extern "C" {
     int pio_file_async_pend_op_add(file_desc_t *file,
           pio_async_op_type_t op_type, void *pdata);
 
+    /* Free a viobuf var cache */
+    void pio_viobuf_free(void *p);
+
+    /* Copy rearranged data for all variables to a single buffer */
+    int pio_file_compact_and_copy_rearr_data(void *dest, size_t dest_sz,
+          io_desc_t *iodesc, file_desc_t *file, const int *varids,
+          const int *frames, int nvars);
 
     long long lgcd_array(int nain, long long* ain);
 
@@ -400,6 +407,24 @@ extern "C" {
 
     /* Free a pio swapm user request */
     void pio_swapm_req_free(void *);
+
+    /* Generic wait for async operations on the file */
+    int pio_file_async_pend_ops_wait(file_desc_t *file);
+
+    /* Wait for async operations of a specific kind/type on the file */
+    int pio_file_async_pend_ops_kwait(file_desc_t *file, pio_async_op_type_t op_kind);
+
+    /* Add an asynchronous pending op on a file */
+    int pio_file_async_pend_op_add(file_desc_t *file,
+      pio_async_op_type_t op_type, void *pdata);
+
+    /* Start rearrangement and cache rearranged data */
+    int pio_var_rearr_and_cache(file_desc_t *file, var_desc_t *vdesc,
+          io_desc_t *iodesc, void *buf,
+          size_t buflen, void *fillvalue, int rec_num);
+ 
+    /* Remove cached data (rearranged data) corresponding a var (and record/frame) */
+    int pio_var_rem_cache_data(var_desc_t *vdesc, int rec_num, viobuf_cache_t **pviobuf);
 
     /* Initialize and finalize logging. */
     void pio_init_logging(void);
