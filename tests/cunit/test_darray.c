@@ -3,6 +3,7 @@
  *
  * Ed Hartnett, 2/16/17
  */
+#include "config.h"
 #include <pio.h>
 #include <pio_internal.h>
 #include <pio_tests.h>
@@ -40,7 +41,11 @@
 #define VAR_NAME "foo"
 
 /* Test cases relating to PIOc_write_darray_multi(). */
+#if PIO_ENABLE_ASYNC_WR_REARR
+#define NUM_TEST_CASES_WRT_MULTI 1
+#else
 #define NUM_TEST_CASES_WRT_MULTI 3
+#endif
 
 /* Test with and without specifying a fill value to
  * PIOc_write_darray(). */
