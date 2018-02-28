@@ -216,10 +216,14 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
     }
 
     /* if the buffer is already in use in pnetcdf we need to flush first */
-    if (file->iotype == PIO_IOTYPE_PNETCDF && file->iobuf)
-	flush_output_buffer(file, 1, 0);
+    if(file->npend_ops > 0)
+    {
+        /* Force flush */
+        flush_output_buffer(file, 1, 0);
+    }
 
     pioassert(!file->iobuf, "buffer overwrite",__FILE__, __LINE__);
+    pioassert((file->npend_ops == 0), "Pending ops > 0",__FILE__, __LINE__);
 
     /* Determine total size of aggregated data (all vars/records).
      * For netcdf serial writes we collect the data on io nodes and
@@ -258,6 +262,7 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
     }
 #endif
 
+#if !PIO_ENABLE_ASYNC_WR_REARR
     /* Allocate iobuf. */
     if (rlen > 0)
     {
@@ -291,7 +296,8 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
     if ((ierr = rearrange_comp2io(ios, iodesc, file, array, file->iobuf, nvars)))
         return pio_err(ios, file, ierr, __FILE__, __LINE__);
 
-#if PIO_ENABLE_ASYNC_WR_REARR
+#else
+    /* Wait on pending async rearrange ops */
     ierr = pio_file_async_pend_ops_wait(file);
     if(ierr != PIO_NOERR)
     {
@@ -470,6 +476,7 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
      */
     if (ios->ioproc && file->iotype == PIO_IOTYPE_PNETCDF)
     {
+        file->npend_ops++;
         /* Flush data to disk for pnetcdf. */
         if ((ierr = flush_output_buffer(file, flushtodisk, 0)))
             return pio_err(ios, file, ierr, __FILE__, __LINE__);
@@ -908,6 +915,19 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
               (unsigned long long int) file->varlist[varid].wb_pend,
               (unsigned long long int) file->wb_pend
         ));
+
+#if PIO_ENABLE_ASYNC_WR_REARR
+    /* Start rearranging data pointed to by bufptr and cache the
+     * rearranged data in vdesc viobufs
+     */
+    ierr = pio_var_rearr_and_cache(file, vdesc, iodesc, bufptr,
+              arraylen, wmb->fillvalue, vdesc->record);
+    if(ierr != PIO_NOERR)
+    {
+        return pio_err(ios, file, ierr, __FILE__, __LINE__);
+    }
+#endif
+
 #ifdef PIO_MICRO_TIMING
     mtimer_stop(file->varlist[varid].wr_mtimer, get_var_desc_str(ncid, varid, NULL));
 #endif
