@@ -4,6 +4,7 @@
  *
  * Ed Hartnett, 3/7/17
  */
+#include "config.h"
 #include <pio.h>
 #include <pio_internal.h>
 #include <pio_tests.h>
@@ -85,6 +86,7 @@ int test_darray(int iosysid, int ioid, int num_flavors, int *flavor, int my_rank
     PIO_Offset arraylen = 4; /* Amount of data from each task. */
     void *fillvalue;       /* Pointer to fill value. */
     void *test_data;       /* Pointer to test data we will write. */
+    PIO_Offset test_data_type_sz = 0;
     void *test_data_in;    /* Pointer to buffer we will read into. */
 
     /* Default fill value array for each type. */
@@ -273,10 +275,25 @@ int test_darray(int iosysid, int ioid, int num_flavors, int *flavor, int my_rank
                 int frame[NVAR] = {0, 0, 0};
                 int flushtodisk = test_multi;
 
+#if PIO_ENABLE_ASYNC_WR_REARR
+                if(ret = PIOc_inq_type(ncid, pio_type, NULL, &test_data_type_sz))
+                    ERR(ret);
+
+                /* Use PIOc_write_darray since we are not queueing up async io ops */
+                for(int v=0; v<NVAR; v++)
+                {
+                    if ((ret = PIOc_setframe(ncid, varid[v], frame[v])))
+                        ERR(ret);
+                    if ((ret = PIOc_write_darray(ncid, varid[v], ioid, arraylen,
+                                  (void *) (((char *)test_data) + v * arraylen * test_data_type_sz), fillvalue)))
+                        ERR(ret);
+                }
+#else
                 /* Write the data with the _multi function. */
                 if ((ret = PIOc_write_darray_multi(ncid, varid, ioid, NVAR, arraylen, test_data, frame,
                                                    fillvalue, flushtodisk)))
                     ERR(ret);
+#endif
 
                 /* Close the netCDF file. */
                 if ((ret = PIOc_closefile(ncid)))
