@@ -309,7 +309,7 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
 
 #else
     /* Wait on pending async rearrange ops */
-    ierr = pio_file_async_pend_ops_wait(file);
+    ierr = pio_file_async_pend_ops_kwait(file, PIO_ASYNC_REARR_OP);
     if(ierr != PIO_NOERR)
     {
         return pio_err(ios, file, ierr, __FILE__, __LINE__,

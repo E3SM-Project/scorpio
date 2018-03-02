@@ -4118,6 +4118,60 @@ int pio_async_pnetcdf_write_kwait(void *f)
     return PIO_NOERR;
 }
 
+/* Wait only for rearr async ops on a file */
+int pio_async_rearr_kwait(void *f)
+{
+    int ret;
+    file_desc_t *file = (file_desc_t *)f;
+    assert(file);
+
+    if(file->nasync_pend_ops > 0)
+    {
+        pio_async_op_t *p = file->async_pend_ops, *q=NULL;
+        pio_async_op_t *prev = file->async_pend_ops;
+        while(p)
+        {
+            if(p->op_type == PIO_ASYNC_REARR_OP)
+            {
+                ret = p->wait(p->pdata);
+                if(ret != PIO_NOERR)
+                {
+                    LOG((1, "Waiting for rearr async op failed"));
+                    return pio_err(file->iosystem, file, PIO_EINTERNAL,
+                                    __FILE__, __LINE__,
+                                    "Internal error while waiting for asynchronous rearrangement operations (number of pending ops = %d) on file (%s, ncid=%d)", file->nasync_pend_ops, pio_get_fname_from_file(file), file->pio_ncid);
+                }
+                p->free(p->pdata);
+                q = p->next;
+                /* Free node */
+                free(p);
+                /* p == file->async_pend_ops => First node */
+                if(p == file->async_pend_ops)
+                {
+                    /* Update head and prev to delete/skip node p */
+                    file->async_pend_ops = q;
+                    prev = q;
+                }
+                else
+                {
+                    /* Delete node p, already freed */
+                    prev->next = q;
+                }
+                p = q;
+            }
+            else
+            {
+                /* Ignore op kinds/types that are not pnetcdf writes */
+                prev = p;
+                p = p->next;
+            }
+        }
+        file->nasync_pend_ops = 0;
+    }
+
+    return PIO_NOERR;
+}
+
 /* Optimized wait functions for different async op kinds/types on a file */
 typedef int (*file_async_pend_ops_kwait_func_t) (void *file);
 static file_async_pend_ops_kwait_func_t
@@ -4125,7 +4179,7 @@ static file_async_pend_ops_kwait_func_t
       /* PIO_ASYNC_INVALID_OP */
       pio_async_wait_func_unavail,
       /* PIO_ASYNC_REARR_OP */
-      pio_async_wait_func_unavail,
+      pio_async_rearr_kwait,
       /* PIO_ASYNC_PNETCDF_WRITE_OP */
       pio_async_pnetcdf_write_kwait
     };
