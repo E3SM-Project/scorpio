@@ -4063,7 +4063,9 @@ int pio_async_pnetcdf_write_kwait(void *f)
          * FIXME: Since this is no longer a constraint for async writes
          * investigate on how to relax the constraint
          */ 
-        assert(nreqs == file->nasync_pend_ops);
+        assert(nreqs <= file->nasync_pend_ops);
+        LOG((2, "pio_async_pnetcdf_write_kwait(): nreqs= %d, file->nasync_pend_ops= %d\n",
+                  nreqs, file->nasync_pend_ops));
 
 #ifdef PIO_MICRO_TIMING
         pio_async_pnetcdf_wr_timer_info_t wr_info;
@@ -4112,7 +4114,7 @@ int pio_async_pnetcdf_write_kwait(void *f)
         free(vdescs);
         free(reqs);
 
-        file->nasync_pend_ops = 0;
+        file->nasync_pend_ops -= nreqs;
     }
 
     return PIO_NOERR;
@@ -4127,12 +4129,14 @@ int pio_async_rearr_kwait(void *f)
 
     if(file->nasync_pend_ops > 0)
     {
+        int nreqs = 0;
         pio_async_op_t *p = file->async_pend_ops, *q=NULL;
         pio_async_op_t *prev = file->async_pend_ops;
         while(p)
         {
             if(p->op_type == PIO_ASYNC_REARR_OP)
             {
+                nreqs++;
                 ret = p->wait(p->pdata);
                 if(ret != PIO_NOERR)
                 {
@@ -4166,7 +4170,7 @@ int pio_async_rearr_kwait(void *f)
                 p = p->next;
             }
         }
-        file->nasync_pend_ops = 0;
+        file->nasync_pend_ops -= nreqs;
     }
 
     return PIO_NOERR;
@@ -4298,6 +4302,8 @@ int pio_var_rearr_and_cache(file_desc_t *file, var_desc_t *vdesc,
     int ierr;
     iosystem_desc_t *ios;
 
+    LOG((2, "pio_var_rearr_and_cache : file=%p, vdesc=%p, iodesc=%p, rec_num=%d\n",
+            file, vdesc, iodesc, rec_num));
     /* Note: buf can be NULL or buflen can be 0 if a compute process
      * has no data to send to io procs
      */
