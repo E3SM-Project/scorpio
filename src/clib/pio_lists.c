@@ -338,7 +338,6 @@ int pio_add_to_iodesc_list(io_desc_t *iodesc, MPI_Comm comm)
             ciodesc = ciodesc->next;
         }
         ciodesc->next = iodesc;
-#endif 
     }
     current_iodesc = iodesc;
 
