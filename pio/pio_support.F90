@@ -289,7 +289,7 @@ contains
        if (myrank == masterproc) then
           allocate(wdof_nprocs(0:bwait_nprocs-1))
           do i=0,bwait_nprocs-1
-            allocate(wdof_nprocs(i)%arr(0:sdof1d(n+i)))
+            allocate(wdof_nprocs(i)%arr(sdof1d(n+i)))
           end do
        endif
        ! Post recv and send hs
@@ -337,7 +337,7 @@ contains
        if (myrank == masterproc) then
           do i=0,bwait_nprocs-1
             write(unit,*) n+i,sdof1d(n+i)
-            do m = 0,sdof1d(n+i)-1
+            do m = 1,sdof1d(n+i)
                write(unit,"(I20)",ADVANCE="NO") wdof_nprocs(i)%arr(m)
             enddo
             write(unit,*) ""
@@ -363,7 +363,7 @@ contains
 
   end subroutine pio_writedof
 
-  subroutine pio_readdof (file, DOF, comm, punit)
+  subroutine pio_readdof (file, ndims, gdims, DOF, comm, punit)
     use pio_types
     !-----------------------------------------------------------------------
     ! Purpose:
@@ -384,6 +384,8 @@ contains
     ! Arguments
     !
     character(len=*),intent(in) :: file
+    integer, intent(out) :: ndims
+    integer, pointer :: gdims(:)
     integer(kind=pio_offset),pointer:: dof(:)
     integer         ,intent(in) :: comm
     integer,optional,intent(in) :: punit
@@ -391,9 +393,8 @@ contains
     character(len=*), parameter :: subName=modName//'::pio_readdof'
     integer :: ierr, myrank, npes, m, n, unit, rn
     integer(kind=pio_offset) :: sdof
-    integer :: rversno, rnpes,rndims
+    integer :: rversno, rnpes
     character(len=pio_max_name) :: verstr, npesstr, ndimsstr
-    integer, dimension(:), allocatable :: rgdims
     integer(kind=pio_offset), pointer :: wdof(:)
     integer, parameter :: masterproc = 0
     integer :: status(MPI_STATUS_SIZE)
@@ -418,29 +419,38 @@ contains
 
     allocate(dof(0))   ! default for pes with no dof
 
+    ! Read header
     if (myrank == masterproc) then
        write(6,*) subName,': reading file ',trim(file),' unit=',unit
        open(unit,file=file,status='old')
-       read(unit,*) verstr,rversno,npesstr,rnpes,ndimsstr,rndims
+       read(unit,*) verstr,rversno,npesstr,rnpes,ndimsstr,ndims
        write(6,*) subName,': reading file ',trim(file),' versno=',rversno,&
-                  ' npes=', rnpes, ' ndims=', rndims
+                  ' npes=', rnpes, ' ndims=', ndims
        if (rnpes /= npes) then
           call piodie(__PIO_FILE__,__LINE__,'pio_readdof npes incorrect')
        endif
-       allocate(rgdims(rndims))
-       do n=1,rndims
-          read(unit,*) rgdims(n)
-       end do
+       allocate(gdims(ndims))
+       read(unit,*) gdims
+       print *, "gdims = ", gdims
+    endif
 
+    call MPI_BCAST(ndims, 1, MPI_INTEGER, masterproc, comm, ierr)
+    if (myrank /= masterproc) then
+      allocate(gdims(ndims))
+    endif
+    call MPI_BCAST(gdims, ndims, MPI_INTEGER, masterproc, comm, ierr)
+
+    ! Read the compdof from masterproc and send it to other procs
+    if (myrank == masterproc) then
        do n = 0,npes-1
           read(unit,*) rn,sdof
+          !print *, "npes=", npes, ", dim= ", rn, ", sdof=", sdof
           if (rn /= n) then
              call piodie(__PIO_FILE__,__LINE__,'pio_readdof rn out of sync')
           endif
           allocate(wdof(sdof))
-          do m = 1,sdof
-             read(unit,*) wdof(m)
-          enddo
+          read(unit, *) wdof
+          !print *, wdof
           if (n == masterproc) then
              deallocate(dof)
              allocate(dof(sdof))
