@@ -155,7 +155,7 @@ if (ADIOS_FOUND)
   target_compile_definitions (pioc
     PUBLIC _ADIOS)
   target_link_libraries (pioc
-    PUBLIC ${ADIOS_LIBRARIES})
+    PUBLIC ${ADIOS_LIBRARIES} adios2pio-nm-lib)
 else ()
   target_compile_definitions (pioc
     PUBLIC _NOADIOS)
