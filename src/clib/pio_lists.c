@@ -256,10 +256,14 @@ int pio_num_iosystem(int *niosysid)
  * @returns the ioid of the newly added iodesc.
  * @author Jim Edwards
  */
+static int imax=511; // ADIOS needs a unique ID for the entire run
+#ifdef _ADIOS
+int pio_get_imax() { return imax; }
+int pio_set_imax(int imax_val) { imax = imax_val; }
+#endif 
 int pio_add_to_iodesc_list(io_desc_t *iodesc)
 {
     io_desc_t *ciodesc;
-    static int imax = 511; // ADIOS needs a unique ID for the entire run
 
     iodesc->next = NULL;
     if (pio_iodesc_list == NULL)
