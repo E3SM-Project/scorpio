@@ -2775,6 +2775,9 @@ contains
     if(iosystem%num_iotasks.eq.1.and.iotype.eq.pio_iotype_pnetcdf) then	
 #if defined(_NETCDF)
        file%iotype=pio_iotype_netcdf
+       if(iosystem%io_rank == 0) then
+         print *, "WARNING: Only 1 iotask used to open a file with PIO_IOTYPE_PNETCDF, Switching to PIO_IOTYPE_NETCDF instead"
+       end if
 #else
        file%iotype = iotype 
 #endif       

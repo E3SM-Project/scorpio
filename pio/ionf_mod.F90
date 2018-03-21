@@ -183,7 +183,9 @@ contains
 #ifdef _NETCDF
 #ifdef _NETCDF4
           if(ierr /= PIO_NOERR) then    ! try hdf5 format
-             if(Debug) print *, 'try netcdf4 format'
+             if (File%iosystem%io_rank == 0) then
+               print *, "WARNING: Opening file ", fname, " using PIO_IOTYPE_PNETCDF iotype failed. Retrying using PIO_IOTYPE_NETCDF4P format"
+             end if
              File%iotype = pio_iotype_netcdf4p
              iotype = pio_iotype_netcdf4p
           end if
@@ -204,6 +206,9 @@ contains
               ierr = nf90_open(fname,  ior(amode,ior(NF90_NETCDF4,NF90_MPIIO)), File%fh, &
                    comm=File%iosystem%io_comm, info=File%iosystem%info)
               if(ierr==nf90_enotnc4 .or. ierr==nf90_einval) then
+                if (File%iosystem%io_rank == 0) then
+                   print *, "WARNING: Opening file ", fname, " using PIO_IOTYPE_NETCDF4P iotype failed. Retrying using PIO_IOTYPE_NETCDF format"
+                 end if
                  ierr = nf90_open(fname, amode, File%fh,info=File%iosystem%info)
               end if
            end if
