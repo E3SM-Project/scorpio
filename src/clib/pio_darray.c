@@ -217,6 +217,14 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
         LOG((3, "shared fndims = %d", fndims));
     }
 
+/* If we don't use asynchronous write rearrangment, the same buffer in
+ * the file, file->iobuf, is used for rearranging and writing out all
+ * variables/records in the file. So if a previous write (could be write
+ * of multiple varibles/records associated with this file) is pending
+ * flush it to disk (rearrange + write + wait for write to complete)
+ * before reusing it
+ */
+#if !PIO_ENABLE_ASYNC_WR_REARR
     /* if the buffer is already in use in pnetcdf we need to flush first */
     if(file->npend_ops > 0)
     {
@@ -226,6 +234,7 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
 
     pioassert(!file->iobuf[ioid - PIO_IODESC_START_ID], "buffer overwrite",__FILE__, __LINE__);
     pioassert((file->npend_ops == 0), "Pending ops > 0",__FILE__, __LINE__);
+#endif
 
     /* Determine total size of aggregated data (all vars/records).
      * For netcdf serial writes we collect the data on io nodes and
