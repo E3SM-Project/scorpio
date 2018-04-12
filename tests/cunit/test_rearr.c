@@ -378,6 +378,7 @@ int test_determine_fill(MPI_Comm test_comm)
     if (!(ios = calloc(1, sizeof(iosystem_desc_t))))
         return PIO_ENOMEM;
     ios->union_comm = test_comm;
+    ios->union_comm_arearr = test_comm;
 
     /* Set up iodesc for test. */
     if (!(iodesc = calloc(1, sizeof(io_desc_t))))
@@ -577,6 +578,8 @@ int test_compute_counts(MPI_Comm test_comm, int my_rank)
     ios->ioproc = 1;
     ios->compproc = 1;
     ios->union_comm = test_comm;
+    ios->union_comm_arearr = test_comm;
+
     if (!(ios->ioranks = malloc(TARGET_NTASKS * sizeof(int))))
         return PIO_ENOMEM;
     for (int t = 0; t < TARGET_NTASKS; t++)
@@ -673,6 +676,7 @@ int test_box_rearrange_create(MPI_Comm test_comm, int my_rank)
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
+    ios->union_comm_arearr = test_comm;
     ios->io_comm = test_comm;
     iodesc->ndims = NDIM1;
     iodesc->rearranger = PIO_REARR_BOX;
@@ -788,6 +792,7 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
+    ios->union_comm_arearr = test_comm;
     ios->io_comm = test_comm;
     iodesc->ndims = NDIM1;
     iodesc->rearranger = PIO_REARR_BOX;
@@ -904,6 +909,10 @@ int test_default_subset_partition(MPI_Comm test_comm, int my_rank)
     if ((mpierr = MPI_Comm_free(&iodesc->subset_comm)))
         MPIERR(mpierr);
 
+    /* Free the created communicator. */
+    if ((mpierr = MPI_Comm_free(&iodesc->subset_comm_arearr)))
+        MPIERR(mpierr);
+
     /* Free resources from test. */
     free(iodesc);
     free(ios);
@@ -945,6 +954,7 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
     ios->compproc = 1;
     ios->io_rank = my_rank;
     ios->union_comm = test_comm;
+    ios->union_comm_arearr = test_comm;
     ios->num_iotasks = TARGET_NTASKS;
     ios->num_uniontasks = TARGET_NTASKS;
     iodesc->rearranger = PIO_REARR_BOX;
@@ -965,6 +975,7 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
+    ios->union_comm_arearr = test_comm;
     ios->io_comm = test_comm;
     iodesc->ndims = NDIM1;
     iodesc->rearranger = PIO_REARR_BOX;
@@ -1069,6 +1080,7 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
     ios->ioproc = 1;
     ios->io_rank = my_rank;
     ios->union_comm = test_comm;
+    ios->union_comm_arearr = test_comm;
     ios->num_iotasks = TARGET_NTASKS;
     iodesc->rearranger = PIO_REARR_BOX;
     iodesc->mpitype = MPI_INT;
@@ -1090,6 +1102,7 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
+    ios->union_comm_arearr = test_comm;
     ios->io_comm = test_comm;
     iodesc->ndims = NDIM1;
     iodesc->rearranger = PIO_REARR_BOX;
