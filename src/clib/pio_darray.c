@@ -292,6 +292,33 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
         return pio_err(ios, file, ierr, __FILE__, __LINE__);
 
 #else
+    if(ios->async)
+    {
+        /* Only compute procs in async case call PIOc_write_darray() . So
+         * in the case of I/O procs perform the rearrangement here
+         */
+        if(ios->ioproc)
+        {
+            for(int i=0; i<nvars; i++)
+            {
+                int vframe = (frame) ? (frame[i]) : -1;
+                void *vfillvalue = (fillvalue) ? ((char *)fillvalue + iodesc->mpitype_size * i) : NULL;
+                assert(array);
+                void *bufptr =
+                    (void *)((char *)array + arraylen * iodesc->mpitype_size * i);
+                var_desc_t *vdesc = &(file->varlist[varids[i]]);
+                /* Start rearranging data pointed to by bufptr and cache the
+                 * rearranged data in vdesc viobufs
+                 */
+                ierr = pio_var_rearr_and_cache(file, vdesc, iodesc, bufptr,
+                          arraylen, vfillvalue, vframe);
+                if(ierr != PIO_NOERR)
+                {
+                    return pio_err(ios, file, ierr, __FILE__, __LINE__);
+                }
+            }
+        }
+    }
     /* Wait on pending async rearrange ops */
     ierr = pio_file_async_pend_ops_kwait(file, PIO_ASYNC_REARR_OP);
     if(ierr != PIO_NOERR)
