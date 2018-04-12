@@ -623,6 +623,13 @@ typedef struct io_desc_t
      */
     bool is_saved;
 #endif
+    /** Dup of subset_comm that is used for asynchronous data rearrangment
+     *  A separate communicator is required here because asynchronous
+     *  data rearrangement does not follow the message-based comm
+     *  used by disjoint sets of io procs and compute procs during
+     *  async I/O
+     */
+    MPI_Comm subset_comm_arearr;
 
     /** Pointer to the next io_desc_t in the list. */
     struct io_desc_t *next;
@@ -643,6 +650,14 @@ typedef struct iosystem_desc_t
     /** This is an MPI intra communicator that includes all the tasks in
      * both the IO and the computation communicators. */
     MPI_Comm union_comm;
+
+    /** Dup of union_comm that is used for asynchronous data rearrangment
+     *  A separate communicator is required here because asynchronous
+     *  data rearrangement does not follow the message-based comm
+     *  used by disjoint sets of io procs and compute procs during
+     *  async I/O
+     */
+    MPI_Comm union_comm_arearr;
 
     /** This is an MPI intra communicator that includes all the tasks
      * involved in IO. */

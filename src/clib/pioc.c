@@ -1025,6 +1025,13 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
     if ((mpierr = MPI_Comm_dup(comp_comm, &ios->union_comm)))
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
 
+    /* Create communicator for asynchronous data rearrangement */
+    mpierr = MPI_Comm_dup(ios->union_comm, &(ios->union_comm_arearr));
+    if(mpierr != MPI_SUCCESS)
+    {
+        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
+
     /* Copy the computation communicator into comp_comm. */
     if ((mpierr = MPI_Comm_dup(comp_comm, &ios->comp_comm)))
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
@@ -1357,6 +1364,8 @@ int PIOc_finalize(int iosysid)
 #endif
     if (ios->union_comm != MPI_COMM_NULL)
         MPI_Comm_free(&ios->union_comm);
+    if (ios->union_comm_arearr != MPI_COMM_NULL)
+        MPI_Comm_free(&ios->union_comm_arearr);
     if (ios->io_comm != MPI_COMM_NULL)
         MPI_Comm_free(&ios->io_comm);
 
@@ -1734,6 +1743,7 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
         my_iosys->io_comm = MPI_COMM_NULL;
         my_iosys->comp_comm = MPI_COMM_NULL;
         my_iosys->union_comm = MPI_COMM_NULL;
+        my_iosys->union_comm_arearr = MPI_COMM_NULL;
         my_iosys->intercomm = MPI_COMM_NULL;
         my_iosys->my_comm = MPI_COMM_NULL;
         my_iosys->async = 1;
@@ -1878,6 +1888,13 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
              * and one of the computation components. */
             if ((ret = MPI_Comm_create(world, union_group[cmp], &my_iosys->union_comm)))
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
+
+            /* Create communicator for asynchronous data rearrangement */
+            ret = MPI_Comm_dup(my_iosys->union_comm, &(my_iosys->union_comm_arearr));
+            if(ret != MPI_SUCCESS)
+            {
+                return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
+            }
 
             if ((ret = MPI_Comm_rank(my_iosys->union_comm, &my_iosys->union_rank)))
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);

@@ -891,12 +891,25 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc,
     /* Different rearraangers use different communicators. */
     if (iodesc->rearranger == PIO_REARR_BOX)
     {
+#if PIO_ENABLE_ASYNC_WR_REARR
+        /* We need a separate communicator for asynchronous data rearrangment
+         * to keep this communication separate from the message based
+         * communication used by async I/O (with disjoint sets of I/O and
+         * compute processes
+         */
+        mycomm = ios->union_comm_arearr;
+#else
         mycomm = ios->union_comm;
+#endif
         niotasks = ios->num_iotasks;
     }
     else
     {
+#if PIO_ENABLE_ASYNC_WR_REARR
+        mycomm = iodesc->subset_comm_arearr;
+#else
         mycomm = iodesc->subset_comm;
+#endif
         niotasks = 1;
     }
 
@@ -2121,6 +2134,12 @@ int default_subset_partition(iosystem_desc_t *ios, io_desc_t *iodesc)
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
 
     LOG((2, "Finished Splitting comm = %x, key = %d, color = %d", union_comm, key, color));
+    /* Create a communicator for async data rearrangment */
+    mpierr = MPI_Comm_dup(iodesc->subset_comm, &(iodesc->subset_comm_arearr));
+    if(mpierr != MPI_SUCCESS)
+    {
+        return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
+    }
 
     return PIO_NOERR;
 }

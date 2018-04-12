@@ -1026,8 +1026,12 @@ int PIOc_freedecomp(int iosysid, int ioid)
         free_region_list(iodesc->fillregion);
 
     if (iodesc->rearranger == PIO_REARR_SUBSET)
+    {
         if ((mpierr = MPI_Comm_free(&iodesc->subset_comm)))
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+        if ((mpierr = MPI_Comm_free(&iodesc->subset_comm_arearr)))
+            return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
 
     ret = pio_delete_iodesc_from_list(ioid);
     if (ret != PIO_NOERR)
