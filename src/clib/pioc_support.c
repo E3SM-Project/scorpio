@@ -1802,12 +1802,16 @@ int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filena
             if (do_aggregate)
             {
                 sprintf(file->transport,"%s","MPI_AGGREGATE");
-                sprintf(file->params,"num_aggregators=%d,striping=0,have_metadata_file=0", ios->num_iotasks);
+                /* sprintf(file->params,"num_aggregators=%d,striping=0,have_metadata_file=0", ios->num_iotasks); */
+                sprintf(file->params,"num_aggregators=%d,random_offset=1,striping_count=1,have_metadata_file=0", 
+									ios->num_iotasks);
             }
             else
             {
                 sprintf(file->transport,"%s","MPI_AGGREGATE");
-                sprintf(file->params,"num_aggregators=%d,striping=0,have_metadata_file=0", ios->num_comptasks/16);
+                /* sprintf(file->params,"num_aggregators=%d,striping=0,have_metadata_file=0", ios->num_comptasks/16); */
+                sprintf(file->params,"num_aggregators=%d,random_offset=1,striping_count=1,have_metadata_file=0", 
+									ios->num_comptasks/16);
                 /*sprintf(file->transport,"%s","POSIX");
                 file->params[0] = '\0';*/
             }
@@ -1824,6 +1828,8 @@ int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filena
 
 			if (ios->union_rank==0) 
 				file->adios_iomaster = MPI_ROOT;
+			else
+				file->adios_iomaster = MPI_PROC_NULL;
 
 			/* Track attributes */
 			file->num_attrs = 0;
@@ -1880,12 +1886,16 @@ int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filena
             if (do_aggregate)
             {
                 sprintf(file->transport,"%s","MPI_AGGREGATE");
-                sprintf(file->params,"num_aggregators=%d,striping=0,have_metadata_file=0", ios->num_iotasks);
+                /* sprintf(file->params,"num_aggregators=%d,striping=0,have_metadata_file=0", ios->num_iotasks); */
+                sprintf(file->params,"num_aggregators=%d,random_offset=1,striping_count=1,have_metadata_file=0", 
+									ios->num_iotasks);
             }
             else
             {
                 sprintf(file->transport,"%s","MPI_AGGREGATE");
-                sprintf(file->params,"num_aggregators=%d,striping=0,have_metadata_file=0", ios->num_comptasks/16);
+                /* sprintf(file->params,"num_aggregators=%d,striping=0,have_metadata_file=0", ios->num_comptasks/16); */
+                sprintf(file->params,"num_aggregators=%d,random_offset=1,striping_count=1,have_metadata_file=0", 
+									ios->num_comptasks/16);
                 /*sprintf(file->transport,"%s","POSIX");
                 file->params[0] = '\0';*/
             }
