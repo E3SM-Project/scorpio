@@ -18,6 +18,12 @@ ret = PIO_put_var(pio_file, pio_var, start, count, pval)
 
 call PIO_write_darray(pio_file, pio_var, iodesc, buf, ierr)
 
+Existing support for asynchronous I/O (Asynchronous I/O service)
+---------------------------------------
+In the previous (before the asynchronous framework described below was introduced) version of PIO users could access asynchronous I/O as a service. This feature is still available in the current version of PIO. In asynchronous I/O as a service the total number of processes are split by the user into two disjoint set of processes, I/O processes and compute processes. The I/O processes wait in a loop for asynchronous I/O service messages from the compute processes and execute them. The compute processes create and send messages to the I/O processes when a PIO API is called, including all information pertaining to the function call (args etc).
+
+Asynchronous I/O as a service is still available (not deprecated or removed) in the current version of PIO. However the asynchronous I/O as a service makes minimal use of the generic asynchronous framework described below (e.g. We currently do not use the generic asynchronous framework to send the messages corresponding to these asynchronous I/O as a service calls).
+
 PIO write flow without asynchronous data rearrangement
 -------------------------------------------------------
 The section below briefly documents the PIO write flow without (before) the asynchronous data rearrangement enhancement.
