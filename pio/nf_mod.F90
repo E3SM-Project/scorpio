@@ -751,6 +751,7 @@ contains
     character(len=*), intent(in)     :: name
     type (Var_desc_t), intent(inout) :: vardesc
 
+    vardesc%name = name
     ierr = pio_inq_varid(File, name, vardesc%varid)
     vardesc%rec=-1
     if(ierr==PIO_NOERR) then
@@ -1719,6 +1720,7 @@ contains
        call mpi_bcast(vardesc%ndims, 1, mpi_integer, ios%compmaster, ios%intercomm, ierr)
        call mpi_bcast(dimids, vardesc%ndims, mpi_integer, ios%compmaster, ios%intercomm, ierr)
     endif
+    vardesc%name = name
     if(ios%IOproc) then
        select case(iotype)
 #ifdef _PNETCDF

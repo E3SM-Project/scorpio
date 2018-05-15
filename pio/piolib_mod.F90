@@ -87,6 +87,7 @@ module piolib_mod
 !<
   integer :: lastrss=0
 #endif
+  integer (i4), save :: iodesc_nxt_ioid = 1
 
   !eop
   !boc
@@ -550,7 +551,8 @@ contains
     integer (kind=pio_offset) :: lengthr, lengthw
     integer (kind=pio_offset), pointer :: displacer(:),displacew(:)
 
-
+    iodesc%ioid = iodesc_nxt_ioid
+    iodesc_nxt_ioid = iodesc_nxt_ioid + 1
     nullify(iodesc%start)
     nullify(iodesc%count)
 
@@ -811,6 +813,10 @@ contains
 #ifdef MEMCHK
     integer :: msize, rss, mshare, mtext, mstack
 #endif
+
+    iodesc%ioid = iodesc_nxt_ioid
+    iodesc_nxt_ioid = iodesc_nxt_ioid + 1
+
     nullify(iodesc%start)
     nullify(iodesc%count)
 
@@ -1030,6 +1036,8 @@ contains
 
     nullify(displace)
 
+    iodesc%ioid = iodesc_nxt_ioid
+    iodesc_nxt_ioid = iodesc_nxt_ioid + 1
 #ifdef TIMING
     call t_startf("PIO:PIO_initdecomp_dof")
 #endif
@@ -1226,7 +1234,10 @@ contains
 #endif
 
     call dupiodesc2(iodesc%write,iodesc%read)
-    
+
+#ifdef SAVE_DECOMPS
+    call dumpiodesc(iosystem, iodesc, compdof, dims)
+#endif
 
     if (associated(displace)) then
        call dealloc_check(displace)
@@ -1280,6 +1291,9 @@ contains
 #endif
 
     integer ierror
+
+    iodesc%ioid = iodesc_nxt_ioid
+    iodesc_nxt_ioid = iodesc_nxt_ioid + 1
 
     nullify(iodesc%start)
     nullify(iodesc%count)
@@ -1407,6 +1421,10 @@ contains
     iodesc%write%filetype = mpi_datatype_null
 
     call dupiodesc2(iodesc%write,iodesc%read)
+
+#ifdef SAVE_DECOMPS
+    call dumpiodesc(iosystem, iodesc, compdof, dims)
+#endif
     
 #ifdef MEMCHK	
     call GPTLget_memusage(msize, rss, mshare, mtext, mstack)
@@ -1438,7 +1456,36 @@ contains
     dest%n_words = src%n_words
   end subroutine dupiodesc2
 
+  subroutine dumpiodesc(iosystem, iodesc, compdof, gdims)
+    use pio_types
+    use pio_support
+    type(iosystem_desc_t), intent(in) :: iosystem
+    type(io_desc_t), intent(in) :: iodesc
+    integer(kind=pio_offset), intent(in) :: compdof(:)
+    integer, intent(in) :: gdims(:)
 
+    character(len=PIO_MAX_NAME) :: fname
+    integer :: rank, ierr
+    integer :: ndims
+    integer, save :: counter = 0
+    ! Waiting for decomps from 8 procs should not be large
+    ! enough that we need significantly more mem for writing
+    ! out the dof
+    integer, parameter :: NPROCS_BATCH_WAIT = 8
+
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+    ndims = size(gdims)
+    write(fname,"(A9,I6.6,A5,I6.6,A2,I2.2,A4,I6.6,A5,I6.6,A4)") "piodecomp",&
+                                iosystem%num_tasks, "tasks",&
+                                iosystem%num_iotasks, "io",&
+                                ndims, "dims",&
+                                rank, "wrank",&
+                                counter, ".dat" 
+    counter = counter + 1
+    call pio_writedof(fname, compdof, iodesc, iosystem%union_comm, gdims,&
+                      batch_wait_nprocs=NPROCS_BATCH_WAIT)
+  end subroutine dumpiodesc
 
   !************************************
   ! genindexedblock
@@ -2398,7 +2445,9 @@ contains
     type (io_desc_t), intent(in) :: src
     type (io_desc_t), intent(inout) :: dest
 
-
+    ! The ioid in dest should ideally be different, but for now
+    ! we don't care about distinguishing btw dup iodescs
+    dest%ioid = src%ioid
     dest%glen        =  src%glen
     if(associated(src%start)) then
        n = size(src%start)
@@ -2681,6 +2730,7 @@ contains
     if(ierr==0) file%file_is_open=.true.
 	
     if(debug .and. file%iosystem%io_rank==0) print *,__PIO_FILE__,__LINE__,'open: ',file%fh, myfname
+    file%name = myfname
     deallocate(myfname)
 #ifdef TIMING
     call t_stopf("PIO:PIO_createfile")
@@ -2846,6 +2896,7 @@ contains
     end select
     if(Debug .and. file%iosystem%io_rank==0) print *,__PIO_FILE__,__LINE__,'open: ',file%fh, myfname
     if(ierr==0) file%file_is_open=.true.
+    file%name = myfname
     deallocate(myfname)
 #ifdef TIMING
     call t_stopf("PIO:PIO_openfile")
