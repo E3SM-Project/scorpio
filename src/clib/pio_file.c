@@ -346,15 +346,6 @@ int PIOc_closefile(int ncid)
         return pio_err(ios, file, ierr, __FILE__, __LINE__);
     }
 
-    /* Wait for pending async ops on iosystem. Currently the only pending async
-     * ops will be writes pending on this file
-     */
-    ierr = pio_iosys_async_pend_ops_wait(ios);
-    if(ierr != PIO_NOERR)
-    {
-        LOG((1, "Waiting on pending async ops on file (id=%d) failed", file->pio_ncid));
-        return pio_err(ios, file, ierr, __FILE__, __LINE__);
-    }
 #else /* PIO_ENABLE_SOFT_CLOSE */
     ierr = PIO_hard_closefile(ios, file);
     if(ierr != PIO_NOERR)
