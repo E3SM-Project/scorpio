@@ -200,6 +200,15 @@ int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file)
     int mpierr = MPI_SUCCESS;
 
     assert(ios && file);
+#if PIO_ENABLE_SOFT_SYNC
+    /* Hard sync - the previous syncs were "soft sync"s */
+    ierr = PIO_hard_sync(ios, file);
+    if(ierr != PIO_NOERR)
+    {
+        LOG((1, "Hard sync failed on the file (id=%d)", file->pio_ncid));
+        return pio_err(ios, file, ierr, __FILE__, __LINE__);
+    }
+#endif
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
     {
@@ -413,6 +422,56 @@ int PIOc_deletefile(int iosysid, const char *filename)
     return ierr;
 }
 
+/** Sync data on this file to the disk
+ * @param ios Pointer to the iosystem_desc
+ * @param file Pointer to the file_desc
+ * @returns PIO_NOERR on success, a pio error code otherwise
+ */
+int PIO_hard_sync(iosystem_desc_t *ios, file_desc_t *file)
+{
+    int ierr = PIO_NOERR;
+    int mpierr = MPI_SUCCESS, mpierr2;
+
+    assert(ios && file);
+
+    /* Call the sync function on IO tasks. */
+    if (file->mode & PIO_WRITE)
+    {
+        if (ios->ioproc)
+        {
+            switch(file->iotype)
+            {
+#ifdef _NETCDF4
+            case PIO_IOTYPE_NETCDF4P:
+                ierr = nc_sync(file->fh);
+                break;
+            case PIO_IOTYPE_NETCDF4C:
+#endif
+            case PIO_IOTYPE_NETCDF:
+                if (ios->io_rank == 0)
+                    ierr = nc_sync(file->fh);
+                break;
+#ifdef _PNETCDF
+            case PIO_IOTYPE_PNETCDF:
+                /* force flush data */
+                flush_output_buffer(file, true, 0);
+                ierr = ncmpi_sync(file->fh);
+                break;
+#endif
+            default:
+                return pio_err(ios, file, PIO_EBADIOTYPE, __FILE__, __LINE__);
+            }
+        }
+        LOG((2, "PIOc_sync ierr = %d", ierr));
+    }
+
+    /* Broadcast and check the return code. */
+    if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        return check_mpi2(ios, NULL, mpierr, __FILE__, __LINE__);
+
+    return ierr;
+}
+
 /**
  * PIO interface to nc_sync This routine is called collectively by all
  * tasks in the communicator ios.union_comm.
@@ -431,12 +490,18 @@ int PIOc_sync(int ncid)
     file_desc_t *file;     /* Pointer to file information. */
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function codes. */
     int ierr = PIO_NOERR;  /* Return code from function calls. */
+    bool flushtodisk = true;
 
 #ifdef TIMING
     GPTLstart("PIO:PIOc_sync");
 #endif
 
     LOG((1, "PIOc_sync ncid = %d", ncid));
+
+#if PIO_ENABLE_SOFT_SYNC
+    flushtodisk = false;
+    LOG((1, "PIOc_sync ncid = %d is a soft sync", ncid));
+#endif
 
     /* Get the file info from the ncid. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -457,7 +522,7 @@ int PIOc_sync(int ncid)
                 /* If there are any data arrays waiting in the
                  * multibuffer, flush it. */
                 if (wmb->num_arrays > 0)
-                    flush_buffer(ncid, wmb, true);
+                    flush_buffer(ncid, wmb, flushtodisk);
                 twmb = wmb;
                 wmb = wmb->next;
                 if (twmb == &file->buffer)
@@ -486,46 +551,18 @@ int PIOc_sync(int ncid)
         }
     }
 
-    /* Call the sync function on IO tasks. */
-    if (file->mode & PIO_WRITE)
+#if !PIO_ENABLE_SOFT_SYNC
+    ierr = PIO_hard_sync(ios, file);
+    if (ierr != PIO_NOERR)
     {
-        if (ios->ioproc)
-        {
-            switch(file->iotype)
-            {
-#ifdef _NETCDF4
-            case PIO_IOTYPE_NETCDF4P:
-                ierr = nc_sync(file->fh);
-                break;
-            case PIO_IOTYPE_NETCDF4C:
-#endif
-            case PIO_IOTYPE_NETCDF:
-                if (ios->io_rank == 0)
-                    ierr = nc_sync(file->fh);
-                break;
-#ifdef _PNETCDF
-            case PIO_IOTYPE_PNETCDF:
-                flush_output_buffer(file, true, 0);
-                ierr = ncmpi_sync(file->fh);
-                break;
-#endif
-            default:
-                return pio_err(ios, file, PIO_EBADIOTYPE, __FILE__, __LINE__);
-            }
-        }
-        LOG((2, "PIOc_sync ierr = %d", ierr));
-    }
-
-    /* Broadcast and check the return code. */
-    if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi2(ios, NULL, mpierr, __FILE__, __LINE__);
-    if (ierr)
-    {
+        LOG((1, "Sync (hard sync) failed on file (id=%d)", file->pio_ncid));
 #ifdef TIMING
         GPTLstop("PIO:PIOc_sync");
-#endif
+#endif /* TIMING */
         return check_netcdf2(ios, NULL, ierr, __FILE__, __LINE__);
     }
+#endif /* !PIO_ENABLE_SOFT_SYNC */
+
 
 #ifdef TIMING
     GPTLstop("PIO:PIOc_sync");
