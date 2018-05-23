@@ -336,62 +336,21 @@ static int sync_file(int ncid)
     return PIO_NOERR;
 }
 
-/**
- * Close a file previously opened with PIO.
- *
- * @param ncid: the file pointer
- * @returns PIO_NOERR for success, error code otherwise.
- * @author Jim Edwards, Ed Hartnett
+/* Close the file ("hard close")
+ * @param ios: Pointer to the iosystem_desc
+ * @param file: Pointer to the file_desc for the file
+ * @returns PIO_NOERR for success, a pio error code otherwise
  */
-int PIOc_closefile(int ncid)
+int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file)
 {
-    iosystem_desc_t *ios;  /* Pointer to io system information. */
-    file_desc_t *file;     /* Pointer to file information. */
-    int ierr = PIO_NOERR;  /* Return code from function calls. */
+    int ierr = PIO_NOERR;
+    int mpierr = MPI_SUCCESS;
 #ifdef _ADIOS
     char outfilename[PIO_MAX_NAME + 1];
     size_t len = 0;
 #endif
 
-#ifdef TIMING
-    GPTLstart("PIO:PIOc_closefile");
-#endif
-    LOG((1, "PIOc_closefile ncid = %d", ncid));
-
-    /* Find the info about this file. */
-    if ((ierr = pio_get_file(ncid, &file)))
-    {
-        return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
-                        "Closing file failed. Invalid file id (ncid=%d) provided", ncid);
-    }
-    ios = file->iosystem;
-
-#ifdef TIMING
-    if (file->mode & PIO_WRITE)
-        GPTLstart("PIO:PIOc_closefile_write_mode");
-#endif
-
-    /* Sync changes before closing on all tasks if async is not in
-     * use, but only on non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
-        if (file->mode & PIO_WRITE)
-            sync_file(ncid);
-
-    /* If async is in use and this is a comp tasks, then the compmaster
-     * sends a msg to the pio_msg_handler running on the IO master and
-     * waiting for a message. Then broadcast the ncid over the intercomm
-     * to the IO tasks. */
-    if (ios->async)
-    {
-        int msg = PIO_MSG_CLOSE_FILE;
-
-        PIO_SEND_ASYNC_MSG(ios, msg, &ierr, ncid);
-        if(ierr != PIO_NOERR)
-        {
-            return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Closing file (%s, ncid=%d) failed. Error sending async msg PIO_MSG_CLOSE_FILE", pio_get_fname_from_file(file), ncid);
-        }
-    }
+    assert(ios && file);
 
     /* ADIOS: assume all procs are also IO tasks */
 #ifdef _ADIOS
@@ -471,13 +430,11 @@ int PIOc_closefile(int ncid)
             ierr = nc_close(file->fh);
             break;
         case PIO_IOTYPE_NETCDF4C:
-#endif
-#ifdef _NETCDF
+#endif /* _NETCDF4 */
         case PIO_IOTYPE_NETCDF:
             if (ios->io_rank == 0)
                 ierr = nc_close(file->fh);
             break;
-#endif
 #ifdef _PNETCDF
         case PIO_IOTYPE_PNETCDF:
             if ((file->mode & PIO_WRITE)){
@@ -485,7 +442,7 @@ int PIOc_closefile(int ncid)
             }
             ierr = ncmpi_close(file->fh);
             break;
-#endif
+#endif /* _PNETCDF */
 #ifdef _ADIOS
         case PIO_IOTYPE_ADIOS: /* Needed to avoid default case and error. */
             ierr = 0;
@@ -504,13 +461,129 @@ int PIOc_closefile(int ncid)
                         "Closing file (%s, ncid=%d) failed. Underlying I/O library (iotype=%s) call failed", pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
     }
 
+    /* Delete file from our list of open files. */
+    ierr = pio_delete_file_from_list(file->pio_ncid);
+    if(ierr != PIO_NOERR)
+    {
+        return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                        "Closing file (%s, ncid=%d) failed. Deleting file from the list of open files failed", pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    return PIO_NOERR;
+}
+
+/* "Soft close" the file
+ * The function assumes that only writes are pending on this file
+ * @param ios: Pointer to the iosystem_desc
+ * @param file: Pointer to the file_desc for the file
+ * @returns PIO_NOERR for success, a pio error code otherwise
+ */
+int PIO_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
+{
+    int ierr = PIO_NOERR;
+
+    assert(ios && file);
+    /* Queue up the pending async ops on the file to the iosystem */
+    ierr = pio_iosys_async_pend_op_add(ios, PIO_ASYNC_FILE_WRITE_OPS,
+            (void *)file);
+    if(ierr != PIO_NOERR)
+    {
+        return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                        "Closing file (%s, ncid=%d) failed. Queuing pending asynchronous operations on file to the iosystem (iosysid=%d) failed (iotype=%s)", pio_get_fname_from_file(file), file->pio_ncid, ios->iosysid, pio_iotype_to_string(file->iotype));
+    }
+
+    return PIO_NOERR;
+}
+
+/**
+ * Close a file previously opened with PIO.
+ *
+ * @param ncid: the file pointer
+ * @returns PIO_NOERR for success, error code otherwise.
+ * @author Jim Edwards, Ed Hartnett
+ */
+int PIOc_closefile(int ncid)
+{
+    iosystem_desc_t *ios;  /* Pointer to io system information. */
+    file_desc_t *file;     /* Pointer to file information. */
+    int ierr = PIO_NOERR;  /* Return code from function calls. */
+    int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function codes. */
+#ifdef _ADIOS
+    char outfilename[PIO_MAX_NAME + 1];
+    size_t len = 0;
+#endif
+
+#ifdef TIMING
+    GPTLstart("PIO:PIOc_closefile");
+#endif
+    LOG((1, "PIOc_closefile ncid = %d", ncid));
+
+    /* Find the info about this file. */
+    if ((ierr = pio_get_file(ncid, &file)))
+    {
+        return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
+                        "Closing file (ncid=%d) failed. Invalid file id. Unable to find internal structure associated with the file id", ncid);
+    }
+    ios = file->iosystem;
+
+#ifdef TIMING
+    if (file->mode & PIO_WRITE)
+        GPTLstart("PIO:PIOc_closefile_write_mode");
+#endif
+
+    /* Sync changes before closing on all tasks if async is not in
+     * use, but only on non-IO tasks if async is in use. */
+    if (!ios->async || !ios->ioproc)
+        if (file->mode & PIO_WRITE)
+            sync_file(ncid);
+
+    /* If async is in use and this is a comp tasks, then the compmaster
+     * sends a msg to the pio_msg_handler running on the IO master and
+     * waiting for a message. Then broadcast the ncid over the intercomm
+     * to the IO tasks. */
+    if (ios->async)
+    {
+        int msg = PIO_MSG_CLOSE_FILE;
+
+        PIO_SEND_ASYNC_MSG(ios, msg, &ierr, ncid);
+        if(ierr != PIO_NOERR)
+        {
+            return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                        "Closing file %s (ncid=%d) failed. Unable to send asynchronous message, PIO_MSG_CLOSE_FILE, on iosystem (iosysid=%d)", pio_get_fname_from_file(file), ncid, ios->iosysid);
+        }
+    }
+
+#if PIO_ENABLE_SOFT_CLOSE
+    /* A "soft close" does not sync all data to the disk */
+    ierr = PIO_soft_closefile(ios, file);
+    if(ierr != PIO_NOERR)
+    {
+        return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                        "Closing file %s (ncid=%d) failed. Internal error while performing soft close (asynchronous close) on the file", pio_get_fname_from_file(file), ncid);
+    }
+
+    /* Wait for pending async ops on iosystem. Currently the only pending async
+     * ops will be writes pending on this file
+     */
+    ierr = pio_iosys_async_pend_ops_wait(ios);
+    if(ierr != PIO_NOERR)
+    {
+        return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                        "Closing file %s (ncid=%d) failed. Internal error while  waiting for pending asynchronous operations on the iosystem (including pending asynchronous file operations, iosysid=%d)", pio_get_fname_from_file(file), ncid, ios->iosysid);
+    }
+#else /* PIO_ENABLE_SOFT_CLOSE */
+    ierr = PIO_hard_closefile(ios, file);
+    if(ierr != PIO_NOERR)
+    {
+        return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                        "Closing file %s (ncid=%d) failed. Internal error while  closing the file", pio_get_fname_from_file(file), ncid);
+    }
+#endif /* PIO_ENABLE_SOFT_CLOSE */
+
 #ifdef TIMING
     if (file->mode & PIO_WRITE)
         GPTLstop("PIO:PIOc_closefile_write_mode");
 #endif
-
-    /* Delete file from our list of open files. */
-    pio_delete_file_from_list(ncid);
 
 #ifdef TIMING
     GPTLstop("PIO:PIOc_closefile");

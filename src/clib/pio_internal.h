@@ -166,6 +166,9 @@ extern "C" {
     int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype,
                             const char *filename, int mode, int retry);
 
+    /* Close ("hard close") file - sync all data with disk + close file */
+    int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file);
+
     iosystem_desc_t *pio_get_iosystem_from_id(int iosysid);
     int pio_add_to_iosystem_list(iosystem_desc_t *ios, MPI_Comm comm);
 
@@ -425,6 +428,13 @@ extern "C" {
  
     /* Remove cached data (rearranged data) corresponding a var (and record/frame) */
     int pio_var_rem_cache_data(var_desc_t *vdesc, int rec_num, viobuf_cache_t **pviobuf);
+
+    /* Wait on all pending async ops on the iosystem */
+    int pio_iosys_async_pend_ops_wait(iosystem_desc_t *iosys);
+
+    /* Queue an async op on an iosystem */
+    int pio_iosys_async_pend_op_add(iosystem_desc_t *iosys,
+          pio_async_op_type_t op_type, void *pdata);
 
     /* Initialize and finalize logging. */
     void pio_init_logging(void);

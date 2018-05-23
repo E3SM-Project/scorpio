@@ -4550,3 +4550,136 @@ int pio_file_compact_and_copy_rearr_data(void *dest, size_t dest_sz,
 
     return PIO_NOERR;
 }
+
+/* Wait for all pending asynchronous operations on this iosystem
+ * This is the generic wait function for waiting on all
+ * async ops on an iosystem
+ * @param iosys Pointer to the iosystem_desc for the iosystem
+ * Returns PIO_NOERR on success, a pio error code otherwise
+ */
+int pio_iosys_async_pend_ops_wait(iosystem_desc_t *iosys)
+{
+    int ret;
+    assert(iosys != NULL);
+
+    if(iosys->nasync_pend_ops == 0)
+    {
+        return PIO_NOERR;
+    }
+
+    pio_async_op_t *p = iosys->async_pend_ops, *q=NULL;
+    while(p)
+    {
+        LOG((2, "Waiting on async op, kind = %s",
+            (p->op_type == PIO_ASYNC_REARR_OP) ? "PIO_ASYNC_REARR_OP" :
+            ((p->op_type == PIO_ASYNC_PNETCDF_WRITE_OP) ? "PIO_ASYNC_PNETCDF_WRITE_OP" :
+            ((p->op_type == PIO_ASYNC_FILE_WRITE_OPS) ? "PIO_ASYNC_FILE_WRITE_OPS" :
+            "UNKNOWN"))));
+        assert(p->op_type == PIO_ASYNC_FILE_WRITE_OPS);
+        ret = p->wait(p->pdata);
+        if(ret != PIO_NOERR)
+        {
+            return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
+                            "Internal error waiting for pending asynchronous operations on iosystem (iosysid=%d). Waiting for an asynchronous operation failed.", iosys->iosysid);
+        }
+        q = p;
+        p = p->next;
+        q->free(q->pdata);
+        free(q);
+    }
+    iosys->async_pend_ops = NULL;
+    iosys->nasync_pend_ops = 0;
+
+    return PIO_NOERR;
+}
+
+/* Wait for all pending asynchronous operations on a file
+ * This is the generic wait function for waiting on all
+ * async ops a file
+ * @param pdata Pointer to user data (pointer to file_desc
+ * corresponding to a file)
+ * Returns PIO_NOERR on success, a pio error code otherwise
+ */
+int pio_file_async_pend_op_wait(void *pdata)
+{
+    int ret;
+    assert(pdata != NULL);
+
+    file_desc_t *file = (file_desc_t *)pdata;
+    if(file->nasync_pend_ops == 0)
+    {
+        return PIO_NOERR;
+    }
+
+    /* We only wait for pending pnetcdf writes. So the caller
+     * needs to make sure that no data rearrangement ops are
+     * pending */
+    ret = pio_file_async_pend_ops_kwait(file, PIO_ASYNC_PNETCDF_WRITE_OP);
+    if(ret != PIO_NOERR)
+    {
+        return pio_err(file->iosystem, file, ret, __FILE__, __LINE__,
+                        "Internal error while waiting for pending asynchronous write operations on file (%s, ncid=%d) for the PIO_IOTYPE_PNETCDF iotype", pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    file->wb_pend = 0;
+    file->npend_ops = 0;
+
+    return PIO_NOERR;
+}
+
+/* Free file_desc and close the file
+ * @param pdata Pointer to user data (pointer to file_desc
+ * corresponding to a file)
+ */
+void pio_file_close_and_free(void *pdata)
+{
+    int ret;
+    assert(pdata != NULL);
+
+    file_desc_t *file = (file_desc_t *)pdata;
+    ret = PIO_hard_closefile(file->iosystem, file);
+    if(ret != PIO_NOERR)
+    {
+        LOG((1, "Closing file (id=%d) failed (ignoring the error)", file->pio_ncid));
+    }
+}
+
+
+/* Add an async op to the list of pending ops for an iosystem
+ * @param iosys Pointer to the iosystem_desc
+ * @param op_type Type of asynchronous operation added
+ * @param pdata Pointer to user defined data for this async op
+ * Returns PIO_NOERR on success, a pio error code otherwise
+ */
+int pio_iosys_async_pend_op_add(iosystem_desc_t *iosys,
+      pio_async_op_type_t op_type, void *pdata)
+{
+    assert(iosys != NULL);
+    assert((op_type > PIO_ASYNC_INVALID_OP)
+            && (op_type < PIO_ASYNC_NUM_OP_TYPES));
+    assert(pdata != NULL);
+    assert(op_type == PIO_ASYNC_FILE_WRITE_OPS);
+
+    pio_async_op_t *pnew = (pio_async_op_t *) calloc(1, sizeof(pio_async_op_t));
+    if(pnew == NULL)
+    {
+        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Internal error while adding a pending asynchronous operations on the iosystem (iosysid=%d). Unable to allocate %lld bytes to keep track of the asynchronous operation", iosys->iosysid, (unsigned long long) (sizeof(pio_async_op_t)));
+    }
+
+    pnew->op_type = op_type;
+    pnew->pdata = pdata;
+    if(op_type == PIO_ASYNC_FILE_WRITE_OPS)
+    {
+        pnew->wait = pio_file_async_pend_op_wait;
+        /* File writes do not have a non-blocking test/poke function */
+        pnew->poke = pio_async_poke_func_unavail;
+        pnew->free = pio_file_close_and_free;
+    }
+    pnew->next = iosys->async_pend_ops;
+
+    iosys->async_pend_ops = pnew;
+    iosys->nasync_pend_ops++;
+
+    return PIO_NOERR;
+}

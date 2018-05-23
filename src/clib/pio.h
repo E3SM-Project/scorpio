@@ -636,6 +636,42 @@ typedef struct io_desc_t
 } io_desc_t;
 
 /**
+ * PIO asynchronous operation types
+ */
+typedef enum pio_async_op_type
+{
+    PIO_ASYNC_INVALID_OP = 0,
+    PIO_ASYNC_REARR_OP,
+    PIO_ASYNC_PNETCDF_WRITE_OP,
+    PIO_ASYNC_FILE_WRITE_OPS,
+    PIO_ASYNC_NUM_OP_TYPES
+} pio_async_op_type_t;
+
+/**
+ * PIO asynchronous op
+ */
+typedef struct pio_async_op
+{
+    pio_async_op_type_t op_type;
+    void *pdata;
+    /* Blocking wait function for this async op
+     * param 1 : A user defined data pointer
+     * return : PIO_NOERR on success, pio error code on failure
+     */
+    int (*wait)(void *);
+    /* Non-blocking function for making progress on this async op
+     * param 1 : A user defined data pointer
+     * param 2 : Pointer to a flag that is set to true if async op
+     * is complete, false otherwise
+     * return : PIO_NOERR on success, pio error code on failure
+     */
+    int (*poke)(void *, int *);
+    /* Free function for user defined pdata */
+    void (*free)(void *);
+    struct pio_async_op *next;
+} pio_async_op_t;
+
+/**
  * IO system descriptor structure.
  *
  * This structure contains the general IO subsystem data and MPI
@@ -761,6 +797,12 @@ typedef struct iosystem_desc_t
     /** Rearranger options. */
     rearr_opt_t rearr_opts;
 
+    /* Number of pending async operations on this iosystem */
+    int nasync_pend_ops;
+
+    /* List of pending async operations on this iosystem */
+    pio_async_op_t *async_pend_ops;
+
     /** Pointer to the next iosystem_desc_t in the list. */
     struct iosystem_desc_t *next;
 } iosystem_desc_t;
@@ -862,41 +904,6 @@ typedef struct adios_att_desc_t
     enum ADIOS_DATATYPES adios_type;
 } adios_att_desc_t;
 #endif
-
-/**
- * PIO asynchronous operation types
- */
-typedef enum pio_async_op_type
-{
-    PIO_ASYNC_INVALID_OP = 0,
-    PIO_ASYNC_REARR_OP,
-    PIO_ASYNC_PNETCDF_WRITE_OP,
-    PIO_ASYNC_NUM_OP_TYPES
-} pio_async_op_type_t;
-
-/**
- * PIO asynchronous op
- */
-typedef struct pio_async_op
-{
-    pio_async_op_type_t op_type;
-    void *pdata;
-    /* Blocking wait function for this async op
-     * param 1 : A user defined data pointer
-     * return : PIO_NOERR on success, pio error code on failure
-     */
-    int (*wait)(void *);
-    /* Non-blocking function for making progress on this async op
-     * param 1 : A user defined data pointer
-     * param 2 : Pointer to a flag that is set to true if async op
-     * is complete, false otherwise
-     * return : PIO_NOERR on success, pio error code on failure
-     */
-    int (*poke)(void *, int *);
-    /* Free function for user defined pdata */
-    void (*free)(void *);
-    struct pio_async_op *next;
-} pio_async_op_t;
 
 /**
  * File descriptor structure.
