@@ -195,6 +195,85 @@ int PIOc_create(int iosysid, const char *filename, int cmode, int *ncidp)
     return PIOc_createfile_int(iosysid, ncidp, &iotype, filename, cmode);
 }
 
+/* Close the file ("hard close")
+ * @param ios: Pointer to the iosystem_desc
+ * @param file: Pointer to the file_desc for the file
+ * @returns PIO_NOERR for success, a pio error code otherwise
+ */
+int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file)
+{
+    int ierr = PIO_NOERR;
+    int mpierr = MPI_SUCCESS;
+
+    assert(ios && file);
+    /* If this is an IO task, then call the netCDF function. */
+    if (ios->ioproc)
+    {
+        switch (file->iotype)
+        {
+#ifdef _NETCDF4
+        case PIO_IOTYPE_NETCDF4P:
+            ierr = nc_close(file->fh);
+            break;
+        case PIO_IOTYPE_NETCDF4C:
+#endif /* _NETCDF4 */
+        case PIO_IOTYPE_NETCDF:
+            if (ios->io_rank == 0)
+                ierr = nc_close(file->fh);
+            break;
+#ifdef _PNETCDF
+        case PIO_IOTYPE_PNETCDF:
+            if ((file->mode & PIO_WRITE)){
+                ierr = ncmpi_buffer_detach(file->fh);
+            }
+            ierr = ncmpi_close(file->fh);
+            break;
+#endif /* _PNETCDF */
+        default:
+            return pio_err(ios, file, PIO_EBADIOTYPE, __FILE__, __LINE__);
+        }
+    }
+
+    /* Broadcast and check the return code. */
+    if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        return check_mpi(file, mpierr, __FILE__, __LINE__);
+    if (ierr)
+        return check_netcdf(file, ierr, __FILE__, __LINE__);
+
+    /* Delete file from our list of open files. */
+    ierr = pio_delete_file_from_list(file->pio_ncid);
+    if(ierr != PIO_NOERR)
+    {
+        LOG((1, "Error deleting file (id=%d) from the file list", file->pio_ncid));
+        return pio_err(ios, file, ierr, __FILE__, __LINE__);
+    }
+
+    return PIO_NOERR;
+}
+
+/* "Soft close" the file
+ * The function assumes that only writes are pending on this file
+ * @param ios: Pointer to the iosystem_desc
+ * @param file: Pointer to the file_desc for the file
+ * @returns PIO_NOERR for success, a pio error code otherwise
+ */
+int PIO_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
+{
+    int ierr = PIO_NOERR;
+
+    assert(ios && file);
+    /* Queue up the pending async ops on the file to the iosystem */
+    ierr = pio_iosys_async_pend_op_add(ios, PIO_ASYNC_FILE_WRITE_OPS,
+            (void *)file);
+    if(ierr != PIO_NOERR)
+    {
+        LOG((1, "Error queueing pending async ops on file (id=%d) to ios", file->pio_ncid));
+        return pio_err(ios, file, ierr, __FILE__, __LINE__);
+    }
+
+    return PIO_NOERR;
+}
+
 /**
  * Close a file previously opened with PIO.
  *
@@ -249,42 +328,32 @@ int PIOc_closefile(int ncid)
             return check_mpi(file, mpierr, __FILE__, __LINE__);
     }
 
-    /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+#if PIO_ENABLE_SOFT_CLOSE
+    /* A "soft close" does not sync all data to the disk */
+    ierr = PIO_soft_closefile(ios, file);
+    if(ierr != PIO_NOERR)
     {
-        switch (file->iotype)
-        {
-#ifdef _NETCDF4
-        case PIO_IOTYPE_NETCDF4P:
-            ierr = nc_close(file->fh);
-            break;
-        case PIO_IOTYPE_NETCDF4C:
-#endif
-        case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank == 0)
-                ierr = nc_close(file->fh);
-            break;
-#ifdef _PNETCDF
-        case PIO_IOTYPE_PNETCDF:
-            if ((file->mode & PIO_WRITE)){
-                ierr = ncmpi_buffer_detach(file->fh);
-            }
-            ierr = ncmpi_close(file->fh);
-            break;
-#endif
-        default:
-            return pio_err(ios, file, PIO_EBADIOTYPE, __FILE__, __LINE__);
-        }
+        LOG((1, "Soft close of file (id=%d) failed", file->pio_ncid));
+        return pio_err(ios, file, ierr, __FILE__, __LINE__);
     }
 
-    /* Broadcast and check the return code. */
-    if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(file, mpierr, __FILE__, __LINE__);
-    if (ierr)
-        return check_netcdf(file, ierr, __FILE__, __LINE__);
-
-    /* Delete file from our list of open files. */
-    pio_delete_file_from_list(ncid);
+    /* Wait for pending async ops on iosystem. Currently the only pending async
+     * ops will be writes pending on this file
+     */
+    ierr = pio_iosys_async_pend_ops_wait(ios);
+    if(ierr != PIO_NOERR)
+    {
+        LOG((1, "Waiting on pending async ops on file (id=%d) failed", file->pio_ncid));
+        return pio_err(ios, file, ierr, __FILE__, __LINE__);
+    }
+#else /* PIO_ENABLE_SOFT_CLOSE */
+    ierr = PIO_hard_closefile(ios, file);
+    if(ierr != PIO_NOERR)
+    {
+        LOG((1, "Hard close of file (id=%d) failed", file->pio_ncid));
+        return pio_err(ios, file, ierr, __FILE__, __LINE__);
+    }
+#endif /* PIO_ENABLE_SOFT_CLOSE */
 
 #ifdef TIMING
     GPTLstop("PIO:PIOc_closefile");
