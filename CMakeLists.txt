@@ -28,7 +28,8 @@ option (PIO_USE_MALLOC       "Use native malloc (instead of bget package)"  OFF)
 option (PIO_MICRO_TIMING     "Enable internal micro timers"                 OFF)
 option (PIO_SAVE_DECOMPS     "Dump the decomposition information"           OFF)
 option (PIO_ENABLE_ASYNC_WR_REARR     "Enable async rearrangement during write" OFF)
-option (PIO_ENABLE_SOFT_CLOSE     "Enable soft close (close does not sync data)" OFF)
+option (PIO_ENABLE_SOFT_CLOSE "Enable soft close (close does not sync data with disk)" OFF)
+option (PIO_ENABLE_SOFT_SYNC  "Enable soft sync (sync does not sync data with disk)" OFF)
 option (WITH_PNETCDF         "Require the use of PnetCDF"                   ON)
 
 # Set a variable that appears in the config.h.in file.
@@ -67,6 +68,12 @@ if(PIO_ENABLE_SOFT_CLOSE)
   set(ENABLE_SOFT_CLOSE 1)
 else()
   set(ENABLE_SOFT_CLOSE 0)
+endif()
+
+if(PIO_ENABLE_SOFT_SYNC)
+  set(ENABLE_SOFT_SYNC 1)
+else()
+  set(ENABLE_SOFT_SYNC 0)
 endif()
 
 #==============================================================================
@@ -123,6 +130,9 @@ option (PIO_ENABLE_LARGE_TESTS  "Enable large (file, processes) tests"         O
 option (PIO_VALGRIND_CHECK  "Enable memory leak check using valgrind"           OFF)
 option (PIO_TEST_CLOSE_OPEN_FOR_SYNC  "PIO fortran tests will close+open for sync"  OFF)
 
+if (PIO_ENABLE_SOFT_SYNC)
+  set(PIO_TEST_CLOSE_OPEN_FOR_SYNC ON)
+endif()
 #==============================================================================
 #  BACKWARDS COMPATIBILITY
 #==============================================================================
