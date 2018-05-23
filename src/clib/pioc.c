@@ -1284,6 +1284,16 @@ int PIOc_finalize(int iosysid)
         }
     }
 
+#if PIO_ENABLE_SOFT_CLOSE
+    /* Wait for pending async ops on iosystem */
+    ierr = pio_iosys_async_pend_ops_wait(ios);
+    if(ierr != PIO_NOERR)
+    {
+        return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                        "PIO Finalize failed on iosystem (%d). Waiting on pending asynchronous operation on the iosystem failed", iosysid);
+    }
+#endif
+
     /* Free this memory that was allocated in init_intracomm. */
     if (ios->ioranks)
         free(ios->ioranks);

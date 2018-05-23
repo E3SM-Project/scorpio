@@ -573,15 +573,6 @@ int PIOc_closefile(int ncid)
                         "Closing file %s (ncid=%d) failed. Internal error while performing soft close (asynchronous close) on the file", pio_get_fname_from_file(file), ncid);
     }
 
-    /* Wait for pending async ops on iosystem. Currently the only pending async
-     * ops will be writes pending on this file
-     */
-    ierr = pio_iosys_async_pend_ops_wait(ios);
-    if(ierr != PIO_NOERR)
-    {
-        return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                        "Closing file %s (ncid=%d) failed. Internal error while  waiting for pending asynchronous operations on the iosystem (including pending asynchronous file operations, iosysid=%d)", pio_get_fname_from_file(file), ncid, ios->iosysid);
-    }
 #else /* PIO_ENABLE_SOFT_CLOSE */
     ierr = PIO_hard_closefile(ios, file);
     if(ierr != PIO_NOERR)
