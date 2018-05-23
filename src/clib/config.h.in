@@ -40,4 +40,7 @@
 /** Enable soft close (data is not sync'ed to disk on file close) */
 #define PIO_ENABLE_SOFT_CLOSE @ENABLE_SOFT_CLOSE@
 
+/** Enable soft sync (data is not sync'ed to disk on file sync) */
+#define PIO_ENABLE_SOFT_SYNC @ENABLE_SOFT_SYNC@
+
 #endif /* _PIO_CONFIG_ */

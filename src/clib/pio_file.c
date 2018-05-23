@@ -224,6 +224,7 @@ static int sync_file(int ncid)
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     int ierr = PIO_NOERR;  /* Return code from function calls. */
+    bool flushtodisk = false;
 
     LOG((1, "sync_file ncid = %d", ncid));
 
@@ -255,7 +256,7 @@ static int sync_file(int ncid)
                 /* If there are any data arrays waiting in the
                  * multibuffer, flush it to IO tasks. */
                 if (wmb->num_arrays > 0)
-                    flush_buffer(ncid, wmb, false);
+                    flush_buffer(ncid, wmb, flushtodisk);
                 twmb = wmb;
                 wmb = wmb->next;
                 if (twmb == &file->buffer)
@@ -417,6 +418,16 @@ int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file)
 
         free(file->filename);
         ierr = 0;
+    }
+#endif
+
+#if PIO_ENABLE_SOFT_SYNC
+    /* Hard sync - the previous syncs were "soft sync"s */
+    ierr = PIO_hard_sync(ios, file);
+    if(ierr != PIO_NOERR)
+    {
+        return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                        "Closing file (%s, ncid=%d) failed. A hard sync on the file failed (iotype=%s)", pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
     }
 #endif
 
@@ -664,6 +675,57 @@ int PIOc_deletefile(int iosysid, const char *filename)
     return ierr;
 }
 
+/** Sync data on this file to the disk
+ * @param ios Pointer to the iosystem_desc
+ * @param file Pointer to the file_desc
+ * @returns PIO_NOERR on success, a pio error code otherwise
+ */
+int PIO_hard_sync(iosystem_desc_t *ios, file_desc_t *file)
+{
+    int ierr = PIO_NOERR;
+    int mpierr = MPI_SUCCESS, mpierr2;
+
+    assert(ios && file);
+
+    /* Call the sync function on IO tasks. */
+    if (file->mode & PIO_WRITE)
+    {
+        if (ios->ioproc)
+        {
+            switch(file->iotype)
+            {
+#ifdef _NETCDF4
+            case PIO_IOTYPE_NETCDF4P:
+                ierr = nc_sync(file->fh);
+                break;
+            case PIO_IOTYPE_NETCDF4C:
+#endif
+            case PIO_IOTYPE_NETCDF:
+                if (ios->io_rank == 0)
+                    ierr = nc_sync(file->fh);
+                break;
+#ifdef _PNETCDF
+            case PIO_IOTYPE_PNETCDF:
+                /* force flush data */
+                flush_output_buffer(file, true, 0);
+                ierr = ncmpi_sync(file->fh);
+                break;
+#endif
+            default:
+                return pio_err(ios, file, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                                "Syncing file (%s, ncid=%d) failed. Unsupported iotype (%d) specified", pio_get_fname_from_file(file), file->pio_ncid, file->iotype);
+            }
+        }
+        LOG((2, "PIOc_sync ierr = %d", ierr));
+    }
+
+    /* Broadcast and check the return code. */
+    if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+
+    return ierr;
+}
+
 /**
  * PIO interface to nc_sync This routine is called collectively by all
  * tasks in the communicator ios.union_comm.
@@ -679,6 +741,7 @@ int PIOc_deletefile(int iosysid, const char *filename)
 int PIOc_sync(int ncid)
 {
     int ierr = PIO_NOERR;  /* Return code from function calls. */
+    bool flushtodisk = true;
 
 #ifdef TIMING
     GPTLstart("PIO:PIOc_sync");
