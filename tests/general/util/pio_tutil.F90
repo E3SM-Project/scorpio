@@ -29,7 +29,7 @@ MODULE pio_tutil
   ! MPI info
   INTEGER ::  pio_tf_world_rank_, pio_tf_world_sz_
   INTEGER :: pio_tf_tmp_comm_rank_, pio_tf_tmp_comm_sz_
-  INTEGER :: pio_tf_comm_
+  INTEGER :: pio_tf_comm_, pio_tf_rearr_
 
   ! REAL types
   INTEGER, PARAMETER, PUBLIC :: fc_real   = selected_real_kind(6)
@@ -62,6 +62,7 @@ MODULE pio_tutil
   PUBLIC  :: PIO_TF_MAX_STR_LEN
   ! Public functions
   PUBLIC  :: PIO_TF_Init_, PIO_TF_Finalize_, PIO_TF_Passert_
+  PUBLIC  :: PIO_TF_Reinit
   PUBLIC  :: PIO_TF_Is_netcdf
   PUBLIC  :: PIO_TF_Get_nc_iotypes, PIO_TF_Get_undef_nc_iotypes
   PUBLIC  :: PIO_TF_Get_iotypes, PIO_TF_Get_undef_iotypes
@@ -132,7 +133,7 @@ CONTAINS
 #endif
 
 
-
+    pio_tf_rearr_ = rearr
     pio_tf_log_level_ = 0
     pio_tf_num_aggregators_ = 0
     pio_tf_num_io_tasks_ = 0
@@ -189,6 +190,53 @@ CONTAINS
       PRINT *, "PIO_TF: Error setting PIO logging level"
     end if
   END SUBROUTINE PIO_TF_Init_
+
+  ! Reinitialize Testing framework 
+  ! This util function finalizes the testing framework and reinitializes
+  ! it
+  ! This function assumes that PIO_TF_Init_ has already been called once
+  SUBROUTINE  PIO_TF_Reinit()
+#ifdef TIMING
+   use perf_mod
+#endif
+#ifndef NO_MPIMOD
+    use mpi
+#else
+    include 'mpif.h'
+#endif
+    INTEGER ierr
+
+    ! Finalize
+    CALL PIO_TF_Finalize_()
+
+    CALL MPI_COMM_DUP(MPI_COMM_WORLD, pio_tf_comm_, ierr);
+    CALL MPI_COMM_RANK(pio_tf_comm_, pio_tf_world_rank_, ierr)
+    CALL MPI_COMM_SIZE(pio_tf_comm_, pio_tf_world_sz_, ierr)
+#ifdef TIMING
+#ifndef TIMING_INTERNAL
+    call t_initf('gptl.nl')
+#endif
+#endif
+
+    ! Initialize PIO
+    CALL PIO_init(pio_tf_world_rank_, &
+          pio_tf_comm_,               &
+          pio_tf_num_io_tasks_,       &
+          pio_tf_num_aggregators_,    &
+          pio_tf_stride_,             &
+          pio_tf_rearr_,              &
+          pio_tf_iosystem_,           &
+          base=0)
+
+    ! Set PIO to bcast error
+    CALL PIO_seterrorhandling(pio_tf_iosystem_, PIO_BCAST_ERROR)
+
+    ! Set PIO logging level
+    ierr = PIO_set_log_level(pio_tf_log_level_)
+    if(ierr /= PIO_NOERR) then
+      PRINT *, "PIO_TF: Error setting PIO logging level"
+    end if
+  END SUBROUTINE PIO_TF_Reinit
 
   ! Finalize Testing framework - Internal (Not directly used by unit tests)
   SUBROUTINE  PIO_TF_Finalize_
