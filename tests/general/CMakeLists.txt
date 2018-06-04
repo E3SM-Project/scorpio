@@ -18,6 +18,7 @@ SET(GENERATED_SRCS pio_file_simple_tests.F90
   pio_rearr_opts2.F90
   pio_decomp_tests.F90
   pio_sclose_decomp_tests_1d.F90
+  pio_sclose_file_tests.F90
   pio_decomp_tests_1d.F90
   pio_decomp_tests_2d.F90
   pio_decomp_tests_3d.F90
@@ -88,6 +89,36 @@ if (PIO_ENABLE_SOFT_CLOSE)
 
     add_mpi_test(pio_sc_decomp_tests_1d_3p
       EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_sclose_decomp_tests_1d
+      NUMPROCS 3
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+
+  endif ()
+
+  #===== pio_sclose_file_tests =====
+  add_executable (pio_sclose_file_tests EXCLUDE_FROM_ALL
+    pio_sclose_file_tests.F90
+    ${CMAKE_CURRENT_SOURCE_DIR}/util/pio_tutil.F90)
+  target_link_libraries (pio_sclose_file_tests piof)
+  add_dependencies (tests pio_sclose_file_tests)
+
+  if (PIO_USE_MPISERIAL)
+    add_test(NAME pio_sc_file_tests_1p
+      COMMAND pio_sclose_file_tests)
+    set_tests_properties(pio_sc_file_tests_1p
+      PROPERTIES TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  else ()
+    add_mpi_test(pio_sc_file_tests_1p
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_sclose_file_tests
+      NUMPROCS 1
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+
+    add_mpi_test(pio_sc_file_tests_2p
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_sclose_file_tests
+      NUMPROCS 2
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+
+    add_mpi_test(pio_sc_file_tests_3p
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_sclose_file_tests
       NUMPROCS 3
       TIMEOUT ${DEFAULT_TEST_TIMEOUT})
 
