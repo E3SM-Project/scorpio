@@ -21,6 +21,7 @@ SET(GENERATED_SRCS pio_file_simple_tests.F90
   pio_rearr_opts2.F90
   pio_decomp_tests.F90
   pio_sclose_decomp_tests_1d.F90
+  pio_sclose_file_tests.F90
   pio_decomp_tests_1d.F90
   pio_decomp_tests2_1d.F90
   pio_async_decomp_tests.F90
@@ -435,6 +436,24 @@ add_dependencies (tests pio_sclose_decomp_tests_1d)
 
 add_pio_test(pio_sclose_decomp_tests_1d
   EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_sclose_decomp_tests_1d
+  MINNUMPROCS 1
+  MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}
+  MINNUMIOPROCS 1
+  MAXNUMIOPROCS ${PIO_TF_C2_MAXNUMIOPROCS}
+  MINSTRIDE 1
+  MAXSTRIDE ${PIO_TF_C2_MAXSTRIDE}
+  TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+
+#===== pio_sclose_file_tests =====
+add_executable (pio_sclose_file_tests EXCLUDE_FROM_ALL
+  pio_sclose_file_tests.F90)
+set_property(TARGET pio_sclose_file_tests PROPERTY LINKER_LANGUAGE Fortran)
+target_link_libraries (pio_sclose_file_tests pio_tutil piof)
+add_dependencies (pio_sclose_file_tests pio_tutil)
+add_dependencies (tests pio_sclose_file_tests)
+
+add_pio_test(pio_sclose_file_tests
+  EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_sclose_file_tests
   MINNUMPROCS 1
   MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}
   MINNUMIOPROCS 1
