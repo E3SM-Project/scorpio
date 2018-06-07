@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 2.8.12)
-project (PIO C Fortran)
+project (PIO C CXX Fortran)
 #cmake_policy(VERSION 3.5.2)
 
 # The project version number.
@@ -28,6 +28,7 @@ option (PIO_USE_MALLOC       "Use native malloc (instead of bget package)"  OFF)
 option (PIO_MICRO_TIMING     "Enable internal micro timers"                 OFF)
 option (PIO_SAVE_DECOMPS     "Dump the decomposition information"           OFF)
 option (PIO_ENABLE_ASYNC_WR_REARR     "Enable async rearrangement during write" OFF)
+option (PIO_USE_ASYNC_WR_THREAD    "Use an asynchronous thread for writes (Requires C++11 support)" OFF)
 option (PIO_ENABLE_SOFT_CLOSE "Enable soft close (close does not sync data with disk)" OFF)
 option (PIO_ENABLE_SOFT_SYNC  "Enable soft sync (sync does not sync data with disk)" OFF)
 option (WITH_PNETCDF         "Require the use of PnetCDF"                   ON)
@@ -69,6 +70,12 @@ if(PIO_ENABLE_ASYNC_WR_REARR)
   set(ENABLE_ASYNC_WR_REARR 1)
 else()
   set(ENABLE_ASYNC_WR_REARR 0)
+endif()
+
+if(PIO_USE_ASYNC_WR_THREAD)
+  set(USE_ASYNC_WR_THREAD 1)
+else()
+  set(USE_ASYNC_WR_THREAD 0)
 endif()
 
 if(PIO_ENABLE_SOFT_CLOSE)
