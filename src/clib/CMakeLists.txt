@@ -5,12 +5,17 @@ project (PIOC C CXX)
 #==============================================================================
 #  DEFINE THE TARGET
 #==============================================================================
-
-add_library (pioc topology.c pio_mpi_timer.c pio_timer.c pio_file.c
+set (pioc_sources topology.c pio_mpi_timer.c pio_timer.c pio_file.c
   pioc_support.c pio_lists.c pio_print.c
   pioc.c pioc_sc.c pio_spmd.c pio_rearrange.c pio_nc4.c bget.c
   pio_nc.c pio_put_nc.c pio_get_nc.c pio_getput_int.c pio_msg.c pio_varm.c
   pio_darray.c pio_darray_int.c pio_sdecomps_regex.cpp)
+
+if(PIO_USE_ASYNC_WR_THREAD)
+  set(pioc_sources ${pioc_sources} pio_async_thread.cpp)
+endif()
+
+add_library (pioc ${pioc_sources})
 
 # set up include-directories
 include_directories(
@@ -44,6 +49,12 @@ if (CMAKE_CXX_COMPILER_NAME STREQUAL "CRAY")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -h std=c++11")
 else ()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+endif ()
+
+if (CMAKE_VERSION VERSION_LESS "3.1")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+else ()
+  set(CMAKE_CXX_STANDARD 11)
 endif ()
 
 #==============================================================================

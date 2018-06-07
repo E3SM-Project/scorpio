@@ -37,6 +37,9 @@
 /** Enable (if set to a non-zero value) asynchronous rearrangement during write */
 #define PIO_ENABLE_ASYNC_WR_REARR @ENABLE_ASYNC_WR_REARR@
 
+/** Use (if set to a non-zero value) an asynchronous thread during write */
+#define PIO_USE_ASYNC_WR_THREAD @USE_ASYNC_WR_THREAD@
+
 /** Enable soft close (data is not sync'ed to disk on file close) */
 #define PIO_ENABLE_SOFT_CLOSE @ENABLE_SOFT_CLOSE@
 
