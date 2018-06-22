@@ -31,20 +31,18 @@ target_compile_definitions (pioc
   PUBLIC ${CMAKE_SYSTEM_DIRECTIVE})
 target_compile_definitions (pioc
   PUBLIC ${CMAKE_C_COMPILER_DIRECTIVE})
+target_compile_definitions (pioc
+  PUBLIC MPICH_SKIP_MPICXX)
 
 # Compiler-specific compiler options
 if ("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
-  target_compile_options (pioc
-    PRIVATE -std=c99)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
 elseif ("${CMAKE_C_COMPILER_ID}" STREQUAL "PGI")
-  target_compile_options (pioc
-    PRIVATE -c99)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -c99")
 elseif ("${CMAKE_C_COMPILER_ID}" STREQUAL "Intel")
-  target_compile_options (pioc
-    PRIVATE -std=c99)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
 elseif ("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
-  target_compile_options (pioc
-    PRIVATE -std=c99)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
 endif()
 
 if (CMAKE_VERSION VERSION_LESS "3.1")
