@@ -93,6 +93,14 @@ if (NOT PIO_USE_MPISERIAL)
     target_link_libraries (test_darray_async_many pioc)
   endif ()
 endif ()
+if(PIO_USE_ASYNC_WR_THREAD)
+  add_executable (test_mtq EXCLUDE_FROM_ALL test_async_mtq.cpp test_common.c)
+  target_link_libraries (test_mtq pioc)
+  add_dependencies (tests test_mtq)
+  add_executable (test_mtq_signal EXCLUDE_FROM_ALL test_async_mtq_signal.cpp test_common.c)
+  target_link_libraries (test_mtq_signal pioc)
+  add_dependencies (tests test_mtq_signal)
+endif()
 add_executable (test_spmd EXCLUDE_FROM_ALL test_spmd.c test_common.c)
 target_link_libraries (test_spmd pioc)
 add_executable (test_sdecomp_regex EXCLUDE_FROM_ALL test_sdecomp_regex.cpp test_common.c)
@@ -246,6 +254,16 @@ else ()
     add_mpi_test(test_darray_async_many
       EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_darray_async
       NUMPROCS ${AT_LEAST_FOUR_TASKS}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endif ()
+  if(PIO_USE_ASYNC_WR_THREAD)
+    add_mpi_test(test_mtq
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_mtq
+      NUMPROCS 2
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+    add_mpi_test(test_mtq_signal
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_mtq_signal
+      NUMPROCS 2
       TIMEOUT ${DEFAULT_TEST_TIMEOUT})
   endif ()
 endif ()
