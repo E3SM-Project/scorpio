@@ -57,21 +57,13 @@ void pio_noop_free(void *pdata)
 {
 }
 
-/* Test enqueue and dequeue operations in a multi-threaded queue containing
- * pointers to user defined types */
-int test_tpool_putype(int wrank, const int max_elems_in_q)
+/* Enqueue op */
+int tpool_enq_putype(int wrank, const int max_elems_in_q, std::vector<UType> &udata)
 {
     assert((wrank >= 0) && (max_elems_in_q > 0));
 
-    std::vector<UType> udata;
     PIO_Util::PIO_async_tpool_manager tpool_mgr;
     PIO_Util::PIO_async_tpool *tpool = tpool_mgr.get_tpool_instance();
-
-    for(int i=0; i<max_elems_in_q; i++){
-      UType tmp_data;
-      tmp_data.nwaits = 0;
-      udata.push_back(tmp_data);  
-    }
 
     for(int i=0; i<max_elems_in_q; i++){
       pio_async_op_t *op = (pio_async_op_t *)calloc(1, sizeof(pio_async_op_t));
@@ -86,6 +78,46 @@ int test_tpool_putype(int wrank, const int max_elems_in_q)
 
     /* tpool is managed by the tpool manager - no delete/free reqd */
 
+    return PIO_NOERR;
+}
+
+/* Test enqueue and dequeue operations in a multi-threaded queue containing
+ * pointers to user defined types */
+int test_tpool_putype(int wrank, const int max_elems_in_q)
+{
+    int ret = PIO_NOERR;
+    assert((wrank >= 0) && (max_elems_in_q > 0));
+
+    std::vector<UType> udata;
+    for(int i=0; i<max_elems_in_q; i++){
+      UType tmp_data;
+      tmp_data.nwaits = 0;
+      udata.push_back(tmp_data);  
+    }
+
+    ret = tpool_enq_putype(wrank, max_elems_in_q, udata);
+    if(ret != PIO_NOERR){
+      LOG_RANK0(wrank, "Error enqueueing task\n");
+      return ret;
+    }
+    for(int i=0; i<max_elems_in_q; i++){
+      if(udata[i].nwaits != 1){
+        LOG_RANK0(wrank, "Error: Wait not called for elem (%d) in queue\n", i);
+        return PIO_EINTERNAL;
+      }
+    }
+
+    ret = tpool_enq_putype(wrank, max_elems_in_q, udata);
+    if(ret != PIO_NOERR){
+      LOG_RANK0(wrank, "Error enqueueing task\n");
+      return ret;
+    }
+    for(int i=0; i<max_elems_in_q; i++){
+      if(udata[i].nwaits != 2){
+        LOG_RANK0(wrank, "Error: Wait not called for elem (%d) in queue\n", i);
+        return PIO_EINTERNAL;
+      }
+    }
     return PIO_NOERR;
 }
 
