@@ -11,6 +11,9 @@
 #include <pio.h>
 #include <pio_internal.h>
 #include "pio_timer.h"
+#if PIO_USE_ASYNC_WR_THREAD
+#include "pio_async_tpool_cint.h"
+#endif
 
 #include <execinfo.h>
 
@@ -4683,3 +4686,50 @@ int pio_iosys_async_pend_op_add(iosystem_desc_t *iosys,
 
     return PIO_NOERR;
 }
+
+#if PIO_USE_ASYNC_WR_THREAD
+/* Add an async op to the list of pending ops in the thread pool
+ * @param iosys Pointer to the iosystem_desc
+ * @param op_type Type of asynchronous operation added
+ * @param pdata Pointer to user defined data for this async op
+ * Returns PIO_NOERR on success, a pio error code otherwise
+ */
+int pio_tpool_async_pend_op_add(iosystem_desc_t *iosys,
+      pio_async_op_type_t op_type, void *pdata)
+{
+    int ret;
+    assert(iosys != NULL);
+    assert((op_type > PIO_ASYNC_INVALID_OP)
+            && (op_type < PIO_ASYNC_NUM_OP_TYPES));
+    assert(pdata != NULL);
+    assert(op_type == PIO_ASYNC_FILE_WRITE_OPS);
+
+    pio_async_op_t *pnew = (pio_async_op_t *) calloc(1, sizeof(pio_async_op_t));
+    if(pnew == NULL)
+    {
+        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Unable to allocate %lld bytes to keep track of the asynchronous operation", iosys->iosysid, (unsigned long long) sizeof(pio_async_op_t));
+    }
+
+    pnew->op_type = op_type;
+    pnew->pdata = pdata;
+    if(op_type == PIO_ASYNC_FILE_WRITE_OPS)
+    {
+        pnew->wait = pio_file_async_pend_op_wait;
+        /* File writes do not have a non-blocking test/poke function */
+        pnew->poke = pio_async_poke_func_unavail;
+        pnew->free = pio_file_close_and_free;
+    }
+
+    ret = pio_async_tpool_op_add(pnew);
+    if(ret != PIO_NOERR)
+    {
+        LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
+        return pio_err(iosys, NULL, ret, __FILE__, __LINE__,
+                        "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", iosys->iosysid);
+    }
+
+    return PIO_NOERR;
+}
+
+#endif // PIO_ENABLE_ASYNC_WR_REARR

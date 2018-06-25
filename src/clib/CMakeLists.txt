@@ -12,7 +12,7 @@ set (pioc_sources topology.c pio_mpi_timer.c pio_timer.c pio_file.c
   pio_darray.c pio_darray_int.c pio_sdecomps_regex.cpp)
 
 if(PIO_USE_ASYNC_WR_THREAD)
-  set(pioc_sources ${pioc_sources} pio_async_thread.cpp)
+  set(pioc_sources ${pioc_sources} pio_async_tpool.cpp)
 endif()
 
 add_library (pioc ${pioc_sources})

@@ -100,6 +100,9 @@ if(PIO_USE_ASYNC_WR_THREAD)
   add_executable (test_mtq_signal EXCLUDE_FROM_ALL test_async_mtq_signal.cpp test_common.c)
   target_link_libraries (test_mtq_signal pioc)
   add_dependencies (tests test_mtq_signal)
+  add_executable (test_mtq_tpool EXCLUDE_FROM_ALL test_async_tpool.cpp test_common.c)
+  target_link_libraries (test_mtq_tpool pioc)
+  add_dependencies (tests test_mtq_tpool)
 endif()
 add_executable (test_spmd EXCLUDE_FROM_ALL test_spmd.c test_common.c)
 target_link_libraries (test_spmd pioc)
@@ -263,6 +266,10 @@ else ()
       TIMEOUT ${DEFAULT_TEST_TIMEOUT})
     add_mpi_test(test_mtq_signal
       EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_mtq_signal
+      NUMPROCS 2
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+    add_mpi_test(test_mtq_tpool
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_mtq_tpool
       NUMPROCS 2
       TIMEOUT ${DEFAULT_TEST_TIMEOUT})
   endif ()
