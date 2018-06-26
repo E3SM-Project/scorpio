@@ -34,6 +34,7 @@ class PIO_mtq{
     std::queue<T> queue_;
     std::condition_variable cv_;
     SigTypes_t sig_;
+    std::condition_variable cv_sig_;
 };
 
 template<typename T>
@@ -53,27 +54,40 @@ template<typename T>
 int PIO_mtq<T>::dequeue(T &val)
 {
   std::unique_lock<std::mutex> lk(mtx_);
-  while(queue_.empty() && (sig_ == PIO_MTQ_SIG_INVALID)){
-    cv_.wait(lk, [this]{ return (queue_.empty() && (sig_ == PIO_MTQ_SIG_INVALID));}); 
-    /*
-    cv_.wait_for(lk, DEFAULT_TIMEOUT,
-            [this]{ return (queue_.empty() && (sig_ == PIO_MTQ_SIG_INVALID));}); 
-    */
-    /* At least on Linux (Ubuntu 4.5.0-040500-generic) just waiting on the condition
-     * variable (with/without timeouts) does not allow other threads to acquire
-     * the lock. So we explicitly unlock, sleep for 0 seconds and reacquire the 
-     * lock to allow other threads to be able to get scheduled and acquire the lock
-     */
-    thread_yield(lk);
-  }
-  if(sig_ == PIO_MTQ_SIG_STOP){
-    return 1;
-  }
-  else if(sig_ == PIO_MTQ_SIG_COMPLETE){
-    if(queue_.empty()){
+  do{
+    while(queue_.empty() && (sig_ == PIO_MTQ_SIG_INVALID)){
+      cv_.wait(lk, [this]{ return (queue_.empty() && (sig_ == PIO_MTQ_SIG_INVALID));}); 
+      /*
+      cv_.wait_for(lk, DEFAULT_TIMEOUT,
+              [this]{ return (queue_.empty() && (sig_ == PIO_MTQ_SIG_INVALID));}); 
+      */
+      /* At least on Linux (Ubuntu 4.5.0-040500-generic) just waiting on the condition
+       * variable (with/without timeouts) does not allow other threads to acquire
+       * the lock. So we explicitly unlock, sleep for 0 seconds and reacquire the 
+       * lock to allow other threads to be able to get scheduled and acquire the lock
+       */
+      thread_yield(lk);
+    }
+    if(sig_ == PIO_MTQ_SIG_STOP){
       return 1;
     }
-  }
+    else if(sig_ == PIO_MTQ_SIG_COMPLETE){
+      if(queue_.empty()){
+        /* Reset signal */
+        sig_ = PIO_MTQ_SIG_INVALID;
+        lk.unlock();
+        /* Notify threads that all async ops are complete */
+        cv_sig_.notify_all();
+        lk.lock();
+      }
+      else{
+        break;
+      }
+    }
+    else{
+      break;
+    }
+  }while(true);
   val = queue_.front();
   queue_.pop();
   lk.unlock();
@@ -87,6 +101,16 @@ void PIO_mtq<T>::signal(PIO_mtq<T>::SigTypes_t sig)
   sig_ = sig;
   lk.unlock();
   cv_.notify_all();
+
+  lk.lock();
+  if(sig == PIO_MTQ_SIG_COMPLETE){
+    /* Wait for all async ops in the queue to complete */
+    while(sig_ == PIO_MTQ_SIG_COMPLETE){
+      cv_sig_.wait(lk, [this]{ return (sig_ == PIO_MTQ_SIG_COMPLETE);}); 
+      thread_yield(lk);
+    }
+  }
+  lk.unlock();
 }
 
 template<typename T>
