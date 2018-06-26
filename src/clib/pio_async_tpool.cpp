@@ -32,9 +32,12 @@ PIO_Util::PIO_async_tpool::PIO_async_tpool(int nthreads)
 
 PIO_Util::PIO_async_tpool::~PIO_async_tpool()
 {
+  mtq_.signal(PIO_Util::PIO_mtq<pio_async_op_t *>::PIO_MTQ_SIG_STOP);
   for(std::vector<std::thread>::iterator iter = pool_threads_.begin();
       iter != pool_threads_.end(); ++iter){
-    iter->join();
+    if(iter->joinable()){
+      iter->join();
+    }
   }
 }
 
