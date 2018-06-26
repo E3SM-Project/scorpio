@@ -36,15 +36,28 @@ SET(GENERATED_SRCS pio_file_simple_tests.F90
   pio_iosystem_tests2.F90
   pio_iosystem_tests3.F90)
 
-foreach (SRC_FILE IN LISTS GENERATED_SRCS)
-  add_custom_command (
-    OUTPUT ${SRC_FILE}
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/util/pio_tf_f90gen.pl
-    --annotate-source
-    --out=${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in)
-endforeach ()
+if (PIO_USE_ASYNC_WR_THREAD)
+  foreach (SRC_FILE IN LISTS GENERATED_SRCS)
+    add_custom_command (
+      OUTPUT ${SRC_FILE}
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/util/pio_tf_f90gen.pl
+      --annotate-source
+      --build-threaded
+      --out=${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in)
+  endforeach ()
+else()
+  foreach (SRC_FILE IN LISTS GENERATED_SRCS)
+    add_custom_command (
+      OUTPUT ${SRC_FILE}
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/util/pio_tf_f90gen.pl
+      --annotate-source
+      --out=${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in)
+  endforeach ()
+endif()
 
 if ("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "GNU")
   add_definitions(-ffree-line-length-none)
