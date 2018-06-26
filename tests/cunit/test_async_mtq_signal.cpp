@@ -37,6 +37,7 @@ void thread_enq(PIO_Util::PIO_mtq<T> &q, const std::vector<T> &elems,
       std::this_thread::sleep_for(delay);
     }
     q.enqueue(*citer);
+    //std::cout << "Enqueued : " << *citer << "\n";
   }
 }
 
@@ -55,6 +56,7 @@ void thread_deq(PIO_Util::PIO_mtq<T> &q, std::vector<T> &elems,
       /* Break on signal */
       break;
     }
+    //std::cout << "Dequeued : " << elems[i] << "\n";
   }
 }
 
@@ -70,6 +72,9 @@ void thread_signal(PIO_Util::PIO_mtq<T> &q,
     std::this_thread::sleep_for(delay);
   }
   q.signal(sig);
+  if(sig == PIO_Util::PIO_mtq<int>::PIO_MTQ_SIG_COMPLETE){
+    q.signal(PIO_Util::PIO_mtq<int>::PIO_MTQ_SIG_STOP);
+  }
 }
 
 std::ostream &operator<<(std::ostream &ostr, const UType &utype)
@@ -148,6 +153,9 @@ int test_signal_mtq(int wrank, const int max_elems_in_q, const int nthreads,
     if(!use_signal_thread){
       /* Signal all threads so that they exit once the queue is empty */
       qi.signal(sig);
+      if(sig == PIO_Util::PIO_mtq<int>::PIO_MTQ_SIG_COMPLETE){
+        qi.signal(PIO_Util::PIO_mtq<int>::PIO_MTQ_SIG_STOP);
+      }
     }
     else{
       /* If there is delay specified during dequeueing data, set the delay so
