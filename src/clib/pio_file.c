@@ -265,13 +265,33 @@ int PIO_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
     int ierr = PIO_NOERR;
 
     assert(ios && file);
-    /* Queue up the pending async ops on the file to the iosystem */
-    ierr = pio_iosys_async_pend_op_add(ios, PIO_ASYNC_FILE_WRITE_OPS,
-            (void *)file);
-    if(ierr != PIO_NOERR)
-    {
-        LOG((1, "Error queueing pending async ops on file (id=%d) to ios", file->pio_ncid));
-        return pio_err(ios, file, ierr, __FILE__, __LINE__);
+    if(file->nasync_pend_ops > 0){
+#if PIO_USE_ASYNC_WR_THREAD
+        /* Queue up the pending async ops on the file to the async thread pool */
+        ierr = pio_tpool_async_pend_op_add(ios, PIO_ASYNC_FILE_WRITE_OPS,
+                (void *)file);
+        if(ierr != PIO_NOERR)
+        {
+            LOG((1, "Error queueing pending async ops on file (id=%d) to ios", file->pio_ncid));
+            return pio_err(ios, file, ierr, __FILE__, __LINE__);
+        }
+#else
+        /* Queue up the pending async ops on the file to the iosystem */
+        ierr = pio_iosys_async_pend_op_add(ios, PIO_ASYNC_FILE_WRITE_OPS,
+                (void *)file);
+        if(ierr != PIO_NOERR)
+        {
+            LOG((1, "Error queueing pending async ops on file (id=%d) to ios", file->pio_ncid));
+            return pio_err(ios, file, ierr, __FILE__, __LINE__);
+        }
+#endif
+    }
+    else{
+        ierr = PIO_hard_closefile(ios, file);
+        if(ierr != PIO_NOERR){
+            LOG((1, "Error closing file (id=%d)", file->pio_ncid));
+            return pio_err(ios, file, ierr, __FILE__, __LINE__);
+        }
     }
 
     return PIO_NOERR;
