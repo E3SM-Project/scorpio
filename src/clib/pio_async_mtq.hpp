@@ -29,6 +29,7 @@ class PIO_mtq{
     template<typename U>
     friend std::ostream & operator<<(std::ostream &ostr, PIO_mtq<U> &mtq);
   private:
+    void thread_yield(std::unique_lock<std::mutex> &lk) const;
     std::mutex mtx_;
     std::queue<T> queue_;
     std::condition_variable cv_;
@@ -51,7 +52,6 @@ void PIO_mtq<T>::enqueue(const T& val)
 template<typename T>
 int PIO_mtq<T>::dequeue(T &val)
 {
-  const std::chrono::milliseconds ZERO_TIMEOUT = std::chrono::milliseconds(0);
   std::unique_lock<std::mutex> lk(mtx_);
   while(queue_.empty() && (sig_ == PIO_MTQ_SIG_INVALID)){
     cv_.wait(lk, [this]{ return (queue_.empty() && (sig_ == PIO_MTQ_SIG_INVALID));}); 
@@ -64,9 +64,7 @@ int PIO_mtq<T>::dequeue(T &val)
      * the lock. So we explicitly unlock, sleep for 0 seconds and reacquire the 
      * lock to allow other threads to be able to get scheduled and acquire the lock
      */
-    lk.unlock();
-    std::this_thread::sleep_for(ZERO_TIMEOUT);
-    lk.lock();
+    thread_yield(lk);
   }
   if(sig_ == PIO_MTQ_SIG_STOP){
     return 1;
@@ -101,6 +99,19 @@ int PIO_mtq<T>::size(void ) const
   return sz;
 }
 
+template<typename T>
+void PIO_mtq<T>::thread_yield(std::unique_lock<std::mutex> &lk) const
+{
+  /* At least on Linux (Ubuntu 4.5.0-040500-generic) just waiting on the condition
+   * variable (with/without timeouts) does not allow other threads to acquire
+   * the lock. So we explicitly unlock, sleep for 0 seconds and reacquire the 
+   * lock to allow other threads to be able to get scheduled and acquire the lock
+   */
+  const std::chrono::milliseconds ZERO_TIMEOUT = std::chrono::milliseconds(0);
+  lk.unlock();
+  std::this_thread::sleep_for(ZERO_TIMEOUT);
+  lk.lock();
+}
 
 template<typename T>
 std::ostream &operator<<(std::ostream &ostr, PIO_Util::PIO_mtq<T> &q)
