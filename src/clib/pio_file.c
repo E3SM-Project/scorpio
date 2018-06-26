@@ -494,13 +494,33 @@ int PIO_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
     int ierr = PIO_NOERR;
 
     assert(ios && file);
-    /* Queue up the pending async ops on the file to the iosystem */
-    ierr = pio_iosys_async_pend_op_add(ios, PIO_ASYNC_FILE_WRITE_OPS,
-            (void *)file);
-    if(ierr != PIO_NOERR)
-    {
-        return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                        "Closing file (%s, ncid=%d) failed. Queuing pending asynchronous operations on file to the iosystem (iosysid=%d) failed (iotype=%s)", pio_get_fname_from_file(file), file->pio_ncid, ios->iosysid, pio_iotype_to_string(file->iotype));
+    if(file->nasync_pend_ops > 0){
+#if PIO_USE_ASYNC_WR_THREAD
+        /* Queue up the pending async ops on the file to the async thread pool */
+        ierr = pio_tpool_async_pend_op_add(ios, PIO_ASYNC_FILE_WRITE_OPS,
+                (void *)file);
+        if(ierr != PIO_NOERR)
+        {
+            return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                            "Closing file (%s, ncid=%d) failed. Soft close of the file failed (iosysid=%d). Internal error while adding pending asynchronous write operations for this file into the thread pool", pio_get_fname_from_file(file), file->pio_ncid, ios->iosysid);
+        }
+#else
+        /* Queue up the pending async ops on the file to the iosystem */
+        ierr = pio_iosys_async_pend_op_add(ios, PIO_ASYNC_FILE_WRITE_OPS,
+                (void *)file);
+        if(ierr != PIO_NOERR)
+        {
+            return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                            "Closing file (%s, ncid=%d) failed. Soft close of the file failed (iosysid=%d). Internal error while adding pending asynchronous write operations for this file into the iosystem queue", pio_get_fname_from_file(file), file->pio_ncid, ios->iosysid);
+        }
+#endif
+    }
+    else{
+        ierr = PIO_hard_closefile(ios, file);
+        if(ierr != PIO_NOERR){
+            return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                            "Closing file (%s, ncid=%d) failed. Internal error while closing the file (iosysid=%d).", pio_get_fname_from_file(file), file->pio_ncid, ios->iosysid);
+        }
     }
 
     return PIO_NOERR;
