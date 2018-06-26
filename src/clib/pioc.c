@@ -799,6 +799,14 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
     }
 #endif
 
+#if PIO_USE_ASYNC_WR_THREAD
+    ret = pio_async_tpool_create();
+    if(ret != PIO_NOERR)
+    {
+        LOG((1, "Initializing PIO async thread pool failed"));
+        return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__);
+    }
+#endif
     /* Find the number of computation tasks. */
     if ((mpierr = MPI_Comm_size(comp_comm, &num_comptasks)))
         return check_mpi2(NULL, NULL, mpierr, __FILE__, __LINE__);
@@ -1066,6 +1074,14 @@ int PIOc_finalize(int iosysid)
     }
 
 #if PIO_ENABLE_SOFT_CLOSE
+#if PIO_USE_ASYNC_WR_THREAD
+    ierr = pio_async_tpool_finalize();
+    if(ierr != PIO_NOERR)
+    {
+        LOG((1, "Waiting on pending async ops on tpool (iosysid=%d) failed", iosysid));
+        return pio_err(ios, NULL, ierr, __FILE__, __LINE__);
+    }
+#else
     /* Wait for pending async ops on iosystem */
     ierr = pio_iosys_async_pend_ops_wait(ios);
     if(ierr != PIO_NOERR)
@@ -1073,6 +1089,7 @@ int PIOc_finalize(int iosysid)
         LOG((1, "Waiting on pending async ops on ios (id=%d) failed", iosysid));
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__);
     }
+#endif
 #endif
 
     /* Free this memory that was allocated in init_intracomm. */
@@ -1354,6 +1371,14 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
     if(ret != PIO_NOERR)
     {
         LOG((1, "Initializing PIO micro timers failed"));
+        return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__);
+    }
+#endif
+#if PIO_USE_ASYNC_WR_THREAD
+    ret = pio_async_tpool_create();
+    if(ret != PIO_NOERR)
+    {
+        LOG((1, "Initializing PIO async thread pool failed"));
         return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__);
     }
 #endif
