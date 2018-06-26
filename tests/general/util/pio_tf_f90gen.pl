@@ -23,6 +23,7 @@ my($template_auto_funcs_inserted);
 # 1 => write is disabled
 my($template_disable_wr);
 my($annotate_source);
+my($build_threaded);
 # The current test case number is modified by multiple funcs
 # * its logically easier to keep it a global
 my($cur_test_case_num);
@@ -46,6 +47,7 @@ $template_auto_funcs_inserted = 0;
 $template_disable_wr = 0;
 $template_has_test_driver = 0;
 $annotate_source = 0;
+$build_threaded = 0;
 $cur_test_case_num = 1;
 
 # Initialize predefined types
@@ -605,16 +607,28 @@ sub get_default_test_main
   my($out_line);
   $out_line = "\n\n";
   $out_line = $out_line . "  PROGRAM PIO_TF_Test_main_\n";
+  $out_line = $out_line . "    USE mpi\n";
   $out_line = $out_line . "    USE pio_tutil\n";
   $out_line = $out_line . "    IMPLICIT NONE\n";
   $out_line = $out_line . "    INTEGER, PARAMETER :: NREARRS = 2\n";
   $out_line = $out_line . "    INTEGER :: rearrs(NREARRS) = (/pio_rearr_subset,pio_rearr_box/)\n";
   $out_line = $out_line . "    CHARACTER(LEN=PIO_TF_MAX_STR_LEN) :: rearrs_info(NREARRS) = (/\"PIO_REARR_SUBSET\",\"PIO_REARR_BOX   \"/)\n";
+  $out_line = $out_line . "    INTEGER ts_provided\n";
   $out_line = $out_line . "    INTEGER i, ierr\n";
   $out_line = $out_line . "\n";
   $out_line = $out_line . "    pio_tf_nerrs_total_=0\n";
   $out_line = $out_line . "    pio_tf_retval_utest_=0\n";
-  $out_line = $out_line . "    CALL MPI_Init(ierr)\n";
+  if($build_threaded){
+    $out_line = $out_line . "    ts_provided = MPI_THREAD_SINGLE\n";
+    $out_line = $out_line . "    CALL MPI_Init_thread(MPI_THREAD_MULTIPLE, ts_provided, ierr)\n";
+    $out_line = $out_line . "    IF((ierr /= MPI_SUCCESS) .OR. (ts_provided /= MPI_THREAD_MULTIPLE)) THEN\n";
+    $out_line = $out_line . "      WRITE(*,*) \"PIO_TF: MPI_THREAD_MULTIPLE is not supported but is required\"\n";
+    $out_line = $out_line . "      STOP 99\n";
+    $out_line = $out_line . "    ENDIF\n";
+  }
+  else{
+    $out_line = $out_line . "    CALL MPI_Init(ierr)\n";
+  }
   $out_line = $out_line . "    DO i=1,SIZE(rearrs)\n";
   $out_line = $out_line . "      CALL PIO_TF_Init_(rearrs(i))\n";
   $out_line = $out_line . "      IF (pio_tf_world_rank_ == 0) THEN\n";
@@ -873,6 +887,7 @@ sub print_usage_and_exit()
 GetOptions(
   # Annotate generated source with template line numbers etc
   "annotate-source"             =>      \$annotate_source,
+  "build-threaded"              =>      \$build_threaded,
   "out=s"                                     =>        \$output_fname,
   "verbose"           =>  \$verbose
 );
