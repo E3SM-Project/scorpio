@@ -439,6 +439,15 @@ extern "C" {
     int pio_iosys_async_pend_op_add(iosystem_desc_t *iosys,
           pio_async_op_type_t op_type, void *pdata);
 
+#if PIO_USE_ASYNC_WR_THREAD
+    /* Queue an async op to a thread pool */
+    int pio_tpool_async_pend_op_add(iosystem_desc_t *iosys,
+          pio_async_op_type_t op_type, void *pdata);
+
+    int pio_async_tpool_create(void );
+    int pio_async_tpool_finalize(void );
+#endif
+
     /* Initialize and finalize logging. */
     void pio_init_logging(void);
     void pio_finalize_logging(void );

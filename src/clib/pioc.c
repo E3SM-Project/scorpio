@@ -983,6 +983,15 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
     adios_init_ref_cnt++;
 #endif
 
+#if PIO_USE_ASYNC_WR_THREAD
+    ret = pio_async_tpool_create();
+    if(ret != PIO_NOERR)
+    {
+        return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
+                        "PIO Init failed. Initializing the asynchronous thread pool failed");
+    }
+#endif
+
     /* Find the number of computation tasks. */
     if ((mpierr = MPI_Comm_size(comp_comm, &num_comptasks)))
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
@@ -1285,6 +1294,14 @@ int PIOc_finalize(int iosysid)
     }
 
 #if PIO_ENABLE_SOFT_CLOSE
+#if PIO_USE_ASYNC_WR_THREAD
+    ierr = pio_async_tpool_finalize();
+    if(ierr != PIO_NOERR)
+    {
+        return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                        "PIO Finalize failed on iosystem (%d). Finalizing the thread pool failed", iosysid);
+    }
+#else
     /* Wait for pending async ops on iosystem */
     ierr = pio_iosys_async_pend_ops_wait(ios);
     if(ierr != PIO_NOERR)
@@ -1292,6 +1309,7 @@ int PIOc_finalize(int iosysid)
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                         "PIO Finalize failed on iosystem (%d). Waiting on pending asynchronous operation on the iosystem failed", iosysid);
     }
+#endif
 #endif
 
     /* Free this memory that was allocated in init_intracomm. */
@@ -1595,6 +1613,14 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
     {
         return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
                         "PIO Init (async) failed. Initializing micro timers failed");
+    }
+#endif
+#if PIO_USE_ASYNC_WR_THREAD
+    ret = pio_async_tpool_create();
+    if(ret != PIO_NOERR)
+    {
+        return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
+                        "PIO init (async) failed. Initializing the asynchronous thread pool failed");
     }
 #endif
     /* If the user did not supply a list of process numbers to use for

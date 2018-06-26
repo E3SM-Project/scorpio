@@ -4731,5 +4731,4 @@ int pio_tpool_async_pend_op_add(iosystem_desc_t *iosys,
 
     return PIO_NOERR;
 }
-
-#endif // PIO_ENABLE_ASYNC_WR_REARR
+#endif // PIO_USE_ASYNC_WR_THREAD
