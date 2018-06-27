@@ -3578,6 +3578,7 @@ int pio_iosys_async_pend_op_add(iosystem_desc_t *iosys,
     return PIO_NOERR;
 }
 
+#if PIO_USE_ASYNC_WR_THREAD
 /* Add an async op to the list of pending ops in the thread pool
  * @param iosys Pointer to the iosystem_desc
  * @param op_type Type of asynchronous operation added
@@ -3619,3 +3620,4 @@ int pio_tpool_async_pend_op_add(iosystem_desc_t *iosys,
 
     return PIO_NOERR;
 }
+#endif // PIO_USE_ASYNC_WR_THREAD
