@@ -2150,6 +2150,7 @@ int PIOc_init_intercomm(int component_count, const MPI_Comm peer_comm,
         /* Initialize the iosystem */
         iosys[i]->iosysid = -1;
         iosys[i]->union_comm = MPI_COMM_NULL;
+        iosys[i]->union_comm_arearr = MPI_COMM_NULL;
         iosys[i]->io_comm = MPI_COMM_NULL;
         iosys[i]->comp_comm = MPI_COMM_NULL;
         iosys[i]->intercomm = MPI_COMM_NULL;
@@ -2529,6 +2530,17 @@ int PIOc_init_intercomm(int component_count, const MPI_Comm peer_comm,
         }
 
         iosys[i]->my_comm = iosys[i]->union_comm;
+
+        /* Create communicator for asynchronous data rearrangement */
+        if(iosys[i]->union_comm != MPI_COMM_NULL)
+        {
+            ret = MPI_Comm_dup(iosys[i]->union_comm, &(iosys[i]->union_comm_arearr));
+            if(ret != MPI_SUCCESS)
+            {
+                return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
+            }
+        }
+
         /* Async I/O service message info */
         iosys[i]->async_ios_msg_info.seq_num = PIO_MSG_START_SEQ_NUM;
         iosys[i]->async_ios_msg_info.prev_msg = PIO_MSG_INVALID;
