@@ -12,10 +12,18 @@ add_executable (pioperf_rearr EXCLUDE_FROM_ALL
 target_link_libraries (pioperf_rearr piof)
 add_dependencies (tests pioperf_rearr)
 
+add_executable (pioperf_asyncthread EXCLUDE_FROM_ALL
+  pioperformance_asyncthread.F90)
+target_link_libraries (pioperf_asyncthread piof)
+add_dependencies (tests pioperf_asyncthread)
+
+
 if ("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "GNU")
   target_compile_options (pioperf
     PRIVATE -ffree-line-length-none)
   target_compile_options (pioperf_rearr
+    PRIVATE -ffree-line-length-none)
+  target_compile_options (pioperf_asyncthread
     PRIVATE -ffree-line-length-none)
 endif()
 
@@ -29,5 +37,7 @@ if (PIO_HDF5_LOGGING)
   target_compile_definitions (pioperf
     PUBLIC LOGGING)
   target_compile_definitions (pioperf_rearr
+    PUBLIC LOGGING)
+  target_compile_definitions (pioperf_asyncthread
     PUBLIC LOGGING)
 endif ()
