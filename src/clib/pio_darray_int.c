@@ -423,6 +423,33 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                              nv, varids[nv], rrcnt, llen));
                         ierr = ncmpi_iput_varn(file->fh, varids[nv], rrcnt, startlist, countlist,
                                                bufptr, llen, iodesc->mpitype, &(pviobuf->req));
+#elif PIO_USE_ASYNC_WR_THREAD
+                        viobuf_cache_t *pviobuf = (viobuf_cache_t *)calloc(1, sizeof(viobuf_cache_t));
+                        if(!pviobuf)
+                        {
+                            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                                "Writing variable %s (varid=%d, number of variables to write = %d) to file (%s, ncid=%d) using PIO_IOTYPE_PNETCDF iotype failed. Unable to allocate memory (%lld bytes) for variable iobuf cache struct", pio_get_vname_from_file(file, varids[nv]), varids[nv], nvars, pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long) sizeof(viobuf_cache_t));
+                        }
+                        if(!fill && (llen > 0))
+                        {
+                            pviobuf->iobuf = bget(iodesc->mpitype_size * llen);
+                            if(!pviobuf->iobuf)
+                            {
+                                return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                                "Writing variable %s (varid=%d, number of variables to write = %d) to file (%s, ncid=%d) using PIO_IOTYPE_PNETCDF iotype failed. Unable to allocate memory (%lld bytes) for variable iobuf data cache", pio_get_vname_from_file(file, varids[nv]), varids[nv], nvars, pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long) (iodesc->mpitype_size * llen));
+                            }
+                            pviobuf->iobuf_sz = iodesc->mpitype_size * llen;
+                            memcpy(pviobuf->iobuf, bufptr, pviobuf->iobuf_sz);
+                            bufptr = pviobuf->iobuf;
+                        }
+                        pviobuf->rec_num = cur_frame;
+                        /* We are using fillbuf from the first var in the list */
+                        pviobuf->vdesc = file->varlist + varids[0];
+                        /* Write, in non-blocking fashion, a list of subarrays. */
+                        LOG((3, "about to call ncmpi_iput_varn() varids[%d] = %d rrcnt = %d, llen = %d",
+                             nv, varids[nv], rrcnt, llen));
+                        ierr = ncmpi_iput_varn(file->fh, varids[nv], rrcnt, startlist, countlist,
+                                               bufptr, llen, iodesc->mpitype, &(pviobuf->req));
 #else
 
                         if (vdesc->nreqs % PIO_REQUEST_ALLOC_CHUNK == 0)
@@ -447,7 +474,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                             vdesc->request[vdesc->nreqs] = PIO_REQ_NULL;
 #endif
 
-#if PIO_ENABLE_ASYNC_WR_REARR
+#if (PIO_ENABLE_ASYNC_WR_REARR || PIO_USE_ASYNC_WR_THREAD)
                         /* Add an async op for the write */
                         ierr = pio_file_async_pend_op_add(file,
                                   PIO_ASYNC_PNETCDF_WRITE_OP,
@@ -492,6 +519,16 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                 free(viobufs);
             }
         }
+#endif
+
+#if PIO_USE_ASYNC_WR_THREAD
+#if !PIO_ENABLE_ASYNC_WR_REARR
+        /* All data in file->iobuf has been copied to viobufs */
+        if((file->iotype == PIO_IOTYPE_PNETCDF) && (file->iobuf))
+        {
+            brel(file->iobuf);
+        }
+#endif
 #endif
     } /* endif (ios->ioproc) */
 
@@ -1585,7 +1622,7 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
  * @return 0 for success, error code otherwise.
  * @ingroup PIO_write_darray
  */
-#if PIO_ENABLE_ASYNC_WR_REARR
+#if (PIO_ENABLE_ASYNC_WR_REARR || PIO_USE_ASYNC_WR_THREAD)
 int flush_output_buffer(file_desc_t *file, bool force, PIO_Offset addsize)
 {
     int mpierr;  /* Return code from MPI functions. */
@@ -1645,7 +1682,7 @@ int flush_output_buffer(file_desc_t *file, bool force, PIO_Offset addsize)
     return ierr;
 }
 
-#else /* PIO_ENABLE_ASYNC_WR_REARR */
+#else /* PIO_ENABLE_ASYNC_WR_REARR || PIO_USE_ASYNC_WR_THREAD */
 
 int flush_output_buffer(file_desc_t *file, bool force, PIO_Offset addsize)
 {

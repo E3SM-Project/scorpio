@@ -224,7 +224,7 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
  * flush it to disk (rearrange + write + wait for write to complete)
  * before reusing it
  */
-#if !PIO_ENABLE_ASYNC_WR_REARR
+#if !(PIO_ENABLE_ASYNC_WR_REARR || PIO_USE_ASYNC_WR_THREAD)
     /* if the buffer is already in use in pnetcdf we need to flush first */
     if(file->npend_ops > 0)
     {
