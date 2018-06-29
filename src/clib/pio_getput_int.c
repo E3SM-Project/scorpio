@@ -1036,7 +1036,7 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
                 LOG((2, "PIOc_put_vars_tc calling pnetcdf function"));
                 vdesc = &file->varlist[varid];
-#if PIO_ENABLE_ASYNC_WR_REARR
+#if (PIO_ENABLE_ASYNC_WR_REARR || PIO_USE_ASYNC_WR_THREAD)
                 viobuf_cache_t *pviobuf = (viobuf_cache_t *) calloc(1, sizeof(viobuf_cache_t));
                 if(!pviobuf)
                 {
@@ -1088,12 +1088,12 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 }
                 else
                 {
-#if !PIO_ENABLE_ASYNC_WR_REARR
+#if !(PIO_ENABLE_ASYNC_WR_REARR || PIO_USE_ASYNC_WR_THREAD)
                     *request = PIO_REQ_NULL;
 #endif
                 }
 
-#if PIO_ENABLE_ASYNC_WR_REARR
+#if (PIO_ENABLE_ASYNC_WR_REARR || PIO_USE_ASYNC_WR_THREAD)
                 ierr = pio_file_async_pend_op_add(file,
                           PIO_ASYNC_PNETCDF_WRITE_OP,
                           (void *)pviobuf);
@@ -1104,7 +1104,7 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 }
 #else
                 vdesc->nreqs++;
-#endif /* PIO_ENABLE_ASYNC_WR_REARR */
+#endif /* PIO_ENABLE_ASYNC_WR_REARR || PIO_USE_ASYNC_WR_THREAD */
 
                 flush_output_buffer(file, false, 0);
                 LOG((2, "PIOc_put_vars_tc flushed output buffer"));
