@@ -895,7 +895,11 @@ contains
                   else
                     comp_comms(1) = comm
                     io_comm = MPI_COMM_NULL
-                    call read_decomp_file(comm, filename, compmap, gmaplen, ndims, gdims)
+                    if(trim(filename) .eq. 'ROUNDROBIN' .or. trim(filename).eq.'BLOCK') then
+                      call init_ideal_dof(filename, rank, sz, ndims, gdims, compmap, varsize)
+                    else
+                      call read_decomp_file(comm, filename, compmap, gmaplen, ndims, gdims)
+                    end if
                     maplen = size(compmap)
                     call alloc_and_init_test_vars(ifld, ifld_in, rfld, rfld_in, dfld, dfld_in, compmap, nvars, nframes)
                   end if
