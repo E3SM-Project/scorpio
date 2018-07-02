@@ -40,6 +40,7 @@ program pioperformance_rearr
   external :: print_memusage
 #endif
   integer :: tmp_result
+  logical :: use_async_io_service_procs
   external :: gptlinitialize, gptlfinalize
 #ifdef _PIO1
   integer, parameter :: PIO_FILL_INT   = 02147483647
@@ -80,7 +81,7 @@ program pioperformance_rearr
   unlimdimindof=.false.
   call read_user_input(mype, decompfile, piotypes, rearrangers,&
         niotasks, nframes, unlimdimindof, nvars, varsize,&
-        rearr_opts, ierr)
+        rearr_opts, use_async_io_service_procs, ierr)
 
   inquire(file=PIO_NML_FNAME,exist=nml_file_exists)
   if(nml_file_exists) then
@@ -114,7 +115,7 @@ program pioperformance_rearr
               if(nvars(nv)>0) then
                  call pioperformance_rearrtest(decompfile(i), piotypes(1:niotypes),&
                       mype, npe, rearrangers, rearr_opts, niotasks, nframes,&
-                      nvars(nv), varsize(vs),unlimdimindof) 
+                      nvars(nv), varsize(vs),unlimdimindof, use_async_io_service_procs) 
               endif
            enddo
         endif
@@ -275,7 +276,7 @@ contains
   ! Parse a single command line arg
   subroutine parse_and_process_input(argv, decompfiles, piotypes,&
         rearrangers, niotasks, nframes, unlimdimindof, nvars, varsize,&
-        rearr_opts, ierr)
+        rearr_opts, use_async_io_service_procs, ierr)
     character(len=*), intent(in)  :: argv
     character(len=MAX_FNAME_LEN), intent(out) :: decompfiles(MAX_DECOMP_FILES)
     integer, intent(out) :: piotypes(MAX_PIO_TYPES)
@@ -286,6 +287,7 @@ contains
     integer, intent(out) :: nvars(MAX_NVARS)
     integer, intent(out) :: varsize(MAX_NVARS)
     type(pio_rearr_opt_t), intent(out) :: rearr_opts
+    integer, intent(out) :: use_async_io_service_procs
     integer, intent(out) :: ierr
 
     integer, parameter :: MAX_PIO_REARR_OPT_LEN = 128
@@ -363,6 +365,8 @@ contains
       else if (argv(:pos) == "--pio-varsize=") then
         call init_arr_from_list(argv(pos+1:), iarr=varsize, ierr=ierr)
         !print *, "Read varsize : ", varsize
+      else if (argv(:pos) == "--use-async-io-service-procs=") then
+        read(argv(pos+1:), *) use_async_io_service_procs
       end if
     end if
 
@@ -371,7 +375,7 @@ contains
   ! Parse command line user options
   subroutine read_cmd_line_input(decompfile, piotypes, rearrangers,&
         niotasks, nframes, unlimdimindof, nvars, varsize,&
-        rearr_opts, ierr)
+        rearr_opts, use_async_io_service_procs, ierr)
     character(len=MAX_FNAME_LEN), intent(out) :: decompfile(MAX_DECOMP_FILES)
     integer, intent(out) :: piotypes(MAX_PIO_TYPES)
     integer, intent(out) :: rearrangers(MAX_PIO_REARRS)
@@ -381,6 +385,7 @@ contains
     integer, intent(out) :: nvars(MAX_NVARS)
     integer, intent(out) :: varsize(MAX_NVARS)
     type(pio_rearr_opt_t), intent(out) :: rearr_opts
+    integer, intent(out) :: use_async_io_service_procs
     integer, intent(out) :: ierr
 
     integer, parameter :: MAX_STDIN_ARG_LEN = 4096
@@ -393,7 +398,7 @@ contains
       call get_command_argument(i, argv)
       call parse_and_process_input(argv, decompfile, piotypes, rearrangers,&
             niotasks, nframes, unlimdimindof, nvars, varsize,&
-            rearr_opts, ierr)
+            rearr_opts, use_async_io_service_procs, ierr)
     end do
 
   end subroutine read_cmd_line_input
@@ -548,7 +553,7 @@ contains
   ! read (and override) the command line options
   subroutine read_user_input(mype, decompfile, piotypes, rearrangers,&
         niotasks, nframes, unlimdimindof, nvars, varsize,&
-        rearr_opts, ierr)
+        rearr_opts, use_async_io_service_procs, ierr)
     integer, intent(in) :: mype
     character(len=MAX_FNAME_LEN), intent(out) :: decompfile(MAX_DECOMP_FILES)
     integer, intent(out) :: piotypes(MAX_PIO_TYPES)
@@ -559,10 +564,14 @@ contains
     integer, intent(out) :: nvars(MAX_NVARS)
     integer, intent(out) :: varsize(MAX_NVARS)
     type(pio_rearr_opt_t), intent(out) :: rearr_opts
+    logical, intent(out) :: use_async_io_service_procs
     integer, intent(out) :: ierr
 
+    integer :: iuse_async_io_service_procs
     character(len=MAX_PIO_TYPENAME_LEN) :: pio_typenames(MAX_PIO_TYPES)
 
+    iuse_async_io_service_procs = 0
+    use_async_io_service_procs = .false.
     pio_typenames = ' '
 
     if(mype == 0) then
@@ -573,7 +582,7 @@ contains
       ! Allow user to override the values via command line
       call read_cmd_line_input(decompfile, piotypes, rearrangers,&
             niotasks, nframes, unlimdimindof, nvars, varsize,&
-            rearr_opts, ierr)
+            rearr_opts, iuse_async_io_service_procs, ierr)
     end if
 
     call MPI_Bcast(decompfile,MAX_FNAME_LEN*MAX_DECOMP_FILES,MPI_CHARACTER,0, MPI_COMM_WORLD,ierr)
@@ -586,6 +595,10 @@ contains
     call MPI_Bcast(varsize, MAX_NVARS, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
 
     call bcast_rearr_opts(rearr_opts)
+    call MPI_Bcast(iuse_async_io_service_procs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+    if(iuse_async_io_service_procs > 0) then
+      use_async_io_service_procs = .true.
+    end if
 
   end subroutine read_user_input
 
@@ -649,9 +662,125 @@ contains
     tmp_result = C(1, 1)
   end subroutine
 
+  subroutine split_comm_io_comp(comm, io_root, io_stride, nio_procs, new_comm, new_rank, new_size, is_io_proc)
+    use mpi
+    integer, intent(in) :: comm
+    integer, intent(in) :: io_root
+    integer, intent(in) :: io_stride
+    integer, intent(in) :: nio_procs
+    integer, intent(out) :: new_comm
+    integer, intent(out) :: new_rank
+    integer, intent(out) :: new_size
+    logical, intent(out) :: is_io_proc
+
+    integer :: rank, sz, color
+    integer :: ierr
+
+    new_comm = MPI_COMM_NULL
+    new_rank = 0
+    new_size = 0
+
+    call MPI_Comm_rank(comm, rank, ierr)
+
+    if((mod(rank - io_root, io_stride) == 0) .and. ((rank - io_root)/io_stride < nio_procs)) then
+      color = 0
+      is_io_proc = .true.
+    else
+      color = 1
+      is_io_proc = .false.
+    end if
+
+    call MPI_Comm_split(comm, color, 0, new_comm, ierr)
+    call MPI_Comm_rank(new_comm, new_rank, ierr)
+    call MPI_Comm_size(new_comm, new_size, ierr)
+  end subroutine
+
+  subroutine read_decomp_file(comm, filename, compmap, gmaplen, ndims, gdims)
+    use pio
+    use pio_support, only : pio_readdof
+    integer, intent(in) :: comm
+    character(len=*), intent(in) :: filename
+    integer(kind=PIO_Offset_kind), pointer, intent(out) :: compmap(:)
+    integer(kind=PIO_Offset_kind), intent(out) :: gmaplen
+    integer, intent(out) :: ndims
+    integer, pointer, intent(out) :: gdims(:)
+
+    integer(kind=PIO_Offset_kind) :: maplen
+    integer :: sz, j
+    ! Changed to support PIO1 as well
+#ifdef _PIO1
+    call pio_readdof(filename, compmap, comm, 81, ndims, gdims)
+#else
+    call pio_readdof(filename, ndims, gdims, compmap, comm)
+#endif
+
+    maplen = size(compmap)
+    call MPI_ALLREDUCE(maplen,gmaplen,1,MPI_INTEGER8,MPI_SUM,comm,ierr)
+
+  end subroutine
+
+  subroutine alloc_and_init_test_vars(ifld, ifld_in, rfld, rfld_in, dfld, dfld_in, compmap, nvars, nframes)
+    use pio
+    integer, allocatable, intent(inout) :: ifld(:,:), ifld_in(:,:,:)
+    real, allocatable, intent(inout) :: rfld(:,:), rfld_in(:,:,:)
+    double precision, allocatable, intent(inout) :: dfld(:,:), dfld_in(:,:,:)
+    integer(kind=PIO_Offset_kind), pointer, intent(in) :: compmap(:)
+    integer, intent(in) :: nvars, nframes
+
+    integer(kind=PIO_Offset_kind) :: maplen, j, nv
+
+    maplen = size(compmap)
+    allocate(ifld(maplen,nvars))
+    allocate(ifld_in(maplen,nvars,nframes))
+
+    allocate(rfld(maplen,nvars))
+    allocate(rfld_in(maplen,nvars,nframes))
+
+    allocate(dfld(maplen,nvars))
+    allocate(dfld_in(maplen,nvars,nframes))
+
+    ifld = PIO_FILL_INT
+    rfld = PIO_FILL_FLOAT
+    dfld = PIO_FILL_DOUBLE
+    do nv=1,nvars
+      do j=1,maplen
+        if(compmap(j) > 0) then
+          ifld(j,nv) = compmap(j)
+          dfld(j,nv) = ifld(j,nv)/1000000.0
+          rfld(j,nv) = 1.0E5*ifld(j,nv)
+        endif
+      enddo
+    enddo
+  end subroutine
+
+  subroutine free_test_vars(ifld, ifld_in, rfld, rfld_in, dfld, dfld_in)
+    integer, allocatable, intent(inout) :: ifld(:,:), ifld_in(:,:,:)
+    real, allocatable, intent(inout) :: rfld(:,:), rfld_in(:,:,:)
+    double precision, allocatable, intent(inout) :: dfld(:,:), dfld_in(:,:,:)
+
+    if(allocated(ifld)) then
+      deallocate(ifld)
+    end if
+    if(allocated(ifld_in)) then
+      deallocate(ifld_in)
+    end if
+    if(allocated(rfld)) then
+      deallocate(rfld)
+    end if
+    if(allocated(rfld_in)) then
+      deallocate(rfld_in)
+    end if
+    if(allocated(dfld)) then
+      deallocate(dfld)
+    end if
+    if(allocated(dfld_in)) then
+      deallocate(dfld_in)
+    end if
+  end subroutine
+
   subroutine pioperformance_rearrtest(filename, piotypes, mype, npe_base, &
        rearrangers, rearr_opts, niotasks,nframes, nvars, varsize,&
-       unlimdimindof)
+       unlimdimindof, use_async_io_service_procs)
     use pio
     use pio_support, only : pio_readdof
     use perf_mod
@@ -665,8 +794,9 @@ contains
     integer, intent(in) :: nvars
     integer, intent(in) :: varsize
     logical, intent(in) :: unlimdimindof
+    logical, intent(in) :: use_async_io_service_procs
     integer(kind=PIO_Offset_kind), pointer :: compmap(:)
-    integer :: ntasks
+    integer :: ntasks, rank, sz
     integer :: comm
     integer :: npe
     integer :: color
@@ -675,7 +805,6 @@ contains
     integer, pointer :: gdims(:)
     character(len=20) :: fname
     type(var_desc_t) :: vari(nvars), varr(nvars), vard(nvars)
-    type(iosystem_desc_t) :: iosystem
     integer :: stride, n
     integer, allocatable :: ifld(:,:), ifld_in(:,:,:)
     real, allocatable :: rfld(:,:), rfld_in(:,:,:)
@@ -696,74 +825,42 @@ contains
     integer,  parameter :: c0 = -1
     double precision, parameter :: cd0 = 1.0e30
     integer :: nvarmult
+    integer :: tmp_comm
+    logical :: is_io_proc
     character(len=*), parameter :: rearr_name(MAX_PIO_REARRS) = (/'   BOX','SUBSET'/)
+    integer, parameter :: NUM_COMPONENTS = 1
+    type(iosystem_desc_t) :: iosystem(NUM_COMPONENTS)
+    integer, dimension(1) :: comp_comms
+    integer :: io_comm, mycomm
 
     nullify(compmap)
 
-    if(trim(filename) .eq. 'ROUNDROBIN' .or. trim(filename).eq.'BLOCK') then
-       call init_ideal_dof(filename, mype, npe_base, ndims, gdims, compmap, varsize)
+    comm = MPI_COMM_WORLD
+    if(.not. use_async_io_service_procs) then
+      if(trim(filename) .eq. 'ROUNDROBIN' .or. trim(filename).eq.'BLOCK') then
+        call init_ideal_dof(filename, mype, npe_base, ndims, gdims, compmap, varsize)
+      else
+        call read_decomp_file(comm, filename, compmap, gmaplen, ndims, gdims)
+        maplen = size(compmap)
+      endif
+      call alloc_and_init_test_vars(ifld, ifld_in, rfld, rfld_in, dfld, dfld_in, compmap, nvars, nframes)
     else
-       ! Changed to support PIO1 as well
-#ifdef _PIO1
-       call pio_readdof(filename, compmap, MPI_COMM_WORLD, 81, ndims, gdims)
-#else
-       call pio_readdof(filename, ndims, gdims, compmap, MPI_COMM_WORLD)
-#endif
+      mycomm = MPI_COMM_WORLD
+    end if
 
-!    print *,__FILE__,__LINE__,' gdims=',ndims
-    endif
-    maplen = size(compmap)
-!    color = 0
-!    if(maplen>0) then
-       color = 1
-!    endif
-
-    call MPI_Comm_split(MPI_COMM_WORLD, color, mype, comm, ierr)
-
-    call MPI_Comm_size(comm, npe,  ierr)
-    call CheckMPIreturn(__LINE__,ierr)
-    niomin=1
-    niomax=min(npe,MAX_IO_TASK_ARRAY_SIZE)
-    if(niotasks(1)<=0) then
-       do j=1,min(MAX_IO_TASK_ARRAY_SIZE, npe)
-          niotasks(j)=npe-j+1
-       enddo
-    endif
-
-    if(mype < npe) then
-
-       call MPI_ALLREDUCE(maplen,gmaplen,1,MPI_INTEGER8,MPI_SUM,comm,ierr)
-
-!       if(gmaplen /= product(gdims)) then
-!          print *,__FILE__,__LINE__,gmaplen,gdims
-!       endif
-    
-       allocate(ifld(maplen,nvars))
-       allocate(ifld_in(maplen,nvars,nframes))
-
-       allocate(rfld(maplen,nvars))
-       allocate(rfld_in(maplen,nvars,nframes))
-
-       allocate(dfld(maplen,nvars))
-       allocate(dfld_in(maplen,nvars,nframes))
-
-       ifld = PIO_FILL_INT
-       rfld = PIO_FILL_FLOAT
-       dfld = PIO_FILL_DOUBLE
-       do nv=1,nvars
-          do j=1,maplen
-	     if(compmap(j) > 0) then
-               ifld(j,nv) = compmap(j)
-               dfld(j,nv) = ifld(j,nv)/1000000.0
-               rfld(j,nv) = 1.0E5*ifld(j,nv)
-             endif
-          enddo
-        enddo
-
+    call MPI_Comm_size(comm, npe, ierr)
+    niomin = 1
+    niomax = min(MAX_IO_TASK_ARRAY_SIZE, npe)
+    if(niotasks(1) <= 0) then
+      do j=1,niomax
+        niotasks(j) = npe - j + 1
+      end do
+    end if
 #ifdef BGQTRY
   call print_memusage()
 #endif
 
+      rank = mype
       if(mype ==0) then
          write(*,'(a15,a15,a15,a10,a10,a20,a20,a20)') &
           'I/O mode', 'Rearranger', 'iotype', 'niotasks', 'nvars', 'BW(MB/s)', 'I/O time(s)', 'Comp time(s)'
@@ -789,136 +886,161 @@ contains
                 if(ntasks<=0 .or. ntasks>npe) exit
                 stride = max(1,npe/ntasks)
 
-                call pio_init(mype, comm, ntasks, 0, stride, rearr,&
-                  iosystem, rearr_opts=rearr_opts)
-                   
-                ! ================== I/O Phase =========================
-                write(fname, '(a,i1,a,i4.4,a,i1,a)') 'pioperf.',rearr,'-',ntasks,'-',iotype,'.nc'
-		
-                ierr =  PIO_CreateFile(iosystem, File, iotype, trim(fname), mode)
-
-                call WriteMetadata(File, gdims, vari, varr, vard, unlimdimindof)
-
-                call MPI_Barrier(comm,ierr)
-                call get_tstamp(wall(1), usr(1), sys(1))
-
-                if(.not. unlimdimindof) then
-#ifdef VARINT
-                   call PIO_InitDecomp(iosystem, PIO_INT, gdims, compmap, iodesc_i4, rearr=rearr)
-#endif
-#ifdef VARREAL
-                   call PIO_InitDecomp(iosystem, PIO_REAL, gdims, compmap, iodesc_r4, rearr=rearr)
-#endif
-#ifdef VARDOUBLE
-                   call PIO_InitDecomp(iosystem, PIO_DOUBLE, gdims, compmap, iodesc_r8, rearr=rearr)
-#endif
-                endif
-
-                ! print *,__FILE__,__LINE__,minval(dfld),maxval(dfld),minloc(dfld),maxloc(dfld)
-
-                do frame=1,nframes
-                   recnum = frame
-                   if( unlimdimindof) then
-                      recnum = 1 + (frame-1)*gdims(ndims)
-!                      compmap = compmap2 + (frame-1)*gdims(ndims)
-!                      print *,__FILE__,__LINE__,compmap
-#ifdef VARINT
-                      call PIO_InitDecomp(iosystem, PIO_INT, gdims, compmap, iodesc_i4, rearr=rearr)
-#endif
-#ifdef VARREAL
-                      call PIO_InitDecomp(iosystem, PIO_REAL, gdims, compmap, iodesc_r4, rearr=rearr)
-#endif
-#ifdef VARDOUBLE
-                      call PIO_InitDecomp(iosystem, PIO_DOUBLE, gdims, compmap, iodesc_r8, rearr=rearr)
-#endif
-                   endif
-                   !if(mype==0) print *,__FILE__,__LINE__,'Frame: ',recnum
-
-                   do nv=1,nvars   
-                      !if(mype==0) print *,__FILE__,__LINE__,'var: ',nv
-#ifdef VARINT
-                      call PIO_setframe(File, vari(nv), recnum)
-                      call pio_write_darray(File, vari(nv), iodesc_i4, ifld(:,nv)    , ierr, fillval= PIO_FILL_INT)
-#endif
-#ifdef VARREAL
-                      call PIO_setframe(File, varr(nv), recnum)
-                      call pio_write_darray(File, varr(nv), iodesc_r4, rfld(:,nv)    , ierr, fillval= PIO_FILL_FLOAT)
-#endif
-#ifdef VARDOUBLE
-                      call PIO_setframe(File, vard(nv), recnum)
-                      call pio_write_darray(File, vard(nv), iodesc_r8, dfld(:,nv)    , ierr, fillval= PIO_FILL_DOUBLE)
-#endif
-                   enddo
-                   if(unlimdimindof) then
-#ifdef VARREAL                
-                      call PIO_freedecomp(File, iodesc_r4)
-#endif
-#ifdef VARDOUBLE
-                      call PIO_freedecomp(File, iodesc_r8)
-#endif
-#ifdef VARINT
-                      call PIO_freedecomp(File, iodesc_i4)
-#endif                
-                   endif
-                enddo
-                call pio_closefile(File)
-
-                call MPI_Barrier(comm,ierr)
-
-                call get_tstamp(wall(2), usr(2), sys(2))
-                wall(1) = wall(2)-wall(1)
-                call MPI_Reduce(wall(1), wall(2), 1, MPI_DOUBLE_PRECISION, MPI_MAX, 0, comm, ierr)
-                walltime_iophase = wall(2)
-                ! ================== Compute Phase =========================
-                call MPI_Barrier(comm,ierr)
-                call get_tstamp(wall(1), usr(1), sys(1))
-                call compute_phase(mype, ntasks)
-                call get_tstamp(wall(2), usr(2), sys(2))
-                wall(1) = wall(2)-wall(1)
-                call MPI_Reduce(wall(1), wall(2), 1, MPI_DOUBLE_PRECISION, MPI_MAX, 0, comm, ierr)
-
-                walltime_compphase = wall(2)
-                if(mype==0) then
-                   ! print out performance in MB/s
-		   nvarmult = 0
-#ifdef VARINT
-                   nvarmult = nvarmult+1
-#endif
-#ifdef VARREAL
-                   nvarmult = nvarmult+1
-#endif
-#ifdef VARDOUBLE
-                   nvarmult = nvarmult+2
-#endif
-                  call pio_type2typename(piotypes(k), typename)
-                   write(*,'(a15,a15,a15,i10,i10,f20.10,f20.10,f20.10)') &
-                   'write',rearr_name(rearr), trim(typename), ntasks, nvars, &
-                                     nvarmult*nvars*nframes*gmaplen*4.0/(1048576.0*walltime_iophase), walltime_iophase, walltime_compphase
-#ifdef BGQTRY
-  call print_memusage()
-#endif
+                if(use_async_io_service_procs) then
+                  call split_comm_io_comp(mycomm, 0, stride, ntasks, comm, rank, sz, is_io_proc)
+                  
+                  if(is_io_proc) then
+                    comp_comms(1) = MPI_COMM_NULL
+                    io_comm = comm                      
+                  else
+                    comp_comms(1) = comm
+                    io_comm = MPI_COMM_NULL
+                    call read_decomp_file(comm, filename, compmap, gmaplen, ndims, gdims)
+                    maplen = size(compmap)
+                    call alloc_and_init_test_vars(ifld, ifld_in, rfld, rfld_in, dfld, dfld_in, compmap, nvars, nframes)
+                  end if
+                  call pio_init(NUM_COMPONENTS, mycomm, comp_comms, io_comm, iosystem, rearr)
+                else
+                  call pio_init(mype, comm, ntasks, 0, stride, rearr,&
+                    iosystem(1), rearr_opts=rearr_opts)
+                  is_io_proc = .false.
                 end if
-#ifdef VARREAL                
-                call PIO_freedecomp(iosystem, iodesc_r4)
+                if(.not. is_io_proc) then   
+                  ! ================== I/O Phase =========================
+                  write(fname, '(a,i1,a,i4.4,a,i1,a)') 'pioperf.',rearr,'-',ntasks,'-',iotype,'.nc'
+      
+                  ierr =  PIO_CreateFile(iosystem(1), File, iotype, trim(fname), mode)
+
+                  call WriteMetadata(File, gdims, vari, varr, vard, unlimdimindof)
+
+                  call MPI_Barrier(comm,ierr)
+                  call get_tstamp(wall(1), usr(1), sys(1))
+
+                  if(.not. unlimdimindof) then
+#ifdef VARINT
+                     call PIO_InitDecomp(iosystem(1), PIO_INT, gdims, compmap, iodesc_i4, rearr=rearr)
+#endif
+#ifdef VARREAL
+                     call PIO_InitDecomp(iosystem(1), PIO_REAL, gdims, compmap, iodesc_r4, rearr=rearr)
 #endif
 #ifdef VARDOUBLE
-                call PIO_freedecomp(iosystem, iodesc_r8)
+                     call PIO_InitDecomp(iosystem(1), PIO_DOUBLE, gdims, compmap, iodesc_r8, rearr=rearr)
+#endif
+                  endif
+
+                  ! print *,__FILE__,__LINE__,minval(dfld),maxval(dfld),minloc(dfld),maxloc(dfld)
+
+                  do frame=1,nframes
+                     recnum = frame
+                     if( unlimdimindof) then
+                        recnum = 1 + (frame-1)*gdims(ndims)
+  !                      compmap = compmap2 + (frame-1)*gdims(ndims)
+  !                      print *,__FILE__,__LINE__,compmap
+#ifdef VARINT
+                        call PIO_InitDecomp(iosystem(1), PIO_INT, gdims, compmap, iodesc_i4, rearr=rearr)
+#endif
+#ifdef VARREAL
+                        call PIO_InitDecomp(iosystem(1), PIO_REAL, gdims, compmap, iodesc_r4, rearr=rearr)
+#endif
+#ifdef VARDOUBLE
+                        call PIO_InitDecomp(iosystem(1), PIO_DOUBLE, gdims, compmap, iodesc_r8, rearr=rearr)
+#endif
+                     endif
+                     !if(mype==0) print *,__FILE__,__LINE__,'Frame: ',recnum
+
+                     do nv=1,nvars   
+                        !if(mype==0) print *,__FILE__,__LINE__,'var: ',nv
+#ifdef VARINT
+                        call PIO_setframe(File, vari(nv), recnum)
+                        call pio_write_darray(File, vari(nv), iodesc_i4, ifld(:,nv)    , ierr, fillval= PIO_FILL_INT)
+#endif
+#ifdef VARREAL
+                        call PIO_setframe(File, varr(nv), recnum)
+                        call pio_write_darray(File, varr(nv), iodesc_r4, rfld(:,nv)    , ierr, fillval= PIO_FILL_FLOAT)
+#endif
+#ifdef VARDOUBLE
+                        call PIO_setframe(File, vard(nv), recnum)
+                        call pio_write_darray(File, vard(nv), iodesc_r8, dfld(:,nv)    , ierr, fillval= PIO_FILL_DOUBLE)
+#endif
+                     enddo
+                     if(unlimdimindof) then
+#ifdef VARREAL                
+                        call PIO_freedecomp(File, iodesc_r4)
+#endif
+#ifdef VARDOUBLE
+                        call PIO_freedecomp(File, iodesc_r8)
 #endif
 #ifdef VARINT
-                call PIO_freedecomp(iosystem, iodesc_i4)
+                        call PIO_freedecomp(File, iodesc_i4)
 #endif                
-                call pio_finalize(iosystem, ierr)
+                     endif
+                  enddo
+                  call pio_closefile(File)
+
+                  call MPI_Barrier(comm,ierr)
+
+                  call get_tstamp(wall(2), usr(2), sys(2))
+                  wall(1) = wall(2)-wall(1)
+                  call MPI_Reduce(wall(1), wall(2), 1, MPI_DOUBLE_PRECISION, MPI_MAX, 0, comm, ierr)
+                  walltime_iophase = wall(2)
+                  ! ================== Compute Phase =========================
+                  call MPI_Barrier(comm,ierr)
+                  call get_tstamp(wall(1), usr(1), sys(1))
+                  call compute_phase(mype, ntasks)
+                  call get_tstamp(wall(2), usr(2), sys(2))
+                  wall(1) = wall(2)-wall(1)
+                  call MPI_Reduce(wall(1), wall(2), 1, MPI_DOUBLE_PRECISION, MPI_MAX, 0, comm, ierr)
+
+                  walltime_compphase = wall(2)
+                  if(rank == 0) then
+                     ! print out performance in MB/s
+         nvarmult = 0
+#ifdef VARINT
+                     nvarmult = nvarmult+1
+#endif
+#ifdef VARREAL
+                     nvarmult = nvarmult+1
+#endif
+#ifdef VARDOUBLE
+                     nvarmult = nvarmult+2
+#endif
+                    call pio_type2typename(piotypes(k), typename)
+                     write(*,'(a15,a15,a15,i10,i10,f20.10,f20.10,f20.10)') &
+                     'write',rearr_name(rearr), trim(typename), ntasks, nvars, &
+                                       nvarmult*nvars*nframes*gmaplen*4.0/(1048576.0*walltime_iophase), walltime_iophase, walltime_compphase
+#ifdef BGQTRY
+    call print_memusage()
+#endif
+                  end if
+#ifdef VARREAL                
+                  call PIO_freedecomp(iosystem(1), iodesc_r4)
+#endif
+#ifdef VARDOUBLE
+                  call PIO_freedecomp(iosystem(1), iodesc_r8)
+#endif
+#ifdef VARINT
+                  call PIO_freedecomp(iosystem(1), iodesc_i4)
+#endif                
+                  call pio_finalize(iosystem(1), ierr)
+                  if(use_async_io_service_procs) then
+                    if(.not. is_io_proc) then
+                      call free_test_vars(ifld, ifld_in, rfld, rfld_in, dfld, dfld_in)
+                      deallocate(compmap)
+                      deallocate(gdims)
+                    end if
+                    call MPI_Comm_free(comm, ierr)
+                    comm = mycomm
+                  end if
+                end if
              enddo
           enddo
        enddo
 !       deallocate(compmap)
-       deallocate(ifld)
-       deallocate(ifld_in)
-       deallocate(rfld)
-       deallocate(dfld)
-       deallocate(dfld_in)
-       deallocate(rfld_in)
-    endif
+      if(.not. use_async_io_service_procs) then
+        call free_test_vars(ifld, ifld_in, rfld, rfld_in, dfld, dfld_in)
+        deallocate(compmap)
+        deallocate(gdims)
+      end if
 
   end subroutine pioperformance_rearrtest
 
