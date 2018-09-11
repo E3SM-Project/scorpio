@@ -286,6 +286,10 @@ extern "C" {
      * transfers. */
     int create_mpi_datatypes(MPI_Datatype basetype, int msgcnt, const PIO_Offset *mindex,
                              const int *mcount, int *mfrom, MPI_Datatype *mtype);
+
+    /* Calculate block lengths and displacements for MPI_Type_indexed(). */
+    int calc_blocklengths_displacements(int count, int *displacements, int *blocklengths);
+
     int compare_offsets(const void *a, const void *b) ;
 
     /* Print a trace statement, for debugging. */

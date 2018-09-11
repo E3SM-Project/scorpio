@@ -254,6 +254,60 @@ int compute_maxIObuffersize(MPI_Comm io_comm, io_desc_t *iodesc)
 }
 
 /**
+ * Calculate block lengths and displacements for MPI_Type_indexed().
+ * Used in create_mpi_datatypes().
+ *
+ * @param count Number of initial blocks (each block has a length of 1)
+ * @param displacements An input array of displacements (initial blocks)
+ * and an output array of picked displacements (contiguous blocks).
+ * @param blocklengths An output array of block lengths.
+ * @returns Number of contiguous blocks.
+ */
+int calc_blocklengths_displacements(int count, int *displacements, int *blocklengths)
+{
+    /* Check inputs. */
+    pioassert(count > 0 && displacements && blocklengths && displacements[0] >= 0,
+              "invalid input", __FILE__, __LINE__);
+
+    /* If theres is only one contiguous block with length 1, we can return. */
+    if (count == 1)
+    {
+        blocklengths[0] = 1;
+        return 1;
+    }
+
+    int new_count = 0;
+
+    /* The minimum length of a block is 1. */
+    int blk_len = 1;
+
+    for (int i = 0; i < count - 1; i++)
+    {
+        pioassert(displacements[i + 1] >= 0, "invalid input", __FILE__, __LINE__);
+
+        if ((displacements[i + 1] - displacements[i]) == 1)
+        {
+            /* Still in a contiguous block. */
+            blk_len++;
+        }
+        else
+        {
+            /* The end of a block has been reached. */
+            blocklengths[new_count++] = blk_len;
+
+            /* Continue to find next block. */
+            blk_len = 1;
+            displacements[new_count] = displacements[i + 1];
+        }
+    }
+
+    /* Handle the last block. */
+    blocklengths[new_count++] = blk_len;
+
+    return new_count;
+}
+
+/**
  * Create the derived MPI datatypes used for comp2io and io2comp
  * transfers. Used in define_iodesc_datatypes().
  *
@@ -274,15 +328,11 @@ int create_mpi_datatypes(MPI_Datatype mpitype, int msgcnt,
                          const PIO_Offset *mindex, const int *mcount, int *mfrom,
                          MPI_Datatype *mtype)
 {
-    int blocksize;
     int numinds = 0;
-    PIO_Offset *lindex = NULL;
     int mpierr; /* Return code from MPI functions. */
 
     /* Check inputs. */
     pioassert(msgcnt > 0 && mcount, "invalid input", __FILE__, __LINE__);
-
-    PIO_Offset bsizeT[msgcnt];
 
     LOG((1, "create_mpi_datatypes mpitype = %d msgcnt = %d", mpitype, msgcnt));
     LOG((2, "MPI_BYTE = %d MPI_CHAR = %d MPI_SHORT = %d MPI_INT = %d MPI_FLOAT = %d MPI_DOUBLE = %d",
@@ -293,86 +343,36 @@ int create_mpi_datatypes(MPI_Datatype mpitype, int msgcnt,
         numinds += mcount[j];
     LOG((2, "numinds = %d", numinds));
 
-    if (mindex)
-    {
-        if (!(lindex = malloc(numinds * sizeof(PIO_Offset))))
-            return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__);
-        memcpy(lindex, mindex, (size_t)(numinds * sizeof(PIO_Offset)));
-        LOG((3, "allocated lindex, copied mindex"));
-    }
-
-    bsizeT[0] = 0;
     mtype[0] = PIO_DATATYPE_NULL;
-    int pos = 0;
-    int ii = 0;
-
-    /* Determine the blocksize. This is done differently for the
-     * rearrangers. (If mfrom is NULL, this is the box rearranger.) */
-    if (mfrom == NULL)
-    {
-        LOG((3, "mfrom is NULL"));
-        for (int i = 0; i < msgcnt; i++)
-        {
-            if (mcount[i] > 0)
-            {
-                /* Look for the largest block of data for io which
-                 * can be expressed in terms of start and
-                 * count. */
-                bsizeT[ii] = GCDblocksize(mcount[i], lindex + pos);
-                ii++;
-                pos += mcount[i];
-            }
-        }
-        blocksize = (int)lgcd_array(ii, bsizeT);
-    }
-    else
-    {
-        blocksize = 1;
-    }
-    LOG((3, "blocksize = %d", blocksize));
 
     /* pos is an index to the start of each message block. */
-    pos = 0;
+    int pos = 0;
     for (int i = 0; i < msgcnt; i++)
     {
         if (mcount[i] > 0)
         {
-            int len = mcount[i] / blocksize;
+            int len = mcount[i];
             int *displace = NULL;
-            LOG((3, "blocksize = %d i = %d mcount[%d] = %d len = %d", blocksize, i, i,
+            int *blocklens = NULL;
+            LOG((3, "i = %d mcount[%d] = %d len = %d", i, i,
                  mcount[i], len));
 
-            if (len > 0)
-            {
-                if (!(displace = calloc(len, sizeof(int))))
-                    return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__);
-            }
+            if (!(displace = calloc(len, sizeof(int))))
+                return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__);
 
-            if (blocksize == 1)
+            if (!mfrom)
             {
-                if (!mfrom)
-                {
-                    /* Box rearranger. */
-                    for (int j = 0; j < len; j++)
-                        displace[j] = (int)(lindex[pos + j]);
-                }
-                else
-                {
-                    /* Subset rearranger. */
-                    int k = 0;
-                    for (int j = 0; j < numinds; j++)
-                        if (mfrom[j] == i)
-                            displace[k++] = (int)(lindex[j]);
-                }
-
+                /* Box rearranger (on all tasks), subset rearranger (on computation tasks). */
+                for (int j = 0; j < len; j++)
+                    displace[j] = (int)(mindex[pos + j]);
             }
             else
             {
-                for (int j = 0; j < mcount[i]; j++)
-                    (lindex + pos)[j]++;
-
-                for (int j = 0; j < len; j++)
-                    displace[j] = ((lindex + pos)[j * blocksize] - 1);
+                /* Subset rearranger (on IO tasks). */
+                int k = 0;
+                for (int j = 0; j < numinds; j++)
+                    if (mfrom[j] == i)
+                        displace[k++] = (int)(mindex[j]);
             }
 
 #if PIO_ENABLE_LOGGING
@@ -380,15 +380,22 @@ int create_mpi_datatypes(MPI_Datatype mpitype, int msgcnt,
                 LOG((3, "displace[%d] = %d", j, displace[j]));
 #endif /* PIO_ENABLE_LOGGING */
 
-            LOG((3, "calling MPI_Type_create_indexed_block len = %d blocksize = %d "
-                 "mpitype = %d", len, blocksize, mpitype));
-            /* Create an indexed datatype with constant-sized blocks. */
-            if ((mpierr = MPI_Type_create_indexed_block(len, blocksize, displace,
-                                                        mpitype, &mtype[i])))
+            if (!(blocklens = calloc(len, sizeof(int))))
+                return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__);
+
+            len = calc_blocklengths_displacements(len, displace, blocklens);
+
+            LOG((3, "calling MPI_Type_indexed len = %d "
+                 "mpitype = %d", len, mpitype));
+            /* Create an indexed datatype with variable-sized blocks. */
+            if ((mpierr = MPI_Type_indexed(len, blocklens, displace,
+                                           mpitype, &mtype[i])))
                 return check_mpi(NULL, mpierr, __FILE__, __LINE__);
 
             free(displace);
             displace = NULL;
+            free(blocklens);
+            blocklens = NULL;
 
             if (mtype[i] == PIO_DATATYPE_NULL)
                 return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__);
@@ -400,10 +407,6 @@ int create_mpi_datatypes(MPI_Datatype mpitype, int msgcnt,
             pos += mcount[i];
         }
     }
-
-    /* Free resources. */
-    if (lindex)
-        free(lindex);
 
     LOG((3, "done with create_mpi_datatypes()"));
     return PIO_NOERR;
