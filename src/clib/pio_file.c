@@ -207,6 +207,116 @@ int PIOc_create(int iosysid, const char *filename, int cmode, int *ncidp)
     return PIOc_createfile_int(iosysid, ncidp, &iotype, filename, cmode);
 }
 
+int Sync_for_close(int ncid)
+{
+    iosystem_desc_t *ios;  /* Pointer to io system information. */
+    file_desc_t *file;     /* Pointer to file information. */
+    int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function codes. */
+    int ierr = PIO_NOERR;  /* Return code from function calls. */
+
+#ifdef TIMING
+    GPTLstart("Sync_for_close");
+#endif
+
+    LOG((1, "Sync_for_close ncid = %d", ncid));
+
+    /* Get the file info from the ncid. */
+    if ((ierr = pio_get_file(ncid, &file)))
+        return pio_err(NULL, NULL, ierr, __FILE__, __LINE__);
+    ios = file->iosystem;
+
+    /* Flush data buffers on computational tasks. */
+    if (!ios->async || !ios->ioproc)
+    {
+        if (file->mode & PIO_WRITE)
+        {
+            wmulti_buffer *wmb, *twmb;
+            
+            LOG((3, "Sync_for_close checking buffers"));
+            wmb = &file->buffer;
+            while (wmb)
+            {
+                /* If there are any data arrays waiting in the
+                 * multibuffer, flush it. */
+                if (wmb->num_arrays > 0)
+                    flush_buffer(ncid, wmb, true);
+                twmb = wmb;
+                wmb = wmb->next;
+                if (twmb == &file->buffer)
+                {
+                    twmb->ioid = -1;
+                    twmb->next = NULL;
+                }
+                else
+                {
+                    free(twmb);
+                }
+            }
+        }
+    }
+
+    /* If async is in use, send message to IO master tasks. */
+    if (ios->async)
+    {
+        int msg = PIO_MSG_SYNC;
+
+        PIO_SEND_ASYNC_MSG(ios, msg, &ierr, ncid);
+        if(ierr != PIO_NOERR)
+        {
+            LOG((1, "Error sending async msg for PIO_MSG_SYNC"));
+            return pio_err(ios, NULL, ierr, __FILE__, __LINE__);
+        }
+    }
+
+    /* Call the sync function on IO tasks. */
+    if (file->mode & PIO_WRITE)
+    {
+        if (ios->ioproc)
+        {
+            switch(file->iotype)
+            {
+#ifdef _NETCDF4
+            case PIO_IOTYPE_NETCDF4P:
+                ierr = nc_sync(file->fh);
+                break;
+            case PIO_IOTYPE_NETCDF4C:
+#endif
+#ifdef _NETCDF
+            case PIO_IOTYPE_NETCDF:
+                if (ios->io_rank == 0)
+                    ierr = nc_sync(file->fh);
+                break;
+#endif
+#ifdef _PNETCDF
+            case PIO_IOTYPE_PNETCDF:
+                flush_output_buffer(file, true, 0);
+                //ierr = ncmpi_sync(file->fh);
+                break;
+#endif
+            default:
+                return pio_err(ios, file, PIO_EBADIOTYPE, __FILE__, __LINE__);
+            }
+        }
+        LOG((2, "Sync_for_close ierr = %d", ierr));
+    }
+
+    /* Broadcast and check the return code. */
+    if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        return check_mpi2(ios, NULL, mpierr, __FILE__, __LINE__);
+    if (ierr)
+    {
+#ifdef TIMING
+        GPTLstop("Sync_for_close");
+#endif
+        return check_netcdf2(ios, NULL, ierr, __FILE__, __LINE__);
+    }
+
+#ifdef TIMING
+    GPTLstop("Sync_for_close");
+#endif
+    return ierr;
+}
+
 /**
  * Close a file previously opened with PIO.
  *
@@ -229,13 +339,19 @@ int PIOc_closefile(int ncid)
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
         return pio_err(NULL, NULL, ierr, __FILE__, __LINE__);
+
+#ifdef TIMING
+    if (file->mode & PIO_WRITE)
+        GPTLstart("PIO:PIOc_close_write_mode_file");
+#endif
+
     ios = file->iosystem;
 
     /* Sync changes before closing on all tasks if async is not in
      * use, but only on non-IO tasks if async is in use. */
     if (!ios->async || !ios->ioproc)
         if (file->mode & PIO_WRITE)
-            PIOc_sync(ncid);
+            Sync_for_close(ncid);
 
     /* If async is in use and this is a comp tasks, then the compmaster
      * sends a msg to the pio_msg_handler running on the IO master and
@@ -288,6 +404,11 @@ int PIOc_closefile(int ncid)
         return check_mpi(file, mpierr, __FILE__, __LINE__);
     if (ierr)
         return check_netcdf(file, ierr, __FILE__, __LINE__);
+
+#ifdef TIMING
+    if (file->mode & PIO_WRITE)
+        GPTLstop("PIO:PIOc_close_write_mode_file");
+#endif
 
     /* Delete file from our list of open files. */
     pio_delete_file_from_list(ncid);
