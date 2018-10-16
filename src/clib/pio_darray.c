@@ -686,6 +686,11 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
     vdesc = &(file->varlist[varid]);
     LOG((2, "vdesc record %d nreqs %d", vdesc->record, vdesc->nreqs));
 
+#if 0
+    if (ios->union_rank == 0)
+        printf("PIOc_write_darray, file name = %s, var name = %s, ioid = %d\n", file->fname, vdesc->vname, ioid);
+#endif
+
     /* If we don't know the fill value for this var, get it. */
     if (!vdesc->fillvalue)
         if ((ierr = find_var_fillvalue(file, varid, vdesc)))
