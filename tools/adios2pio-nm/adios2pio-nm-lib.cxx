@@ -21,6 +21,7 @@ using namespace std;
 /* debug output */
 static int debug_out = 0;
 
+/* TAHSIN */
 /* static MPI_Comm comm = MPI_COMM_WORLD; */
 /*
 static int mpirank;
