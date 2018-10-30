@@ -520,6 +520,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
         if((file->iotype == PIO_IOTYPE_PNETCDF) && (file->iobuf))
         {
             brel(file->iobuf);
+            file->iobuf = NULL;
         }
 #endif
 #endif
