@@ -524,9 +524,10 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
 #if PIO_USE_ASYNC_WR_THREAD
 #if !PIO_ENABLE_ASYNC_WR_REARR
         /* All data in file->iobuf has been copied to viobufs */
-        if((file->iotype == PIO_IOTYPE_PNETCDF) && (file->iobuf))
+        if((file->iotype == PIO_IOTYPE_PNETCDF) && file->iobuf[iodesc->ioid - PIO_IODESC_START_ID])
         {
-            brel(file->iobuf);
+            brel(file->iobuf[iodesc->ioid - PIO_IODESC_START_ID]);
+            file->iobuf[iodesc->ioid - PIO_IODESC_START_ID] = NULL;
         }
 #endif
 #endif
