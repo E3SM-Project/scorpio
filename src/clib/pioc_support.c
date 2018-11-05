@@ -1853,7 +1853,16 @@ int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filena
             LOG((2, "Calling ncmpi_create mode = %d", file->mode));
             if (ios->info == MPI_INFO_NULL)
                 MPI_Info_create(&ios->info);
-            MPI_Info_set(ios->info, "nc_var_align_size", "1");
+
+            /* Set MPI-IO hints */
+            MPI_Info_set(ios->info, "romio_ds_write", "disable"); /* MPI-IO data sieving */
+            MPI_Info_set(ios->info, "romio_cb_write", "enable");  /* Collective write */
+            MPI_Info_set(ios->info, "romio_no_indep_rw", "true"); /* No independent MPI-IO */
+
+            /* Set PnetCDF I/O hints */
+            MPI_Info_set(ios->info, "nc_var_align_size", "1"); /* No gap between variables */
+            MPI_Info_set(ios->info, "nc_in_place_swap", "enable"); /* In-place byte swap */
+
             ierr = ncmpi_create(ios->io_comm, filename, file->mode, ios->info, &file->fh);
             if (!ierr)
                 ierr = ncmpi_buffer_attach(file->fh, pio_buffer_size_limit);
