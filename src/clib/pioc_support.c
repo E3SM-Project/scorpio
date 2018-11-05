@@ -4640,7 +4640,8 @@ void pio_file_close_and_free(void *pdata)
     assert(pdata != NULL);
 
     file_desc_t *file = (file_desc_t *)pdata;
-    ret = PIO_hard_closefile(file->iosystem, file);
+    bool sync_with_ioprocs = false;
+    ret = PIO_hard_closefile(file->iosystem, file, sync_with_ioprocs);
     if(ret != PIO_NOERR)
     {
         LOG((1, "Closing file (id=%d) failed (ignoring the error)", file->pio_ncid));

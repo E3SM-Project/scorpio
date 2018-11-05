@@ -168,10 +168,12 @@ extern "C" {
                             const char *filename, int mode, int retry);
 
     /* Close ("hard close") file - sync all data with disk + close file */
-    int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file);
+    int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
+          bool sync_with_ioprocs);
 
     /* Sync ("hard sync") file - sync all data with disk */
-    int PIO_hard_sync(iosystem_desc_t *ios, file_desc_t *file);
+    int PIO_hard_sync(iosystem_desc_t *ios, file_desc_t *file,
+          bool sync_with_ioprocs);
 
     iosystem_desc_t *pio_get_iosystem_from_id(int iosysid);
     int pio_add_to_iosystem_list(iosystem_desc_t *ios, MPI_Comm comm);

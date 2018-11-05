@@ -342,7 +342,8 @@ static int sync_file(int ncid)
  * @param file: Pointer to the file_desc for the file
  * @returns PIO_NOERR for success, a pio error code otherwise
  */
-int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file)
+int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
+      bool sync_with_ioprocs)
 {
     int ierr = PIO_NOERR;
     int mpierr = MPI_SUCCESS;
@@ -423,7 +424,7 @@ int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file)
 
 #if PIO_ENABLE_SOFT_SYNC
     /* Hard sync - the previous syncs were "soft sync"s */
-    ierr = PIO_hard_sync(ios, file);
+    ierr = PIO_hard_sync(ios, file, sync_with_ioprocs);
     if(ierr != PIO_NOERR)
     {
         return pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -465,11 +466,13 @@ int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file)
         }
     }
 
-    ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
-    if(ierr != PIO_NOERR){
-        LOG((1, "nc*_close failed, ierr = %d", ierr));
-        return pio_err(NULL, file, ierr, __FILE__, __LINE__,
-                        "Closing file (%s, ncid=%d) failed. Underlying I/O library (iotype=%s) call failed", pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
+    if(sync_with_ioprocs){
+        ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
+        if(ierr != PIO_NOERR){
+            LOG((1, "nc*_close failed, ierr = %d", ierr));
+            return pio_err(NULL, file, ierr, __FILE__, __LINE__,
+                            "Closing file (%s, ncid=%d) failed. Underlying I/O library (iotype=%s) call failed", pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
+        }
     }
 
     int file_ncid = file->pio_ncid;
@@ -547,7 +550,8 @@ int PIO_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
 #endif
     }
     else{
-        ierr = PIO_hard_closefile(ios, file);
+        bool sync_with_ioprocs = false;
+        ierr = PIO_hard_closefile(ios, file, false);
         if(ierr != PIO_NOERR){
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
                             "Closing file (%s, ncid=%d) failed. Internal error while closing the file (iosysid=%d).", pio_get_fname_from_file(file), file->pio_ncid, ios->iosysid);
@@ -625,7 +629,8 @@ int PIOc_closefile(int ncid)
     }
 
 #else /* PIO_ENABLE_SOFT_CLOSE */
-    ierr = PIO_hard_closefile(ios, file);
+    bool sync_with_ioprocs = true;
+    ierr = PIO_hard_closefile(ios, file, sync_with_ioprocs);
     if(ierr != PIO_NOERR)
     {
         return pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -722,7 +727,8 @@ int PIOc_deletefile(int iosysid, const char *filename)
  * @param file Pointer to the file_desc
  * @returns PIO_NOERR on success, a pio error code otherwise
  */
-int PIO_hard_sync(iosystem_desc_t *ios, file_desc_t *file)
+int PIO_hard_sync(iosystem_desc_t *ios, file_desc_t *file,
+      bool sync_with_ioprocs)
 {
     int ierr = PIO_NOERR;
     int mpierr = MPI_SUCCESS, mpierr2;
@@ -761,9 +767,11 @@ int PIO_hard_sync(iosystem_desc_t *ios, file_desc_t *file)
         LOG((2, "PIOc_sync ierr = %d", ierr));
     }
 
-    /* Broadcast and check the return code. */
-    if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    if(sync_with_ioprocs){
+        /* Broadcast and check the return code. */
+        if ((mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+            return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
 
     return ierr;
 }
