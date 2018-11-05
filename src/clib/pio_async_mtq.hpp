@@ -7,6 +7,9 @@
 #include <chrono>
 #include <mutex>
 #include <condition_variable>
+extern "C"{
+#include "pio_internal.h"
+} // extern "C"
 
 namespace PIO_Util{
 
@@ -39,12 +42,15 @@ class PIO_mtq{
 
 template<typename T>
 PIO_mtq<T>::PIO_mtq():sig_(PIO_mtq<T>::PIO_MTQ_SIG_INVALID)
-{}
+{
+  LOG((2, "PIO_mtq:PIO_mtq: Creating MT queue"));
+}
 
 template<typename T>
 void PIO_mtq<T>::enqueue(const T& val)
 {
   std::unique_lock<std::mutex> lk(mtx_);
+  LOG((2, "PIO_mtq:enqueue: Enqueing val to mtq"));
   queue_.push(val);
   lk.unlock();
   cv_.notify_all();
@@ -55,6 +61,7 @@ int PIO_mtq<T>::dequeue(T &val)
 {
   std::unique_lock<std::mutex> lk(mtx_);
   do{
+    LOG((2, "PIO_mtq:dequeue: Waiting for dequeueing val from mtq..."));
     while(queue_.empty() && (sig_ == PIO_MTQ_SIG_INVALID)){
       cv_.wait(lk, [this]{ return (queue_.empty() && (sig_ == PIO_MTQ_SIG_INVALID));}); 
       /*
@@ -69,6 +76,7 @@ int PIO_mtq<T>::dequeue(T &val)
       thread_yield(lk);
     }
     if(sig_ == PIO_MTQ_SIG_STOP){
+      LOG((2, "PIO_mtq:dequeue: Received STOP signal on mtq (exiting...)"));
       return 1;
     }
     else if(sig_ == PIO_MTQ_SIG_COMPLETE){
@@ -90,6 +98,7 @@ int PIO_mtq<T>::dequeue(T &val)
   }while(true);
   val = queue_.front();
   queue_.pop();
+  LOG((2, "PIO_mtq:dequeue: Successfully dequeued val from mtq"));
   lk.unlock();
   return 0;
 }
@@ -133,6 +142,7 @@ void PIO_mtq<T>::thread_yield(std::unique_lock<std::mutex> &lk) const
    */
   const std::chrono::milliseconds ZERO_TIMEOUT = std::chrono::milliseconds(0);
   lk.unlock();
+  LOG((2, "PIO_mtq:thread_yield: Yielding for 0 secs"));
   std::this_thread::sleep_for(ZERO_TIMEOUT);
   lk.lock();
 }
