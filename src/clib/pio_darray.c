@@ -138,9 +138,9 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
                             "Writing multiple variables to file (%s, ncid=%d) failed. Internal error, invalid arguments, nvars = %d, varids[%d] = %d (expected >= 0 && <= PIO_MAX_VARS=%d)", pio_get_fname_from_file(file), ncid, nvars, v, varids[v], PIO_MAX_VARS);
         }
 
-    LOG((1, "PIOc_write_darray_multi ncid = %d ioid = %d nvars = %d arraylen = %ld "
+    LOG((1, "PIOc_write_darray_multi file = %s ncid = %d ioid = %d nvars = %d arraylen = %ld "
          "flushtodisk = %d",
-         ncid, ioid, nvars, arraylen, flushtodisk));
+         file->fname, ncid, ioid, nvars, arraylen, flushtodisk));
 
     /* Check that we can write to this file. */
     if (!(file->mode & PIO_WRITE))

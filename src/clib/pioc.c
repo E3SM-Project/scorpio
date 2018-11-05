@@ -984,12 +984,15 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
 #endif
 
 #if PIO_USE_ASYNC_WR_THREAD
+    LOG((1, "Trying to create async tpool : %s:%d", __FILE__, __LINE__));
     ret = pio_async_tpool_create();
     if(ret != PIO_NOERR)
     {
         return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
                         "PIO Init failed. Initializing the asynchronous thread pool failed");
     }
+#else
+    LOG((1, "PIO_USE_ASYNC_WR_THREAD is not enabled : %s:%d", __FILE__, __LINE__));
 #endif
 
     /* Find the number of computation tasks. */

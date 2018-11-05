@@ -171,6 +171,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
     pioassert(file && file->iosystem && varids && varids[0] >= 0 && varids[0] <= PIO_MAX_VARS &&
               iodesc, "invalid input", __FILE__, __LINE__);
 
+    LOG((1, "write_darray_multi_par file=%s, pio_ncid=%d, fh=%d", file->fname, file->pio_ncid, file->fh));
     LOG((1, "write_darray_multi_par nvars = %d iodesc->ndims = %d iodesc->mpitype = %d "
          "iodesc->maxregions = %d iodesc->llen = %d", nvars, iodesc->ndims,
          iodesc->mpitype, iodesc->maxregions, iodesc->llen));
@@ -475,6 +476,11 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
 #endif
 
 #if (PIO_ENABLE_ASYNC_WR_REARR || PIO_USE_ASYNC_WR_THREAD)
+                        if(ierr != PIO_NOERR)
+                        {
+                            LOG((1, "Pnetcdf write failed"));
+                        }
+                        LOG((1, "Adding async op - pnetcdf nb wr, (file=%s, pio_ncid=%d, fh=%d", file->fname, file->pio_ncid, file->fh));
                         /* Add an async op for the write */
                         ierr = pio_file_async_pend_op_add(file,
                                   PIO_ASYNC_PNETCDF_WRITE_OP,
