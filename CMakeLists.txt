@@ -33,14 +33,14 @@ option (PIO_ENABLE_SOFT_CLOSE "Enable soft close (close does not sync data with 
 option (PIO_ENABLE_SOFT_SYNC  "Enable soft sync (sync does not sync data with disk)" OFF)
 option (WITH_PNETCDF         "Require the use of PnetCDF"                   ON)
 
-# Set a variable that appears in the config.h.in file.
+# Set a variable that appears in the pio_config.h.in file.
 if(PIO_USE_MALLOC)
   set(USE_MALLOC 1)
 else()
   set(USE_MALLOC 0)
 endif()
 
-# Set a variable that appears in the config.h.in file.
+# Set a variable that appears in the pio_config.h.in file.
 if(PIO_ENABLE_LOGGING)
   set(ENABLE_LOGGING 1)
 else()
@@ -191,8 +191,8 @@ set (CMAKE_Fortran_COMPILER_DIRECTIVE "CPR${CMAKE_Fortran_COMPILER_NAME}"
 # configure a header file to pass some of the CMake settings
 # to the source code
 configure_file (
-  "${PROJECT_SOURCE_DIR}/src/clib/config.h.in"
-  "${PROJECT_BINARY_DIR}/src/clib/config.h"
+  "${PROJECT_SOURCE_DIR}/src/clib/pio_config.h.in"
+  "${PROJECT_BINARY_DIR}/src/clib/pio_config.h"
   )
 
 #==============================================================================

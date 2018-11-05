@@ -20,7 +20,7 @@ add_library (pioc ${pioc_sources})
 # set up include-directories
 include_directories(
   "${PROJECT_SOURCE_DIR}"   # to find foo/foo.h
-  "${PROJECT_BINARY_DIR}")  # to find foo/config.h
+  "${PROJECT_BINARY_DIR}")  # to find foo/pio_config.h
 
 # Include the clib source directory
 target_include_directories (pioc
