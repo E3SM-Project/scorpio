@@ -517,6 +517,8 @@ int PIO_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
     int ierr = PIO_NOERR;
 
     assert(ios && file);
+    LOG((2, "PIO_soft_closefile(file=%s, pio_ncid=%d, fh=%d)",
+            file->fname, file->pio_ncid, file->fh));
 #if PIO_USE_ASYNC_WR_THREAD
     /* Delete file from our list of open files. */
     ierr = pio_delete_file_from_list(file->pio_ncid, NULL);
@@ -530,6 +532,7 @@ int PIO_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
 
     if(file->nasync_pend_ops > 0){
 #if PIO_USE_ASYNC_WR_THREAD
+        LOG((2, "Soft close: Pending async ops, queue for async thread"));
         /* Queue up the pending async ops on the file to the async thread pool */
         ierr = pio_tpool_async_pend_op_add(ios, PIO_ASYNC_FILE_WRITE_OPS,
                 (void *)file);
@@ -539,6 +542,7 @@ int PIO_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
                             "Closing file (%s, ncid=%d) failed. Soft close of the file failed (iosysid=%d). Internal error while adding pending asynchronous write operations for this file into the thread pool", pio_get_fname_from_file(file), file->pio_ncid, ios->iosysid);
         }
 #else
+        LOG((2, "Soft close: Pending async ops, queue pending ops to iosys"));
         /* Queue up the pending async ops on the file to the iosystem */
         ierr = pio_iosys_async_pend_op_add(ios, PIO_ASYNC_FILE_WRITE_OPS,
                 (void *)file);
@@ -550,6 +554,7 @@ int PIO_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
 #endif
     }
     else{
+        LOG((2, "Soft close: No pending async ops, hard close"));
         bool sync_with_ioprocs = false;
         ierr = PIO_hard_closefile(ios, file, false);
         if(ierr != PIO_NOERR){

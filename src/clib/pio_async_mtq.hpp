@@ -113,6 +113,7 @@ void PIO_mtq<T>::signal(PIO_mtq<T>::SigTypes_t sig)
 
   lk.lock();
   if(sig == PIO_MTQ_SIG_COMPLETE){
+    LOG((2, "PIO_mtq:signal: Received PIO_MTQ_SIG_COMPLETE, Waiting for async ops to complete"));
     /* Wait for all async ops in the queue to complete */
     while(sig_ == PIO_MTQ_SIG_COMPLETE){
       cv_sig_.wait(lk, [this]{ return (sig_ == PIO_MTQ_SIG_COMPLETE);}); 
@@ -142,7 +143,7 @@ void PIO_mtq<T>::thread_yield(std::unique_lock<std::mutex> &lk) const
    */
   const std::chrono::milliseconds ZERO_TIMEOUT = std::chrono::milliseconds(0);
   lk.unlock();
-  LOG((2, "PIO_mtq:thread_yield: Yielding for 0 secs"));
+  //LOG((2, "PIO_mtq:thread_yield: Yielding for 0 secs"));
   std::this_thread::sleep_for(ZERO_TIMEOUT);
   lk.lock();
 }
