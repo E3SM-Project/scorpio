@@ -1,6 +1,9 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+extern "C"{
+#include "pio_config.h"
+} // extern "C"
 #include "pio_async_mtq.hpp"
 #include "pio_async_tpool.hpp"
 extern "C"{
