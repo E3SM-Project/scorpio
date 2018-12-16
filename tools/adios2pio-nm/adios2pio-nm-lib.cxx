@@ -1117,9 +1117,6 @@ void ConvertBPFile(string infilepath, string outfilename, int pio_iotype, int io
 	int n_bp_writers;
 
 	try {
-
-		int save_imax = pio_get_imax();
-
 		/*
 		 * This assumes we are running the program in the same folder where 
 		 * the BP folder exists.
@@ -1277,8 +1274,6 @@ void ConvertBPFile(string infilepath, string outfilename, int pio_iotype, int io
 		             fflush(stdout);
 		     }
 		}
-	
-		pio_set_imax(save_imax);
 	
 		ret = PIOc_sync(ncid);
 		ret = PIOc_closefile(ncid);
