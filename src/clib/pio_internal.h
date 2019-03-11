@@ -163,7 +163,7 @@ extern "C" {
     int iotype_is_valid(int iotype);
 
     /* Print error message and abort. */
-    void piodie(const char *msg, const char *fname, int line);
+    void piodie(const char *fname, int line, const char *fmt, ...);
 
     /* Assert that an expression is true. */
     void pioassert(bool exp, const char *msg, const char *fname, int line);
