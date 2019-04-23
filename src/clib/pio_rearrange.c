@@ -812,6 +812,13 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
     /* Caller must provide these. */
     pioassert(ios && iodesc && nvars > 0, "invalid input", __FILE__, __LINE__);
 
+    if (ios->ioproc)
+    {
+#ifdef TIMING
+        GPTLstart("PIO:rearrange_comp2io_ioproc");
+#endif
+    }
+
     LOG((1, "rearrange_comp2io nvars = %d iodesc->rearranger = %d", nvars,
          iodesc->rearranger));
 
@@ -975,6 +982,13 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
         if (recvtypes[i] != PIO_DATATYPE_NULL)
             if ((mpierr = MPI_Type_free(&recvtypes[i])))
                 return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
+    }
+
+    if (ios->ioproc)
+    {
+#ifdef TIMING
+        GPTLstop("PIO:rearrange_comp2io_ioproc");
+#endif
     }
 
 #ifdef TIMING
