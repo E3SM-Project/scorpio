@@ -1072,6 +1072,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
     LOG((2, "wmb->num_arrays = %d arraylen = %d iodesc->mpitype_size = %d\n",
          wmb->num_arrays, arraylen, iodesc->mpitype_size));
 
+#if 0
     needsflush = PIO_wmb_needs_flush(wmb, arraylen, iodesc);
     assert(needsflush >= 0);
 
@@ -1097,6 +1098,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
                                 ios->comp_comm)))
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
     LOG((2, "needsflush = %d", needsflush));
+#endif
 
     if(!ios->async || !ios->ioproc)
     {
