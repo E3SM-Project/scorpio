@@ -1541,7 +1541,17 @@ int flush_output_buffer(file_desc_t *file, bool force, PIO_Offset addsize)
         }
 
         if (rcnt > 0)
+        {
+#ifdef TIMING
+            GPTLstart("flush_output_buffer_ncmpi_wait");
+#endif
+
             ierr = ncmpi_wait_all(file->fh, rcnt, request, status);
+
+#ifdef TIMING
+            GPTLstop("flush_output_buffer_ncmpi_wait");
+#endif
+        }
 
 #ifdef PIO_MICRO_TIMING
         ierr = mtimer_pause(tmp_mt, NULL);
