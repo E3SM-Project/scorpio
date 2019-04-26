@@ -323,6 +323,10 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                 /* Do this when we reach the last region. */
                 if (regioncnt == num_regions - 1)
                 {
+#ifdef TIMING
+                    GPTLstart("write_darray_multi_par_ncmpi_iput_varn");
+#endif
+
                     /* For each variable to be written. */
                     for (int nv = 0; nv < nvars; nv++)
                     {
@@ -360,6 +364,10 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
 
                         vdesc->nreqs++;
                     }
+
+#ifdef TIMING
+                    GPTLstop("write_darray_multi_par_ncmpi_iput_varn");
+#endif
 
                     /* Free resources. */
                     for (int i = 0; i < rrcnt; i++)
