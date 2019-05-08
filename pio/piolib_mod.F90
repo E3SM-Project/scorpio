@@ -69,6 +69,7 @@ module piolib_mod
        PIO_setframe,      &
        PIO_advanceframe,  &
        PIO_setdebuglevel, &
+       PIO_set_log_level, &
        PIO_seterrorhandling, &
        PIO_get_local_array_size, &
        PIO_freedecomp,     &
@@ -377,6 +378,20 @@ contains
     
     end if
   end subroutine setdebuglevel
+
+!>  
+!! @public
+!! @ingroup PIO_set_log_level
+!! @brief sets the level of debug information output to stdout by pio 
+!! @details
+!! @param level : default value is 0, allowed values 0-3
+!<
+  integer function PIO_set_log_level(level)
+    integer(i4), intent(in) :: level
+
+    call setdebuglevel(level)
+    PIO_set_log_level = PIO_NOERR
+  end function PIO_set_log_level
 
 !>
 !! @ingroup PIO_seterrorhandling

@@ -13,7 +13,8 @@ module pio
   use pio_kinds, only : pio_offset
 
   use piolib_mod, only : pio_initdecomp, pio_set_rearr_opts, &
-       pio_openfile, pio_closefile, pio_createfile, pio_setdebuglevel, &
+       pio_openfile, pio_closefile, pio_createfile,&
+       pio_setdebuglevel, pio_set_log_level,&
        pio_seterrorhandling, pio_setframe, pio_init, pio_get_local_array_size, &
        pio_freedecomp, pio_syncfile,pio_numtowrite,pio_numtoread,pio_setiotype, &
        pio_dupiodesc, pio_finalize, pio_set_hint, pio_getnumiotasks, pio_file_is_open, &
