@@ -2070,7 +2070,7 @@ contains
 !! @param io_comm    The io communicator 
 !! @param iosystem a derived type which can be used in subsequent pio operations (defined in PIO_types).
 !<
-  subroutine init_intercom(component_count, peer_comm, comp_comms, io_comm, iosystem, rearr_opts)
+  subroutine init_intercom(component_count, peer_comm, comp_comms, io_comm, iosystem, rearr, rearr_opts)
     use pio_types, only : pio_internal_error, pio_rearr_box
     integer, intent(in) :: component_count
     integer, intent(in) :: peer_comm
@@ -2078,6 +2078,7 @@ contains
     integer, intent(in) :: io_comm     !  The io communicator
 
     type (iosystem_desc_t), intent(out)  :: iosystem(component_count)  ! io descriptor to initalize
+    integer(i4), intent(in), optional :: rearr ! Adding rearr to be compatible with PIO2, this arg is ignored
     type (pio_rearr_opt_t), intent(in), optional :: rearr_opts
 
     integer :: ierr
