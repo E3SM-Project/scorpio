@@ -31,7 +31,7 @@ module piolib_mod
   !--------------
   use pio_support, only : piodie, debug, debugio, debugasync, checkmpireturn
   !
-  use ionf_mod, only : create_nf, open_nf,close_nf, sync_nf
+  use ionf_mod, only : create_nf, open_nf,close_nf, delete_nf, sync_nf
   use pionfread_mod, only : read_nf
   use pionfwrite_mod, only : write_nf
 #ifdef _COMPRESSION
@@ -63,6 +63,7 @@ module piolib_mod
        PIO_syncfile,      &
        PIO_createfile,    &
        PIO_closefile,     &
+       PIO_deletefile,    &
        PIO_setiotype,     &
        PIO_numtoread,     &
        PIO_numtowrite,    &
@@ -3079,6 +3080,45 @@ contains
 
   end subroutine closefile
 
+!> 
+!! @public
+!! @ingroup PIO_deletefile
+!! @brief Delete a file on disk
+!! @details
+!! @param iosystem : a defined pio system descriptor, see PIO_types
+!! @param filename : name of file to be deleted
+!< 
+  subroutine PIO_deletefile(ios, filename)
+    type(iosystem_desc_t), intent(inout) :: ios
+    character(len=*),intent(in)   :: filename
+
+    integer :: ierr, msg, flen
+
+#ifdef TIMING
+    call t_startf("PIO:PIO_deletefile")
+#endif
+    if(ios%async_interface .and. .not. ios%ioproc) then
+       msg = PIO_MSG_DELETE_FILE
+       flen = len_trim(filename)
+       if(ios%comp_rank==0) then
+          call mpi_send(msg, 1, mpi_integer, ios%ioroot, 1, ios%union_comm, ierr)
+       end if
+       call mpi_bcast(flen, 1, mpi_integer, ios%compmaster, ios%intercomm, ierr)
+       call mpi_bcast(filename, flen, mpi_character, ios%compmaster, ios%intercomm, ierr)
+    end if
+
+    if(debug .and. ios%io_rank==0) &
+      print *,__PIO_FILE__,__LINE__,'delete: ',filename
+
+    call MPI_Barrier(ios%io_comm, ierr)
+
+    ! Currently we only support deleting files for NetCDF/PnetCDF iotypes
+    ierr = delete_nf(ios, filename)
+
+#ifdef TIMING
+    call t_stopf("PIO:PIO_deletefile")
+#endif
+  end subroutine PIO_deletefile
 
   !******************************
   ! read_ascii

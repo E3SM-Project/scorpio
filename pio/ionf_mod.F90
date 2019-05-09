@@ -28,6 +28,7 @@ module ionf_mod
    public :: create_nf
    public :: open_nf 
    public :: close_nf 
+   public :: delete_nf 
    public :: sync_nf 
 
 contains 
@@ -276,6 +277,34 @@ contains
     file%fh=-1
     call check_netcdf(File, ierr,__PIO_FILE__,__LINE__)
   end function close_nf
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! delete_nf
+  !
+
+
+  integer function delete_nf(ios, filename) result(ierr)
+    type(iosystem_desc_t), intent(inout) :: ios
+    character(len=*),intent(in)   :: filename
+
+    ierr=PIO_noerr
+
+    ! All error conditions are treated as non-fatal/soft errors
+    if(ios%io_rank == 0) then
+       if(Debug) print *,__PIO_FILE__,__LINE__,': Deleting : ', trim(filename)
+#ifdef _NETCDF
+          ierr=nf90_delete(filename)
+#elif _PNETCDF
+          ierr=nfmpi_delete(filename)
+#else
+          !call piodie(__PIO_FILE__,__LINE__,'File delete error ',0,filename)
+          print *, __PIO_FILE__, ":", __LINE__, ": WARNING: Deleting files is not supported" 
+#endif
+      if(ierr /= PIO_NOERR) then
+        print *, __PIO_FILE__, ":", __LINE__, ": WARNING: Error deleting file : ", trim(filename), ", ierr = ", ierr
+      end if
+    end if
+  end function delete_nf
 
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!

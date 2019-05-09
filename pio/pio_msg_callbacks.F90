@@ -173,6 +173,38 @@ subroutine open_file_handler(iosystem)
 
 end subroutine open_file_handler
 
+subroutine delete_file_handler(iosystem)
+  use pio
+  use piolib_mod
+  use pio_kinds
+  use pio_msg_mod
+  use pio_support, only : debugAsync
+#ifndef NO_MPIMOD
+  use mpi !_EXTERNAL
+#endif
+  implicit none
+#ifdef NO_MPIMOD
+  include 'mpif.h' !_EXTERNAL
+#endif
+  type(iosystem_desc_t) :: iosystem
+
+  integer :: ierr
+  
+  character(len=:), allocatable :: fname
+  integer :: namelen
+
+
+  call mpi_bcast(namelen, 1, mpi_integer, iosystem%compmaster, iosystem%intercomm, ierr)
+  allocate(character(len=namelen):: fname )  
+  call mpi_bcast(fname, namelen, mpi_character, iosystem%compmaster, iosystem%intercomm, ierr)
+
+  call pio_deletefile(iosystem, fname)
+  deallocate(fname)
+
+  if(Debugasync) print *,__PIO_FILE__,__LINE__,": Deleted file : ", fname
+
+end subroutine delete_file_handler
+
 subroutine initdecomp_dof_handler(iosystem)
 
   use pio
