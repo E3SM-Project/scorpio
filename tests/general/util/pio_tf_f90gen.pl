@@ -607,9 +607,9 @@ sub get_default_test_main
   $out_line = $out_line . "  PROGRAM PIO_TF_Test_main_\n";
   $out_line = $out_line . "    USE pio_tutil\n";
   $out_line = $out_line . "    IMPLICIT NONE\n";
-  $out_line = $out_line . "    INTEGER, PARAMETER :: NREARRS = 2\n";
-  $out_line = $out_line . "    INTEGER :: rearrs(NREARRS) = (/pio_rearr_subset,pio_rearr_box/)\n";
-  $out_line = $out_line . "    CHARACTER(LEN=PIO_TF_MAX_STR_LEN) :: rearrs_info(NREARRS) = (/\"PIO_REARR_SUBSET\",\"PIO_REARR_BOX   \"/)\n";
+  $out_line = $out_line . "    INTEGER, PARAMETER :: NREARRS = 1\n";
+  $out_line = $out_line . "    INTEGER :: rearrs(NREARRS) = (/pio_rearr_box/)\n";
+  $out_line = $out_line . "    CHARACTER(LEN=PIO_TF_MAX_STR_LEN) :: rearrs_info(NREARRS) = (/\"PIO_REARR_BOX\"/)\n";
   $out_line = $out_line . "    INTEGER i, ierr\n";
   $out_line = $out_line . "\n";
   $out_line = $out_line . "    pio_tf_nerrs_total_=0\n";
