@@ -1,7 +1,7 @@
 #ifndef NO_C_SIZEOF
-#define TYPE_SIZEOF(x) (C_SIZEOF(x)/SIZE(x))
+#define TYPE_SIZEOF(buf, bbuf) (C_SIZEOF(buf)/SIZE(buf))
 #else
-#define TYPE_SIZEOF(x) (SIZE(TRANSFER(x,bbuf))/SIZE(x))
+#define TYPE_SIZEOF(buf, bbuf) (SIZE(TRANSFER(buf,bbuf))/SIZE(buf))
 #endif
 ! Get the iobuf size
 ! lbuf_sz -> local buffer size
@@ -141,7 +141,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_wr_mvar_impl_flush
   character(len=PIO_TF_MAX_STR_LEN), dimension(:), allocatable :: iotype_descs
   integer :: num_iotypes
 
-  type_sz = TYPE_SIZEOF(wbuf)
+  type_sz = TYPE_SIZEOF(wbuf, bbuf)
 
   do i=1,VEC_LOCAL_SZ
     compdof_rel_disps(i) = i
@@ -389,7 +389,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_wr_after_impl_flush
   character(len=PIO_TF_MAX_STR_LEN), dimension(:), allocatable :: iotype_descs
   integer :: num_iotypes
 
-  type_sz = TYPE_SIZEOF(wbuf)
+  type_sz = TYPE_SIZEOF(wbuf, bbuf)
 
   do i=1,VEC_LOCAL_SZ
     compdof_rel_disps(i) = i
