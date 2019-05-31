@@ -50,6 +50,16 @@ function (platform_name RETURN_VARIABLE)
 
         set (${RETURN_VARIABLE} "alcf_theta" PARENT_SCOPE)
 
+    # LCRC machines - anvil and blues
+    elseif (SITENAME MATCHES "^blues")
+
+        set (${RETURN_VARIABLE} "lcrc" PARENT_SCOPE)
+
+    # LCRC machine - bebop
+    elseif (SITENAME MATCHES "^bebop")
+
+        set (${RETURN_VARIABLE} "lcrc" PARENT_SCOPE)
+
     # NERSC Machines
     elseif (SITENAME MATCHES "^edison" OR
         SITENAME MATCHES "^cori")
@@ -68,8 +78,12 @@ function (platform_name RETURN_VARIABLE)
         set (${RETURN_VARIABLE} "olcf" PARENT_SCOPE)
         
     else ()
-
-        set (${RETURN_VARIABLE} "unknown" PARENT_SCOPE)
+        cmake_host_system_information (RESULT FQDN_SITENAME QUERY FQDN)
+        if (FQDN_SITENAME MATCHES "^.*summit[.]olcf")
+            set (${RETURN_VARIABLE} "summit" PARENT_SCOPE)
+        else()
+            set (${RETURN_VARIABLE} "unknown" PARENT_SCOPE)
+        endif ()
     
     endif ()
 

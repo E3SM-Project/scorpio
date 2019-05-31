@@ -60,7 +60,8 @@ module nf_mod
        pio_inq_varndims,   &
        pio_inq_vardimid,   &
        pio_inq_varnatts,   &
-       pio_inquire_variable
+       pio_inquire_variable,&
+       pio_inq_dimlen
 !>
 !! \defgroup PIO_def_var
 !<
@@ -148,6 +149,14 @@ module nf_mod
   end interface
 
 !>
+!! \defgroup PIO_inq_dimlen
+!<
+   interface pio_inq_dimlen
+     module procedure inquire_dimlen, inquire_dimlen_pio2
+   end interface
+  
+
+!>
 !! @defgroup PIO_def_dim
 !<
    public :: PIO_def_dim
@@ -176,11 +185,6 @@ module nf_mod
 !! \defgroup PIO_inq_dimname
 !<
    public :: PIO_inq_dimname
-
-!>
-!! \defgroup PIO_inq_dimlen
-!<
-   public :: PIO_inq_dimlen
 
 !>
 !! \defgroup PIO_inquire_dimension
@@ -1380,7 +1384,7 @@ contains
 !! @param dimlen : The extent of the netcdf dimension.
 !! @retval ierr @copydoc error_return
 !>
-  integer function pio_inq_dimlen(File,dimid,dimlen) result(ierr)
+  integer function inquire_dimlen(File,dimid,dimlen) result(ierr)
 
     type (File_desc_t), intent(in) :: File
     integer(i4)     , intent(in)   :: dimid
@@ -1442,7 +1446,20 @@ contains
     end if
 
 
-  end function pio_inq_dimlen
+  end function inquire_dimlen
+
+  integer function inquire_dimlen_pio2(File,dimid,dimlen) result(ierr)
+
+    type (File_desc_t), intent(in) :: File
+    integer(i4)     , intent(in)   :: dimid
+    integer(pio_offset)     , intent(out)  :: dimlen !dimension name
+
+    integer :: idimlen
+
+    ierr = inquire_dimlen(File, dimid, idimlen)
+    dimlen = int(idimlen,pio_offset)
+
+  end function inquire_dimlen_pio2
 
 !> 
 !! @public

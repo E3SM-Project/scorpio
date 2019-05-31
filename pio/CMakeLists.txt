@@ -28,6 +28,17 @@ IF(${WITH_CSIZEOF} STREQUAL FALSE)
     SET(bld_PIO_DEFINITIONS ${bld_PIO_DEFINITIONS} -DNO_C_SIZEOF)
 endif()
 
+# MPI
+if (PIO_USE_MPISERIAL)
+  find_package (MPISERIAL COMPONENTS Fortran REQUIRED)
+  if (MPISERIAL_Fortran_FOUND)
+    set (CMAKE_REQUIRED_INCLUDES ${MPISERIAL_Fortran_INCLUDE_DIRS})
+  endif ()
+else ()
+  find_package (MPI REQUIRED)
+  set (CMAKE_REQUIRED_INCLUDES ${MPI_INCLUDE_PATH})
+endif ()
+
 # Netcdf is required
 #SET (NETCDF_FIND_COMPONENTS F90)
 FIND_PACKAGE(NetCDF "4.3.3" COMPONENTS C Fortran)
@@ -190,7 +201,14 @@ TARGET_LINK_LIBRARIES(pio ${PnetCDF_Fortran_LIBRARIES})
 TARGET_LINK_LIBRARIES(pio ${NetCDF_Fortran_LIBRARIES})
 TARGET_LINK_LIBRARIES(pio ${ADDITIONAL_LIBS})
 
+add_custom_target(tests)
+
 if(PIO_ENABLE_TESTS)
+  enable_testing()
+  include (CTest)
+  if(EXISTS ${CMAKE_SOURCE_DIR}/tests/general)
+    ADD_SUBDIRECTORY(${CMAKE_SOURCE_DIR}/tests/general general)
+  endif()
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../unittests)
     ADD_SUBDIRECTORY(../unittests unittests)
   endif()

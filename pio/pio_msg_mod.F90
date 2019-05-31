@@ -15,6 +15,7 @@ module pio_msg_mod
    integer, parameter, public :: pio_msg_create_file = 300
    integer, parameter, public :: pio_msg_open_file = 301
    integer, parameter, public :: pio_msg_close_file = 302
+   integer, parameter, public :: pio_msg_delete_file = 303
    integer, parameter, public :: pio_msg_def_dim = 310
    integer, parameter, public :: pio_msg_def_var = 312
    integer, parameter, public :: pio_msg_enddef = 313
@@ -157,6 +158,8 @@ contains
           call create_file_handler(ios)
        case (PIO_MSG_OPEN_FILE)
           call open_file_handler(ios)
+       case (PIO_MSG_DELETE_FILE)
+          call delete_file_handler(ios)
        case (PIO_MSG_INITDECOMP_DOF)
           call initdecomp_dof_handler(ios)
        case (PIO_MSG_WRITEDARRAY)
