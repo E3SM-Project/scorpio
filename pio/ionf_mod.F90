@@ -152,6 +152,8 @@ contains
     type (File_desc_t), intent(inout) :: File
     character(len=*), intent(in)      :: fname
     integer(i4), optional, intent(in) :: mode
+    character(len=*), parameter :: UFS_PREFIX = "ufs:"
+    character(len=PIO_MAX_NAME) :: ufs_fname
     integer(i4) :: iotype, amode , mpierr, ier2
     integer :: tmpfh, format
 
@@ -175,12 +177,14 @@ contains
 #endif
 #ifdef _PNETCDF
        if(iotype==PIO_iotype_pnetcdf) then
+          write(ufs_fname, *) UFS_PREFIX, trim(fname)
+          !print *, "Trying to open : ", trim(ufs_fname)
           if(present(mode)) then
              amode = mode
           else
              amode = NF_NOWRITE
           end if
-          ierr  = nfmpi_open(File%iosystem%IO_comm,fname,amode,File%iosystem%info,File%fh)
+          ierr  = nfmpi_open(File%iosystem%IO_comm,trim(ufs_fname),amode,File%iosystem%info,File%fh)
 #ifdef _NETCDF
 #ifdef _NETCDF4
           if(ierr /= PIO_NOERR) then    ! try hdf5 format
