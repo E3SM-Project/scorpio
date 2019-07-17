@@ -163,7 +163,10 @@ int pio_delete_file_from_list(int ncid)
             /* Free the varlist entries for this file. */
             while (cfile->varlist2)
                 if ((ret = delete_var_desc(cfile->varlist2->varid, &cfile->varlist2)))
-                    return pio_err(NULL, cfile, ret, __FILE__, __LINE__);
+                {
+                    return pio_err(NULL, cfile, ret, __FILE__, __LINE__,
+                                    "Internal error while deleting file (%s, ncid=%d) from internal list. Deleting variable information (vardesc for varid=%d) cached in the file", pio_get_fname_from_file(cfile), ncid, cfile->varlist2->varid);
+                }
 
             free(cfile->unlim_dimids);
             /* Free the memory used for this file. */
