@@ -325,6 +325,8 @@ module pio_types
 !!  - PIO_int :  4-byte integers
 !!  - PIO_char : character
 !<
+   integer, public, parameter :: PIO_MAX_NAME_UB = 1024
+   integer, public, parameter :: PIO_MAX_VAR_DIMS_UB = 1024
 #ifdef _PNETCDF
 #ifndef USE_PNETCDF_MOD
 #include <pnetcdf.inc>   /* _EXTERNAL */
@@ -341,8 +343,8 @@ module pio_types
    integer, public, parameter :: PIO_CLOBBER = nf_clobber	
    integer, public, parameter :: PIO_NOCLOBBER = nf_NOclobber	
    integer, public, parameter :: PIO_NOFILL = nf_nofill
-   integer, public, parameter :: PIO_MAX_NAME = nf_max_name
-   integer, public, parameter :: PIO_MAX_VAR_DIMS = nf_max_var_dims
+   integer, public, parameter :: PIO_MAX_NAME = min(nf_max_name, PIO_MAX_NAME_UB)
+   integer, public, parameter :: PIO_MAX_VAR_DIMS = min(nf_max_var_dims, PIO_MAX_VAR_DIMS_UB)
    integer, public, parameter :: PIO_64BIT_OFFSET = nf_64bit_offset
    integer, public, parameter :: PIO_64BIT_DATA = nf_64bit_data
    integer, public, parameter :: PIO_FILL_CHAR = nf_fill_char
@@ -364,8 +366,8 @@ module pio_types
    integer, public, parameter :: PIO_CLOBBER = nf90_clobber	
    integer, public, parameter :: PIO_NOCLOBBER = nf90_NOclobber	
    integer, public, parameter :: PIO_NOFILL = nf90_nofill
-   integer, public, parameter :: PIO_MAX_NAME = nf90_max_name
-   integer, public, parameter :: PIO_MAX_VAR_DIMS = nf90_max_var_dims
+   integer, public, parameter :: PIO_MAX_NAME = min(nf90_max_name, PIO_MAX_NAME_UB)
+   integer, public, parameter :: PIO_MAX_VAR_DIMS = min(nf90_max_var_dims, PIO_MAX_VAR_DIMS_UB)
    integer, public, parameter :: PIO_64BIT_OFFSET = nf90_64bit_offset
    integer, public, parameter :: PIO_64BIT_DATA = 0
    integer, public, parameter :: PIO_FILL_CHAR = nf90_fill_char
