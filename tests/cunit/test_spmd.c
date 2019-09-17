@@ -214,7 +214,7 @@ int test_lists()
         return ERR_WRONG;
     if (pio_delete_iosystem_from_list(42) != PIO_EBADID)
         return ERR_WRONG;
-    if (pio_delete_file_from_list(42) != PIO_EBADID)
+    if (pio_delete_file_from_list(42, NULL) != PIO_EBADID)
         return ERR_WRONG;
     if (pio_get_file(42, NULL) != PIO_EINVAL)
         return ERR_WRONG;

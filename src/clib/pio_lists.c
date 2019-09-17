@@ -123,13 +123,47 @@ int pio_get_file(int ncid, file_desc_t **cfile1)
 }
 
 /** 
+ * Free a file
+ *
+ * @param file Pointer to file_desc_t associated with the file
+ * @returns 0 for success, error code otherwise
+ */
+int pio_free_file(file_desc_t *file)
+{
+    int ret;
+
+    /* Free any fill values that were allocated. */
+    for (int v = 0; v < PIO_MAX_VARS; v++)
+    {
+        if (file->varlist[v].fillvalue)
+        {
+            free(file->varlist[v].fillvalue);
+        }
+#ifdef PIO_MICRO_TIMING
+        mtimer_destroy(&(file->varlist[v].rd_mtimer));
+        mtimer_destroy(&(file->varlist[v].rd_rearr_mtimer));
+        mtimer_destroy(&(file->varlist[v].wr_mtimer));
+        mtimer_destroy(&(file->varlist[v].wr_rearr_mtimer));
+#endif
+    }
+
+    free(file->unlim_dimids);
+
+    /* Free the memory used for this file. */
+    free(file);
+    
+    return PIO_NOERR;
+}
+
+/** 
  * Delete a file from the list of open files.
+ * Note: The file is deleted from the list but not freed
  *
  * @param ncid ID of file to delete from list
  * @returns 0 for success, error code otherwise
  * @author Jim Edwards, Ed Hartnett
  */
-int pio_delete_file_from_list(int ncid)
+int pio_delete_file_from_list(int ncid, file_desc_t **filep)
 {
     file_desc_t *cfile, *pfile = NULL;
 
@@ -146,23 +180,11 @@ int pio_delete_file_from_list(int ncid)
             if (current_file == cfile)
                 current_file = pfile;
 
-            /* Free any fill values that were allocated. */
-            for (int v = 0; v < PIO_MAX_VARS; v++)
+            if(filep)
             {
-                if (cfile->varlist[v].fillvalue)
-                    free(cfile->varlist[v].fillvalue);
-#ifdef PIO_MICRO_TIMING
-                mtimer_destroy(&(cfile->varlist[v].rd_mtimer));
-                mtimer_destroy(&(cfile->varlist[v].rd_rearr_mtimer));
-                mtimer_destroy(&(cfile->varlist[v].wr_mtimer));
-                mtimer_destroy(&(cfile->varlist[v].wr_rearr_mtimer));
-#endif
+                *filep = cfile;
             }
 
-            free(cfile->unlim_dimids);
-            /* Free the memory used for this file. */
-            free(cfile);
-            
             return PIO_NOERR;
         }
         pfile = cfile;

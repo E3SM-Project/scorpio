@@ -472,13 +472,33 @@ int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file)
                         "Closing file (%s, ncid=%d) failed. Underlying I/O library (iotype=%s) call failed", pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
     }
 
+    int file_ncid = file->pio_ncid;
+#if PIO_USE_ASYNC_WR_THREAD
+    /* The file has already been deleted from the list, free the file */
+    ierr = pio_free_file(file);
+    if(ierr != PIO_NOERR)
+    {
+        return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                        "Closing file (%s, ncid=%d) failed. Freeing internal file structure failed", pio_get_fname_from_file(file), file->pio_ncid);
+    }
+#else
     /* Delete file from our list of open files. */
-    ierr = pio_delete_file_from_list(file->pio_ncid);
+    ierr = pio_delete_file_from_list(file_ncid, NULL);
     if(ierr != PIO_NOERR)
     {
         return pio_err(ios, file, ierr, __FILE__, __LINE__,
                         "Closing file (%s, ncid=%d) failed. Deleting file from the list of open files failed", pio_get_fname_from_file(file), file->pio_ncid);
     }
+
+    /* Free the file */
+    ierr = pio_free_file(file);
+    if(ierr != PIO_NOERR)
+    {
+        LOG((1, "Error freeing file (id=%d) from the file list", file_ncid));
+        return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                        "Closing file (%s, ncid=%d) failed. Freeing internal file structure failed", pio_get_fname_from_file(file), file->pio_ncid);
+    }
+#endif
 
     return PIO_NOERR;
 }
@@ -494,6 +514,17 @@ int PIO_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
     int ierr = PIO_NOERR;
 
     assert(ios && file);
+#if PIO_USE_ASYNC_WR_THREAD
+    /* Delete file from our list of open files. */
+    ierr = pio_delete_file_from_list(file->pio_ncid, NULL);
+    if(ierr != PIO_NOERR)
+    {
+        LOG((1, "Error deleting file (id=%d) from the file list", file->pio_ncid));
+        return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                        "Closing file (%s, ncid=%d) failed. Soft close of the file failed (iosysid=%d). Deleting file from the internal file list failed", pio_get_fname_from_file(file), file->pio_ncid, ios->iosysid);
+    }
+#endif
+
     if(file->nasync_pend_ops > 0){
 #if PIO_USE_ASYNC_WR_THREAD
         /* Queue up the pending async ops on the file to the async thread pool */
