@@ -595,17 +595,20 @@ int PIOc_closefile(int ncid)
         return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
                         "Closing file (ncid=%d) failed. Invalid file id. Unable to find internal structure associated with the file id", ncid);
     }
+
+    /* Is the file open for writing? */
+    bool is_fopen_for_write = (file->mode & PIO_WRITE) ? true : false;
     ios = file->iosystem;
 
 #ifdef TIMING
-    if (file->mode & PIO_WRITE)
+    if (is_fopen_for_write)
         GPTLstart("PIO:PIOc_closefile_write_mode");
 #endif
 
     /* Sync changes before closing on all tasks if async is not in
      * use, but only on non-IO tasks if async is in use. */
     if (!ios->async || !ios->ioproc)
-        if (file->mode & PIO_WRITE)
+        if (is_fopen_for_write)
             sync_file(ncid);
 
     /* If async is in use and this is a comp tasks, then the compmaster
@@ -644,7 +647,7 @@ int PIOc_closefile(int ncid)
 #endif /* PIO_ENABLE_SOFT_CLOSE */
 
 #ifdef TIMING
-    if (file->mode & PIO_WRITE)
+    if (is_fopen_for_write)
         GPTLstop("PIO:PIOc_closefile_write_mode");
 #endif
 
