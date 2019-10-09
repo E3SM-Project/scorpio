@@ -210,15 +210,15 @@ int test_lists()
     file_desc_t *fdesc;
     
     /* Test that bad input is correctly rejected. */
-    if (pio_delete_iodesc_from_list(42) != PIO_EBADID)
+    if (pio_delete_iodesc_from_list(42) == PIO_NOERR)
         return ERR_WRONG;
-    if (pio_delete_iosystem_from_list(42) != PIO_EBADID)
+    if (pio_delete_iosystem_from_list(42) == PIO_NOERR)
         return ERR_WRONG;
-    if (pio_delete_file_from_list(42, NULL) != PIO_EBADID)
+    if (pio_delete_file_from_list(42, NULL) == PIO_NOERR)
         return ERR_WRONG;
-    if (pio_get_file(42, NULL) != PIO_EINVAL)
+    if (pio_get_file(42, NULL) == PIO_NOERR)
         return ERR_WRONG;
-    if (pio_get_file(42, &fdesc) != PIO_EBADID)
+    if (pio_get_file(42, &fdesc) == PIO_NOERR)
         return ERR_WRONG;
     return 0;
 }
