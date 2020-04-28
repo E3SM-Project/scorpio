@@ -197,6 +197,13 @@ if("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "GNU")
 endif()
 
 ADD_LIBRARY(pio ${SRCS_F90} ${SRCS_C} ${TEMPSRCF90})
+
+# At least on Titan + Cray MPI MPI_Irsends are buggy
+# causing hangs during I/O
+# Disable MPI_Irsends by default and using MPI_Isends
+# instead
+TARGET_COMPILE_DEFINITIONS(pio PRIVATE _NO_MPI_RSEND)
+
 TARGET_LINK_LIBRARIES(pio ${PnetCDF_Fortran_LIBRARIES})
 TARGET_LINK_LIBRARIES(pio ${NetCDF_Fortran_LIBRARIES})
 TARGET_LINK_LIBRARIES(pio ${ADDITIONAL_LIBS})
