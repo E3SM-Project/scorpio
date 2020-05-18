@@ -14,6 +14,9 @@ module pionfatt_mod
   use pio_support, only : piodie, checkmpireturn, debug, debugasync
   use pio_utils, only : check_netcdf, bad_iotype
 
+#ifdef TIMING
+    use perf_mod, only : t_startf, t_stopf     ! _EXTERNAL
+#endif
 #ifdef _NETCDF
     use netcdf      ! _EXTERNAL
 #endif
@@ -97,6 +100,10 @@ contains
     integer :: iotype, mpierr, msg, itype
     integer ::  clen=1, nlen
 
+#ifdef TIMING
+    call t_startf("PIO:PIO_put_att_{TYPE}")
+#endif
+
     iotype = File%iotype
     ierr=PIO_noerr
 
@@ -168,6 +175,9 @@ contains
        end select
     endif
     call check_netcdf(File, ierr,__PIO_FILE__,__LINE__)
+#ifdef TIMING
+    call t_stopf("PIO:PIO_put_att_{TYPE}")
+#endif
   end function put_att_{TYPE}
 
 !pl The next line is needed by genf90.pl, do not remove it.
@@ -202,6 +212,9 @@ contains
     integer :: iotype, mpierr, msg
     integer ::  clen, itype, nlen
 
+#ifdef TIMING
+    call t_startf("PIO:PIO_put_att_1d_{TYPE}")
+#endif
     iotype = File%iotype
     ierr=PIO_noerr
     clen = size(value)
@@ -260,6 +273,9 @@ contains
        end select
     endif
     call check_netcdf(File, ierr,__PIO_FILE__,__LINE__)
+#ifdef TIMING
+    call t_stopf("PIO:PIO_put_att_1d_{TYPE}")
+#endif
   end function put_att_1d_{TYPE}
 
 !>
@@ -384,6 +400,9 @@ contains
     integer :: iotype, mpierr, msg
     integer :: clen=1, itype, nlen
 
+#ifdef TIMING
+    call t_startf("PIO:PIO_get_att_{TYPE}")
+#endif
     iotype = File%iotype
     ierr=PIO_noerr
 #if ({ITYPE} == TYPETEXT)	
@@ -437,6 +456,9 @@ contains
        call MPI_BCAST(value, clen, {MPITYPE},Ios%iomaster,Ios%my_comm, mpierr)
        call CheckMPIReturn(subName, mpierr)
     end if
+#ifdef TIMING
+    call t_stopf("PIO:PIO_get_att_{TYPE}")
+#endif
   end function get_att_{TYPE}
 
 ! TYPE real,int,double
@@ -466,6 +488,9 @@ contains
     integer :: iotype, mpierr, msg
     integer :: clen, itype, nlen
 
+#ifdef TIMING
+    call t_startf("PIO:PIO_get_att_1d_{TYPE}")
+#endif
     iotype = File%iotype
     ierr=PIO_noerr
     clen = size(value)
@@ -517,6 +542,9 @@ contains
        call CheckMPIReturn(subName, mpierr)
     end if
 
+#ifdef TIMING
+    call t_stopf("PIO:PIO_get_att_1d_{TYPE}")
+#endif
   end function get_att_1d_{TYPE}
 
 

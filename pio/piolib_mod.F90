@@ -2935,6 +2935,9 @@ contains
     type(iosystem_desc_t), pointer :: ios
      
  
+#ifdef TIMING
+    call t_startf("PIO:PIO_syncfile")
+#endif
     ios => file%iosystem
     if(ios%async_interface .and. .not. ios%ioproc) then
        msg = PIO_MSG_SYNC_FILE
@@ -2952,6 +2955,9 @@ contains
     case(pio_iotype_pbinary, pio_iotype_direct_pbinary)
     case(pio_iotype_binary) 
     end select
+#ifdef TIMING
+    call t_stopf("PIO:PIO_syncfile")
+#endif
   end subroutine syncfile
 !> 
 !! @public 
