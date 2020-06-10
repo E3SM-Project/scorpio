@@ -81,19 +81,8 @@ else ()
 endif ()
 
 #===== ADIOS-C =====
-if (WITH_ADIOS)
-  find_package (ADIOS "1.10.0")
-endif ()
-if (ADIOS_FOUND)
-  target_include_directories (spio_finfo.exe
-    PRIVATE ${ADIOS_INCLUDE_DIRS})
-  target_compile_definitions (spio_finfo.exe
-    PRIVATE _ADIOS)
-  target_link_libraries (spio_finfo.exe
-    PRIVATE ${ADIOS_LIBRARIES})
-else ()
-  target_compile_definitions (spio_finfo.exe
-    PRIVATE _NOADIOS)
+if (WITH_ADIOS2)
+  find_package (ADIOS2 ${ADIOS_MIN_VER_REQD})
 endif ()
 
 #===== Add EXTRAs =====
