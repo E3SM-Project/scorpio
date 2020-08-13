@@ -241,7 +241,9 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
      * and write (or read). The buffer size on io task 0 must be as
      * large as the largest used to accommodate this serial io
      * method.  */
-    rlen = iodesc->maxiobuflen * nvars;
+    rlen = 0;
+    if (iodesc->llen > 0)
+        rlen = iodesc->maxiobuflen * nvars;
 
 #ifdef PIO_MICRO_TIMING
     bool var_mtimer_was_running[nvars];
@@ -275,11 +277,26 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
     /* Allocate iobuf. */
     if (rlen > 0)
     {
+        if (ios->io_rank == 0)
+        {
+            printf("[DEBUG] PIOc_write_darray_multi, file = %s, comptasks = %d, iotasks = %d, aiotasks = %d, ioid = %d, nvars = %d, rlen = %ld, trying to allocate %ld bytes of memory.\n",
+                   file->fname, ios->num_comptasks, ios->num_iotasks, iodesc->num_aiotasks, ioid, nvars, rlen, rlen * iodesc->mpitype_size);
+            for (int d = 0; d < iodesc->ndims; d++)
+                printf("dimlen[%d] = %d ", d, iodesc->dimlen[d]);
+            printf("\n");
+            fflush(stdout);
+        }
         /* Allocate memory for the buffer for all vars/records. */
         if (!(file->iobuf[ioid - PIO_IODESC_START_ID] = bget(iodesc->mpitype_size * rlen)))
         {
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
                             "Writing multiple variables to file (%s, ncid=%d) failed. Out of memory (Trying to allocate %lld bytes for rearranged data for multiple variables with the same decomposition)", pio_get_fname_from_file(file), ncid, (unsigned long long)(iodesc->mpitype_size * rlen));
+        }
+        if (ios->io_rank == 0)
+        {
+            printf("[DEBUG] PIOc_write_darray_multi, file = %s, allocated %ld bytes for IO buffer.\n",
+                   file->fname, rlen * iodesc->mpitype_size);
+            fflush(stdout);
         }
         LOG((3, "allocated %lld bytes for variable buffer", rlen * iodesc->mpitype_size));
 
