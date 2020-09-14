@@ -150,6 +150,10 @@ CONTAINS
     call MPI_Bcast(ival, ilen, {MPITYPE} , File%iosystem%IOMaster, File%iosystem%MY_comm, mpierr)
     call CheckMPIReturn(subName, mpierr)
 
+#if ({ITYPE} == TYPETEXT)
+    call Cstring2Fstring_0d(ival)
+#endif
+
 #ifdef TIMING
     call t_stopf("PIO:pio_get_var1_{TYPE}")
 #endif
@@ -292,7 +296,9 @@ CONTAINS
        call CheckMPIReturn(subName, mpierr)
     end if
 
-
+#if ({ITYPE} == TYPETEXT)
+    call Cstring2Fstring_{DIMS}d(ival)
+#endif
 
 #ifdef TIMING
     call t_stopf("PIO:pio_get_vara_{DIMS}d_{TYPE}")
@@ -428,6 +434,11 @@ CONTAINS
        call MPI_Bcast(ival,int(isize), {MPITYPE} , ios%IOMaster, ios%My_comm, mpierr)
        call CheckMPIReturn(subName, mpierr)
     end if
+
+#if ({ITYPE} == TYPETEXT)
+    call Cstring2Fstring_{DIMS}d(ival)
+#endif
+
 #ifdef TIMING
     call t_stopf("PIO:pio_get_var_{DIMS}d_{TYPE}")
 #endif
@@ -453,4 +464,124 @@ CONTAINS
     ierr = get_var_{DIMS}d_{TYPE} (File, vardesc%varid, ival)
 
   end function get_var_vdesc_{DIMS}d_{TYPE}
+
+! DIMS 0,1,2,3,4,5
+  subroutine Cstring2Fstring_{DIMS}d(fstr)
+    use iso_c_binding
+    character(len=*), intent(inout) :: fstr{DIMSTR}
+
+#if {DIMS} != 0
+    integer :: fstr_dim_sz({DIMS})
+#endif
+    integer :: max_flen
+    integer :: i, j, k, m, n, q
+
+    character, parameter :: F_SPACE_CHAR = ' '
+
+#if {DIMS} != 0
+    do i=1,{DIMS}
+      fstr_dim_sz(i) = size(fstr,i)
+    enddo
+#endif
+
+    ! Replace C nulls at the end of a string, if any,
+    ! with spaces. This allows Fortran programs using
+    ! Scorpio classic (that uses Fortran interfaces
+    ! to the low-level I/O libraries) to read text
+    ! variables written out by programs using Scorpio
+    ! (that uses C interfaces to the low-level I/O
+    ! libraries)
+#if {DIMS} == 0
+    max_flen= len(fstr)
+    do i=max_flen,1,-1
+      if(fstr(i:i) == C_NULL_CHAR) then
+        fstr(i:i) = F_SPACE_CHAR
+      else
+        exit
+      end if
+    end do
+#endif
+#if {DIMS} == 1
+    max_flen= len(fstr(1))
+    do j=1,fstr_dim_sz(1)
+      do i=max_flen,1,-1
+        if(fstr(j)(i:i) == C_NULL_CHAR) then
+          fstr(j)(i:i) = F_SPACE_CHAR
+        else
+          exit
+        end if
+      end do
+    enddo
+#endif
+#if {DIMS} == 2
+    max_flen= len(fstr(1,1))
+    do k=1,fstr_dim_sz(2)
+      do j=1,fstr_dim_sz(1)
+        do i=max_flen,1,-1
+          if(fstr(j,k)(i:i) == C_NULL_CHAR) then
+            fstr(j,k)(i:i) = F_SPACE_CHAR
+          else
+            exit
+          end if
+        end do
+      enddo ! do j=1,fstr_dim_sz(1)
+    enddo ! do k=1,fstr_dim_sz(2)
+#endif
+#if {DIMS} == 3
+    max_flen= len(fstr(1,1,1))
+    do m=1,fstr_dim_sz(3)
+      do k=1,fstr_dim_sz(2)
+        do j=1,fstr_dim_sz(1)
+          do i=max_flen,1,-1
+            if(fstr(j,k,m)(i:i) == C_NULL_CHAR) then
+              fstr(j,k,m)(i:i) = F_SPACE_CHAR
+            else
+              exit
+            end if
+          end do
+        enddo ! do j=1,fstr_dim_sz(1)
+      enddo ! do k=1,fstr_dim_sz(2)
+    enddo ! do m=1,fstr_dim_sz(3)
+#endif
+#if {DIMS} == 4
+    max_flen= len(fstr(1,1,1,1))
+    do n=1,fstr_dim_sz(4)
+      do m=1,fstr_dim_sz(3)
+        do k=1,fstr_dim_sz(2)
+          do j=1,fstr_dim_sz(1)
+            do i=max_flen,1,-1
+              if(fstr(j,k,m,n)(i:i) == C_NULL_CHAR) then
+                fstr(j,k,m,n)(i:i) = F_SPACE_CHAR
+              else
+                exit
+              end if
+            end do
+          enddo ! do j=1,fstr_dim_sz(1)
+        enddo ! do k=1,fstr_dim_sz(2)
+      enddo ! do m=1,fstr_dim_sz(3)
+    enddo ! do n=1,fstr_dim_sz(4)
+#endif
+#if {DIMS} == 5
+    max_flen= len(fstr(1,1,1,1,1))
+    do q=1,fstr_dim_sz(5)
+      do n=1,fstr_dim_sz(4)
+        do m=1,fstr_dim_sz(3)
+          do k=1,fstr_dim_sz(2)
+            do j=1,fstr_dim_sz(1)
+              do i=max_flen,1,-1
+                if(fstr(j,k,m,n,q)(i:i) == C_NULL_CHAR) then
+                  fstr(j,k,m,n,q)(i:i) = F_SPACE_CHAR
+                else
+                  exit
+                end if
+              end do
+            enddo ! do j=1,fstr_dim_sz(1)
+          enddo ! do k=1,fstr_dim_sz(2)
+        enddo ! do m=1,fstr_dim_sz(3)
+      enddo ! do n=1,fstr_dim_sz(4)
+    enddo ! do q=1,fstr_dim_sz(5)
+#endif
+
+  end subroutine Cstring2Fstring_{DIMS}d
+
 end module pionfget_mod
