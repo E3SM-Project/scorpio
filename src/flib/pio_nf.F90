@@ -1702,7 +1702,7 @@ contains
     end interface
 
     ierr = PIOc_set_chunk_cache(iosysid, iotype, chunk_cache_size, chunk_cache_nelems, &
-         chunk_cache_preemption)
+         real(chunk_cache_preemption,kind=c_float))
   end function set_chunk_cache
 
 !>
@@ -1718,6 +1718,8 @@ contains
     integer(kind=PIO_OFFSET_KIND), intent(out) :: chunk_cache_nelems
     real, intent(out) :: chunk_cache_preemption
 
+    real(kind=c_float) :: tmp
+
     interface
        integer (C_INT) function PIOc_get_chunk_cache(iosysid, iotype, chunk_cache_size, &
             chunk_cache_nelems, chunk_cache_preemption) &
@@ -1732,7 +1734,8 @@ contains
     end interface
 
     ierr = PIOc_get_chunk_cache(iosysid, iotype, chunk_cache_size, chunk_cache_nelems, &
-         chunk_cache_preemption)
+         tmp)
+    chunk_cache_preemption = tmp
   end function get_chunk_cache
 
 !>
@@ -1762,7 +1765,7 @@ contains
     end interface
 
     ierr = PIOc_set_var_chunk_cache(file%fh, varid-1, chunk_cache_size, &
-         chunk_cache_nelems, chunk_cache_preemption)
+         chunk_cache_nelems, real(chunk_cache_preemption,kind=c_float))
   end function set_var_chunk_cache_id
 
   !>
@@ -1812,6 +1815,7 @@ contains
     integer(PIO_OFFSET_KIND), intent(out) :: chunk_cache_nelems
     real, intent(out) :: chunk_cache_preemption
 
+    real(kind=c_float) :: tmp
     interface
        integer (C_INT) function PIOc_get_var_chunk_cache(ncid, varid, &
             chunk_cache_size, chunk_cache_nelems, chunk_cache_preemption) &
@@ -1826,7 +1830,8 @@ contains
     end interface
 
     ierr = PIOc_get_var_chunk_cache(file%fh, varid-1, chunk_cache_size, &
-         chunk_cache_nelems, chunk_cache_preemption)
+         chunk_cache_nelems, tmp)
+    chunk_cache_preemption = tmp
   end function get_var_chunk_cache_id
 
 !>
