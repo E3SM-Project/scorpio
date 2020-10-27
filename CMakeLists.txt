@@ -31,8 +31,8 @@ option (PIO_SAVE_DECOMPS     "Dump the decomposition information"           OFF)
 option (PIO_LIMIT_CACHED_IO_REGIONS  "Limit the number of non-contiguous regions in an IO process" OFF)
 option (WITH_PNETCDF         "Require the use of PnetCDF"                   ON)
 option (WITH_NETCDF          "Require the use of NetCDF"                    ON)
-option (WITH_ADIOS2          "Require the use of ADIOS 2.x"                 OFF)
-option (ADIOS_BP2NC_TEST     "Enable testing of BP to NetCDF conversion"    OFF)
+option (WITH_ADIOS2          "Require the use of ADIOS 2.x"                 ON)
+option (ADIOS_BP2NC_TEST     "Enable testing of BP to NetCDF conversion"    ON)
 
 # The tools and examples do not build with the MPI serial library
 if(PIO_USE_MPISERIAL)

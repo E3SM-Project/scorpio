@@ -8,6 +8,7 @@
 
 #ifdef _ADIOS2
 #include "../../tools/adios2pio-nm/adios2pio-nm-lib-c.h"
+extern int remove_directory(const char *path);
 #endif
 
 /**
@@ -527,6 +528,21 @@ int PIOc_closefile(int ncid)
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
                             "C_API_ConvertBPToNC(infile = %s, outfile = %s, piotype = %s) failed", file->filename, outfilename, conv_iotype);
         }
+
+        /* Delete directory XXXX.nc.bp.dir after conversion */
+        if (ios->union_rank == 0)
+        {
+            char filefolder[PIO_MAX_NAME];
+            assert(len + 5 <= PIO_MAX_NAME);
+            snprintf(filefolder, len + 5, "%s.dir", file->filename);
+            struct stat sd;
+            if (0 == stat(filefolder, &sd))
+            {
+                remove_directory(filefolder);
+                printf("Deleted BP files directory %s\n", filefolder);
+            }
+        }
+        MPI_Barrier(ios->union_comm);
 #endif
 
         free(file->filename);
