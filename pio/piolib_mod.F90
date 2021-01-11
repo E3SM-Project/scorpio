@@ -159,6 +159,7 @@ module piolib_mod
   interface PIO_init
      module procedure init_intracom
      module procedure init_intercom
+     module procedure init_intercom_v2
      
   end interface
 
@@ -2294,6 +2295,32 @@ contains
 #endif
   end subroutine init_intercom
 
+!>
+!! @public
+!! @ingroup PIO_init
+!! @brief Initialize the pio subsystem.
+!! @details  This is a collective call.  Input parameters are read on comp_rank=0
+!!   values on other tasks are ignored.  This variation of PIO_init sets up a distinct set of tasks
+!!   to handle IO, these tasks do not return from this call.  Instead they go to an internal loop
+!!   and wait to receive further instructions from the computational tasks
+!! @param iosystems a derived type which can be used in subsequent pio operations (defined in PIO_types).
+!! @param peer_comm  The communicator from which all other communicator arguments are derived
+!! @param comp_comms The computational communicator for each of the computational components
+!! @param io_comm    The io communicator
+!<
+  subroutine init_intercom_v2(iosystems, peer_comm, comp_comms, io_comm, rearr, rearr_opts)
+    use pio_types, only : pio_internal_error, pio_rearr_box
+    type (iosystem_desc_t), intent(out)  :: iosystems(:)  ! io descriptor to initalize
+    integer, intent(in) :: peer_comm
+    integer, intent(in) :: comp_comms(:)   !  The compute communicator
+    integer, intent(in) :: io_comm     !  The io communicator
+
+    integer(i4), intent(in), optional :: rearr ! Adding rearr to be compatible with PIO2, this arg is ignored
+    type (pio_rearr_opt_t), intent(in), optional :: rearr_opts
+
+    call init_intercom(size(iosystems), peer_comm, comp_comms, io_comm, iosystems, rearr, rearr_opts)
+
+  end subroutine init_intercom_v2
 !>
 !! @public
 !! @defgroup PIO_recommend_iotasks PIO_recommend_iotasks
