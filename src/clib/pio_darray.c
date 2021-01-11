@@ -1208,6 +1208,102 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
 
 #endif
 
+void log_data(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file,
+              int varid, const void *arr, PIO_Offset arrlen)
+{
+  static char filename[PIO_MAX_NAME];
+  static bool log_file_created = false;
+
+  int ret = 0;
+
+  assert(ios && iodesc && file && (varid >= 0) && arr && (arrlen >= 0));
+  assert(arrlen == iodesc->ndof);
+
+  var_desc_t *vdesc = &(file->varlist[varid]);
+
+  if(!log_file_created){
+    snprintf(filename, PIO_MAX_NAME, "spiodump%010dwrank", ios->union_rank);
+    ret = pio_create_uniq_str(ios, iodesc, filename + strlen(filename),
+            PIO_MAX_NAME - strlen(filename),
+            "_", ".dat");
+    /*
+    ret = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME,
+            "spiodump", ".dat");
+    */
+    if(ret != PIO_NOERR){
+      printf("ERROR: Unable to create unique name for log file to dump data\n");
+      return;
+    }
+
+  }
+  ret = PIOc_inq_vartype(file->pio_ncid, varid, &vdesc->pio_type);
+  if(ret != PIO_NOERR){
+    printf("ERROR: Unable to query variable (%s) type for var in file (%s)\n",
+            pio_get_vname_from_file(file, varid), pio_get_fname_from_file(file));
+    return;
+  }
+
+  /* Find out length of type. */
+  ret = PIOc_inq_type(file->pio_ncid, vdesc->pio_type, NULL, &vdesc->type_size);
+  if(ret != PIO_NOERR){
+    printf("ERROR: Unable to query variable (%s) type size for var in file (%s)\n",
+            pio_get_vname_from_file(file, varid), pio_get_fname_from_file(file));
+    return;
+  }
+
+  FILE *fp = NULL;
+  fp = fopen(filename, "a+");
+  if(!fp){
+    printf("ERROR: Opening/Creating log file (%s) for dumping log data failed\n",
+            filename);
+    return;
+  }
+
+  ret = fseek(fp, 0, SEEK_END);
+  if(ret != 0){
+    printf("ERROR: fseek to move fp to end of log file (%s) failed, ret = %d\n",
+            filename, ret);
+    return;
+  }
+
+  /* Write header info */
+  fprintf(fp, "###############################\n");
+  fprintf(fp, "File: %s, Variable: %s, ioid = %d\n",
+            pio_get_fname_from_file(file), pio_get_vname_from_file(file, varid), iodesc->ioid);
+  fprintf(fp, "###############################\n");
+  fprintf(fp, "==============================\n");
+  fprintf(fp, "local index : decomp index : val\n");
+  fprintf(fp, "==============================\n");
+
+  char tmp_buf[vdesc->type_size];
+  for(long long int i = 0; i < (long long int )arrlen; i++){
+    fprintf(fp, "%lld : %lld : ", i, (long long int )iodesc->map[i]);
+    memcpy(tmp_buf, arr, vdesc->type_size);
+    switch(vdesc->pio_type){
+      case PIO_INT:
+              fprintf(fp, "%d\n", *(int *)tmp_buf);
+              break;
+      case PIO_REAL:
+              fprintf(fp, "%f\n", *(float *)tmp_buf);
+              break;
+      case PIO_DOUBLE:
+              fprintf(fp, "%f\n", *(double *)tmp_buf);
+              break;
+      default:
+              fprintf(fp, "UNKNOWN\n");
+    }
+    arr += vdesc->type_size;
+  }
+
+  fprintf(fp, "==============================\n");
+
+  fclose(fp);
+
+  if(!log_file_created){
+    log_file_created = true;
+  }
+}
+
 /**
  * Write a distributed array to the output file.
  *
@@ -1358,6 +1454,9 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
         iodesc->is_saved = true;
     }
 #endif
+
+    log_data(ios, iodesc, file, varid, array, arraylen);
+
     /* Get var description. */
     vdesc = &(file->varlist[varid]);
     LOG((2, "vdesc record %d nreqs %d", vdesc->record, vdesc->nreqs));
