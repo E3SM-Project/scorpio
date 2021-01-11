@@ -1284,10 +1284,10 @@ void log_data(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file,
               fprintf(fp, "%d\n", *(int *)tmp_buf);
               break;
       case PIO_REAL:
-              fprintf(fp, "%f\n", *(float *)tmp_buf);
+              fprintf(fp, "%.14e\n", *(float *)tmp_buf);
               break;
       case PIO_DOUBLE:
-              fprintf(fp, "%f\n", *(double *)tmp_buf);
+              fprintf(fp, "%.14e\n", *(double *)tmp_buf);
               break;
       default:
               fprintf(fp, "UNKNOWN\n");
