@@ -1305,7 +1305,7 @@ void bufdump(void *buf)
             bascii[i] = isprint(bdump[i]) ? bdump[i] : ' ';
         }
         bascii[i] = 0;
-        LOG((0, "%-48s   %s", bhex, bascii));
+        LOG((3, "%-48s   %s", bhex, bascii));
         bdump += l;
         bdlen -= l;
         while ((bdlen > 16) && (memcmp((char *) (bdump - 16),
@@ -1315,7 +1315,7 @@ void bufdump(void *buf)
             bdlen -= 16;
         }
         if (dupes > 1) {
-            LOG((0,
+            LOG((3,
                 "     (%d lines [%d bytes] identical to above line skipped)",
                 dupes, dupes * 16));
         } else if (dupes == 1) {
@@ -1343,7 +1343,7 @@ void bpoold(void *buf, int dumpalloc, int dumpfree)
 
         if (bs < 0) {
             bs = -bs;
-            LOG((0, "Allocated buffer: size %6ld bytes.", (long) bs));
+            LOG((3, "Allocated buffer: size %6ld bytes.", (long) bs));
             if (dumpalloc) {
                 bufdump((void *) (((char *) b) + sizeof(struct bhead)));
             }
@@ -1355,14 +1355,14 @@ void bpoold(void *buf, int dumpalloc, int dumpfree)
                 (b->ql.flink->ql.blink != b)) {
                 lerr = "  (Bad free list links)";
             }
-            LOG((0, "Free block:       size %6ld bytes.%s",
+            LOG((3, "Free block:       size %6ld bytes.%s",
                      (long) bs, lerr));
 #ifdef FreeWipe
             lerr = ((char *) b) + sizeof(struct bfhead);
             if ((bs > sizeof(struct bfhead)) && ((*lerr != 0x55) ||
                                                  (memcmp(lerr, lerr + 1,
                                                          (MemSize) (bs - (sizeof(struct bfhead) + 1))) != 0))) {
-                LOG((0,
+                LOG((3,
                     "(Contents of above free block have been overstored.)"));
                 bufdump((void *) (((char *) b) + sizeof(struct bhead)));
             } else
@@ -1399,7 +1399,7 @@ int bpoolv(void *buf)
             }
             if ((b->ql.blink->ql.flink != b) ||
                 (b->ql.flink->ql.blink != b)) {
-                LOG((0, "Free block: size %6ld bytes.  (Bad free list links)",
+                LOG((3, "Free block: size %6ld bytes.  (Bad free list links)",
                          (long) bs));
                 assert(0);
                 return 0;
@@ -1409,7 +1409,7 @@ int bpoolv(void *buf)
             if ((bs > sizeof(struct bfhead)) && ((*lerr != 0x55) ||
                                                  (memcmp(lerr, lerr + 1,
                                                          (MemSize) (bs - (sizeof(struct bfhead) + 1))) != 0))) {
-                LOG((0,
+                LOG((3,
                     "(Contents of above free block have been overstored.)"));
                 bufdump((void *) (((char *) b) + sizeof(struct bhead)));
                 assert(0);
@@ -1496,15 +1496,15 @@ static void stats(char *when)
 #endif
 
     bstats(&cural, &totfree, &maxfree, &nget, &nfree);
-    LOG((0,
+    LOG((3,
         "%s: %ld gets, %ld releases.  %ld in use, %ld free, largest = %ld",
         when, nget, nfree, (long) cural, (long) totfree, (long) maxfree));
 #ifdef BECtl
     bstatse(&pincr, &totblocks, &npget, &nprel, &ndget, &ndrel);
-    LOG((0,
+    LOG((3,
         "  Blocks: size = %ld, %ld (%ld bytes) in use, %ld gets, %ld frees",
         (long)pincr, totblocks, pincr * totblocks, npget, nprel));
-    LOG((0, "  %ld direct gets, %ld direct frees", ndget, ndrel));
+    LOG((3, "  %ld direct gets, %ld direct frees", ndget, ndrel));
 #endif /* BECtl */
 }
 
@@ -1520,13 +1520,13 @@ static int bcompact(bufsize bsize, int seq)
     int i = rand() & 0x3;
 
 #ifdef COMPACTRACE
-    LOG((0, "Compaction requested.  %ld bytes needed, sequence %d.",
+    LOG((3, "Compaction requested.  %ld bytes needed, sequence %d.",
              (long) bsize, seq));
 #endif
 
     if (protect || (seq > CompactTries)) {
 #ifdef COMPACTRACE
-        LOG((0, "Compaction gave up."));
+        LOG((3, "Compaction gave up."));
 #endif
         return 0;
     }
@@ -1550,7 +1550,7 @@ static int bcompact(bufsize bsize, int seq)
     }
 
 #ifdef COMPACTRACE
-    LOG((0, "Compaction bailed out."));
+    LOG((3, "Compaction bailed out."));
 #endif
 #endif /* CompactTries */
     return 0;
@@ -1572,7 +1572,7 @@ static void *bexpand(bufsize size)
         np = (void *) malloc((unsigned) size);
     }
 #ifdef EXPTRACE
-    LOG((0, "Expand pool by %ld -- %s.", (long) size,
+    LOG((3, "Expand pool by %ld -- %s.", (long) size,
              np == NULL ? "failed" : "succeeded"));
 #endif
     return np;
@@ -1584,12 +1584,12 @@ static void bshrink(void *buf)
 {
     if (((char *) buf) == bp) {
 #ifdef EXPTRACE
-        LOG((0, "Initial pool released."));
+        LOG((3, "Initial pool released."));
 #endif
         bp = NULL;
     }
 #ifdef EXPTRACE
-    LOG((0, "Shrink pool."));
+    LOG((3, "Shrink pool."));
 #endif
     free((char *) buf);
 }
