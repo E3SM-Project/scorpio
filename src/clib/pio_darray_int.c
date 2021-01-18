@@ -380,6 +380,57 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                         /* Write, in non-blocking fashion, a list of subarrays. */
                         LOG((3, "about to call ncmpi_iput_varn() varids[%d] = %d rrcnt = %d, llen = %d",
                              nv, varids[nv], rrcnt, llen));
+
+                        LOG((0,"ncmpi_iput_varn(fh = %d, varids[%d] = %d, rrcnt = %d, llen = %d\n",
+                                file->fh, nv, varids[nv], rrcnt, llen));
+                        for(int j = 0; j < rrcnt; j++){
+                          LOG((0, "rrcnt = %d", rrcnt));
+                          PIO_Offset tmp_startlist[fndims], tmp_countlist[fndims], tot_count = 1;
+                          assert(fndims > 0);
+                          for(int i = 0; i < fndims; i++){
+                            LOG((0, "startlist[%d][%d] = %d countlist[%d][%d] = %d", j, i,
+                                 startlist[j][i], j, i, countlist[j][i]));
+                            tmp_startlist[i] = startlist[j][i];
+                            tmp_countlist[i] = countlist[j][i];
+                            tot_count *= countlist[j][i];
+                          }
+                          char idx_str[PIO_MAX_NAME];
+                          for(int i = 0; i < tot_count; i++){
+                            size_t idx_str_len = 0; PIO_Offset gidx = i;
+                            snprintf(idx_str, PIO_MAX_NAME - idx_str_len - 1, "("); idx_str_len = strlen(idx_str);
+                            for(int i = 0; i < fndims; i++)
+                            {
+                              snprintf(idx_str + idx_str_len, PIO_MAX_NAME - idx_str_len - 1, "%lld, ", tmp_startlist[i]); idx_str_len = strlen(idx_str);
+                            }
+                            snprintf(idx_str + idx_str_len, PIO_MAX_NAME - idx_str_len - 1, ")"); idx_str_len = strlen(idx_str);
+                            if(vdesc->dim_sz){
+                              PIO_Offset pos_wgt = 1;
+                              gidx = 0;
+                              for(int i = fndims - 1; i >=0; i--){
+                                gidx += tmp_startlist[i] * pos_wgt;
+                                pos_wgt *= vdesc->dim_sz[i];
+                              }
+                            }
+                            
+                            if(vdesc->pio_type == PIO_DOUBLE){
+                              LOG((0, "%lld : %s : %.14e\n", (long long int) gidx, idx_str, ((double *)bufptr)[i]));
+                            }
+                            else{
+                              LOG((0, "%lld : UNKNOWN\n", (long long int) i));
+                            }
+                  
+                            for(int k = fndims - 1; k >= 0; k--){
+                              tmp_startlist[k]++;
+                              if(tmp_startlist[k] < startlist[j][k] + tmp_countlist[k]){
+                                break;
+                              }
+                              else{
+                                tmp_startlist[k] = startlist[j][k];
+                              }
+                            }
+
+                          }
+                        }
                         ierr = ncmpi_iput_varn(file->fh, varids[nv], rrcnt, startlist, countlist,
                                                bufptr, llen, iodesc->mpitype, vdesc->request + vdesc->nreqs);
                         if (ierr != PIO_NOERR)

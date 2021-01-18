@@ -149,6 +149,8 @@ int pio_delete_file_from_list(int ncid)
             /* Free any fill values that were allocated. */
             for (int v = 0; v < PIO_MAX_VARS; v++)
             {
+                if (cfile->varlist[v].dim_sz)
+                    free(cfile->varlist[v].dim_sz);
                 if (cfile->varlist[v].fillvalue)
                     free(cfile->varlist[v].fillvalue);
 #ifdef PIO_MICRO_TIMING

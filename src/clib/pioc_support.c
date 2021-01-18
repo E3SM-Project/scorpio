@@ -310,10 +310,6 @@ void pio_log(int severity, const char *fmt, ...)
     if (severity > pio_log_level)
         return;
 
-    /* If the severity is 0, only print on rank 0. */
-    if (severity < 1 && my_rank != 0)
-        return;
-
     /* If the severity is zero, this is an error. Otherwise insert that
        many tabs before the message. */
     if (!severity)

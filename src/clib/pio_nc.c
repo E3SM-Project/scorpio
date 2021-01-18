@@ -2459,6 +2459,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
     iosystem_desc_t *ios;      /* Pointer to io system information. */
     file_desc_t *file;         /* Pointer to file information. */
     int invalid_unlim_dim = 0; /* True invalid dims are used. */
+    PIO_Offset dim_sz[ndims];
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function codes. */
     int ierr = PIO_NOERR;                  /* Return code from function calls. */
     int ierr2 = PIO_NOERR;    /* Return code from function calls. */
@@ -2493,16 +2494,14 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
      * is unlimited. */
     if (!ios->async || !ios->ioproc)
     {
-        for (int d = 1; d < ndims; d++)
+        for (int d = 0; d < ndims; d++)
         {
-            PIO_Offset dimlen;
-            
-            ierr = PIOc_inq_dimlen(ncid, dimidsp[d], &dimlen);
+            ierr = PIOc_inq_dimlen(ncid, dimidsp[d], dim_sz + d);
             if(ierr != PIO_NOERR){
                 LOG((1, "PIOc_inq_dimlen failed, ierr = %d", ierr));
                 return ierr;
             }
-            if (dimlen == PIO_UNLIMITED)
+            if ((d != 0) && (dim_sz[d] == PIO_UNLIMITED))
                 invalid_unlim_dim++;
         }
     }
@@ -2526,6 +2525,8 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
         if ((mpierr = MPI_Bcast(&invalid_unlim_dim, 1, MPI_INT, ios->comproot, ios->my_comm)))
+            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        if ((mpierr = MPI_Bcast(dim_sz, ndims, MPI_OFFSET, ios->comproot, ios->my_comm)))
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
     }
 
@@ -2713,6 +2714,17 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
 
     strncpy(file->varlist[*varidp].vname, name, PIO_MAX_NAME);
+    file->varlist[*varidp].dim_sz = (PIO_Offset *) malloc(ndims * sizeof(PIO_Offset));
+    if(!(file->varlist[*varidp].dim_sz))
+    {
+        return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Defining variable %s (varid = %d, ndims = %d) in file %s (ncid=%d, iotype=%s) failed. Out of memory allocating cache for dimension sizes",
+                        name, *varidp, ndims, pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
+    }
+    for(int i = 0; i < ndims; i++)
+    {
+        file->varlist[*varidp].dim_sz[i] = dim_sz[i];
+    }
     if(file->num_unlim_dimids > 0)
     {
         int is_rec_var = 0;

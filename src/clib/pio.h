@@ -321,6 +321,9 @@ typedef struct var_desc_t
 
     /* Variable description */
     char vdesc[PIO_MAX_NAME + 1];
+
+    /** Variable dimension size */
+    PIO_Offset *dim_sz;
     
     /* Non-zero if this is a record var (i.e. uses unlimited
      * dimension). */
