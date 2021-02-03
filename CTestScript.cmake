@@ -163,9 +163,9 @@ message (" -- Start dashboard - ${CTEST_BUILD_NAME} --")
 ctest_start("${CTEST_SCRIPT_ARG}")
 
 ## -- Update
-message (" -- Update source - ${CTEST_BUILD_NAME} --")
-set (CTEST_UPDATE_COMMAND "${CTEST_GIT_COMMAND}")
-ctest_update ()
+#message (" -- Update source - ${CTEST_BUILD_NAME} --")
+#set (CTEST_UPDATE_COMMAND "${CTEST_GIT_COMMAND}")
+#ctest_update ()
 
 ## -- Configure
 message (" -- Configure build - ${CTEST_BUILD_NAME} -- with options ${CTEST_CONFIGURE_OPTIONS}")
