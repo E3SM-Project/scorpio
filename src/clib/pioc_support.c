@@ -2467,6 +2467,16 @@ int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filena
     }
 #endif
 
+    if (!ios->union_rank == 0)
+    {
+        char dummy_file[PIO_MAX_NAME];
+        snprintf(dummy_file, PIO_MAX_NAME, "%s.xx", filename);
+        FILE *fp = fopen(dummy_file, "w");
+        fclose(fp);
+    }
+
+    MPI_Barrier(ios->union_comm);
+
     /* If this task is in the IO component, do the IO. */
     if (ios->ioproc)
     {
