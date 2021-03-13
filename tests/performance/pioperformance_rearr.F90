@@ -1,6 +1,7 @@
 !#define VARINT 1
 #define VARREAL 1
 !#define VARDOUBLE 1
+!#define TEST_READ 1
 
 program pioperformance_rearr
 #ifndef NO_MPIMOD
@@ -817,6 +818,7 @@ contains
 #endif
                 end if
 ! Now the Read
+#ifdef TEST_READ
                 ierr = PIO_OpenFile(iosystem, File, iotype, trim(fname), mode=PIO_NOWRITE);
                 do nv=1,nvars
 #ifdef VARINT
@@ -954,6 +956,7 @@ contains
   call print_memusage()
 #endif
                 end if
+#endif
 #ifdef VARREAL                
                 call PIO_freedecomp(iosystem, iodesc_r4)
 #endif
