@@ -716,7 +716,7 @@ contains
                    call PIO_InitDecomp(iosystem, PIO_INT, gdims, compmap, iodesc_i4, rearr=rearr)
 #endif
 #ifdef VARREAL
-                   call PIO_InitDecomp(iosystem, PIO_REAL, gdims, compmap, iodesc_r4, rearr=rearr)
+                   call PIO_InitDecomp(iosystem, PIO_DOUBLE, gdims, compmap, iodesc_r4, rearr=rearr)
 #endif
 #ifdef VARDOUBLE
                    call PIO_InitDecomp(iosystem, PIO_DOUBLE, gdims, compmap, iodesc_r8, rearr=rearr)
@@ -752,7 +752,7 @@ contains
 #endif
 #ifdef VARREAL
                       call PIO_setframe(File, varr(nv), recnum)
-                      call pio_write_darray(File, varr(nv), iodesc_r4, rfld(:,nv)    , ierr, fillval= PIO_FILL_FLOAT)
+                      call pio_write_darray(File, varr(nv), iodesc_r4, dfld(:,nv)    , ierr, fillval= PIO_FILL_DOUBLE)
 #endif
 #ifdef VARDOUBLE
                       call PIO_setframe(File, vard(nv), recnum)
@@ -857,7 +857,7 @@ contains
 #endif
 #ifdef VARREAL
                       call PIO_setframe(File, varr(nv), frame)
-                      call pio_read_darray(File, varr(nv), iodesc_r4, rfld_in(:,nv,frame), ierr)
+                      call pio_read_darray(File, varr(nv), iodesc_r4, dfld_in(:,nv,frame), ierr)
 #endif
 #ifdef VARDOUBLE
                       call PIO_setframe(File, vard(nv), frame)
@@ -895,16 +895,16 @@ contains
 #ifdef VARREAL
 #ifdef DEBUG
                             write(*,'(a11,i2,a9,f11.2,a9,f11.2,a9,i2)') &
-			        ' Real   PE=',mype,'rfld=',rfld(j,nv),' rfld_in=',rfld_in(j,nv,frame),' compmap=',compmap(j)
+			        ' Real   PE=',mype,'dfld=',dfld(j,nv),' dfld_in=',dfld_in(j,nv,frame),' compmap=',compmap(j)
 #endif
                             
-                            if(rfld(j,nv) /= rfld_in(j,nv,frame) ) then
+                            if(dfld(j,nv) /= dfld_in(j,nv,frame) ) then
                                !if(errorcnt < 10) then
-                               !   print *,__LINE__,'Real:', mype,j,nv,rfld(j,nv),rfld_in(j,nv,frame),compmap(j)
+                               !   print *,__LINE__,'Real:', mype,j,nv,dfld(j,nv),dfld_in(j,nv,frame),compmap(j)
                                !endif
                                write(*,*) '***ERROR:Mismatch!***'
                                write(*,'(a11,i2,a9,f11.2,a9,f11.2,a9,i2)') &
-			         ' Real   PE=',mype,'rfld=',rfld(j,nv),' rfld_in=',rfld_in(j,nv,frame),' compmap=',compmap(j)
+			         ' Real   PE=',mype,'dfld=',dfld(j,nv),' dfld_in=',dfld_in(j,nv,frame),' compmap=',compmap(j)
 
                                errorcnt = errorcnt+1                           
                             endif
