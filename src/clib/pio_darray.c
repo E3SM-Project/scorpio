@@ -1645,6 +1645,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
     LOG((2, "wmb->num_arrays = %d arraylen = %d iodesc->mpitype_size = %d\n",
          wmb->num_arrays, arraylen, iodesc->mpitype_size));
 
+#if 0
     needsflush = PIO_wmb_needs_flush(wmb, arraylen, iodesc);
     assert(needsflush >= 0);
 
@@ -1736,6 +1737,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
         spio_ltimer_start(file->io_fstats->wr_timer_name);
         spio_ltimer_start(file->io_fstats->tot_timer_name);
     }
+#endif
 
     /* One record size (sum across all procs) of data is buffered */
     file->varlist[varid].wb_pend += file->varlist[varid].vrsize;
