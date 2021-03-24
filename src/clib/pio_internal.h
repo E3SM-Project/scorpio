@@ -380,6 +380,9 @@ extern "C" {
     void pio_init_logging(void);
     void pio_finalize_logging(void );
 
+    void spio_log_var(file_desc_t *file, int varid, io_desc_t *iodesc,
+                      PIO_Offset arraylen, void *array, void *fillvalue);
+
     /* Initialize and finalize GPTL timers. */
     void pio_init_gptl(void);
     void pio_finalize_gptl(void );

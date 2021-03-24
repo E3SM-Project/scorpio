@@ -248,6 +248,86 @@ void pio_finalize_logging(void)
 }
 
 /**
+ * Log variable data (passed by the user)
+ */
+void spio_log_var(file_desc_t *file, int varid, io_desc_t *iodesc,
+                  PIO_Offset arraylen, void *array, void *fillvalue)
+{
+    static bool file_created = false;
+    static char filename[PIO_MAX_NAME + 1];
+    static char filename_suffix[PIO_MAX_NAME + 1];
+    iosystem_desc_t *ios = NULL;
+    FILE *fp = NULL;
+    int ret = PIO_NOERR;
+
+    assert(file && (varid >= 0) && iodesc && (arraylen >= 0) && array);
+
+    ios = file->iosystem;
+    assert(ios);
+
+    if(!file_created)
+    {
+        snprintf(filename_suffix, PIO_MAX_NAME, "_%d.dat", ios->union_rank);
+
+        ret = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME, "piovdump", filename_suffix);
+        if(ret != PIO_NOERR)
+        {
+            LOG((2, "ERROR: Unable to create unique file name for storing var data"));
+            return;
+        }
+        file_created = true;
+    }
+
+    fp = fopen(filename, "a");
+    if(!fp)
+    {
+        LOG((2, "ERROR: Unable to open file (%s) for storing var data", filename));
+        return;
+    }
+
+    fprintf(fp, "file : %s (ncid = %d)\n", file->fname, file->pio_ncid);
+    fprintf(fp, "var : %s (varid = %d, record=%d, arraylen=%lld)\n",
+            file->varlist[varid].vname, varid, file->varlist[varid].record, (long long int) arraylen);
+    fprintf(fp, "ioid : %d (ndof=%lld)\n", iodesc->ioid, (long long int) iodesc->ndof);
+
+    switch(iodesc->piotype)
+    {
+        case PIO_INT:
+            {
+                int *ibuf = (int *)array;
+                for(PIO_Offset i = 0; i < arraylen; i++)
+                {
+                  fprintf(fp, "%d ", ibuf[i]);
+                }
+                break;
+            }
+        case PIO_FLOAT:
+            {
+                float *fbuf = (float *)array;
+                for(PIO_Offset i = 0; i < arraylen; i++)
+                {
+                  fprintf(fp, "%.16E ", fbuf[i]);
+                }
+                break;
+            }
+        case PIO_DOUBLE:
+            {
+                double *dbuf = (double *)array;
+                for(PIO_Offset i = 0; i < arraylen; i++)
+                {
+                  fprintf(fp, "%.16E ", dbuf[i]);
+                }
+                break;
+            }
+        default:
+            fprintf(fp, "Unsupported data type");
+    }
+
+    fprintf(fp, "\n=====================\n");
+    fclose(fp);
+}
+
+/**
  * Initialize GPTL timer library, if needed
  * The library is only initialized if the timing is internal
  */

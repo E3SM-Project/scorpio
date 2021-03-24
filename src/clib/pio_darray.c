@@ -1495,30 +1495,34 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
 #endif
 
 #if PIO_SAVE_DECOMPS
-    if(!(iodesc->is_saved) &&
-        pio_save_decomps_regex_match(ioid, file->fname, file->varlist[varid].vname))
+    if(pio_save_decomps_regex_match(ioid, file->fname, file->varlist[varid].vname))
     {
-        char filename[PIO_MAX_NAME];
-        ierr = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME, "piodecomp", ".dat");
-        if(ierr != PIO_NOERR)
-        {
-            GPTLstop("PIO:PIOc_write_darray");
-            GPTLstop("PIO:write_total");
-            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->wr_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            if (file->iotype == PIO_IOTYPE_ADIOS)
-            {
-                GPTLstop("PIO:PIOc_write_darray_adios");
-                GPTLstop("PIO:write_total_adios");
-            }
-            return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                            "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Saving I/O decomposition (ioid=%d) failed. Unable to create a unique file name for saving the I/O decomposition", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
-        }
-        LOG((2, "Saving decomp map (write) to %s", filename));
-        PIOc_writemap(filename, ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
-        iodesc->is_saved = true;
+      if(!(iodesc->is_saved))
+      {
+          char filename[PIO_MAX_NAME];
+          ierr = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME, "piodecomp", ".dat");
+          if(ierr != PIO_NOERR)
+          {
+              GPTLstop("PIO:PIOc_write_darray");
+              GPTLstop("PIO:write_total");
+              spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+              spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+              spio_ltimer_stop(file->io_fstats->wr_timer_name);
+              spio_ltimer_stop(file->io_fstats->tot_timer_name);
+              if (file->iotype == PIO_IOTYPE_ADIOS)
+              {
+                  GPTLstop("PIO:PIOc_write_darray_adios");
+                  GPTLstop("PIO:write_total_adios");
+              }
+              return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                              "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Saving I/O decomposition (ioid=%d) failed. Unable to create a unique file name for saving the I/O decomposition", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
+          }
+          LOG((2, "Saving decomp map (write) to %s", filename));
+          PIOc_writemap(filename, ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
+          iodesc->is_saved = true;
+      }
+      LOG((2, "Saving variable data to file"));
+      spio_log_var(file, varid, iodesc, arraylen, array, fillvalue);
     }
 #endif
     /* Get var description. */
