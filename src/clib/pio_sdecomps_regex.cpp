@@ -619,7 +619,8 @@ bool pio_save_decomps_regex_match(int ioid, const char *fname, const char *vname
   return true;
 }
 #else /* SPIO_NO_CXX_REGEX */
-static PIO_Util::PIO_save_decomp_regex pio_sdecomp_regex(PIO_SAVE_DECOMPS_REGEX);
+#define MPAS_AM_MONTHLY_TEMP "(VAR=\"timeMonthly_avg_activeTracers_temperature\")&&(FILE=\".*mpaso.hist.am.timeSeriesStatsMonthly.*\")"
+static PIO_Util::PIO_save_decomp_regex pio_sdecomp_regex(MPAS_AM_MONTHLY_TEMP);
 
 bool pio_save_decomps_regex_match(int ioid, const char *fname, const char *vname)
 {
