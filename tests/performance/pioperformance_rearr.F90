@@ -968,8 +968,8 @@ contains
              enddo
           enddo
        enddo
-       deallocate(compmap)
-       deallocate(gdims)
+       !deallocate(compmap)
+       !deallocate(gdims)
        deallocate(ifld)
        deallocate(ifld_in)
        deallocate(rfld)
