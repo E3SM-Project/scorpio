@@ -384,8 +384,10 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                         /* Write, in non-blocking fashion, a list of subarrays. */
                         LOG((3, "about to call ncmpi_iput_varn() varids[%d] = %d rrcnt = %d, llen = %d",
                              nv, varids[nv], rrcnt, llen));
+                        GPTLstart("ncmpi_iput_varn");
                         ierr = ncmpi_iput_varn(file->fh, varids[nv], rrcnt, startlist, countlist,
                                                bufptr, llen, iodesc->mpitype, vdesc->request + vdesc->nreqs);
+                        GPTLstop("ncmpi_iput_varn");
                         if (ierr != PIO_NOERR)
                         {
                             ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -1989,7 +1991,9 @@ int flush_output_buffer(file_desc_t *file, bool force, PIO_Offset addsize)
             rcnt = req_block_ends[k] - req_block_starts[k] + 1;
 
             LOG((1, "ncmpi_wait_all(file=%s, ncid=%d, request range = [%d, %d], num pending requests = %d)", pio_get_fname_from_file(file), file->pio_ncid, req_block_starts[k], req_block_ends[k], nreqs));
+            GPTLstart("ncmpi_wait_all");
             ierr = ncmpi_wait_all(file->fh, rcnt, request, status);
+            GPTLstop("ncmpi_wait_all");
             if(ierr != PIO_NOERR)
             {
                 GPTLstop("PIO:flush_output_buffer");
