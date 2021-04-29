@@ -602,7 +602,7 @@ contains
     character(len=PIO_MAX_NAME) :: varname
     integer, parameter :: MAX_TIMESTAMPS = 2
     double precision :: wall(MAX_TIMESTAMPS)
-    double precision :: wall_init_decomp(MAX_TIMESTAMPS), wall_wr_darr(MAX_TIMESTAMPS), wall_close(MAX_TIMESTAMPS)
+    double precision :: wall_readdof(MAX_TIMESTAMPS), wall_init_decomp(MAX_TIMESTAMPS), wall_wr_darr(MAX_TIMESTAMPS), wall_close(MAX_TIMESTAMPS)
     integer :: niomin, niomax
     integer :: nv, mode
     integer,  parameter :: c0 = -1
@@ -619,7 +619,13 @@ contains
 #ifdef _PIO1
        call pio_readdof(filename, compmap, MPI_COMM_WORLD, 81, ndims, gdims)
 #else
+       if(mype == 0) print *, 'pio_readdof start'
+       wall_readdof(1) = MPI_Wtime()
        call pio_readdof(filename, ndims, gdims, compmap, MPI_COMM_WORLD)
+       wall_readdof(2) = MPI_Wtime()
+       wall_readdof(1) = wall_readdof(2) - wall_readdof(1)
+       call MPI_Reduce(wall_readdof(1), wall_readdof(2), 1, MPI_DOUBLE_PRECISION, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
+       if(mype == 0) print *, 'pio_readdof end, read time = ', wall_readdof(2)
 #endif
 
 !    print *,__FILE__,__LINE__,' gdims=',ndims
