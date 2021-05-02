@@ -717,37 +717,21 @@ contains
                 call MPI_Barrier(comm,ierr)
                 wall_init_decomp(1) = MPI_Wtime()
 
-                if(.not. unlimdimindof) then
 #ifdef VARINT
-                   call PIO_InitDecomp(iosystem, PIO_INT, gdims, compmap, iodesc_i4, rearr=rearr)
+                call PIO_InitDecomp(iosystem, PIO_INT, gdims, compmap, iodesc_i4, rearr=rearr)
 #endif
 #ifdef VARREAL
-                   call PIO_InitDecomp(iosystem, PIO_DOUBLE, gdims, compmap, iodesc_r4, rearr=rearr)
+                call PIO_InitDecomp(iosystem, PIO_DOUBLE, gdims, compmap, iodesc_r4, rearr=rearr)
 #endif
 #ifdef VARDOUBLE
-                   call PIO_InitDecomp(iosystem, PIO_DOUBLE, gdims, compmap, iodesc_r8, rearr=rearr)
+                call PIO_InitDecomp(iosystem, PIO_DOUBLE, gdims, compmap, iodesc_r8, rearr=rearr)
 #endif
-                endif
 
                 wall(1) = MPI_Wtime()
                 ! print *,__FILE__,__LINE__,minval(dfld),maxval(dfld),minloc(dfld),maxloc(dfld)
 
                 do frame=1,nframes
                    recnum = frame
-                   if( unlimdimindof) then
-                      recnum = 1 + (frame-1)*gdims(ndims)
-!                      compmap = compmap2 + (frame-1)*gdims(ndims)
-!                      print *,__FILE__,__LINE__,compmap
-#ifdef VARINT
-                      call PIO_InitDecomp(iosystem, PIO_INT, gdims, compmap, iodesc_i4, rearr=rearr)
-#endif
-#ifdef VARREAL
-                      call PIO_InitDecomp(iosystem, PIO_REAL, gdims, compmap, iodesc_r4, rearr=rearr)
-#endif
-#ifdef VARDOUBLE
-                      call PIO_InitDecomp(iosystem, PIO_DOUBLE, gdims, compmap, iodesc_r8, rearr=rearr)
-#endif
-                   endif
                    !if(mype==0) print *,__FILE__,__LINE__,'Frame: ',recnum
 
                    do nv=1,nvars   
@@ -765,17 +749,6 @@ contains
                       call pio_write_darray(File, vard(nv), iodesc_r8, dfld(:,nv)    , ierr, fillval= PIO_FILL_DOUBLE)
 #endif
                    enddo
-                   if(unlimdimindof) then
-#ifdef VARREAL                
-                      call PIO_freedecomp(File, iodesc_r4)
-#endif
-#ifdef VARDOUBLE
-                      call PIO_freedecomp(File, iodesc_r8)
-#endif
-#ifdef VARINT
-                      call PIO_freedecomp(File, iodesc_i4)
-#endif                
-                   endif
                 enddo
                 wall_wr_darr(2) = MPI_Wtime()
                 call pio_closefile(File)
@@ -838,19 +811,6 @@ contains
                    ierr =  pio_inq_varid(File, varname, vard(nv))
 #endif
                 enddo
-
-                if( unlimdimindof) then
-#ifdef VARINT
-                   call PIO_InitDecomp(iosystem, PIO_INT, gdims, compmap, iodesc_i4, rearr=rearr)
-#endif
-#ifdef VARREAL
-                   call PIO_InitDecomp(iosystem, PIO_REAL, gdims, compmap, iodesc_r4, rearr=rearr)
-#endif
-#ifdef VARDOUBLE
-                   call PIO_InitDecomp(iosystem, PIO_DOUBLE, gdims, compmap, iodesc_r8, rearr=rearr)
-#endif
-                endif
-
 
                 call MPI_Barrier(comm,ierr)
                 wall(1) = MPI_Wtime()
