@@ -602,7 +602,7 @@ contains
     character(len=PIO_MAX_NAME) :: varname
     integer, parameter :: MAX_TIMESTAMPS = 2
     double precision :: wall(MAX_TIMESTAMPS)
-    double precision :: wall_readdof(MAX_TIMESTAMPS), wall_init_decomp(MAX_TIMESTAMPS), wall_wr_darr(MAX_TIMESTAMPS), wall_close(MAX_TIMESTAMPS)
+    double precision :: wall_readdof(MAX_TIMESTAMPS), wall_open_to_close(MAX_TIMESTAMPS)
     integer :: niomin, niomax
     integer :: nv, mode
     integer,  parameter :: c0 = -1
@@ -710,12 +710,13 @@ contains
                       '-ncomptasks-', npe, '-niotasks-', ntasks, '-stride-', stride, '-iotype-', iotype, &
                       '-nframes-',nframes,'-nvars-',nvars,'.nc'
 		
+                call MPI_Barrier(comm,ierr)
+
+                wall_open_to_close(1) = MPI_Wtime()
+
                 ierr =  PIO_CreateFile(iosystem, File, iotype, trim(fname), mode)
 
                 call WriteMetadata(File, gdims, vari, varr, vard, unlimdimindof)
-
-                call MPI_Barrier(comm,ierr)
-                wall_init_decomp(1) = MPI_Wtime()
 
 #ifdef VARINT
                 call PIO_InitDecomp(iosystem, PIO_INT, gdims, compmap, iodesc_i4, rearr=rearr)
@@ -727,7 +728,6 @@ contains
                 call PIO_InitDecomp(iosystem, PIO_DOUBLE, gdims, compmap, iodesc_r8, rearr=rearr)
 #endif
 
-                wall(1) = MPI_Wtime()
                 ! print *,__FILE__,__LINE__,minval(dfld),maxval(dfld),minloc(dfld),maxloc(dfld)
 
                 do frame=1,nframes
@@ -750,25 +750,15 @@ contains
 #endif
                    enddo
                 enddo
-                wall_wr_darr(2) = MPI_Wtime()
                 call pio_closefile(File)
-
 
                 call MPI_Barrier(comm,ierr)
 
-                wall(2) = MPI_Wtime()
-                wall_init_decomp(2) = wall(1)
-                wall_wr_darr(1) = wall(1)
-                wall_close(1) = wall_wr_darr(2)
-                wall_close(2) = wall(2)
-                wall(1) = wall(2)-wall(1)
-                call MPI_Reduce(wall(1), wall(2), 1, MPI_DOUBLE_PRECISION, MPI_MAX, 0, comm, ierr)
-                wall_wr_darr(1) = wall_wr_darr(2)-wall_wr_darr(1)
-                call MPI_Reduce(wall_wr_darr(1), wall_wr_darr(2), 1, MPI_DOUBLE_PRECISION, MPI_MAX, 0, comm, ierr)
-                wall_close(1) = wall_close(2)-wall_close(1)
-                call MPI_Reduce(wall_close(1), wall_close(2), 1, MPI_DOUBLE_PRECISION, MPI_MAX, 0, comm, ierr)
-                wall_init_decomp(1) = wall_init_decomp(2)-wall_init_decomp(1)
-                call MPI_Reduce(wall_init_decomp(1), wall_init_decomp(2), 1, MPI_DOUBLE_PRECISION, MPI_MAX, 0, comm, ierr)
+                wall_open_to_close(2) = MPI_Wtime()
+
+                wall_open_to_close(1) = wall_open_to_close(2) - wall_open_to_close(1)
+                call MPI_Reduce(wall_open_to_close(1), wall_open_to_close(2), 1, MPI_DOUBLE_PRECISION, MPI_MAX, 0, comm, ierr)
+
                 if(mype==0) then
                    ! print out performance in MB/s
                    nvarmult = 0
@@ -782,14 +772,11 @@ contains
                    nvarmult = nvarmult+2
 #endif
                    print *, 'nvars = ', nvars, ', nframes = ', nframes, ', gmaplen = ', gmaplen, &
-                            ', init decomp time = ', wall_init_decomp(2), &
-                            ', write darray time = ', wall_wr_darr(2), &
-                            ', close file time = ', wall_close(2), &
-                            ', write time (write darray + close file) = ', wall(2)
+                            ', write time (open-to-close) = ', wall_open_to_close(2)
                    write(*,'(a15,a9,i10,i10,i10,f20.10)') &	
                    'RESULT: write ',&
                     rearr_name(rearr), piotypes(k), ntasks, nvars, &
-                    nvarmult*nvars*nframes*gmaplen*4.0D0/(1048576.0*wall(2))
+                    nvarmult*nvars*nframes*gmaplen*4.0D0/(1048576.0*wall_open_to_close(2))
 #ifdef BGQTRY
   call print_memusage()
 #endif
