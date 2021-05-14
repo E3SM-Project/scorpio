@@ -73,6 +73,7 @@ int pair(int np, int p, int k)
  * @returns 0 for success, error code otherwise.
  * @author Jim Edwards
  */
+#if 0
 int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendtypes,
               void *recvbuf, int *recvcounts, int *rdispls, MPI_Datatype *recvtypes,
               MPI_Comm comm, rearr_comm_fc_opt_t *fc)
@@ -442,6 +443,30 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
     GPTLstop("PIO:pio_swapm");
     return PIO_NOERR;
 }
+#else
+int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendtypes,
+              void *recvbuf, int *recvcounts, int *rdispls, MPI_Datatype *recvtypes,
+              MPI_Comm comm, rearr_comm_fc_opt_t *fc)
+{
+    int mpierr;  /* Return code from MPI functions. */
+
+    GPTLstart("PIO:pio_swapm");
+
+    /* Call the MPI alltoall without flow control. */
+    LOG((3, "Calling MPI_Alltoallw without flow control."));
+    if ((mpierr = MPI_Alltoallw(sendbuf, sendcounts, sdispls, sendtypes, recvbuf,
+                                recvcounts, rdispls, recvtypes, comm)))
+    {
+        GPTLstop("PIO:pio_swapm");
+        return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
+    }
+
+    GPTLstop("PIO:pio_swapm");
+
+    return PIO_NOERR;
+}
+
+#endif
 
 /**
  * Provides the functionality of MPI_Gatherv with flow control
