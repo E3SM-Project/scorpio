@@ -155,6 +155,18 @@ int PIOc_createfile(int iosysid, int *ncidp, int *iotype, const char *filename,
                         "Unable to create file (%s, mode = %d, iotype=%s). Invalid arguments provided, invalid iosystem id (iosysid = %d)", (filename) ? filename : "NULL", mode, (!iotype) ? "UNKNOWN" : pio_iotype_to_string(*iotype), iosysid);
     }
 
+    int root_mode = mode;
+
+    MPI_Barrier(ios->union_comm);
+    MPI_Bcast(&root_mode, 1, MPI_INT, 0, ios->union_comm);
+
+    if (mode != root_mode)
+    {
+        printf("PIOc_createfile: mode is inconsistent among processes. rank = %d, file = %s, root mode = %d, mode = %d\n",
+                ios->union_rank, filename, root_mode, mode);
+        fflush(stdout);
+    }
+
     spio_ltimer_start(ios->io_fstats->wr_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
 
