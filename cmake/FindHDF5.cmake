@@ -106,6 +106,13 @@ foreach (HDF5_comp IN LISTS HDF5_FIND_VALID_COMPONENTS)
                     list (APPEND HDF5_C_INCLUDE_DIRS ${LIBDE_INCLUDE_DIRS})
                     list (APPEND HDF5_C_LIBRARIES ${LIBDE_LIBRARIES})
                 endif ()
+
+                # DEPENDENCY: LIBLOWFIVE (Optional)
+                find_package (LIBLOWFIVE)
+                if (LIBLOWFIVE_FOUND)
+                    list (APPEND HDF5_C_INCLUDE_DIRS ${LIBLOWFIVE_INCLUDE_DIRS})
+                    list (APPEND HDF5_C_LIBRARIES ${LIBLOWFIVE_LIBRARIES})
+                endif ()
                 
             elseif (NOT HDF5_${HDF5_comp}_IS_SHARED)
     
