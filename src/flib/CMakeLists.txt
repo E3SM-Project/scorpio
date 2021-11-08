@@ -35,6 +35,8 @@ set (PIO_GenF90_SRCS pionfatt_mod.F90
   pionfput_mod.F90
   pionfget_mod.F90
   pio_support.F90
+  spio_darray.F90
+  spio_darray_cint.F90
   piodarray.F90)
 
 # Generate Fortran source from template files using genf90
@@ -248,6 +250,7 @@ set (PIO_Fortran_MODS ${CMAKE_CURRENT_BINARY_DIR}/pio.mod
   ${CMAKE_CURRENT_BINARY_DIR}/pionfget_mod.mod
   ${CMAKE_CURRENT_BINARY_DIR}/pio_kinds.mod
   ${CMAKE_CURRENT_BINARY_DIR}/pio_support.mod
+  ${CMAKE_CURRENT_BINARY_DIR}/spio_darray.mod
   ${CMAKE_CURRENT_BINARY_DIR}/piodarray.mod
   ${CMAKE_CURRENT_BINARY_DIR}/pionfatt_mod.mod
   ${CMAKE_CURRENT_BINARY_DIR}/pionfput_mod.mod)

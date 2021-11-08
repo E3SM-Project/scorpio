@@ -1,0 +1,140 @@
+!> @file
+!! @brief APIs for reading and writing distributed arrays.
+!! This file contains the APIs for reading and writing distributed
+!! arrays, pio_[read|write]_darray
+
+!> @internal
+!! @def __PIO_FILE__
+!! @brief This macro is used to define the file name in user messages
+!!
+#define __PIO_FILE__ 'spio_darray.F90'
+
+MODULE spio_darray
+  USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t
+  USE pio_kinds, ONLY : i4, r4, r8, pio_offset_kind
+  USE spio_darray_cint
+#ifdef TIMING
+  use perf_mod, only : t_startf, t_stopf   !_EXTERNAL
+#endif
+  IMPLICIT NONE
+
+  PRIVATE
+  PUBLIC :: pio_read_darray, pio_write_darray
+
+!> @defgroup PIO_write_darray PIO_write_darray
+!! @brief Writes a distributed array to the output file
+!! 
+  INTERFACE pio_write_darray
+! TYPE real,int,double
+! DIMS 1,2,3,4,5,6,7
+    MODULE PROCEDURE pio_write_darray_{DIMS}d_{TYPE}
+  END INTERFACE
+
+!> @defgroup PIO_read_darray PIO_read_darray
+!! @brief Reads a distributed array from the input file
+!! 
+  INTERFACE pio_read_darray
+! TYPE real,int,double
+! DIMS 1,2,3,4,5,6,7
+    MODULE PROCEDURE pio_read_darray_{DIMS}d_{TYPE}
+  END INTERFACE
+
+CONTAINS
+
+! TYPE real,int,double
+! DIMS 1,2,3,4,5,6,7
+!> @ingroup PIO_write_darray
+!! @public
+!! @brief Writes a distributed {DIMS}D array of type {TYPE} to the output file
+!! @details
+!! @param[in] file The handle to the file being written to (@ref file_desc_t)
+!! @param[in] vdesc The handle to the variable (@ref var_desc_t)
+!! @param[in] iodesc The handle to the I/O decomposition that describes how
+!! the data is decomposed across processes (@ref io_desc_t)
+!! @param[in] array The distributed array being written to the file. The data
+!! in the local array is written to the file (for the variable @p vdesc)
+!! based on the I/O decomposition @p iodesc
+!! @param[out] ierr Set to PIO_NOERR on success, or an error code otherwise
+!! (Also see @ref PIO_seterrorhandling for more information on how to
+!! customize/set error handling for the functions)
+!! @param[in] fillval An optional fill value for filling missing values (holes) in
+!! the data being written out.
+!!
+  SUBROUTINE pio_write_darray_{DIMS}d_{TYPE} (file, vdesc, iodesc, array, ierr, fillval)
+    USE iso_c_binding
+
+    TYPE(file_desc_t), INTENT(IN) :: file
+    TYPE(var_desc_t), INTENT(IN) :: vdesc
+    TYPE(io_desc_t), INTENT(IN) :: iodesc
+    {VTYPE}, INTENT(IN), TARGET :: array{DIMSTR}
+    INTEGER, INTENT(OUT) :: ierr
+    {VTYPE}, OPTIONAL, INTENT(IN), TARGET :: fillval
+
+    INTEGER(C_INT) :: cerr
+    INTEGER(C_SIZE_T) :: array_sz
+    TYPE(C_PTR) :: array_ptr, fillval_ptr
+
+    array_sz = SIZE(array, KIND=C_SIZE_T)
+    array_ptr = C_LOC(array)
+    IF(PRESENT(fillval)) THEN
+      fillval_ptr = C_LOC(fillval)
+    ELSE
+      fillval_ptr = C_NULL_PTR
+    END IF
+
+#ifdef TIMING
+    call t_startf("PIO:write_darray_{TYPE}")
+#endif
+    cerr = PIOc_write_darray(file%fh, vdesc%varid - 1, iodesc%ioid,&
+                              array_sz, array_ptr, fillval_ptr)
+#ifdef TIMING
+    call t_stopf("PIO:write_darray_{TYPE}")
+#endif
+    ierr = INT(cerr)
+
+  END SUBROUTINE pio_write_darray_{DIMS}d_{TYPE}
+
+! TYPE real,int,double
+! DIMS 1,2,3,4,5,6,7
+!> @ingroup PIO_read_darray
+!! @public
+!! @brief Reads a distributed {DIMS}D array of type {TYPE} from the output file
+!! @details
+!! @param[in] file The handle to the file being read (@ref file_desc_t)
+!! @param[in] vdesc The handle to the variable being read (@ref var_desc_t)
+!! @param[in] iodesc The handle to the I/O decomposition that describes how
+!! the data is decomposed across processes (@ref io_desc_t)
+!! @param[in] array The distributed array being read from the file. The data
+!! in the local array is read from the file (for the variable @p vdesc)
+!! based on the I/O decomposition @p iodesc
+!! @param[out] ierr Set to PIO_NOERR on success, or an error code otherwise
+!! (Also see @ref PIO_seterrorhandling for more information on how to
+!! customize/set error handling for the functions)
+!!
+  SUBROUTINE pio_read_darray_{DIMS}d_{TYPE} (file, vdesc, iodesc, array, ierr)
+    USE iso_c_binding
+
+    TYPE(file_desc_t), INTENT(IN) :: file
+    TYPE(var_desc_t), INTENT(IN) :: vdesc
+    TYPE(io_desc_t), INTENT(IN) :: iodesc
+    {VTYPE}, INTENT(IN), TARGET :: array{DIMSTR}
+    INTEGER, INTENT(OUT) :: ierr
+
+    INTEGER(C_INT) :: cerr
+    INTEGER(C_SIZE_T) :: array_sz
+    TYPE(C_PTR) :: array_ptr
+
+    array_sz = SIZE(array, KIND=C_SIZE_T)
+    array_ptr = C_LOC(array)
+
+#ifdef TIMING
+    call t_startf("PIO:read_darray_{DIMS}d_{TYPE}")
+#endif
+    cerr = PIOc_read_darray(file%fh, vdesc%varid - 1, iodesc%ioid,&
+                            array_sz, array_ptr)
+#ifdef TIMING
+    call t_stopf("PIO:read_darray_{DIMS}d_{TYPE}")
+#endif
+    ierr = INT(cerr)
+  END SUBROUTINE pio_read_darray_{DIMS}d_{TYPE}
+END MODULE spio_darray
