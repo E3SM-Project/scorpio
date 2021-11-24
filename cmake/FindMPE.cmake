@@ -48,3 +48,6 @@ foreach (NCDFcomp IN LISTS MPE_FIND_VALID_COMPONENTS)
   endif ()
   
 endforeach ()
+
+# Handle QUIET/REQUIRED, and set <PKG>_FOUND if all required components were found
+find_package_handle_standard_args (MPE HANDLE_COMPONENTS)
