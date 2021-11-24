@@ -297,15 +297,18 @@ function (find_package_component PKG)
             
         endforeach ()
         
-        # handle the QUIETLY and REQUIRED arguments and 
-        # set NetCDF_C_FOUND to TRUE if all listed variables are TRUE
-        find_package_handle_standard_args (${PKGCOMP} DEFAULT_MSG
-                                           ${PKGCOMP}_LIBRARY 
-                                           ${PKGCOMP}_INCLUDE_DIR)
+        # Use find_package_handle_standard_args only if this is not a component-specific
+        # call, to avoid cmake errors. If this is a component specific call, the upstream
+        # Find<PKG>.cmake module will take care of calling the macro, using HANDLE_COMPONENTS
+        if (NOT COMP) 
+          find_package_handle_standard_args (${PKGCOMP} DEFAULT_MSG
+                                             ${PKGCOMP}_LIBRARY 
+                                             ${PKGCOMP}_INCLUDE_DIR)
+        elseif (${PKGCOMP}_LIBRARY AND ${PKGCOMP}_INCLUDE_DIR)
+          set (${PKGCOMP}_FOUND TRUE)
+        endif()
+
         mark_as_advanced (${PKGCOMP}_INCLUDE_DIR ${PKGCOMP}_LIBRARY)
-        
-        # HACK For bug in CMake v3.0:
-        set (${PKGCOMP}_FOUND ${${PKGCOMPUP}_FOUND})
     
         # Set return variables
         if (${PKGCOMP}_FOUND)
@@ -320,7 +323,6 @@ function (find_package_component PKG)
         set (${PKGCOMP}_LIBRARY      ${${PKGCOMP}_LIBRARY}       PARENT_SCOPE)
         set (${PKGCOMP}_LIBRARIES    ${${PKGCOMP}_LIBRARIES}     PARENT_SCOPE)
         set (${PKGCOMP}_IS_SHARED    ${${PKGCOMP}_IS_SHARED}     PARENT_SCOPE)
-        
     endif ()
 
 endfunction ()
