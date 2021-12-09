@@ -203,12 +203,14 @@ function (find_package_component PKG)
              $ENV{${PKGUP}}
              ${CMAKE_SYSTEM_PREFIX_PATH})
 
-           # Start the search for the include file(s) and library file(s)
+        # Start the search for the include file(s) and library file(s)
         find_path (${PKGCOMP}_INCLUDE_DIR
                    NAMES ${${PKGCOMP}_INCLUDE_NAMES}
-                   PATHS ${SEARCH_DIRS})
+                   HINTS ${SEARCH_DIRS}
+                   PATH_SUFFIXES include)
 
-        # Only search for libs "near" the include dir
+        # From now on, use NO_DEFAULT_PATH, since we want to ONLY search
+        # the directories "near" the include dir, which we provide via HINTS
         find_library (${PKGCOMP}_LIBRARY
                       NAMES ${${PKGCOMP}_LIBRARY_NAMES}
                       HINTS ${${PKGCOMP}_INCLUDE_DIR} ${${PKGCOMP}_INCLUDE_DIR}/../
