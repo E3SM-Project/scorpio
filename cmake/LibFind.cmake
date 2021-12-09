@@ -206,7 +206,9 @@ function (find_package_component PKG)
            # Start the search for the include file(s) and library file(s)
         find_path (${PKGCOMP}_INCLUDE_DIR
                    NAMES ${${PKGCOMP}_INCLUDE_NAMES}
-                   PATHS ${SEARCH_DIRS})
+                   NO_DEFAULT_PATH
+                   PATHS ${SEARCH_DIRS}
+                   PATH_SUFFIXES include)
 
         # Only search for libs "near" the include dir
         find_library (${PKGCOMP}_LIBRARY
