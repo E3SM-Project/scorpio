@@ -12,7 +12,7 @@ module piolib_mod
   use pio_kinds
   !--------------
   use pio_types, only : file_desc_t, iosystem_desc_t, var_desc_t, io_desc_t, &
-        pio_iotype_netcdf, pio_iotype_pnetcdf, pio_iotype_netcdf4p, pio_iotype_netcdf4c, &
+        pio_iotype_netcdf, pio_iotype_pnetcdf, pio_iotype_netcdf4p, pio_iotype_netcdf4c, pio_iotype_adios, &
         pio_noerr, pio_rearr_subset, pio_rearr_box, pio_rearr_opt_t
   !--------------
   use pio_support, only : piodie, debug, debugio, debugasync, checkmpireturn,&
@@ -935,7 +935,7 @@ contains
        cfname(i) = fname(i:i)
     enddo
     cfname(nl+1)=C_NULL_CHAR
-    ierr = PIOc_createfile(iosystem%iosysid, file%fh, iotype, cfname, mode)
+    ierr = PIOc_createfile(iosystem%iosysid, file%fh, pio_iotype_adios, cfname, mode)
     deallocate(cfname)
     file%iosystem => iosystem
 #ifdef TIMING
