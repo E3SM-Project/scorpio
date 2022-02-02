@@ -2710,6 +2710,7 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
     mtimer_start(file->varlist[varid].rd_rearr_mtimer);
 #endif
     /* Rearrange the data. */
+    memset(array, 0, iodesc->piotype_size * arraylen);
     if ((ierr = rearrange_io2comp(ios, iodesc, iobuf, array)))
     {
         GPTLstop("PIO:PIOc_read_darray");
