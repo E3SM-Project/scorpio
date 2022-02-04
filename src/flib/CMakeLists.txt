@@ -37,7 +37,7 @@ set (PIO_GenF90_SRCS pionfatt_mod.F90
   pio_support.F90
   spio_darray.F90
   spio_darray_cint.F90
-  piodarray.F90)
+  )
 
 # Generate Fortran source from template files using genf90
 foreach (SRC_FILE IN LISTS PIO_GenF90_SRCS)
@@ -51,7 +51,10 @@ endforeach ()
 #  DEFINE THE TARGET LIBRARY
 #==============================================================================
 
-set (PIO_Fortran_SRCS pio_nf.F90
+set (PIO_Fortran_SRCS
+  spio_misc_cint.F90
+  spio_misc.F90
+  pio_nf.F90
   pio.F90
   pio_kinds.F90
   pio_types.F90
