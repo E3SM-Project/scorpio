@@ -256,8 +256,8 @@ SUBROUTINE shr_mpi_bcasti0(vec,comm,string)
    IMPLICIT none
 
    !----- arguments ---
-   integer(SHR_KIND_IN), intent(inout):: vec      ! vector of 1
    integer(SHR_KIND_IN), intent(in)   :: comm     ! mpi communicator
+   integer(SHR_KIND_IN), intent(inout):: vec      ! vector of 1
    character(*),optional,intent(in)   :: string   ! message
 
    !----- local ---
@@ -296,14 +296,22 @@ SUBROUTINE shr_mpi_bcastl0(vec,comm,string)
    character(*),parameter             :: subName = '(shr_mpi_bcastl0) '
    integer(SHR_KIND_IN)               :: ierr
    integer(SHR_KIND_IN)               :: lsize
+   integer                            :: vec2
 
 !-------------------------------------------------------------------------------
-! PURPOSE: Broadcast a logical
+! PURPOSE: Broadcast a logical or interface is ambigous. With new gcc need to use integer arguement in MPI_BCAST or types don't
+! match
 !-------------------------------------------------------------------------------
 
    lsize = 1
 
-   call MPI_BCAST(vec,lsize,MPI_LOGICAL,0,comm,ierr)
+   if (vec .eqv. .true.) then
+        vec2 = 1
+   else
+        vec2 = 0
+   endif
+
+   call MPI_BCAST(vec2,lsize,MPI_LOGICAL,0,comm,ierr)
    if (present(string)) then
      call shr_mpi_chkerr(ierr,subName//trim(string))
    else
