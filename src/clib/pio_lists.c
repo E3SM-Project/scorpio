@@ -175,6 +175,37 @@ int pio_delete_file_from_list(int ncid)
     return PIO_EBADID;
 }
 
+/** Print I/O stats for all files in the iosystem
+ *
+ * This call can be expensive when a lot of files are open
+ * (and not expensive when called during I/O system finalize,
+ * when all the I/O systems finalize at the same time and the
+ * user is careful about closing all open files before the
+ * I/O systems are finalized)
+ * This call can be used to force writing out file I/O stats
+ * for all the files in an I/O system (e.g. not all files
+ * are closed and we need the file I/O stats of these files)
+ * @param iosysp Pointer to the I/O system, iosystem_desc_t
+ * @returns PIO_NOERR on success, error code otherwise
+ */
+int spio_write_all_file_iostats(iosystem_desc_t *iosysp)
+{
+    int ret = PIO_NOERR;
+    for(file_desc_t *pf = pio_file_list; pf; pf = pf->next)
+    {
+        if(pf->iosystem == iosysp)
+        {
+            assert(pf->iosystem->iosysid == iosysp->iosysid);
+            ret = spio_write_file_io_summary(pf);
+            if(ret != PIO_NOERR)
+            {
+                return ret;
+            }
+        }
+    }
+    return ret;
+}
+
 /** 
  * Delete iosystem info from list.
  *

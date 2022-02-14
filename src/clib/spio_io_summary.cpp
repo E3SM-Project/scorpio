@@ -630,6 +630,14 @@ int spio_write_io_summary(iosystem_desc_t *ios)
 
   assert(ios);
 
+  /* Ensure that we have stats from all files (including files that
+   * were not closed) in the I/O system */
+  ierr = spio_write_all_file_iostats(ios);
+  if(ierr != PIO_NOERR){
+    /* Not a fatal error, log the error and continue */
+    LOG((1, "An error occured writing file I/O stats on the I/O system (iosysid= %d), ret = %d", ios->iosysid, ierr));
+  }
+
   /* For async I/O only collect statistics from the I/O processes */
   if(ios->async && !(ios->ioproc)){
     return PIO_NOERR;
