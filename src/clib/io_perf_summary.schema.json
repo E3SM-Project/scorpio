@@ -54,6 +54,17 @@
       },
 
       "required": ["name", "avg_wtput(MB/s)", "avg_rtput(MB/s)", "tot_wb(bytes)", "tot_rb(bytes)", "tot_wtime(s)", "tot_rtime(s)", "tot_time(s)"]
+    },
+    "fio_stats":{
+      "type": "object",
+      "allof":[{"$ref": "$/definitions/iostats"}],
+      "properties": {
+        "model_component_name": {
+          "description": "The name of the Model Component that opened/created the file",
+          "type": "string"
+        }
+      },
+      "required": ["model_component_name"]
     }
   },
 
@@ -74,7 +85,7 @@
         "FileIOStatistics": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/io_stats"
+            "$ref": "#/definitions/fio_stats"
           }
         }
       },
@@ -83,4 +94,3 @@
   },
   "required": ["ScorpioIOSummaryStatistics"]
 }
-

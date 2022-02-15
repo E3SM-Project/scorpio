@@ -562,6 +562,7 @@ static int cache_or_print_stats(iosystem_desc_t *ios, int root_proc,
         const std::size_t ONE_MB = 1024 * 1024;
 
         PIO_Util::Serializer_Utils::serialize_pack("name", cached_file_names[i][j], file_vals);
+        PIO_Util::Serializer_Utils::serialize_pack("model_component_name", cached_ios_names[i], file_vals);
         PIO_Util::Serializer_Utils::serialize_pack("avg_wtput(MB/s)",
           (cached_file_gio_sstats[i][j].wtime_max > 0.0) ?
           (cached_file_gio_sstats[i][j].wb_total / (ONE_MB * cached_file_gio_sstats[i][j].wtime_max)) : 0.0,

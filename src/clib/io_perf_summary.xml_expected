@@ -32,6 +32,7 @@
   </ModelComponentIOStatistics>
   <FileIOStatistics>
     <name>"file1.nc"</name>
+    <model_component_name>"COMP_CPL: CPL"</model_component_name>
     <avg_wtput(MB/s)>2.5</avg_wtput(MB/s)>
     <avg_rtput(MB/s)>1.5</avg_rtput(MB/s)>
     <tot_wb(bytes)>512</tot_wb(bytes)>
@@ -42,6 +43,7 @@
   </FileIOStatistics>
   <FileIOStatistics>
     <name>"file2.nc"</name>
+    <model_component_name>"COMP_ATM: EAM"</model_component_name>
     <avg_wtput(MB/s)>2.5</avg_wtput(MB/s)>
     <avg_rtput(MB/s)>1.5</avg_rtput(MB/s)>
     <tot_wb(bytes)>512</tot_wb(bytes)>
