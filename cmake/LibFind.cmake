@@ -138,7 +138,8 @@ function (initialize_paths PATHLIST)
     set (multiValueArgs INCLUDE_DIRECTORIES LIBRARIES)
     cmake_parse_arguments (INIT "" "" "${multiValueArgs}" ${ARGN})
     
-    set (paths)
+    # Initialize the paths with whatever the user may have already specified
+    set (paths ${${PATHLIST}})
     foreach (inc IN LISTS INIT_INCLUDE_DIRECTORIES)
         list (APPEND paths ${inc})
         get_filename_component (dname ${inc} NAME)
