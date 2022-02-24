@@ -65,7 +65,11 @@ unsigned long get_adios2_io_cnt();
 /** PIO_OFFSET is an integer type of size sufficient to represent the
  * size (in bytes) of the largest file supported by MPI. */
 #define PIO_OFFSET MPI_OFFSET
+#ifdef MPIFJ
+#define PIO_Offset long long
+#else
 #define PIO_Offset MPI_Offset
+#endif
 
 /** The start ID and maximum number of IDs for IO decompositions. */
 #define PIO_IODESC_START_ID 512
