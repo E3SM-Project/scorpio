@@ -283,6 +283,9 @@ extern "C" {
     /* Allocation memory for a data region. */
     int alloc_region2(iosystem_desc_t *ios, int ndims, io_region **region);
 
+    /* Write I/O performance statistics on all files in the I/O system */
+    int spio_write_all_file_iostats(iosystem_desc_t *iosysp);
+
     /* Delete an entry from the lost of open IO systems. */
     int pio_delete_iosystem_from_list(int piosysid);
 

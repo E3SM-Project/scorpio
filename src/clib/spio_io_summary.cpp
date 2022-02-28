@@ -562,6 +562,7 @@ static int cache_or_print_stats(iosystem_desc_t *ios, int root_proc,
         const std::size_t ONE_MB = 1024 * 1024;
 
         PIO_Util::Serializer_Utils::serialize_pack("name", cached_file_names[i][j], file_vals);
+        PIO_Util::Serializer_Utils::serialize_pack("model_component_name", cached_ios_names[i], file_vals);
         PIO_Util::Serializer_Utils::serialize_pack("avg_wtput(MB/s)",
           (cached_file_gio_sstats[i][j].wtime_max > 0.0) ?
           (cached_file_gio_sstats[i][j].wb_total / (ONE_MB * cached_file_gio_sstats[i][j].wtime_max)) : 0.0,
@@ -629,6 +630,14 @@ int spio_write_io_summary(iosystem_desc_t *ios)
 #endif
 
   assert(ios);
+
+  /* Ensure that we have stats from all files (including files that
+   * were not closed) in the I/O system */
+  ierr = spio_write_all_file_iostats(ios);
+  if(ierr != PIO_NOERR){
+    /* Not a fatal error, log the error and continue */
+    LOG((1, "An error occured writing file I/O stats on the I/O system (iosysid= %d), ret = %d", ios->iosysid, ierr));
+  }
 
   /* For async I/O only collect statistics from the I/O processes */
   if(ios->async && !(ios->ioproc)){
