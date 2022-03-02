@@ -189,9 +189,6 @@ CONTAINS
 !!$       end function PIOc_get_var1_text
 !!$    end interface
 
-#ifdef TIMING
-    call t_startf("PIO:get_var1_text")
-#endif
     clen = size(index)
     allocate(cindex(clen))
     do i=1,clen
@@ -203,9 +200,6 @@ CONTAINS
     ierr = PIOc_get_vara_text (ncid, varid-1, cindex, count, ival)
     deallocate(cindex)
     deallocate(count)
-#ifdef TIMING
-    call t_stopf("PIO:get_var1_text")
-#endif
   end function get_var1_id_text_internal
 
   integer function get_var1_id_text (ncid,varid, index, ival) result(ierr)
@@ -215,6 +209,9 @@ CONTAINS
     character, allocatable :: cval(:)
     integer :: clen, i
 
+#ifdef TIMING
+    call t_startf("PIO:get_var1_id_text")
+#endif
     clen = len(ival)
     allocate(cval(clen))
     cval=C_NULL_CHAR
@@ -229,6 +226,9 @@ CONTAINS
    deallocate(cval)
 !   print *,__FILE__,__LINE__,trim(ival)
 
+#ifdef TIMING
+    call t_stopf("PIO:get_var1_id_text")
+#endif
 
   end function get_var1_id_text
 
@@ -293,7 +293,13 @@ CONTAINS
     integer, intent(in) :: varid, start(:), count(:)
     {VTYPE}, intent(out) :: ival{DIMSTR}
 
+#ifdef TIMING
+    call t_startf("PIO:get_vara_{DIMS}d_{TYPE}")
+#endif
     ierr = get_vara_{TYPE}_internal (File%fh, varid, start, count, ival)
+#ifdef TIMING
+    call t_stopf("PIO:get_vara_{DIMS}d_{TYPE}")
+#endif
 
   end function get_vara_{DIMS}d_{TYPE}
 
@@ -306,6 +312,9 @@ CONTAINS
     character(C_CHAR), allocatable :: cval(:)
     integer :: cval_sz, clen
 
+#ifdef TIMING
+    call t_startf("PIO:get_vara_{DIMS}d_text")
+#endif
     ival = ' '
     ierr = get_text_var_sz(File, varid, clen)
     if(ierr /= PIO_NOERR) then
@@ -318,6 +327,9 @@ CONTAINS
     call Cstring2Fstring_{DIMS}d (cval, cval_sz, clen, ival)
     deallocate(cval)
 
+#ifdef TIMING
+    call t_stopf("PIO:get_vara_{DIMS}d_text")
+#endif
   end function get_vara_{DIMS}d_text
 
 ! DIMS 1,2,3,4,5
@@ -370,10 +382,16 @@ CONTAINS
     {VTYPE}, intent(out) :: ival
     {VTYPE}  :: aival(1)
 
+#ifdef TIMING
+    call t_startf("PIO:get_var_0d_{TYPE}")
+#endif
 
     ierr = PIOc_get_var_{NCTYPE} (File%fh, varid-1, aival)
     ival = aival(1)
 
+#ifdef TIMING
+    call t_stopf("PIO:get_var_0d_{TYPE}")
+#endif
   end function Get_var_0d_{TYPE}
 
 ! DIMS 0,1,2,3,4,5
@@ -385,6 +403,9 @@ CONTAINS
     character(C_CHAR), allocatable :: cval(:)
     integer :: cval_sz, clen, nstrs
 
+#ifdef TIMING
+    call t_startf("PIO:get_var_{DIMS}d_text")
+#endif
     ival = ' '
     ierr = get_text_var_sz(File, varid, clen, var_nstrs=nstrs)
     if(ierr /= PIO_NOERR) then
@@ -402,6 +423,9 @@ CONTAINS
     call Cstring2Fstring_{DIMS}d (cval, cval_sz, clen, ival)
     deallocate(cval)
 
+#ifdef TIMING
+    call t_stopf("PIO:get_var_{DIMS}d_text")
+#endif
   end function get_var_{DIMS}d_text
 
 ! TYPE int,real,double
@@ -468,6 +492,9 @@ CONTAINS
     {VTYPE}, intent(out) :: ival{DIMSTR}
     integer(PIO_OFFSET_KIND) :: var_sz
 
+#ifdef TIMING
+    call t_startf("PIO:get_var_{DIMS}d_{TYPE}")
+#endif
     ierr = get_var_dim_sz(File, varid, var_sz)
     if(ierr /= PIO_NOERR) then
       print *, "WARNING: Getting variable dimensions failed, (varid = ", varid, ")"
@@ -484,6 +511,9 @@ CONTAINS
 
     ierr = get_var_{TYPE}_internal(File%fh, varid, ival)
 
+#ifdef TIMING
+    call t_stopf("PIO:get_var_{DIMS}d_{TYPE}")
+#endif
   end function get_var_{DIMS}d_{TYPE}
 
 

@@ -4,6 +4,9 @@
 !! @brief NetCDF attribute interface to PIO
 !<
 module pionfatt_mod
+#ifdef TIMING
+  use perf_mod, only : t_startf, t_stopf      ! _EXTERNAL
+#endif
   use pio_kinds, only : r4, r8, i4, pio_offset_kind
   use pio_types
   use pio_support, only : replace_c_null
@@ -184,9 +187,15 @@ contains
     character(len=*), intent(in) :: name
     {VTYPE}, intent(in) :: values
 
+#ifdef TIMING
+    call t_startf("PIO:put_att_id_{TYPE}")
+#endif
 
     ierr = PIOc_put_att_{NCTYPE} (ncid,varid-1,trim(name)//C_NULL_CHAR, PIO_{TYPE}, 1_C_SIZE_T, values)
 
+#ifdef TIMING
+    call t_stopf("PIO:put_att_id_{TYPE}")
+#endif
   end function put_att_id_{TYPE}
   integer function put_att_id_text (ncid, varid, name, values) result(ierr)
     use iso_c_binding
@@ -198,6 +207,9 @@ contains
     integer(C_SIZE_T) :: clen
     integer(C_SIZE_T) :: i
 
+#ifdef TIMING
+    call t_startf("PIO:put_att_id_text")
+#endif
     clen = len_trim(values)
     allocate(cvar(clen+1))
     cvar = C_NULL_CHAR
@@ -206,6 +218,9 @@ contains
     end do
     ierr = PIOc_put_att_text (ncid,varid-1,trim(name)//C_NULL_CHAR, clen, cvar(1))
     deallocate(cvar)
+#ifdef TIMING
+    call t_stopf("PIO:put_att_id_text")
+#endif
   end function put_att_id_text
 
   integer function put_att_1d_id_text (ncid, varid, name, value) result(ierr)
@@ -217,6 +232,9 @@ contains
     character, allocatable :: nvalue(:)
     integer :: slen, alen, i, j, k
 
+#ifdef TIMING
+    call t_startf("PIO:put_att_1d_id_text")
+#endif
     slen = len(value(1))
     alen = size(value)
     allocate(nvalue(slen*alen))
@@ -232,6 +250,9 @@ contains
 
     deallocate(nvalue)
 
+#ifdef TIMING
+    call t_stopf("PIO:put_att_1d_id_text")
+#endif
   end function put_att_1d_id_text
 
 
@@ -257,9 +278,15 @@ contains
     character(len=*), intent(in) :: name
     character(len=*), intent(out) :: values
 
+#ifdef TIMING
+    call t_startf("PIO:get_att_id_text")
+#endif
     values = ' '
     ierr = PIOc_get_att_text (ncid,varid-1,trim(name)//C_NULL_CHAR, values)
     call replace_c_null(values)
+#ifdef TIMING
+    call t_stopf("PIO:get_att_id_text")
+#endif
   end function get_att_id_text
 
   !pl The next line is needed by genf90.pl, do not remove it.
@@ -282,8 +309,14 @@ contains
     {VTYPE}, intent(in) :: values(:)
     integer(PIO_OFFSET_KIND) :: len
 
+#ifdef TIMING
+    call t_startf("PIO:put_att_1d_id_{TYPE}")
+#endif
     len = size(values)
     ierr = put_att_1d_id_internal_{TYPE} (ncid, varid, name, len, values)
+#ifdef TIMING
+    call t_stopf("PIO:put_att_1d_id_{TYPE}")
+#endif
 
   end function put_att_1d_id_{TYPE}
 
@@ -402,9 +435,15 @@ contains
     character(len=*), intent(in) :: name
     {VTYPE}, intent(out), target :: values
 
+#ifdef TIMING
+    call t_startf("PIO:get_att_id_{TYPE}")
+#endif
 
     ierr = PIOc_get_att_{NCTYPE} (ncid,varid-1,trim(name)//C_NULL_CHAR, values)
 
+#ifdef TIMING
+    call t_stopf("PIO:get_att_id_{TYPE}")
+#endif
   end function get_att_id_{TYPE}
 
 
@@ -451,8 +490,15 @@ contains
     character(len=*), intent(in)   :: name
     {VTYPE}, intent(out) , target         :: values(*)
 
+#ifdef TIMING
+    call t_startf("PIO:get_att_1d_id_{TYPE}")
+#endif
+
     ierr = PIOc_get_att_{NCTYPE} (ncid, varid-1, trim(name)//C_NULL_CHAR, values(1))
 
+#ifdef TIMING
+    call t_stopf("PIO:get_att_1d_id_{TYPE}")
+#endif
 
   end function get_att_1d_id_{TYPE}
 

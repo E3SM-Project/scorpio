@@ -844,9 +844,15 @@ contains
          integer(C_INT), intent(in), value :: iosysid
        end function PIOc_finalize
     end interface
+#ifdef TIMING
+    call t_startf("PIO:finalize")
+#endif
     if(iosystem%iosysid /= -1) then
        ierr = PIOc_finalize(iosystem%iosysid)
     endif
+#ifdef TIMING
+    call t_stopf("PIO:finalize")
+#endif
   end subroutine finalize
 
 
@@ -1020,8 +1026,14 @@ contains
        end function PIOc_sync
     end interface
 
+#ifdef TIMING
+    call t_startf("PIO:syncfile")
+#endif
     ierr = PIOc_sync(file%fh)
 
+#ifdef TIMING
+    call t_stopf("PIO:syncfile")
+#endif
   end subroutine syncfile
 !>
 !! @public
@@ -1044,7 +1056,13 @@ contains
        end function PIOc_freedecomp
     end interface
 
+#ifdef TIMING
+    call t_startf("PIO:freedecomp")
+#endif
     ierr = PIOc_freedecomp(ios%iosysid, iodesc%ioid)
+#ifdef TIMING
+    call t_stopf("PIO:freedecomp")
+#endif
 
   end subroutine freedecomp_ios
 !>
@@ -1116,7 +1134,13 @@ contains
        end function PIOc_deletefile
     end interface
 
+#ifdef TIMING
+    call t_startf("PIO:deletefile")
+#endif
     ierr = PIOc_deletefile(ios%iosysid, trim(fname)//C_NULL_CHAR)
+#ifdef TIMING
+    call t_stopf("PIO:deletefile")
+#endif
 
   end subroutine pio_deletefile
 
