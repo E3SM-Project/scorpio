@@ -245,6 +245,9 @@ contains
     character(C_CHAR), allocatable :: cval(:)
     integer :: cval_sz, clen, nstrs
 
+#ifdef TIMING
+    call t_startf("PIO:put_var_{DIMS}d_text")
+#endif
 !   This manipulation is required to convert the fortran string to
 !   a c character array with all trailing space set to null
 !
@@ -275,6 +278,9 @@ contains
     ierr = PIOc_put_var_text(file%fh, varid-1,  cval)
     deallocate(cval)
 
+#ifdef TIMING
+    call t_stopf("PIO:put_var_{DIMS}d_text")
+#endif
   end function put_var_{DIMS}d_text
 
 ! DIMS 1,2,3,4,5
@@ -332,6 +338,9 @@ contains
     integer(PIO_OFFSET_KIND) :: var_sz
     integer :: i, clen
 
+#ifdef TIMING
+    call t_startf("PIO:put_var_{DIMS}d_{TYPE}")
+#endif
     clen = size(ival)
     if (clen > 0) then
         allocate(cval(clen))
@@ -369,6 +378,9 @@ contains
                   " be skipped on this process. ", __PIO_FILE__, __LINE__
     end if
 
+#ifdef TIMING
+    call t_stopf("PIO:put_var_{DIMS}d_{TYPE}")
+#endif
   end function put_var_{DIMS}d_{TYPE}
 
 ! TYPE int,real,double
@@ -472,6 +484,9 @@ contains
     integer(C_SIZE_T), allocatable :: cstart(:), ccount(:)
     integer :: i
     integer :: ndims
+#ifdef TIMING
+    call t_startf("PIO:put_vara_{DIMS}d_text")
+#endif
 
     ndims = 0
     do i=1,size(count)
@@ -525,6 +540,9 @@ contains
     end if
     deallocate(cstart, ccount)
 
+#ifdef TIMING
+    call t_stopf("PIO:put_vara_{DIMS}d_text")
+#endif
   end function put_vara_{DIMS}d_text
 
 ! TYPE int,real,double
