@@ -63,17 +63,10 @@ adios2_adios *get_adios2_adios();
 unsigned long get_adios2_io_cnt();
 #endif
 
-#ifndef MPI_OFFSET
-/** MPI_OFFSET is an integer type of size sufficient to represent the
- * size (in bytes) of the largest file supported by MPI. In some MPI
- * implementations MPI_OFFSET is not properly defined.  */
-#define MPI_OFFSET  MPI_LONG_LONG
-#endif
+/* PIO_OFFSET_C_TYPENAME is defined in pio_config.h */
+typedef PIO_OFFSET_C_TYPENAME PIO_Offset;
 
-/** PIO_OFFSET is an integer type of size sufficient to represent the
- * size (in bytes) of the largest file supported by MPI. */
-#define PIO_OFFSET MPI_OFFSET
-#define PIO_Offset MPI_Offset
+/* The MPI typename corresponding to PIO_Offset, PIO_OFFSET, is defined in pio_config.h */
 
 /** The start ID and maximum number of IDs for IO decompositions. */
 #define PIO_IODESC_START_ID 512

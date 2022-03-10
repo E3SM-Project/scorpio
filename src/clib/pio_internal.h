@@ -21,17 +21,6 @@
 #define NETCDF_INT_FLOAT_SIZE 4
 #define NETCDF_DOUBLE_INT64_SIZE 8
 
-/* It seems that some versions of openmpi fail to define
- * MPI_OFFSET. */
-#ifdef OMPI_OFFSET_DATATYPE
-#ifndef MPI_OFFSET
-#define MPI_OFFSET OMPI_OFFSET_DATATYPE
-#endif
-#endif
-#ifndef MPI_Offset
-#define MPI_Offset long long
-#endif
-
 #if defined(MPT_VERSION) || defined(OPEN_MPI)
 /* Some MPI implementations do not allow passing MPI_DATATYPE_NULL to comm functions
  * even though the send or recv length is 0, in these cases we use MPI_CHAR */

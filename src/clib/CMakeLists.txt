@@ -1,6 +1,7 @@
 cmake_minimum_required (VERSION 2.8.12)
 include (CheckFunctionExists)
 include(CheckTypeSize)
+include(SPIOTypeUtils)
 project (PIOC C CXX)
 
 message(STATUS "===== Configuring SCORPIO C library... =====")
@@ -143,6 +144,10 @@ endif ()
 #==============================================================================
 #  CONFIGURE TYPE CHECKS
 #==============================================================================
+get_pio_offset_type()
+
+message(STATUS "Using ${PIO_OFFSET_C_TYPENAME} for PIO Offset. sizeof(PIO_Offset) = ${PIO_OFFSET_SIZE} bytes")
+
 check_type_size("size_t" SIZEOF_SIZE_T)
 message(STATUS "sizeof(size_t) = ${SIZEOF_SIZE_T} bytes")
 CHECK_TYPE_SIZE("long long" SIZEOF_LONG_LONG)
