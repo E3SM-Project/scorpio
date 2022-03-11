@@ -316,7 +316,7 @@ int create_mpi_datatypes(MPI_Datatype mpitype, int msgcnt,
     LOG((2, "numinds = %d", numinds));
 
     bsizeT[0] = 0;
-    mtype[0] = PIO_DATATYPE_NULL;
+    mtype[0] = MPI_DATATYPE_NULL;
     int pos = 0;
     int ii = 0;
 
@@ -404,7 +404,7 @@ int create_mpi_datatypes(MPI_Datatype mpitype, int msgcnt,
             free(displace);
             displace = NULL;
 
-            if (mtype[i] == PIO_DATATYPE_NULL)
+            if (mtype[i] == MPI_DATATYPE_NULL)
             {
                 return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
                                 "Creating MPI datatypes to rearrange data from/to compute processes to/from io processes failed. The MPI function returned a NULL datatype");
@@ -471,7 +471,7 @@ int define_iodesc_datatypes(iosystem_desc_t *ios, io_desc_t *iodesc)
 
                 /* Initialize data types to NULL. */
                 for (int i = 0; i < iodesc->nrecvs; i++)
-                    iodesc->rtype[i] = PIO_DATATYPE_NULL;
+                    iodesc->rtype[i] = MPI_DATATYPE_NULL;
 
                 /* The different rearrangers get different values for mfrom. */
                 int *mfrom = iodesc->rearranger == PIO_REARR_SUBSET ? iodesc->rfrom : NULL;
@@ -510,7 +510,7 @@ int define_iodesc_datatypes(iosystem_desc_t *ios, io_desc_t *iodesc)
             
             /* Initialize send types to NULL. */
             for (int i = 0; i < ntypes; i++)
-                iodesc->stype[i] = PIO_DATATYPE_NULL;
+                iodesc->stype[i] = MPI_DATATYPE_NULL;
             
             /* Remember how many types we created for the send side. */
             iodesc->num_stypes = ntypes;
@@ -899,8 +899,8 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
         recvcounts[i] = 0;
         sdispls[i] = 0;
         rdispls[i] = 0;
-        recvtypes[i] = PIO_DATATYPE_NULL;
-        sendtypes[i] =  PIO_DATATYPE_NULL;
+        recvtypes[i] = MPI_DATATYPE_NULL;
+        sendtypes[i] = MPI_DATATYPE_NULL;
     }
     LOG((3, "ntasks = %d iodesc->mpitype_size = %d niotasks = %d", ntasks,
          iodesc->mpitype_size, niotasks));
@@ -921,7 +921,7 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
     {
         for (int i = 0; i < iodesc->nrecvs; i++)
         {
-            if (iodesc->rtype[i] != PIO_DATATYPE_NULL)
+            if (iodesc->rtype[i] != MPI_DATATYPE_NULL)
             {
                 LOG((3, "iodesc->rtype[%d] = %d iodesc->rearranger = %d", i, iodesc->rtype[i],
                         iodesc->rearranger));
@@ -949,7 +949,7 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
                         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
                     }
 #endif /* PIO_USE_MPISERIAL */
-                    pioassert(recvtypes[i] != PIO_DATATYPE_NULL, "bad mpi type", __FILE__, __LINE__);
+                    pioassert(recvtypes[i] != MPI_DATATYPE_NULL, "bad mpi type", __FILE__, __LINE__);
 
                     if ((mpierr = MPI_Type_commit(&recvtypes[i])))
                     {
@@ -979,7 +979,7 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
                         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
                     }
 #endif /* PIO_USE_MPISERIAL */
-                    pioassert(recvtypes[iodesc->rfrom[i]] != PIO_DATATYPE_NULL,  "bad mpi type",
+                    pioassert(recvtypes[iodesc->rfrom[i]] != MPI_DATATYPE_NULL,  "bad mpi type",
                               __FILE__, __LINE__);
 
                     if ((mpierr = MPI_Type_commit(&recvtypes[iodesc->rfrom[i]])))
@@ -1025,7 +1025,7 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
                     return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
                 }
     #endif /* PIO_USE_MPISERIAL */
-                pioassert(sendtypes[io_comprank] != PIO_DATATYPE_NULL,  "bad mpi type", __FILE__, __LINE__);
+                pioassert(sendtypes[io_comprank] != MPI_DATATYPE_NULL,  "bad mpi type", __FILE__, __LINE__);
 
                 if ((mpierr = MPI_Type_commit(&sendtypes[io_comprank])))
                 {
@@ -1055,14 +1055,14 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
     for (int i = 0; i < ntasks; i++)
     {
         LOG((3, "freeing MPI types for task %d", i));
-        if (sendtypes[i] != PIO_DATATYPE_NULL)
+        if (sendtypes[i] != MPI_DATATYPE_NULL)
             if ((mpierr = MPI_Type_free(&sendtypes[i])))
             {
                 GPTLstop("PIO:rearrange_comp2io");
                 return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
             }
 
-        if (recvtypes[i] != PIO_DATATYPE_NULL)
+        if (recvtypes[i] != MPI_DATATYPE_NULL)
             if ((mpierr = MPI_Type_free(&recvtypes[i])))
             {
                 GPTLstop("PIO:rearrange_comp2io");
@@ -1145,8 +1145,8 @@ int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
         recvcounts[i] = 0;
         sdispls[i] = 0;
         rdispls[i] = 0;
-        sendtypes[i] = PIO_DATATYPE_NULL;
-        recvtypes[i] = PIO_DATATYPE_NULL;
+        sendtypes[i] = MPI_DATATYPE_NULL;
+        recvtypes[i] = MPI_DATATYPE_NULL;
     }
 
     /* In IO tasks set up sendcounts/sendtypes for pio_swapm() call
@@ -1155,7 +1155,7 @@ int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
     {
         for (int i = 0; i < iodesc->nrecvs; i++)
         {
-            if (iodesc->rtype[i] != PIO_DATATYPE_NULL)
+            if (iodesc->rtype[i] != MPI_DATATYPE_NULL)
             {
                 if (iodesc->rearranger == PIO_REARR_SUBSET)
                 {
@@ -1185,7 +1185,7 @@ int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
         if (iodesc->rearranger == PIO_REARR_SUBSET)
             io_comprank = 0;
 
-        if (iodesc->scount[i] > 0 && iodesc->stype[i] != PIO_DATATYPE_NULL)
+        if (iodesc->scount[i] > 0 && iodesc->stype[i] != MPI_DATATYPE_NULL)
         {
             recvcounts[io_comprank] = 1;
             recvtypes[io_comprank] = iodesc->stype[i];
