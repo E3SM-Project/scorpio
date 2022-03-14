@@ -39,13 +39,14 @@
 !    won't work with all compilers
 !    e.g. "4", "8", ...
 PROGRAM TryMPI_OFFSET_TYPE
+  USE iso_c_binding
 #ifndef NO_MPIMOD
   USE mpi, ONLY : MPI_OFFSET_KIND
+  IMPLICIT NONE
 #else
+  IMPLICIT NONE
 #include "mpif.h"
 #endif
-  USE iso_c_binding
-  IMPLICIT NONE
 
 #ifdef SPIO_USE_NON_STD_BYTE_FMT_FOR_ACTUAL_TARGET
   INTEGER *<SPIO_ACTUAL_TARGET_BYTES>, TARGET :: off
