@@ -47,14 +47,27 @@ function (check_ftype_size_eq FINTEGER_KIND1 FINTEGER_KIND2)
     # Try compiling the program, if the compilation succeeds the type sizes match
     message (STATUS "Checking whether Fortran type INTEGER(KIND=${FINTEGER_KIND1}) has the same size as INTEGER(KIND=${FINTEGER_KIND2})")
     unset (ftype_size_is_eq)
+    if (PIO_USE_MPISERIAL)
+      find_package (MPISERIAL COMPONENTS Fortran REQUIRED)
+      if (MPISERIAL_Fortran_FOUND)
+        #message(STATUS "MPI serial Fortran library dependencies : ${MPISERIAL_Fortran_LIBRARIES}")
+        set (tmp_pgm_defns "-DNO_MPIMOD")
+        set (tmp_pgm_include_dirs ${MPISERIAL_Fortran_INCLUDE_DIRS})
+        set (tmp_pgm_libs ${MPISERIAL_Fortran_LIBRARIES})
+      else ()
+        message (FATAL_ERROR "Could not find MPI serial library")
+      endif ()
+    endif ()
     if (MPI_MOD_PATH)
-      set (tmp_pgm_defns "-I${MPI_MOD_PATH} ")
+      list (APPEND tmp_pgm_defns " -I${MPI_MOD_PATH}")
     endif ()
 
     try_compile (ftype_size_is_eq
                 ${tmp_pgm_path}
                 SOURCES ${tmp_pgm_full_path_fname}
                 COMPILE_DEFINITIONS ${tmp_pgm_defns}
+                CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${tmp_pgm_include_dirs}"
+                LINK_LIBRARIES ${tmp_pgm_libs}
                 OUTPUT_VARIABLE build_out)
     #message (STATUS "Compile result: ${ftype_size_is_eq}")
 
