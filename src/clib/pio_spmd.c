@@ -130,10 +130,31 @@ int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendty
      * mpi_alltoallw function is used. */
     if (fc->max_pend_req == 0)
     {
+        /* Some MPI implementations (some vers of OpenMPI, MPICH 4.0 etc) do not
+         * allow passing MPI_DATATYPE_NULL to comm functions (MPI_Alltoallw) even
+         * though the send or recv length is 0, so using a dummy MPI type instead
+         * of MPI_DATATYPE_NULL
+         */
+        MPI_Datatype dummy_dt = MPI_CHAR;
+        MPI_Datatype sndtypes[ntasks], rcvtypes[ntasks];
+        for (int i = 0; i < ntasks; i++)
+        {
+            sndtypes[i] = sendtypes[i];
+            if (sndtypes[i] == MPI_DATATYPE_NULL)
+            {
+                sndtypes[i] = dummy_dt;
+            }
+            rcvtypes[i] = recvtypes[i];
+            if (rcvtypes[i] == MPI_DATATYPE_NULL)
+            {
+                rcvtypes[i] = dummy_dt;
+            }
+        }
+
         /* Call the MPI alltoall without flow control. */
         LOG((3, "Calling MPI_Alltoallw without flow control."));
-        if ((mpierr = MPI_Alltoallw(sendbuf, sendcounts, sdispls, sendtypes, recvbuf,
-                                    recvcounts, rdispls, recvtypes, comm)))
+        if ((mpierr = MPI_Alltoallw(sendbuf, sendcounts, sdispls, sndtypes, recvbuf,
+                                    recvcounts, rdispls, rcvtypes, comm)))
         {
             GPTLstop("PIO:pio_swapm");
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);

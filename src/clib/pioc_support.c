@@ -1416,7 +1416,7 @@ int PIOc_freedecomp(int iosysid, int ioid)
     if (iodesc->rtype)
     {
         for (int i = 0; i < iodesc->nrecvs; i++)
-            if (iodesc->rtype[i] != PIO_DATATYPE_NULL)
+            if (iodesc->rtype[i] != MPI_DATATYPE_NULL)
                 if ((mpierr = MPI_Type_free(&iodesc->rtype[i])))
                 {
                     GPTLstop("PIO:PIOc_freedecomp");
@@ -1430,7 +1430,7 @@ int PIOc_freedecomp(int iosysid, int ioid)
     if (iodesc->stype)
     {
         for (int i = 0; i < iodesc->num_stypes; i++)
-            if (iodesc->stype[i] != PIO_DATATYPE_NULL)
+            if (iodesc->stype[i] != MPI_DATATYPE_NULL)
                 if ((mpierr = MPI_Type_free(iodesc->stype + i)))
                 {
                     GPTLstop("PIO:PIOc_freedecomp");

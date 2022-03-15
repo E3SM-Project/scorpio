@@ -1097,14 +1097,14 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
 
     /* We created send types, so free them. */
     for (int st = 0; st < num_send_types; st++)
-        if (iodesc->stype[st] != PIO_DATATYPE_NULL)
+        if (iodesc->stype[st] != MPI_DATATYPE_NULL)
             if ((mpierr = MPI_Type_free(&iodesc->stype[st])))
                 MPIERR(mpierr);
 
     /* We created one receive type, so free it. */
     if (iodesc->rtype)
         for (int r = 0; r < iodesc->nrecvs; r++)
-            if (iodesc->rtype[r] != PIO_DATATYPE_NULL)
+            if (iodesc->rtype[r] != MPI_DATATYPE_NULL)
                 if ((mpierr = MPI_Type_free(&iodesc->rtype[r])))
                     MPIERR(mpierr);
 
@@ -1226,14 +1226,14 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
 
     /* We created send types, so free them. */
     for (int st = 0; st < num_send_types; st++)
-        if (iodesc->stype[st] != PIO_DATATYPE_NULL)
+        if (iodesc->stype[st] != MPI_DATATYPE_NULL)
             if ((mpierr = MPI_Type_free(&iodesc->stype[st])))
                 MPIERR(mpierr);
 
     /* We created one receive type, so free it. */
     if (iodesc->rtype)
         for (int r = 0; r < iodesc->nrecvs; r++)
-            if (iodesc->rtype[r] != PIO_DATATYPE_NULL)
+            if (iodesc->rtype[r] != MPI_DATATYPE_NULL)
                 if ((mpierr = MPI_Type_free(&iodesc->rtype[r])))
                     MPIERR(mpierr);
 
