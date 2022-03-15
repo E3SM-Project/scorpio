@@ -80,6 +80,11 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "NAG")
   #        PRIVATE -mismatch_all)
 endif ()
 
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+  if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL "10.0")
+    set ( CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fallow-argument-mismatch" )
+  endif ()
+endif ()
 #==============================================================================
 #  DEFINE THE TARGETS AND TESTS
 #==============================================================================

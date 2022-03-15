@@ -43,6 +43,9 @@ if ("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "GNU")
     PRIVATE -ffree-line-length-none)
   target_compile_options (pioperf_rearr
     PRIVATE -ffree-line-length-none)
+  if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL "10.0")
+    set ( CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fallow-argument-mismatch" )
+  endif ()
 endif()
 
 if (PIO_HDF5_LOGGING)
