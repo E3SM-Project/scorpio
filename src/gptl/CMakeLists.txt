@@ -56,6 +56,10 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "NAG")
   set ( CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -mismatch_all" )
   #    target_compile_options (gptl
   #        PRIVATE -mismatch_all)
+elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+  if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL "10.0")
+    set ( CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fallow-argument-mismatch" )
+  endif ()
 endif ()
 
 #==============================================================================
