@@ -6,7 +6,6 @@ var searchData=
   ['io_5fcomm',['io_comm',['../structiosystem__desc__t.html#ab97de8bab80dccb81d015cd8ea9f6fc3',1,'iosystem_desc_t']]],
   ['io_5ffstats',['io_fstats',['../structiosystem__desc__t.html#acdb654e33d5dd371ed673152badea2d4',1,'iosystem_desc_t::io_fstats()'],['../structfile__desc__t.html#ac88c7e0fd92366345c32cfe8e59d8886',1,'file_desc_t::io_fstats()']]],
   ['io_5frank',['io_rank',['../structiosystem__desc__t.html#ab3668f3353df907f53d3ce7b8dc02b6c',1,'iosystem_desc_t']]],
-  ['iobuf',['iobuf',['../structfile__desc__t.html#aa277f80e643976b554c539ba27019a75',1,'file_desc_t']]],
   ['iodescncells',['iodescncells',['../structpioexample_1_1pioexampleclass.html#ad6af5157ab138c120ae091f19b6cd6c9',1,'pioexample::pioexampleclass']]],
   ['iogroup',['iogroup',['../structiosystem__desc__t.html#a4ba4093dfc08e4dcdd4c1216cb5f989d',1,'iosystem_desc_t']]],
   ['ioid',['ioid',['../structio__desc__t.html#a25b4283d2730b6570d8fa890a8ce73ea',1,'io_desc_t::ioid()'],['../structwmulti__buffer.html#a667fee0c4b8abf44a2b0703e097ab5f6',1,'wmulti_buffer::ioid()']]],

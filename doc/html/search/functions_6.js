@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['init',['init',['../structpioexample_1_1pioexampleclass.html#a839b15f3abf340e2b046964bfe297808',1,'pioexample::pioexampleclass::init()'],['../classpioexample.html#a78080ad7096ad345563544273bb61b85',1,'pioexample::init()']]],
+  ['init',['init',['../structpioexample_1_1pioexampleclass.html#a839b15f3abf340e2b046964bfe297808',1,'pioexample::pioexampleclass::init()'],['../example_pio_8f90.html#a78080ad7096ad345563544273bb61b85',1,'pioexample::init()']]],
   ['init_5fintercom',['init_intercom',['../group___p_i_o__init.html#gac9fca4c2e861e75d0de9605a77a8fb19',1,'piolib_mod']]],
   ['init_5fintercom_5fv2',['init_intercom_v2',['../group___p_i_o__init.html#ga4003a8c32c50ac13109bdb4ef906491f',1,'piolib_mod']]],
   ['init_5fintracom',['init_intracom',['../group___p_i_o__init.html#ga24013f7eb18aa1552bb0a9ccecc689b3',1,'piolib_mod']]],
@@ -28,8 +28,6 @@ var searchData=
   ['inq_5fndims_5fid',['inq_ndims_id',['../group___p_i_o__inq__ndims.html#ga6c4b1ac748a3ca0c85360f0d1362309d',1,'pio_nf']]],
   ['inq_5fnvars_5fdesc',['inq_nvars_desc',['../group___p_i_o__inq__nvars.html#ga75745bf73050d2ba33f50c96e5ca9737',1,'pio_nf']]],
   ['inq_5fnvars_5fid',['inq_nvars_id',['../group___p_i_o__inq__nvars.html#ga64f78f2105aa0c8114a9995c114b738d',1,'pio_nf']]],
-  ['inq_5funlimdim_5fdesc',['inq_unlimdim_desc',['../classpio__nf.html#ac9b95e29502dececfa46daf02a451817',1,'pio_nf']]],
-  ['inq_5funlimdim_5fid',['inq_unlimdim_id',['../classpio__nf.html#a4e62e2c5174c482a51467a542f22b6ca',1,'pio_nf']]],
   ['inq_5fvar_5fdeflate_5fdesc',['inq_var_deflate_desc',['../group___p_i_o__inq__var__deflate.html#ga9ef34700d0b2fb30d1443c5424d997d9',1,'pio_nf']]],
   ['inq_5fvar_5fdeflate_5fid',['inq_var_deflate_id',['../group___p_i_o__inq__var__deflate.html#gab68fda955e3a5ac6ef0367749483c7f1',1,'pio_nf']]],
   ['inq_5fvar_5fdeflate_5fvid',['inq_var_deflate_vid',['../group___p_i_o__inq__var__deflate.html#gacaf3f950665cd30b440c162969bce37d',1,'pio_nf']]],
