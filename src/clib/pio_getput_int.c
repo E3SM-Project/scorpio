@@ -963,19 +963,89 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
-            int var_ndims;
-            PIO_Offset *cnt;
-
             LOG((2, "pnetcdf calling ncmpi_get_vars_*() file->fh = %d varid = %d", file->fh, varid));
+#if PIO_USE_INDEP_MODE
+            /* Turn on independent access for pnetcdf file. */
+            if ((ierr = ncmpi_begin_indep_data(file->fh)))
+            {
+                GPTLstop("PIO:PIOc_get_vars_tc");
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Starting independent (across processes) access failed on the file", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
+            }
 
             /* Only the IO master does the IO, so we are not really
              * getting parallel IO here. */
-            ncmpi_inq_varndims(file->fh, varid, &var_ndims);
+            if (ios->iomaster == MPI_ROOT)
+            {
+                switch(xtype)
+                {
+                case NC_BYTE:
+                    ierr = ncmpi_get_vars_schar(file->fh, varid, start, count, stride, buf);
+                    break;
+                case NC_CHAR:
+                    ierr = ncmpi_get_vars_text(file->fh, varid, start, count, stride, buf);
+                    break;
+                case NC_SHORT:
+                    ierr = ncmpi_get_vars_short(file->fh, varid, start, count, stride, buf);
+                    break;
+                case NC_INT:
+                    ierr = ncmpi_get_vars_int(file->fh, varid, start, count, stride, buf);
+                    break;
+                case PIO_LONG_INTERNAL:
+                    ierr = ncmpi_get_vars_long(file->fh, varid, start, count, stride, buf);
+                    break;
+                case NC_FLOAT:
+                    ierr = ncmpi_get_vars_float(file->fh, varid, start, count, stride, buf);
+                    break;
+                case NC_DOUBLE:
+                    ierr = ncmpi_get_vars_double(file->fh, varid, start, count, stride, buf);
+                    break;
+                default:
+                    GPTLstop("PIO:PIOc_get_vars_tc");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, file, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                                    "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Unsupported variable type (type=%x)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, xtype);
+                }
+            }
+
+            /* Turn off independent access for pnetcdf file. */
+            if ((ierr = ncmpi_end_indep_data(file->fh)))
+            {
+                GPTLstop("PIO:PIOc_get_vars_tc");
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Ending independent (across processes) access failed on the file", pio_get_vname_from_file(file, varid), varid, pio_get_vname_from_file(file, varid), ncid);
+            }
+#else
+            PIO_Offset *cnt;
             if (ios->iomaster == MPI_ROOT)
                 cnt = (PIO_Offset*)count;
             else
+            {
                 /* non-root reads nothing */
-                cnt = (PIO_Offset*) calloc(var_ndims, sizeof(PIO_Offset));
+                cnt = (PIO_Offset*) calloc(ndims, sizeof(PIO_Offset));
+                if (cnt == NULL)
+                {
+                    GPTLstop("PIO:PIOc_get_vars_tc");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for a temporary count array",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, (long long int) (ndims * sizeof(PIO_Offset)));
+                }
+            }
 
             switch(xtype)
             {
@@ -1009,8 +1079,10 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 return pio_err(ios, file, PIO_EBADIOTYPE, __FILE__, __LINE__,
                                 "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Unsupported variable type (type=%x)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, xtype);
             }
+
             if (ios->iomaster != MPI_ROOT)
                 free(cnt);
+#endif /* PIO_USE_INDEP_MODE */
         }
 #endif /* _PNETCDF */
 
