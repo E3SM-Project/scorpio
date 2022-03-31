@@ -121,7 +121,11 @@ endif ()
 
 #===== ADIOS-C =====
 if (WITH_ADIOS2)
+  # ADIOS 2.8.0 overwrites/resets CMAKE_MODULE_PATH, so cache and restore it after
+  # finding ADIOS
+  set(SPIO_CMAKE_MODULE_PATH_BACKUP ${CMAKE_MODULE_PATH})
   find_package (ADIOS2 ${ADIOS_MIN_VER_REQD})
+  set(CMAKE_MODULE_PATH ${SPIO_CMAKE_MODULE_PATH_BACKUP})
   if (ADIOS2_FOUND)
     message(STATUS "Found ADIOS library")
     set(PIO_USE_ADIOS 1)
