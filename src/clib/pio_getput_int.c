@@ -927,6 +927,15 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
+        if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->comproot, ios->my_comm)))
+        {
+            GPTLstop("PIO:PIOc_get_vars_tc");
+            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        }
         if ((mpierr = MPI_Bcast(&num_elem, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
             GPTLstop("PIO:PIOc_get_vars_tc");
@@ -964,6 +973,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
             LOG((2, "pnetcdf calling ncmpi_get_vars_*() file->fh = %d varid = %d", file->fh, varid));
+#if PIO_USE_INDEP_MODE
             /* Turn on independent access for pnetcdf file. */
             if ((ierr = ncmpi_begin_indep_data(file->fh)))
             {
@@ -1025,6 +1035,63 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 return pio_err(ios, file, ierr, __FILE__, __LINE__,
                                 "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Ending independent (across processes) access failed on the file", pio_get_vname_from_file(file, varid), varid, pio_get_vname_from_file(file, varid), ncid);
             }
+#else
+            PIO_Offset *cnt;
+            if (ios->iomaster == MPI_ROOT)
+                cnt = (PIO_Offset*)count;
+            else
+            {
+                /* non-root reads nothing */
+                cnt = (PIO_Offset*) calloc(ndims, sizeof(PIO_Offset));
+                if (cnt == NULL)
+                {
+                    GPTLstop("PIO:PIOc_get_vars_tc");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for a temporary count array",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, (long long int) (ndims * sizeof(PIO_Offset)));
+                }
+            }
+
+            switch(xtype)
+            {
+            case NC_BYTE:
+                ierr = ncmpi_get_vars_schar_all(file->fh, varid, start, cnt, stride, buf);
+                break;
+            case NC_CHAR:
+                ierr = ncmpi_get_vars_text_all(file->fh, varid, start, cnt, stride, buf);
+                break;
+            case NC_SHORT:
+                ierr = ncmpi_get_vars_short_all(file->fh, varid, start, cnt, stride, buf);
+                break;
+            case NC_INT:
+                ierr = ncmpi_get_vars_int_all(file->fh, varid, start, cnt, stride, buf);
+                break;
+            case PIO_LONG_INTERNAL:
+                ierr = ncmpi_get_vars_long_all(file->fh, varid, start, cnt, stride, buf);
+                break;
+            case NC_FLOAT:
+                ierr = ncmpi_get_vars_float_all(file->fh, varid, start, cnt, stride, buf);
+                break;
+            case NC_DOUBLE:
+                ierr = ncmpi_get_vars_double_all(file->fh, varid, start, cnt, stride, buf);
+                break;
+            default:
+                GPTLstop("PIO:PIOc_get_vars_tc");
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Unsupported variable type (type=%x)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, xtype);
+            }
+
+            if (ios->iomaster != MPI_ROOT)
+                free(cnt);
+#endif /* PIO_USE_INDEP_MODE */
         }
 #endif /* _PNETCDF */
 

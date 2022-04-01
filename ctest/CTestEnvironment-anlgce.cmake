@@ -95,3 +95,8 @@ endif ()
 if (DEFINED ENV{ENABLE_EXAMPLES})
     set (CTEST_CONFIGURE_OPTIONS "${CTEST_CONFIGURE_OPTIONS} -DPIO_ENABLE_EXAMPLES=ON")
 endif ()
+
+# If USE_INDEP_MODE environment variable is set, then use PnetCDF independent data mode
+if (DEFINED ENV{USE_INDEP_MODE})
+    set (CTEST_CONFIGURE_OPTIONS "${CTEST_CONFIGURE_OPTIONS} -DPIO_USE_INDEP_MODE=ON")
+endif ()
