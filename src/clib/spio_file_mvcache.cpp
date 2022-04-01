@@ -14,10 +14,11 @@ extern "C"{
 
 void *SPIO_Util::File_Util::MVCache::get(int ioid)
 {
-  try{
-    return ioid2mvbuf_.at(ioid);
+  std::map<int, void *>::iterator iter = ioid2mvbuf_.find(ioid);
+  if(iter != ioid2mvbuf_.end()){
+    return iter->second;
   }
-  catch(std::out_of_range &e){
+  else{
     /* Multi-variable cache has not been allocated for ioid */
     return NULL;
   }
