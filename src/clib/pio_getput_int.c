@@ -927,6 +927,15 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
+        if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->comproot, ios->my_comm)))
+        {
+            GPTLstop("PIO:PIOc_get_vars_tc");
+            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        }
         if ((mpierr = MPI_Bcast(&num_elem, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
             GPTLstop("PIO:PIOc_get_vars_tc");
