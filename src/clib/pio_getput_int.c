@@ -862,6 +862,9 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         spio_ltimer_start(file->io_fstats->tot_timer_name);
         LOG((3, "ndims = %d", ndims));
 
+        /* The number of dimensions should be non-negative (zero for scalar vars) */
+        pioassert(ndims >= 0, "Unexpected number of dimensions", __FILE__, __LINE__);
+
         /* Only scalar vars can pass NULL for start/count. */
         pioassert(ndims == 0 || (start && count), "need start/count", __FILE__, __LINE__);
 
@@ -1042,17 +1045,22 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             else
             {
                 /* non-root reads nothing */
-                cnt = (PIO_Offset*) calloc(ndims, sizeof(PIO_Offset));
-                if (cnt == NULL)
+                if (ndims == 0)
+                    cnt = NULL; /* scalar variables can pass NULL for start/count */
+                else
                 {
-                    GPTLstop("PIO:PIOc_get_vars_tc");
-                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for a temporary count array",
-                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, (long long int) (ndims * sizeof(PIO_Offset)));
+                    cnt = (PIO_Offset*) calloc(ndims, sizeof(PIO_Offset));
+                    if (cnt == NULL)
+                    {
+                        GPTLstop("PIO:PIOc_get_vars_tc");
+                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for a temporary count array",
+                                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, (long long int) (ndims * sizeof(PIO_Offset)));
+                    }
                 }
             }
 
