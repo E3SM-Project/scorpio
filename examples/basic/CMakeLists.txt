@@ -10,7 +10,7 @@ SET(TEMPSRCF90 alloc_mod.F90)
 FOREACH(tempfile IN LISTS TEMPSRCF90)
 ADD_CUSTOM_COMMAND(
 	OUTPUT ${tempfile}
-	COMMAND ${GENF90_PATH}/genf90.pl ${CMAKE_CURRENT_SOURCE_DIR}/${tempfile}.in > ${tempfile}
+	COMMAND ${SPIO_GENF90_PATH}/genf90.pl ${CMAKE_CURRENT_SOURCE_DIR}/${tempfile}.in > ${tempfile}
 	DEPENDS  ${tempfile}.in
 )
 ENDFOREACH()
