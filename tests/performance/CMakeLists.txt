@@ -16,11 +16,14 @@ endif ()
 #==============================================================================
 #  DEFINE THE TARGETS
 #==============================================================================
-add_executable (pioperf EXCLUDE_FROM_ALL
-  pioperformance.F90)
-set_property(TARGET pioperf PROPERTY LINKER_LANGUAGE ${PIO_LINKER_LANGUAGE})
-target_link_libraries (pioperf piof)
-add_dependencies (tests pioperf)
+if (PIO_ENABLE_TIMING)
+  # This tool requires GPTL
+  add_executable (pioperf EXCLUDE_FROM_ALL
+    pioperformance.F90)
+  set_property(TARGET pioperf PROPERTY LINKER_LANGUAGE ${PIO_LINKER_LANGUAGE})
+  target_link_libraries (pioperf piof)
+  add_dependencies (tests pioperf)
+endif ()
 
 add_executable (pioperf_rearr EXCLUDE_FROM_ALL
   pioperformance_rearr.F90)
@@ -39,8 +42,11 @@ endif ()
 
 # Add compiler-specifc options for the tools
 if ("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "GNU")
-  target_compile_options (pioperf
-    PRIVATE -ffree-line-length-none)
+  if (PIO_ENABLE_TIMING)
+    # This tool requires GPTL
+    target_compile_options (pioperf
+      PRIVATE -ffree-line-length-none)
+  endif ()
   target_compile_options (pioperf_rearr
     PRIVATE -ffree-line-length-none)
   if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL "10.0")
@@ -49,8 +55,11 @@ if ("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "GNU")
 endif()
 
 if (PIO_HDF5_LOGGING)
-  target_compile_definitions (pioperf
-    PUBLIC LOGGING)
+  if (PIO_ENABLE_TIMING)
+    # This tool requires GPTL
+    target_compile_definitions (pioperf
+      PUBLIC LOGGING)
+  endif ()
   target_compile_definitions (pioperf_rearr
     PUBLIC LOGGING)
 endif ()
