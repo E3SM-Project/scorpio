@@ -100,3 +100,8 @@ endif ()
 if (DEFINED ENV{USE_INDEP_MODE})
     set (CTEST_CONFIGURE_OPTIONS "${CTEST_CONFIGURE_OPTIONS} -DPIO_USE_INDEP_MODE=ON")
 endif ()
+
+# If DISABLE_TIMING environment variable is set, then disable the use of the GPTL timing library
+if (DEFINED ENV{DISABLE_TIMING})
+    set (CTEST_CONFIGURE_OPTIONS "${CTEST_CONFIGURE_OPTIONS} -DPIO_ENABLE_TIMING=OFF")
+endif ()
