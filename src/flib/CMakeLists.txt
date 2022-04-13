@@ -15,21 +15,21 @@ check_macro (Fortran_CSIZEOF
   COMMENT "whether the Fortran compiler supports c_sizeof")
 
 # The genf90 tool generates *.F90 from *.F90.in
-if (NOT DEFINED GENF90_PATH)
+if (NOT DEFINED SPIO_GENF90_PATH)
   message(STATUS "Using internal version of genf90 tool")
-  set (GENF90_PATH ${SCORPIO_SOURCE_DIR}/src/genf90)
+  set (SPIO_GENF90_PATH ${SCORPIO_SOURCE_DIR}/src/genf90)
 else ()
-  if (EXISTS "${GENF90_PATH}/genf90.pl")
-    message(STATUS "Using user-specified version of genf90 tool : ${GENF90_PATH}/genf90.pl")
+  if (EXISTS "${SPIO_GENF90_PATH}/genf90.pl")
+    message(STATUS "Using user-specified version of genf90 tool : ${SPIO_GENF90_PATH}/genf90.pl")
   else ()
-    message(WARNING "Could not find genf90.pl at user-specified path, GENF90_PATH = ${GENF90_PATH}")
+    message(WARNING "Could not find genf90.pl at user-specified path, SPIO_GENF90_PATH = ${SPIO_GENF90_PATH}")
     message(WARNING "Resetting to using internal version of genf90.pl (${SCORPIO_SOURCE_DIR}/src/genf90)")
-    set (GENF90_PATH ${SCORPIO_SOURCE_DIR}/src/genf90)
+    set (SPIO_GENF90_PATH ${SCORPIO_SOURCE_DIR}/src/genf90)
   endif ()
 endif ()
 
 add_custom_target(genf90
-  DEPENDS ${GENF90_PATH}/genf90.pl)
+  DEPENDS ${SPIO_GENF90_PATH}/genf90.pl)
 
 set (PIO_GenF90_SRCS pionfatt_mod.F90
   pionfput_mod.F90
@@ -40,7 +40,7 @@ set (PIO_GenF90_SRCS pionfatt_mod.F90
 # Generate Fortran source from template files using genf90
 foreach (SRC_FILE IN LISTS PIO_GenF90_SRCS)
   add_custom_command (OUTPUT ${SRC_FILE}
-    COMMAND ${GENF90_PATH}/genf90.pl
+    COMMAND ${SPIO_GENF90_PATH}/genf90.pl
     ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in > ${SRC_FILE}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in genf90)
 endforeach ()
