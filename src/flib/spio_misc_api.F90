@@ -7,12 +7,12 @@
 !! @def __PIO_FILE__
 !! This macro is used to define the file name in user messages
 !!
-#define __PIO_FILE__ 'spio_misc.F90'
+#define __PIO_FILE__ 'spio_misc_api.F90'
 
-MODULE spio_misc
+MODULE spio_misc_api
   USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t
   USE pio_kinds, ONLY : i4, r4, r8, pio_offset_kind
-  USE spio_misc_cint
+  USE spio_misc_api_cint
   IMPLICIT NONE
 
   PRIVATE
@@ -40,4 +40,4 @@ CONTAINS
       prev_limit = lim
     END IF
   END SUBROUTINE pio_set_buffer_size_limit
-END MODULE spio_misc
+END MODULE spio_misc_api

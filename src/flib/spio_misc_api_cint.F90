@@ -6,9 +6,9 @@
 !! @def __PIO_FILE__
 !! This macro is used to define the file name in user messages
 !!
-#define __PIO_FILE__ 'spio_misc_cint'
+#define __PIO_FILE__ 'spio_misc_api_cint'
 
-MODULE spio_misc_cint
+MODULE spio_misc_api_cint
   USE iso_c_binding
   IMPLICIT NONE
 
@@ -27,4 +27,4 @@ INTERFACE
   END FUNCTION PIOc_set_buffer_size_limit
 END INTERFACE
 
-END MODULE spio_misc_cint
+END MODULE spio_misc_api_cint

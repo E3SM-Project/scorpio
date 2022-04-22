@@ -52,8 +52,8 @@ endforeach ()
 #==============================================================================
 
 set (PIO_Fortran_SRCS
-  spio_misc_cint.F90
-  spio_misc.F90
+  spio_misc_api_cint.F90
+  spio_misc_api.F90
   pio_nf.F90
   pio.F90
   pio_kinds.F90

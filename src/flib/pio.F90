@@ -36,7 +36,7 @@ module pio
        pio_internal_error, pio_bcast_error, pio_reduce_error,&
           pio_return_error, pio_default
 
-  use spio_misc, only : pio_set_buffer_size_limit
+  use spio_misc_api, only : pio_set_buffer_size_limit
   use spio_darray, only : pio_read_darray, pio_write_darray
 
   use pio_nf, only:        &
