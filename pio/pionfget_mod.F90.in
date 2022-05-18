@@ -51,6 +51,8 @@ module pionfget_mod
      module procedure get_var1_{TYPE}, get_var1_vdesc_{TYPE}
   end interface
 
+  public :: get_var_dim_sz
+
  character(len=*), parameter :: modName='pionfget_mod'
 
 CONTAINS
@@ -583,5 +585,77 @@ CONTAINS
 #endif
 
   end subroutine Cstring2Fstring_{DIMS}d
+
+!>
+!! @public
+!! @brief Get the dim size of a variable
+!! @details
+!! @param File : File containing the variable
+!! @param varid : Id of the queried variable
+!! @param var_sz : The total size of the variable is
+!!                      returned in this arg
+!! @param var_dim_sz : The dimension sizes of the variable is
+!!                      returned in this optional arg
+!! @retval ierr
+!<
+  integer function get_var_dim_sz(File, varid, var_sz, var_dim_sz)
+    use nf_mod, only : pio_inq_varndims, pio_inq_vardimid, pio_inq_dimlen
+    type (File_desc_t), intent(in) :: File
+    integer, intent(in) :: varid
+    integer(kind=pio_offset), intent(out) :: var_sz
+    integer, intent(inout), allocatable, optional :: var_dim_sz(:)
+
+    integer :: ndims = 0
+    integer, allocatable :: dimids(:)
+    integer, allocatable :: dim_sz(:)
+    integer :: i, ierr = PIO_NOERR
+
+    var_sz = 0
+    ! Get the number of dimensions in variable
+    ierr = pio_inq_varndims(File, varid, ndims)
+    if(ierr /= PIO_NOERR) then
+      call piodie(__PIO_FILE__, __LINE__, "Inquiring number of dims of variable failed")
+    end if
+    if(ndims == 0) then
+      ! A scalar variable
+      var_sz = 1
+
+      if(present(var_dim_sz)) then
+        allocate(var_dim_sz(1))
+        var_dim_sz(1) = 1
+      end if
+
+      get_var_dim_sz = PIO_NOERR
+      return
+    end if
+
+    ! Get the dimension ids for the variable
+    allocate(dimids(ndims))
+    ierr = pio_inq_vardimid(File, varid, dimids)
+    if(ierr /= PIO_NOERR) then
+      call piodie(__PIO_FILE__, __LINE__, "Inquiring the variable dimension ids for the variable failed")
+    end if
+
+    allocate(dim_sz(ndims))
+    if(present(var_dim_sz)) then
+      allocate(var_dim_sz(ndims))
+    end if
+    var_sz = 1
+    do i=1,ndims
+      ierr = pio_inq_dimlen(File, dimids(i), dim_sz(i))
+      if(ierr /= PIO_NOERR) then
+        call piodie(__PIO_FILE__, __LINE__, "Inquiring the lengths of dimension for the variable failed")
+      end if
+      var_sz = var_sz * dim_sz(i)
+      if(present(var_dim_sz)) then
+        var_dim_sz(i) = dim_sz(i)
+      end if
+    end do
+
+    deallocate(dim_sz)
+    deallocate(dimids)
+
+    get_var_dim_sz = ierr
+  end function get_var_dim_sz
 
 end module pionfget_mod
