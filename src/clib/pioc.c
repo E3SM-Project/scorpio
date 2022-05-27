@@ -259,6 +259,8 @@ int PIOc_setframe(int ncid, int varid, int frame)
             {
                 spio_ltimer_start(ios->io_fstats->wr_timer_name);
                 spio_ltimer_start(file->io_fstats->wr_timer_name);
+                GPTLstart("PIO:write_total");
+                GPTLstart("PIO:write_total_adios");
             }
             spio_ltimer_start(ios->io_fstats->tot_timer_name);
             spio_ltimer_start(file->io_fstats->tot_timer_name);
@@ -269,6 +271,8 @@ int PIOc_setframe(int ncid, int varid, int frame)
             {
                 spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                 spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                GPTLstop("PIO:write_total");
+                GPTLstop("PIO:write_total_adios");
             }
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
