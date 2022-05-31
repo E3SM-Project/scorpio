@@ -1069,23 +1069,34 @@ int PIOc_sync(int ncid)
     int ierr = PIO_NOERR;  /* Return code from function calls. */
 
     GPTLstart("PIO:PIOc_sync");
-    GPTLstart("PIO:write_total");
     LOG((1, "PIOc_sync ncid = %d", ncid));
 
     /* Get the file info from the ncid. */
     if ((ierr = pio_get_file(ncid, &file)))
     {
         GPTLstop("PIO:PIOc_sync");
-        GPTLstop("PIO:write_total");
         return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
                         "Syncing file (ncid=%d) failed. Invalid file id. Unable to find internal structure associated with the file id", ncid);
     }
     assert(file);
 
+    if (file->mode & PIO_WRITE)
+    {
+        GPTLstart("PIO:write_total");
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+            GPTLstart("PIO:write_total_adios");
+    }
+
     ierr = sync_file(ncid);
 
+    if (file->mode & PIO_WRITE)
+    {
+        GPTLstop("PIO:write_total");
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+            GPTLstop("PIO:write_total_adios");
+    }
+
     GPTLstop("PIO:PIOc_sync");
-    GPTLstop("PIO:write_total");
 
     return ierr;
 }
