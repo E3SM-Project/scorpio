@@ -1230,6 +1230,49 @@ int pio_err(iosystem_desc_t *ios, file_desc_t *file,
 }
 
 /**
+ * Handle an error in SCORPIO.
+ * (Not a collective call)
+ *
+ * If the error handler is set to PIO_INTERNAL_ERROR an error
+ * results in an internal abort. For all other error handlers
+ * the function returns a PIO error code back to the caller.
+ *
+ * The error handler used for handling the error is
+ * 1) The error handler associated with the file if @p ncid is valid
+ * 2) If @p ncid is not valid, the error handler associated with
+ *    the I/O system if @p iosysid is valid
+ * 3) If the I/O system id (@p iosysid) and the file id (@p ncid)
+ * are both invalid the default error handler (PIO_INTERNAL_ERROR)
+ * is used to handle the error code
+ *
+ * @param iosysid The I/O system id associated with the error
+ * @param ncid The file id of the file associated with the error
+ * @param err_num The error code (corresponding to the error that
+ *  needs to be handled)
+ * @param fname The name of source code file where the error occured.
+ * @param line The line number of source code where the error occurred.
+ * @param uerr_msg The user error message
+ * @returns The error code, PIO_NOERR on no error and an error
+ * code otherwise
+ */
+int PIOc_error(int iosysid, int ncid,
+            int err_num, const char *fname, int line,
+            const char *uerr_msg)
+{
+  iosystem_desc_t *ios = NULL;
+  file_desc_t *file = NULL;
+  int ierr = PIO_NOERR;
+
+  /* Note that calls to get the I/O system and
+   * the file can (is allowed to) fail
+   */
+  ios = pio_get_iosystem_from_id(iosysid);
+  ierr = pio_get_file(ncid, &file);
+
+  return pio_err(ios, file, err_num, fname, line, "%s", uerr_msg);
+}
+
+/**
  * Allocate a region struct, and initialize it.
  *
  * @param ios pointer to the IO system info, used for error

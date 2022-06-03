@@ -19,6 +19,18 @@ module pio_types
         integer(i4) :: length
     end type
 
+    !----------------------------------------
+    ! Some constants related to types below
+    !----------------------------------------
+    ! Invalid I/O system id
+    integer(kind=c_int), public, parameter :: PIO_IOSYSID_INVALID = -1
+    ! Invalid file handle
+    integer(kind=c_int), public, parameter :: PIO_FH_INVALID = -1
+    ! Invalid I/O decomposition id
+    integer(kind=c_int), public, parameter :: PIO_IOID_INVALID = -1
+    ! Invalid variable id
+    integer(kind=c_int), public, parameter :: PIO_VARID_INVALID = -1
+
     !------------------------------------
     !  a file descriptor data structure
     !------------------------------------
@@ -94,10 +106,13 @@ module pio_types
 !>
 !! @defgroup PIO_iotype PIO_iotype
 !! @public
-!! @brief An integer parameter which controls the iotype
+!! @brief An integer parameter that controls the underlying I/O library and
+!! the I/O library-specific options (compression etc) used by the library.
+!! Note that since an iotype is associated with a file, two different files
+!! can potentially be associated with two different iotypes.
 !! @details
-!!   - PIO_iotype_pnetcdf : parallel read/write of pNetCDF files (netcdf3)
-!!   - PIO_iotype_netcdf : serial read/write of NetCDF files using 'base_node' (netcdf3)
+!!   - PIO_iotype_pnetcdf : parallel read/write using the PnetCDF library
+!!   - PIO_iotype_netcdf : serial (only the root I/O process) read/write using the NetCDF library
 !!   - PIO_iotype_netcdf4c : parallel read/serial write of NetCDF4 (HDF5) files with data compression
 !!   - PIO_iotype_netcdf4p : parallel read/write of NETCDF4 (HDF5) files
 !!   - PIO_iotype_adios : parallel write of ADIOS files with subset rearrangement only
@@ -157,8 +172,35 @@ module pio_types
 !>
 !! @public
 !! @defgroup error_return error return codes
-!! @brief : The error return code; ierr != PIO_noerr indicates
-!! an error. (see @ref PIO_seterrorhandling )
+!! @brief : The error return code. Set to PIO_NOERR on success,
+!! or an error code otherwise
+!! (See @ref PIO_seterrorhandling for more information on how
+!! to customize/set error handling)
+!>
+
+!>
+!! @public
+!! @defgroup open_file_modes Supported modes for opening a file
+!! @brief : The flags to specify the file access mode when
+!! opening a file
+!! PIO_WRITE : Using this flag an existing file is opened
+!! in "write" mode
+!! PIO_NOWRITE : Using this flag an existing file is opened
+!! in "read-only" mode
+!>
+
+!>
+!! @public
+!! @defgroup create_file_modes Supported modes for creating a file
+!! @brief : The flags to specify the file access mode when
+!! creating a file
+!! PIO_CLOBBER : The file, if it exists, is truncated
+!! (the old contents of the file are deleted/overwritten)
+!! PIO_NOCLOBBER : This flag is used to ensure that a file,
+!! if it exists, is not truncated (the current contents of
+!! the file are not deleted) during file creation. If a
+!! file exists and the user uses PIO_NOCLOBBER while trying
+!! to recreate the file the call (PIO_createfile) will fail
 !>
 
 !>
