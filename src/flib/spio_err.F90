@@ -10,6 +10,7 @@
 #define __PIO_FILE__ 'spio_err.F90'
 
 MODULE spio_err
+  USE iso_c_binding
   USE pio_types, ONLY : iosystem_desc_t, file_desc_t,&
                         PIO_IOSYSID_INVALID, PIO_FH_INVALID
   USE spio_err_cint
@@ -27,6 +28,7 @@ MODULE spio_err
   INTERFACE pio_error
     MODULE PROCEDURE pio_iosys_error
     MODULE PROCEDURE pio_file_error
+    MODULE PROCEDURE pio_comm_error
   END INTERFACE
 
 CONTAINS
@@ -42,16 +44,13 @@ CONTAINS
 !! @param[in] uerr_msg The user error message
 !! @returns Returns PIO_NOERR on success, the error code, err_num,
 !! otherwise (The function can also abort on error)
-  FUNCTION pio_iosys_error (iosys, err_num, fname, line, uerr_msg) RESULT(ierr)
-    USE iso_c_binding
-
+  INTEGER FUNCTION pio_iosys_error (iosys, err_num, fname, line, uerr_msg) RESULT(ierr)
     TYPE(iosystem_desc_t), INTENT(IN) :: iosys
     INTEGER, INTENT(IN) :: err_num
     CHARACTER(LEN=*), INTENT(IN) :: fname
     INTEGER, INTENT(IN) :: line
     CHARACTER(LEN=*), INTENT(IN) :: uerr_msg
 
-    INTEGER :: ierr
     INTEGER(C_INT) :: cerr
 
     ! FIXME: Do fortran strings (trim(fname)) need to be converted to
@@ -73,16 +72,13 @@ CONTAINS
 !! @param[in] uerr_msg The user error message
 !! @returns Returns PIO_NOERR on success, the error code, err_num,
 !! otherwise (The function can also abort on error)
-  FUNCTION pio_file_error (file, err_num, fname, line, uerr_msg) RESULT(ierr)
-    USE iso_c_binding
-
+  INTEGER FUNCTION pio_file_error (file, err_num, fname, line, uerr_msg) RESULT(ierr)
     TYPE(file_desc_t), INTENT(IN) :: file
     INTEGER, INTENT(IN) :: err_num
     CHARACTER(LEN=*), INTENT(IN) :: fname
     INTEGER, INTENT(IN) :: line
     CHARACTER(LEN=*), INTENT(IN) :: uerr_msg
 
-    INTEGER :: ierr
     INTEGER(C_INT) :: cerr
 
     cerr = PIOc_error(PIO_IOSYSID_INVALID, file%fh, INT(err_num, C_INT),&
@@ -90,4 +86,34 @@ CONTAINS
                       trim(uerr_msg) // C_NULL_CHAR)
     ierr = INT(cerr)
   END FUNCTION pio_file_error
+
+!> @ingroup PIO_error
+!> @private
+!! @brief Function that handles misc error codes (not associated with an I/O
+!! system or file) associated with an MPI communicator in the fortran interface
+!!
+!! @param[in] comm The MPI communicator associated with the error
+!! @param[in] err_num The error number/code
+!! @param[in] fname The name of the source file with the error
+!! @param[in] line The line number in the source file with the error
+!! @param[in] uerr_msg The user error message
+!! @returns Returns PIO_NOERR on success, the error code, err_num,
+!! otherwise (The function can also abort on error)
+  INTEGER FUNCTION pio_comm_error (comm, err_num, fname, line, uerr_msg) RESULT(ierr)
+    INTEGER, INTENT(IN) :: comm
+    INTEGER, INTENT(IN) :: err_num
+    CHARACTER(LEN=*), INTENT(IN) :: fname
+    INTEGER, INTENT(IN) :: line
+    CHARACTER(LEN=*), INTENT(IN) :: uerr_msg
+
+    INTEGER, PARAMETER :: ROOT_RANK = 0
+    INTEGER :: rank
+
+    CALL MPI_Comm_rank(comm, rank, ierr)
+    IF(rank == ROOT_RANK) THEN
+      PRINT *, "ERROR: ", TRIM(uerr_msg), ", err_num =", err_num, ", ", trim(fname), ":", line
+    ENDIF
+
+    ierr = err_num
+  END FUNCTION pio_comm_error
 END MODULE spio_err

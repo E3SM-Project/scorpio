@@ -224,6 +224,7 @@ module pio_types
    integer, public, parameter :: PIO_MAX_VARS_UB = 8192
    integer, public, parameter :: PIO_MAX_NAME_UB = 1024
    integer, public, parameter :: PIO_MAX_VAR_DIMS_UB = 1024
+   integer, public, parameter :: PIO_FMODE_CLR = 0
 #ifdef _PNETCDF
 #include <pnetcdf.inc>   /* _EXTERNAL */
    integer, public, parameter :: PIO_global = nf_global
@@ -286,7 +287,7 @@ module pio_types
    integer, public, parameter :: PIO_MAX_DIMS = PIO_MAX_DIMS_UB
    integer, public, parameter :: PIO_MAX_ATTRS = PIO_MAX_ATTRS_UB
    integer, public, parameter :: PIO_MAX_VARS = PIO_MAX_VARS_UB
-   integer, public, parameter :: PIO_MAX_NAME = 25
+   integer, public, parameter :: PIO_MAX_NAME = PIO_MAX_NAME_UB
    integer, public, parameter :: PIO_MAX_VAR_DIMS = 6
    integer, public, parameter :: PIO_CLOBBER = 10
    integer, public, parameter :: PIO_NOCLOBBER = 11
@@ -305,8 +306,15 @@ module pio_types
 !>
 !! @defgroup PIO_rearr_comm_t PIO_rearr_comm_t
 !! @public 
-!! @brief The two choices for rearranger communication
+!! @brief The data rearranger communication mode
 !! @details
+!! The data rearranger in the library rearranges data between the
+!! compute processes (all the MPI processes in the I/O subsystem) and
+!! I/O processes (a subset of the compute processes in the I/O subsystem or
+!! a disjoint set of MPI processes in the I/O subsystem) before flushing the
+!! data written out by the user to the filesystem. The data rearrangement
+!! among the MPI processes can be achieved using MPI point to point or
+!! collective communication.
 !!  - PIO_rearr_comm_p2p : Point to point
 !!  - PIO_rearr_comm_coll : Collective
 !>
@@ -318,12 +326,17 @@ module pio_types
 !>
 !! @defgroup PIO_rearr_comm_dir PIO_rearr_comm_dir
 !! @public 
-!! @brief The four choices for rearranger communication direction
+!! @brief The data rearrangment flow control direction
 !! @details
-!!  - PIO_rearr_comm_fc_2d_enable : COMM procs to IO procs and vice versa
-!!  - PIO_rearr_comm_fc_1d_comp2io: COMM procs to IO procs only
-!!  - PIO_rearr_comm_fc_1d_io2comp: IO procs to COMM procs only
-!!  - PIO_rearr_comm_fc_2d_disable: Disable flow control
+!! The data rearranger can use flow control when rearranging data among
+!! the MPI processes. The flow control can be enabled for data
+!! rearrangement from compute processes to I/O processes (e.g. during a
+!! write operation), from I/O processes to compute processes (e.g. during
+!! a read operation) or both.
+!!  - PIO_rearr_comm_fc_2d_enable : compute procs to I/O procs and vice versa
+!!  - PIO_rearr_comm_fc_1d_comp2io: compute procs to I/O procs only
+!!  - PIO_rearr_comm_fc_1d_io2comp: I/O procs to compute procs only
+!!  - PIO_rearr_comm_fc_2d_disable: disable flow control
 !>
     enum, bind(c)
       enumerator :: PIO_rearr_comm_fc_2d_enable = 0
@@ -334,12 +347,21 @@ module pio_types
 
 !>
 !! @defgroup PIO_rearr_comm_fc_options PIO_rearr_comm_fc_options
-!! @brief Type that defines the PIO rearranger options
+!! @brief The data rearranger flow control options
 !! @details
-!!  - enable_hs : Enable handshake (true/false) 
-!!  - enable_isend : Enable Isends (true/false)
-!!  - max_pend_req : Maximum pending requests (To indicated unlimited
-!!                    number of requests use PIO_REARR_COMM_UNLIMITED_PEND_REQ)
+!! The data rearranger supports flow control when rearranging data among
+!! the MPI processes.
+!!  - enable_hs : Enable handshake (logical). If this option is enabled
+!!                a "handshake" is sent between communicating processes
+!!                before data is sent
+!!  - enable_isend : Enable non-blocking sends (logical). If this option
+!!                    is enabled non-blocking sends (instead of blocking
+!!                    sends) are used to send data between MPI processes
+!!                    while rearranging data
+!!  - max_pend_req : The maximum pending requests allowed at a time when
+!!                    MPI processes communicate for rearranging data among
+!!                    themselves. (Use PIO_REARR_COMM_UNLIMITED_PEND_REQ
+!!                    for allowing unlimited number of pending requests)
 !>
    type, bind(c), public :: PIO_rearr_comm_fc_opt_t
       logical(c_bool) :: enable_hs            ! Enable handshake?
@@ -350,8 +372,12 @@ module pio_types
     integer, public, parameter :: PIO_REARR_COMM_UNLIMITED_PEND_REQ = -1
 !>
 !! @defgroup PIO_rearr_options PIO_rearr_options
-!! @brief Type that defines the PIO rearranger options
+!! @brief The data rearranger options
 !! @details
+!! The library includes support for a data rearranger that rearranges data
+!! among MPI processes to improve the I/O throughput of the application.
+!! The user can control the data rearrangement by passing the data
+!! rearranger options to the library.
 !!  - comm_type : @copydoc PIO_rearr_comm_t
 !!  - fcd : @copydoc PIO_rearr_comm_dir
 !!  - comm_fc_opts : @copydoc PIO_rearr_comm_fc_options
