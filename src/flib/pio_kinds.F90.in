@@ -21,6 +21,7 @@
 #ifndef NO_MPIMOD
    use mpi, only : MPI_OFFSET_KIND ! _EXTERNAL
 #endif
+   use iso_c_binding
 
    implicit none
    private
@@ -42,7 +43,8 @@
 !  type, which is not nessasarily the type kind
 !
    
-   integer, parameter, public :: PIO_OFFSET_KIND=MPI_OFFSET_KIND
+   integer, parameter, public :: PIO_OFFSET_KIND=@PIO_OFFSET_F_KIND@
+   integer, parameter, public :: PIO_OFFSET_F2C_TYPE_KIND=kind(@PIO_OFFSET_F2C_TYPE_KIND@)
 
 !EOP
 !BOC

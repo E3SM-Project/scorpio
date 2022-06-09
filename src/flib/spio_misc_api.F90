@@ -12,7 +12,7 @@
 MODULE spio_misc_api
   USE iso_c_binding
   USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t
-  USE pio_kinds, ONLY : i4, r4, r8, pio_offset_kind
+  USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
   USE spio_misc_api_cint
   IMPLICIT NONE
 
@@ -34,11 +34,11 @@ CONTAINS
     INTEGER(PIO_OFFSET_KIND), INTENT(IN) :: limit
     INTEGER(PIO_OFFSET_KIND), INTENT(OUT), OPTIONAL :: prev_limit
 
-    INTEGER(PIO_OFFSET_KIND) :: lim
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND) :: lim
 
-    lim = PIOc_set_buffer_size_limit(limit)
+    lim = PIOc_set_buffer_size_limit(INT(limit, PIO_OFFSET_F2C_TYPE_KIND))
     IF(PRESENT(prev_limit)) THEN
-      prev_limit = lim
+      prev_limit = INT(lim, PIO_OFFSET_KIND)
     END IF
   END SUBROUTINE pio_set_buffer_size_limit
 END MODULE spio_misc_api
