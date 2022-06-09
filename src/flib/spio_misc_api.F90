@@ -10,6 +10,7 @@
 #define __PIO_FILE__ 'spio_misc_api.F90'
 
 MODULE spio_misc_api
+  USE iso_c_binding
   USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t
   USE pio_kinds, ONLY : i4, r4, r8, pio_offset_kind
   USE spio_misc_api_cint
