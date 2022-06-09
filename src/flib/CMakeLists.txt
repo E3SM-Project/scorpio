@@ -65,6 +65,8 @@ endforeach ()
 set (PIO_Fortran_SRCS
   spio_err_cint.F90
   spio_err.F90
+  spio_init_cint.F90
+  spio_init.F90
   spio_file_cint.F90
   spio_file.F90
   spio_misc_api_cint.F90
