@@ -1,0 +1,263 @@
+!> @file
+!! @brief Miscellaneous SCORPIO APIs
+!! This file contains the SCORPIO APIs initialize and free
+!! I/O decompositions
+!!
+
+!> @internal
+!! @def __PIO_FILE__
+!! This macro is used to define the file name in user messages
+!!
+#define __PIO_FILE__ 'spio_decomp.F90'
+
+MODULE spio_decomp
+  USE iso_c_binding
+  USE pio_types, ONLY : iosystem_desc_t, io_desc_t, file_desc_t, PIO_IOID_INVALID,&
+                        PIO_MAX_NAME
+  USE pio_kinds, ONLY : i4, i8, r4, r8, PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
+  USE spio_err, ONLY : pio_error
+  USE spio_decomp_cint
+
+#ifdef TIMING
+  USE perf_mod, ONLY  : t_startf, t_stopf
+#endif
+  IMPLICIT NONE
+
+  PRIVATE
+  PUBLIC :: pio_initdecomp, pio_freedecomp
+
+!> @defgroup PIO_initdecomp PIO_initdecomp
+!! @brief Initialize an I/O decomposition
+  INTERFACE pio_initdecomp
+    ! TYPE int,offset
+    MODULE PROCEDURE pio_initdecomp_{TYPE}
+  END INTERFACE
+
+!> @defgroup PIO_freedecomp PIO_freedecomp
+!! @brief Free an I/O decomposition
+  INTERFACE pio_freedecomp
+    MODULE PROCEDURE pio_freedecomp_ios
+    MODULE PROCEDURE pio_freedecomp_file
+  END INTERFACE
+
+CONTAINS
+
+! TYPE int,offset
+!> @ingroup PIO_initdecomp
+!! @public
+!! @brief Initialize an I/O decomposition
+!!
+!! @details
+!! @param[in] iosys The handle to the I/O subsystem associated with
+!!                  the I/O decomposition. @copydoc iosystem_desc_t
+!! @param[in] dt    The type of the data in memory. Note that users
+!!                  can use an I/O decomposition representing data in
+!!                  memory with type T1 (e.g. real(r8)) to write data
+!!                  for a variable with a different type, say T2
+!!                  (e.g. real(r4)) as long as T1 can be safely
+!!                  typecasted to T2. @copydoc PIO_kinds
+!! @param[in] gdims The global dimensions of the I/O decomposition
+!! @param[in] map   The mapping between local data index and the global
+!!                  linearized index for each local data element
+!!                  e.g. If after partitioning the local array contains
+!!                  A(2,3) and A(3,3) of an array A[4x4], the map needs
+!!                  to contain [10, 11] corrsponding to the linearized
+!!                  indices of A(2,3) & A(3,3)
+!! @param[out] iodesc The handle to the I/O decomposition is returned
+!!                    via this arg.
+!!                    @copydoc io_desc_t
+!! @param[in] rearr (Optional) The data rearranger to use for this I/O
+!!                  decomposition. @copydoc PIO_rearr_method
+!! @param[in] start (Optional) The start array containing the local
+!!                  start index for all the dimensions. i.e., start(i)
+!!                  contains the starting index for data in the current
+!!                  process for dimension i and size(start) = number of
+!!                  dimensions for the data. The start array is passed
+!!                  in for trivial (e.g. block cyclic) decompositions.
+!!                  The library internally calculates this value if
+!!                  not provided by the user.
+!! @param[in] cnt (Optional) The count array containing the local
+!!                  count for all the dimensions. i.e., count(i) contains
+!!                  the number of elements of data in the current
+!!                  process for dimension i and size(count) = number of
+!!                  dimensions for the data. The count array is passed
+!!                  in for trivial (e.g. block cyclic) decompositions.
+!!                  The library internally calculates this value if
+!!                  not provided by the user.
+!! @param[out] ierr (Optional) @copydoc error_return
+!!
+  SUBROUTINE pio_initdecomp_{TYPE}(iosys, dt, gdims, map, iodesc,&
+                                    rearr, start, cnt, ierr)
+    TYPE(iosystem_desc_t), INTENT(IN) :: iosys
+    INTEGER, INTENT(IN) :: dt
+    INTEGER, INTENT(IN) :: gdims(:)
+    {VTYPE}, INTENT(IN) :: map(:)
+    TYPE(io_desc_t), INTENT(INOUT) :: iodesc
+    INTEGER, TARGET, OPTIONAL, INTENT(IN) :: rearr
+    INTEGER(PIO_OFFSET_KIND), DIMENSION(:), OPTIONAL, INTENT(IN) :: start
+    INTEGER(PIO_OFFSET_KIND), DIMENSION(:), OPTIONAL, INTENT(IN) :: cnt
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    INTEGER :: ndims, mapsz
+    INTEGER(C_INT), TARGET :: cgdims(SIZE(gdims))
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), DIMENSION(:), TARGET, ALLOCATABLE :: cmap
+    INTEGER(C_INT), TARGET :: crearr, cioid
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), DIMENSION(:), TARGET, ALLOCATABLE :: cstart, ccnt
+    TYPE(C_PTR) :: prearr, pstart, pcnt
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER(C_INT) :: i, cerr, ret
+
+#ifdef TIMING
+    CALL t_startf("PIO:initdecomp")
+#endif
+
+    ndims = SIZE(gdims)
+    mapsz = SIZE(map)
+    ! Convert Fortran dimension order, leftmost fastest varying, to C order,
+    ! rightmost fastest varying
+    DO i=1,ndims
+      cgdims(i) = INT(gdims(ndims - i + 1), C_INT)
+    END DO
+
+    ! Since the decomposition map can be large, allocate() the array
+    ALLOCATE(cmap(mapsz))
+    DO i=1,mapsz
+      cmap(i) = INT(map(i), PIO_OFFSET_F2C_TYPE_KIND)
+    END DO
+
+    IF(PRESENT(rearr)) THEN
+      crearr = INT(rearr, C_INT)
+      prearr = C_LOC(crearr)
+    ELSE
+      prearr = C_NULL_PTR
+    ENDIF
+
+    IF(PRESENT(start) .AND. PRESENT(cnt))THEN
+      ALLOCATE(cstart(ndims), ccnt(ndims))
+      ! Convert Fortran dimension order, leftmost fastest varying, to C order,
+      ! rightmost fastest varying
+      DO i=1,ndims
+        cstart(i) = INT(start(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
+        ccnt(i) = INT(cnt(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
+      END DO
+      pstart = C_LOC(cstart)
+      pcnt = C_LOC(ccnt)
+    ELSE
+      pstart = C_NULL_PTR
+      pcnt = C_NULL_PTR
+    ENDIF
+
+    iodesc%ioid = PIO_IOID_INVALID
+    cioid = PIO_IOID_INVALID
+    cerr = PIOc_initdecomp(iosys%iosysid, INT(dt, C_INT), INT(ndims, C_INT),&
+                            C_LOC(cgdims), INT(mapsz, C_INT), C_LOC(cmap),&
+                            C_LOC(cioid), prearr, pstart, pcnt)
+    IF(PRESENT(ierr)) THEN
+      ierr = INT(cerr)
+    ELSE
+      WRITE(log_msg, *) "PIO_initdecomp (PIO_initdecomp_{TYPE}) failed, err =",&
+                        cerr, ", iosysid =", iosys%iosysid, ", gdims = ", gdims
+      ret = pio_error(iosys, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+    ENDIF
+
+    iodesc%ioid = cioid
+    IF(PRESENT(start) .AND. PRESENT(cnt))THEN
+      DEALLOCATE(cstart, ccnt)
+    ENDIF
+    DEALLOCATE(cmap)
+
+#ifdef TIMING
+    CALL t_stopf("PIO:initdecomp")
+#endif
+  END SUBROUTINE pio_initdecomp_{TYPE}
+
+!> @ingroup PIO_freedecomp
+!! @public
+!! @brief Free an I/O decomposition associated with an I/O subsystem
+!!
+!! @details
+!! @param[in] iosys The handle to the I/O subsystem associated with
+!!                  the I/O decomposition. @copydoc iosystem_desc_t
+!! @param[in] iodesc The handle to the I/O decomposition.
+!!                    @copydoc io_desc_t
+!! @param[out] ierr (Optional) @copydoc error_return
+!!
+  SUBROUTINE pio_freedecomp_ios(iosys, iodesc, ierr)
+    TYPE(iosystem_desc_t), INTENT(IN) :: iosys
+    TYPE(io_desc_t), INTENT(INOUT) :: iodesc
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER :: ret
+    INTEGER(C_INT) :: cerr
+
+#ifdef TIMING
+    CALL t_startf("PIO:freedecomp")
+#endif
+
+    cerr = PIOc_freedecomp(iosys%iosysid, iodesc%ioid)
+    IF(PRESENT(ierr)) THEN
+      ierr = INT(cerr)
+    ELSE
+      WRITE(log_msg, *) "PIO_freedecomp (PIO_freedecomp_ios) failed, err = ",&
+                        cerr, ", iosysid =", iosys%iosysid,&
+                        ", ioid =", iodesc%ioid
+      ret = pio_error(iosys, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+    ENDIF
+
+    iodesc%ioid = PIO_IOID_INVALID
+
+#ifdef TIMING
+    CALL t_stopf("PIO:freedecomp")
+#endif
+  END SUBROUTINE pio_freedecomp_ios
+
+!> @ingroup PIO_freedecomp
+!! @public
+!! @brief Free an I/O decomposition associated with a file
+!!
+!! @details
+!! @param[in] file The handle to the file associated with
+!!                  the I/O decomposition. @copydoc file_desc_t
+!! @param[in] iodesc The handle to the I/O decomposition
+!!                    @copydoc io_desc_t
+!! @param[out] ierr (Optional) @copydoc error_return
+!!
+  SUBROUTINE pio_freedecomp_file(file, iodesc, ierr)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    TYPE(io_desc_t), INTENT(INOUT) :: iodesc
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER :: ret
+    INTEGER(C_INT) :: cerr
+
+#ifdef TIMING
+    CALL t_startf("PIO:freedecomp")
+#endif
+
+    ! Since a I/O decomposition can be freed before all writes
+    ! to a file is synced (explicit sync or close) we need to
+    ! ensure that all writes to the file is synced
+    ! FIXME : This is unfortunate since all writes (even writes
+    ! with a different I/O decomposition) are synced here. This
+    ! is unnecessary and needs to be fixed (a performance bug)
+    call syncfile(file)
+
+    cerr = PIOc_freedecomp(file%iosystem%iosysid, iodesc%ioid)
+    IF(PRESENT(ierr)) THEN
+      ierr = INT(cerr)
+    ELSE
+      WRITE(log_msg, *) "PIO_freedecomp (PIO_freedecomp_file) failed, err = ",&
+                        cerr, ", iosysid =", file%iosystem%iosysid,&
+                        ", ncid =", file%fh, ", ioid = ", iodesc%ioid
+      ret = pio_error(file%iosystem, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+    ENDIF
+
+    iodesc%ioid = PIO_IOID_INVALID
+
+#ifdef TIMING
+    CALL t_stopf("PIO:freedecomp")
+#endif
+  END SUBROUTINE pio_freedecomp_file
+END MODULE spio_decomp

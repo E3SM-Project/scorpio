@@ -36,7 +36,9 @@ set (PIO_GenF90_SRCS pionfatt_mod.F90
   pionfget_mod.F90
   pio_support.F90
   spio_darray.F90
-  spio_darray_cint.F90)
+  spio_darray_cint.F90
+  spio_decomp.F90
+  )
 
 # Generate Fortran source from template files using genf90
 foreach (SRC_FILE IN LISTS PIO_GenF90_SRCS)
@@ -67,6 +69,7 @@ set (PIO_Fortran_SRCS
   spio_err.F90
   spio_init_cint.F90
   spio_init.F90
+  spio_decomp_cint.F90
   spio_file_cint.F90
   spio_file.F90
   spio_misc_api_cint.F90

@@ -13,8 +13,8 @@ my $outfile;
 # {TYPE} and {DIMS} are used to generate the specific subroutine names from the 
 #            generic template
 # {TYPE} : Variable type name; implemented types are character, 4 or 8 byte real,
-#          and 4 or 8 byte integer.
-#                allowed values: text, real, double, int, long, logical
+#          4 or 8 byte integer and PIO_OFFSET types.
+#                allowed values: text, real, double, int, long, offset, logical
 #                default values:  text, real, double, int
 # {VTYPE} : Used to generate variable declarations to match the specific type.
 #                if {TYPE}=double then {VTYPE} is "real(r8)"
@@ -40,18 +40,21 @@ my $vtype = {'text' => 'character(len=*)',
 	     'double' => 'real(r8)',
 	     'int'    => 'integer(i4)',
 	     'long'   => 'integer(i8)',
+	     'offset' => 'integer(PIO_OFFSET_KIND)',
              'logical' => 'logical' };
 my $itype = {'text' => 100, 
 	     'real' => 101, 
 	     'double' => 102,
 	     'int'    => 103,
 	     'long'   => 104,
-             'logical' => 105};
+	     'offset' => 105,
+             'logical' => 106};
 my $itypename = {'text' => 'TYPETEXT', 
 	     'real' =>  'TYPEREAL', 
 	     'double' => 'TYPEDOUBLE',
 	     'int'    => 'TYPEINT',
 	     'long'   =>  'TYPELONG',
+	     'offset' =>  'TYPEOFFSET',
              'logical' => 'TYPELOGICAL'};
 my $mpitype = {'text' => 'MPI_CHARACTER',
 	       'real' => 'MPI_REAL4',
@@ -133,6 +136,7 @@ foreach(@ARGV){
 	$itypeflag=1 if($line =~ /TYPEDOUBLE/);
 	$itypeflag=1 if($line =~ /TYPEINT/);
 	$itypeflag=1 if($line =~ /TYPELONG/);
+	$itypeflag=1 if($line =~ /TYPEOFFSET/);
 
 	
         if($contains==0){
@@ -289,7 +293,8 @@ sub writedtypes{
 #define TYPEDOUBLE 102
 #define TYPEINT 103
 #define TYPELONG 104
-#define TYPELOGICAL 105
+#define TYPEOFFSET 105
+#define TYPELOGICAL 106
 ";
     close(F);
 }
