@@ -12,7 +12,8 @@
 MODULE spio_err
   USE iso_c_binding
   USE pio_types, ONLY : iosystem_desc_t, file_desc_t,&
-                        PIO_IOSYSID_INVALID, PIO_FH_INVALID
+                        PIO_IOSYSID_INVALID, PIO_FH_INVALID, PIO_MAX_NAME,&
+                        PIO_NOERR
   USE spio_err_cint
 #ifdef TIMING
   use perf_mod, only : t_startf, t_stopf   !_EXTERNAL
@@ -20,7 +21,7 @@ MODULE spio_err
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: pio_error
+  PUBLIC :: pio_error, pio_setdebuglevel, pio_seterrorhandling
 
 !> @defgroup PIO_error PIO_error
 !! @brief Handles error codes in the Fortran interface
@@ -29,6 +30,15 @@ MODULE spio_err
     MODULE PROCEDURE pio_iosys_error
     MODULE PROCEDURE pio_file_error
     MODULE PROCEDURE pio_comm_error
+  END INTERFACE
+
+!> @defgroup PIO_seterrorhandling PIO_seterrorhandling
+!! @brief Set the error handler to use for an I/O system of file
+!!        @copydoc PIO_error_method
+!!
+  INTERFACE pio_seterrorhandling
+    MODULE PROCEDURE pio_seterrorhandling_iosys
+    MODULE PROCEDURE pio_seterrorhandling_file
   END INTERFACE
 
 CONTAINS
@@ -116,4 +126,93 @@ CONTAINS
 
     ierr = err_num
   END FUNCTION pio_comm_error
+
+!> @defgroup PIO_setdebuglevel PIO_setdebuglevel
+!> @public
+!! @brief Set the debug level for debug messages from the library
+!!
+!! @param[in] level The debug level for debug messages from the library
+!! @param[out] ierr (Optional) @copydoc error_return
+  SUBROUTINE pio_setdebuglevel(lvl, ierr)
+    USE mpi, only : MPI_COMM_WORLD
+
+    INTEGER, INTENT(IN) :: lvl
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER(C_INT) :: cerr, ret
+
+    cerr = PIO_set_log_level(lvl)
+    IF(PRESENT(ierr)) THEN
+      ierr = INT(cerr)
+    ELSE
+      WRITE(log_msg, *) "Setting the log level to ", lvl, "failed, err = ", cerr
+      ret = pio_error(MPI_COMM_WORLD, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+    END IF
+
+  END SUBROUTINE pio_setdebuglevel
+
+!> @ingroup PIO_seterrorhandling
+!> @public
+!! @brief Set the error handler to use for an I/O system
+!!
+!! @param[in] iosys The I/O subsystem where the error handler needs to be set
+!!                  @copydoc iosystem_desc_t
+!! @param[in] eh  The error handler method to use for this I/O subsystem.
+!!                @copydoc PIO_error_method
+!! @param[out] old_eh (Optional) The old error handler method used by the
+!!                    I/O subsystem.
+!! @param[out] ierr (Optional) @copydoc error_return
+  SUBROUTINE pio_seterrorhandling_iosys(iosys, eh, old_eh, ierr)
+    TYPE(iosystem_desc_t), INTENT(IN) :: iosys
+    INTEGER, INTENT(IN) :: eh
+    INTEGER, OPTIONAL, INTENT(OUT) :: old_eh
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    INTEGER(C_INT) :: ceh
+    INTEGER(C_INT) :: cerr, ret
+
+    ceh = PIOc_Set_IOSystem_Error_handling(iosys%iosysid, eh)
+    IF(PRESENT(old_eh)) THEN
+      old_eh = INT(ceh)
+    END IF
+    IF(PRESENT(ierr)) THEN
+      ierr = PIO_NOERR
+    END IF
+
+  END SUBROUTINE pio_seterrorhandling_iosys
+
+!> @ingroup PIO_seterrorhandling
+!> @public
+!! @brief Set the error handler to use for a file.
+!!
+!! @details
+!! Set the error handler to use for a file. Note that setting the error
+!! handler for a file also sets the error handler for the I/O system
+!! associated with the file
+!! @param[in] file The file to set the error handler
+!!                 @copydoc file_desc_t
+!! @param[in] eh  The error handler method to use for this file & I/O subsystem.
+!!                @copydoc PIO_error_method
+!! @param[out] old_eh (Optional) The old error handler method used by the
+!!                    I/O subsystem associated with this file
+!! @param[out] ierr (Optional) @copydoc error_return
+  SUBROUTINE pio_seterrorhandling_file(file, eh, old_eh, ierr)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    INTEGER, INTENT(IN) :: eh
+    INTEGER, OPTIONAL, INTENT(OUT) :: old_eh
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    INTEGER(C_INT) :: ceh
+    INTEGER(C_INT) :: cerr, ret
+
+    ceh = PIOc_Set_IOSystem_Error_handling(file%iosystem%iosysid, eh)
+    IF(PRESENT(old_eh)) THEN
+      old_eh = INT(ceh)
+    END IF
+    IF(PRESENT(ierr)) THEN
+      ierr = PIO_NOERR
+    END IF
+
+  END SUBROUTINE pio_seterrorhandling_file
 END MODULE spio_err
