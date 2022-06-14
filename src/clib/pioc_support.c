@@ -1273,6 +1273,43 @@ int PIOc_error(int iosysid, int ncid,
 }
 
 /**
+ * Handle a warning in SCORPIO.
+ * (Not a collective call)
+ *
+ * @param iosysid The I/O system id associated with the warning
+ * @param ncid The file id of the file associated with the warning
+ * @param fname The name of source code file where the warning occured.
+ * @param line The line number of source code where the warning occurred.
+ * @param uwarn_msg The user warning message
+ */
+void PIOc_warn(int iosysid, int ncid,
+                const char *fname, int line,
+                const char *uwarn_msg)
+{
+  iosystem_desc_t *ios = NULL;
+  file_desc_t *file = NULL;
+  int ret;
+
+  /* Note that calls to get the I/O system and
+   * the file can (is allowed to) fail
+   */
+  ret = pio_get_file(ncid, &file);
+
+  if(file){
+    ios = file->iosystem;
+  }
+  else{
+    ios = pio_get_iosystem_from_id(iosysid);
+  }
+
+  bool print_warn_msg = (ios) ? (ios->union_rank == ios->ioroot) : true;
+  if(print_warn_msg){
+    fprintf(stderr, "PIO: WARNING: %s, (%s:%d)\n", uwarn_msg, (fname) ? fname : '\0', line);
+    fflush(stderr);
+  }
+}
+
+/**
  * Allocate a region struct, and initialize it.
  *
  * @param ios pointer to the IO system info, used for error

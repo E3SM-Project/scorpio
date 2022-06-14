@@ -36,6 +36,27 @@ END INTERFACE
 
 INTERFACE
 !> @private
+!! @brief Fortran interface to C function that handles warning messages
+!!
+!! @param[in] iosysid The handle to the I/O system with the warning
+!! @param[in] fh The file handle for the file with the warning
+!! @param[in] fname The name of the source file with the warning
+!! @param[in] line The line number in the source file with the warning
+!! @param[in] uwarn_msg The user warning message
+  SUBROUTINE PIOc_warn(iosysid, fh, fname, line, uwarn_msg)&
+                          bind(C,name="PIOc_warn")
+    USE iso_c_binding
+
+    INTEGER(C_INT), VALUE :: iosysid
+    INTEGER(C_INT), VALUE :: fh
+    CHARACTER(C_CHAR), DIMENSION(*) :: fname
+    INTEGER(C_INT), VALUE :: line
+    CHARACTER(C_CHAR), DIMENSION(*) :: uwarn_msg
+  END SUBROUTINE PIOc_warn
+END INTERFACE
+
+INTERFACE
+!> @private
 !! @brief Set the level for debug messages from the I/O library
 !!
 !! @param[in] lvl The new debug level for debug messages

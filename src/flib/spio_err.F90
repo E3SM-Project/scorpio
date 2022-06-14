@@ -21,7 +21,7 @@ MODULE spio_err
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: pio_error, pio_setdebuglevel, pio_seterrorhandling
+  PUBLIC :: pio_error, pio_warn, pio_setdebuglevel, pio_seterrorhandling
 
 !> @defgroup PIO_error PIO_error
 !! @brief Handles error codes in the Fortran interface
@@ -30,6 +30,15 @@ MODULE spio_err
     MODULE PROCEDURE pio_iosys_error
     MODULE PROCEDURE pio_file_error
     MODULE PROCEDURE pio_comm_error
+  END INTERFACE
+
+!> @defgroup PIO_warn PIO_warn
+!! @brief Handles warning messages in the Fortran interface
+!!
+  INTERFACE pio_warn
+    MODULE PROCEDURE pio_iosys_warn
+    MODULE PROCEDURE pio_file_warn
+    MODULE PROCEDURE pio_comm_warn
   END INTERFACE
 
 !> @defgroup PIO_seterrorhandling PIO_seterrorhandling
@@ -126,6 +135,66 @@ CONTAINS
 
     ierr = err_num
   END FUNCTION pio_comm_error
+
+!> @ingroup PIO_warn
+!> @private
+!! @brief Function that handles warning messages associated with an I/O system
+!!
+!! @param[in] iosys The I/O system associated with the warning
+!! @param[in] fname The name of the source file with the warning
+!! @param[in] line The line number in the source file with the warning
+!! @param[in] uwarn_msg The user warning message
+  SUBROUTINE pio_iosys_warn(iosys, fname, line, uwarn_msg)
+    TYPE(iosystem_desc_t), INTENT(IN) :: iosys
+    CHARACTER(LEN=*), INTENT(IN) :: fname
+    INTEGER, INTENT(IN) :: line
+    CHARACTER(LEN=*), INTENT(IN) :: uwarn_msg
+
+    CALL PIOc_warn(iosys%iosysid, PIO_FH_INVALID, trim(fname) // C_NULL_CHAR, line,&
+                      trim(uwarn_msg) // C_NULL_CHAR)
+  END SUBROUTINE pio_iosys_warn
+
+!> @ingroup PIO_warn
+!> @private
+!! @brief Function that handles warning messages associated with a file
+!!
+!! @param[in] file The file associated with the error
+!! @param[in] fname The name of the source file with the warning
+!! @param[in] line The line number in the source file with the warning
+!! @param[in] uwarn_msg The user warning message
+  SUBROUTINE pio_file_warn(file, fname, line, uwarn_msg)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    CHARACTER(LEN=*), INTENT(IN) :: fname
+    INTEGER, INTENT(IN) :: line
+    CHARACTER(LEN=*), INTENT(IN) :: uwarn_msg
+
+    CALL PIOc_warn(PIO_IOSYSID_INVALID, file%fh, trim(fname) // C_NULL_CHAR, line,&
+                      trim(uwarn_msg) // C_NULL_CHAR)
+  END SUBROUTINE pio_file_warn
+
+!> @ingroup PIO_warn
+!> @private
+!! @brief Function that handles warning messages associated with an MPI communicator
+!!
+!! @param[in] comm The MPI communicator associated with the error
+!! @param[in] fname The name of the source file with the warning
+!! @param[in] line The line number in the source file with the warning
+!! @param[in] uwarn_msg The user warning message
+  SUBROUTINE pio_comm_warn(comm, fname, line, uwarn_msg)
+    INTEGER, INTENT(IN) :: comm
+    CHARACTER(LEN=*), INTENT(IN) :: fname
+    INTEGER, INTENT(IN) :: line
+    CHARACTER(LEN=*), INTENT(IN) :: uwarn_msg
+
+    INTEGER, PARAMETER :: ROOT_RANK = 0
+    INTEGER :: rank
+    INTEGER :: ierr
+
+    CALL MPI_Comm_rank(comm, rank, ierr)
+    IF(rank == ROOT_RANK) THEN
+      PRINT *, "WARNING: ", TRIM(uwarn_msg), ",", trim(fname), ":", line
+    ENDIF
+  END SUBROUTINE pio_comm_warn
 
 !> @defgroup PIO_setdebuglevel PIO_setdebuglevel
 !> @public
