@@ -17,7 +17,7 @@ MODULE spio_misc_api
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: pio_set_buffer_size_limit
+  PUBLIC :: pio_set_buffer_size_limit, pio_iotype_available
 
 CONTAINS
 
@@ -41,4 +41,26 @@ CONTAINS
       prev_limit = INT(lim, PIO_OFFSET_KIND)
     END IF
   END SUBROUTINE pio_set_buffer_size_limit
+
+!> @defgroup PIO_iotype_available PIO_iotype_available
+!! @public
+!! @brief Check if an iotype is available. @copydoc PIO_iotype
+!!
+!! @details
+!! @param[in] The iotype to check for availability
+!! @returns .TRUE. if iotype is available, .FALSE. otherwise
+!!
+  LOGICAL FUNCTION pio_iotype_available(iotype) RESULT(is_avail)
+    INTEGER, INTENT(IN) :: iotype
+
+    INTEGER(C_INT) :: cret
+
+    cret = PIOc_iotype_available(INT(iotype, C_INT))
+    IF(cret /= 0) THEN
+      is_avail = .TRUE.
+    ELSE
+      is_avail = .FALSE.
+    END IF
+
+  END FUNCTION pio_iotype_available
 END MODULE spio_misc_api

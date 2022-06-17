@@ -30,4 +30,18 @@ INTERFACE
   END FUNCTION PIOc_set_buffer_size_limit
 END INTERFACE
 
+INTERFACE
+!> @private
+!! @brief Fortran interface to C function to check if an iotype
+!! is available. @copydoc PIO_iotype
+!!
+!! @param[in] iotype The iotype to check
+!! @returns Returns 1 if the iotype is available, 0 otherwise
+  INTEGER(C_INT) FUNCTION PIOc_iotype_available(iotype)&
+                          bind(C,name="PIOc_iotype_available")
+    USE iso_c_binding
+    INTEGER(C_INT), VALUE :: iotype
+  END FUNCTION PIOc_iotype_available
+END INTERFACE
+
 END MODULE spio_misc_api_cint
