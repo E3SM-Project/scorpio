@@ -14,14 +14,16 @@ MODULE spio_util
   USE pio_types, ONLY : iosystem_desc_t, file_desc_t,&
                         PIO_IOSYSID_INVALID, PIO_FH_INVALID, PIO_MAX_NAME,&
                         PIO_EINTERNAL, PIO_NOERR
+  USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
   USE spio_err, ONLY  : pio_error
+  USE spio_util_cint
 #ifdef TIMING
   USE perf_mod, ONLY : t_startf, t_stopf   !_EXTERNAL
 #endif
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: f2cstring, c2fstring
+  PUBLIC :: f2cstring, c2fstring, get_text_var_sz, get_var_dim_sz
 
 !> @private
 !! @defgroup f2cstring f2cstring
@@ -945,4 +947,213 @@ CONTAINS
     END DO ! DO q=1,fstr_dim_sz(5)
 
   END FUNCTION c2fstring_5d
+
+!>
+!! @private
+!! @brief Get the size of a text/character variable
+!! (Each element of a text variable is a string)
+!! @details
+!! @param file  The handle to the file containing the variable
+!! @param varid Id of the queried variable
+!! @param var_slen  The length of each string in the variable is
+!!                    returned in this arg
+!! @param var_nstrs (Optional) The number of strings in the variable is
+!!                    returned in this arg
+!! @param var_dim_sz  (Optional) The dimension sizes of the variable is
+!!                      returned in this arg
+!! @returns @copydoc error_code
+!!
+  INTEGER FUNCTION get_text_var_sz(file, varid, var_slen,&
+                                    var_nstrs, var_dim_sz) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    INTEGER, INTENT(IN) :: varid
+    INTEGER, INTENT(OUT) :: var_slen
+    INTEGER, INTENT(OUT), OPTIONAL :: var_nstrs
+    INTEGER, INTENT(OUT), OPTIONAL :: var_dim_sz(:)
+
+    INTEGER :: ndims = 0
+    INTEGER, ALLOCATABLE :: dimids(:)
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND) :: dim_sz
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER :: i
+    INTEGER(C_INT) :: cerr
+
+    ierr = PIO_NOERR
+
+    IF(PRESENT(var_nstrs)) THEN
+      var_nstrs = 0
+    END IF
+
+    ! Get the number of dimensions in variable
+    cerr = PIOc_inq_varndims(file%fh, varid-1, ndims)
+    IF(cerr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "Inquiring number of dims of variable failed, fh = ", file%fh,&
+                        ", varid = ", varid
+      cerr = pio_error(file%iosystem, cerr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      ierr = INT(cerr)
+      RETURN
+    END IF
+    IF(ndims == 0) THEN
+      ! A scalar character variable
+      var_slen = 1
+      ! Number of strings = 0, so leave it at the default value
+      ierr = PIO_NOERR
+      RETURN
+    END IF
+    ! Get the dimension ids for the variable
+    ALLOCATE(dimids(ndims))
+    cerr = PIOc_inq_vardimid(file%fh, varid-1, dimids)
+    IF(cerr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "Inquiring the variable dimension ids for the text variable failed,",&
+                        "fh = ", file%fh, ", varid = ", varid
+      cerr = pio_error(file%iosystem, cerr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      ierr = INT(cerr)
+      RETURN
+    END IF
+
+    ! Get the size of dimension 1
+    ! The dimension 1 of a text variable is the length
+    ! of each string in the variable i.e., var_slen
+    ! Note: The dimension ids used here were retrieved using
+    !   the C interface FUNCTION, hence does not require
+    !   Fortran to C conversion (to pass to a C function)
+    !   i.e., using dimids(i) instead of dimids(i) - 1
+    !   However the dimids are in the C order, so we
+    !   need to use the reverse array for the Fortran
+    !   dimension (when using it in Fortran)
+    !   i.e., using dimids(ndims - i + 1) instead of dimids(i)
+    cerr = PIOc_inq_dimlen(file%fh, dimids(ndims), dim_sz)
+    IF(cerr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "Inquiring the lengths of 0th dimension for the text variable failed,",&
+                        "fh = ", file%fh, ", varid = ", varid
+      cerr = pio_error(file%iosystem, cerr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      ierr = INT(cerr)
+      RETURN
+    END IF
+
+    var_slen = INT(dim_sz)
+    IF(PRESENT(var_nstrs)) THEN
+      var_nstrs = 1
+    END IF
+
+    IF(ndims > 1) THEN
+      IF(PRESENT(var_dim_sz)) THEN
+        IF(SIZE(var_dim_sz) < ndims - 1) THEN
+          WRITE(log_msg, *) "Not enough space to copy back the dimension sizes of the text variable,",&
+                            "fh = ", file%fh, ", varid = ", varid
+          cerr = pio_error(file%iosystem, cerr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+          ierr = INT(cerr)
+          RETURN
+        END IF
+      END IF
+
+      ! Get the size of the other dimensions
+      ! These dimensions determine the size of the string array
+      DO i=2,ndims
+        cerr = PIOc_inq_dimlen(file%fh, dimids(ndims - i + 1), dim_sz)
+        IF(cerr /= PIO_NOERR) THEN
+          WRITE(log_msg, *) "Inquiring the lengths of dimension", i, " for the text variable failed.",&
+                            "fh = ", file%fh, ", varid = ", varid
+          cerr = pio_error(file%iosystem, cerr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+          ierr = INT(cerr)
+          RETURN
+        END IF
+
+        IF(PRESENT(var_dim_sz)) THEN
+          var_dim_sz(i-1) = INT(dim_sz)
+        END IF
+        IF(PRESENT(var_nstrs)) THEN
+          var_nstrs = var_nstrs * INT(dim_sz)
+        END IF
+      END DO
+    END IF
+    DEALLOCATE(dimids)
+
+  END FUNCTION get_text_var_sz
+
+!> @private
+!! @brief Get the dim size of a variable
+!!
+!! @details
+!! @param file  The handle to the file containing the variable
+!! @param varid Id of the queried variable
+!! @param var_sz  The total size of the variable is
+!!                      returned in this arg
+!! @param var_dim_sz  (Optional) The dimension sizes of the variable is
+!!                      returned in this arg
+!! @returns @copydoc error_code
+!!
+  INTEGER FUNCTION get_var_dim_sz(file, varid, var_sz, var_dim_sz) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    INTEGER, INTENT(IN) :: varid
+    INTEGER(PIO_OFFSET_KIND), INTENT(OUT) :: var_sz
+    INTEGER(PIO_OFFSET_KIND), INTENT(INOUT), ALLOCATABLE, OPTIONAL :: var_dim_sz(:)
+
+    INTEGER :: ndims = 0
+    INTEGER, ALLOCATABLE :: dimids(:)
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), ALLOCATABLE :: dim_sz(:)
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER :: i
+    INTEGER(C_INT) :: cerr
+
+    ierr = PIO_NOERR
+
+    var_sz = 0
+    ! Get the number of dimensions in variable
+    cerr = PIOc_inq_varndims(file%fh, varid-1, ndims)
+    IF(cerr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "ERROR: Inquiring number of dims of variable failed.",&
+                        "fh = ", file%fh, ", varid = ", varid
+      cerr = pio_error(file%iosystem, cerr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      ierr = INT(cerr)
+      RETURN
+    END IF
+    IF(ndims == 0) THEN
+      ! A scalar variable
+      var_sz = 1
+
+      IF(PRESENT(var_dim_sz)) THEN
+        ALLOCATE(var_dim_sz(1))
+        var_dim_sz(1) = 1
+      END IF
+
+      ierr = PIO_NOERR
+      RETURN
+    END IF
+
+    ! Get the dimension ids for the variable
+    ALLOCATE(dimids(ndims))
+    cerr = PIOc_inq_vardimid(file%fh, varid-1, dimids)
+    IF(cerr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "Inquiring the variable dimension ids for the variable failed,",&
+                        "fh = ", file%fh, ", varid = ", varid
+      cerr = pio_error(file%iosystem, cerr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      ierr = INT(cerr)
+      RETURN
+    END IF
+
+    ALLOCATE(dim_sz(ndims))
+    IF(PRESENT(var_dim_sz)) THEN
+      ALLOCATE(var_dim_sz(ndims))
+    END IF
+    var_sz = 1
+    DO i=1,ndims
+      cerr = PIOc_inq_dimlen(file%fh, dimids(i), dim_sz(i))
+      IF(cerr /= PIO_NOERR) THEN
+        WRITE(log_msg, *) "Inquiring the lengths of dimension for the variable failed,",&
+                          "fh = ", file%fh, ", varid = ", varid
+        cerr = pio_error(file%iosystem, cerr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+        ierr = INT(cerr)
+        RETURN
+      END IF
+      var_sz = var_sz * INT(dim_sz(i), PIO_OFFSET_KIND)
+      IF(PRESENT(var_dim_sz)) THEN
+        var_dim_sz(ndims - i + 1) = INT(dim_sz(i), PIO_OFFSET_KIND)
+      END IF
+    END DO
+
+    DEALLOCATE(dim_sz)
+    DEALLOCATE(dimids)
+
+  END FUNCTION get_var_dim_sz
 END MODULE spio_util
