@@ -2,6 +2,7 @@
 !! @brief Miscellaneous SCORPIO APIs
 !! This file contains the SCORPIO APIs initialize and free
 !! I/O decompositions
+!! This file also includes misc APIs related to I/O decompositions
 !!
 
 !> @internal
@@ -13,7 +14,7 @@
 MODULE spio_decomp
   USE iso_c_binding
   USE pio_types, ONLY : iosystem_desc_t, io_desc_t, file_desc_t, PIO_IOID_INVALID,&
-                        PIO_MAX_NAME
+                        PIO_MAX_NAME, PIO_EINTERNAL, PIO_NOERR
   USE pio_kinds, ONLY : i4, i8, r4, r8, PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
   USE spio_err, ONLY : pio_error
   USE spio_decomp_cint
@@ -24,7 +25,7 @@ MODULE spio_decomp
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: pio_initdecomp, pio_freedecomp
+  PUBLIC :: pio_initdecomp, pio_freedecomp, pio_get_local_array_size
 
 !> @defgroup PIO_initdecomp PIO_initdecomp
 !! @brief Initialize an I/O decomposition
@@ -260,4 +261,41 @@ CONTAINS
     CALL t_stopf("PIO:freedecomp")
 #endif
   END SUBROUTINE pio_freedecomp_file
+
+!> @defgroup PIO_get_local_array_size PIO_get_local_array_size
+!! @public
+!! @brief Get the local data size for an I/O decomposition
+!!
+!! @details
+!! Get the local (for the current process) data size for a
+!! distributed array that corresponds to this I/O decomposition
+!! e.g. If rank i contains k elements & rank j contains l elements
+!! of a distributed array represented by an I/O decomposition d,
+!! PIO_get_local_array_size(d) = k on rank i
+!! PIO_get_local_array_size(d) = l on rank j
+!!
+!! @param[in] iodesc The handle to the I/O decomposition
+!!                    @copydoc io_desc_t
+!! @param[out] ierr (Optional) @copydoc error_return
+!! @returns The local data/array size for the I/O decomposition
+!!
+  INTEGER FUNCTION pio_get_local_array_size(iodesc, ierr) RESULT(lsz)
+    TYPE(io_desc_t), INTENT(INOUT) :: iodesc
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    INTEGER(C_INT) :: clsz
+
+    ! FIXME: Change the C interface function to return error codes
+    clsz = PIOc_get_local_array_size(iodesc%ioid)
+    IF(PRESENT(ierr)) THEN
+      IF(clsz >= 0) THEN
+        ierr = PIO_NOERR
+      ELSE
+        ierr = PIO_EINTERNAL
+      END IF
+    END IF
+
+    lsz = INT(clsz)
+
+  END FUNCTION pio_get_local_array_size
 END MODULE spio_decomp

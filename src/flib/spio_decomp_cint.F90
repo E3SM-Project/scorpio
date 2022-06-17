@@ -103,4 +103,19 @@ INTERFACE
   END FUNCTION PIOc_freedecomp
 END INTERFACE
 
+INTERFACE
+!> @private
+!! @brief Get local array/data size for an I/O decomposition
+!!
+!! @details
+!! @param[out] ioid The I/O decomposition id/handle for the decomposition
+!! @returns The local array/data size for the I/O decomposition
+  INTEGER(C_INT) FUNCTION PIOc_get_local_array_size(ioid)&
+                          bind(C,name="PIOc_get_local_array_size")
+    USE iso_c_binding
+
+    INTEGER(C_INT), VALUE :: ioid
+  END FUNCTION PIOc_get_local_array_size
+END INTERFACE
+
 END MODULE spio_decomp_cint
