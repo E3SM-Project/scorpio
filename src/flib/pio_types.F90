@@ -302,6 +302,8 @@ module pio_types
 #endif
 #endif
    integer, public, parameter :: PIO_num_OST =  16
+   ! Generic error code for internal errors in the library
+   integer, public, parameter :: PIO_EINTERNAL = -501
 
 !>
 !! @defgroup PIO_rearr_comm_t PIO_rearr_comm_t
