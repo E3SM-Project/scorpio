@@ -5,6 +5,7 @@
 !! Note that each I/O sub system (usually corresponds to individual
 !! components with a distinct MPI communicator) is initialized/finalized
 !! separately.
+!! This file also includes some misc APIs related to the I/O subsystem
 !!
 
 !> @internal
@@ -19,11 +20,14 @@ MODULE spio_init
                         PIO_MAX_NAME, PIO_NOERR, pio_rearr_box
   USE pio_kinds, ONLY : pio_offset_kind
   USE spio_err, ONLY  : pio_error
+  USE spio_util, ONLY : f2cstring
   USE spio_init_cint
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: pio_init, pio_finalize
+  PUBLIC :: pio_init, pio_finalize,&
+            pio_getnumiotasks, pio_get_numiotasks, pio_set_hint,&
+            pio_set_rearr_opts
 
 !> @defgroup pio_init
 !! @public
@@ -38,6 +42,17 @@ INTERFACE pio_init
   MODULE PROCEDURE pio_init_intracomm
   MODULE PROCEDURE pio_init_intercomm
   MODULE PROCEDURE pio_init_intercomm_v2
+END INTERFACE
+
+!> @defgroup PIO_getnumiotasks PIO_getnumiotasks
+!! @public
+!! @brief Get the number of I/O processes/tasks in an I/O subsystem
+!!
+INTERFACE pio_getnumiotasks
+  MODULE PROCEDURE pio_getnumiotasks_
+END INTERFACE
+INTERFACE pio_get_numiotasks
+  MODULE PROCEDURE pio_getnumiotasks_
 END INTERFACE
 
 CONTAINS
@@ -336,4 +351,151 @@ CONTAINS
     call t_stopf("PIO:finalize")
 #endif
   END SUBROUTINE pio_finalize
+
+!> @ingroup PIO_getnumiotasks
+!! @public
+!! @brief Get the number of I/O processes/tasks in the I/O subsystem
+!!
+!! @details
+!! @param[in] iosys The handle to the I/O system. @copydoc iosystem_desc_t
+!! @param[out] nioprocs The number of I/O processes is returned via this arg
+!! @param[out] ierr (Optional) @copydoc error_return
+!!
+  SUBROUTINE pio_getnumiotasks_(iosys, niotasks, ierr)
+    TYPE(iosystem_desc_t), INTENT(IN) :: iosys
+    INTEGER, INTENT(OUT) :: niotasks
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    INTEGER(C_INT), TARGET :: ntasks
+    INTEGER(C_INT) :: cerr
+
+#ifdef TIMING
+    ! Ignore timing since the call is not costly
+    ! call t_startf("PIO:getnumiotasks")
+#endif
+
+    cerr = PIOc_get_numiotasks(iosys%iosysid, C_LOC(ntasks))
+    IF(PRESENT(ierr)) THEN
+      ierr = INT(cerr)
+    ENDIF
+    niotasks = INT(ntasks)
+
+#ifdef TIMING
+    ! Ignore timing since the call is not costly
+    !call t_stopf("PIO:getnumiotasks")
+#endif
+  END SUBROUTINE pio_getnumiotasks_
+
+!> @defgroup PIO_set_hint PIO_set_hint
+!! @public
+!! @brief Set hints for the I/O system
+!!
+!! @details
+!! Set hints (e.g. filesystem hints, MPI hints) for the I/O system. This
+!! is a collective call on the I/O system
+!! @param[in] iosys The handle to the I/O system. @copydoc iosystem_desc_t
+!! @param[in] hint  The name of the hint
+!! @param[in] hval  The value of the hint
+!! @param[out] ierr (Optional) @copydoc error_return
+!!
+  SUBROUTINE pio_set_hint(iosys, hint, hval, ierr)
+    TYPE(iosystem_desc_t), INTENT(IN) :: iosys
+    CHARACTER(LEN=*), INTENT(IN) :: hint
+    CHARACTER(LEN=*), INTENT(IN) :: hval
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    CHARACTER(C_CHAR), DIMENSION(:), ALLOCATABLE :: chint, chval
+    INTEGER :: chint_sz, chval_sz
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER(C_INT) :: cerr
+
+#ifdef TIMING
+    ! Ignore timing since the call is not costly
+    ! call t_startf("PIO:set_hint")
+#endif
+
+    ! The C versions of the strings need an extra char for C_NULL_CHAR
+    chint_sz = LEN_TRIM(hint) + 1
+    chval_sz = LEN_TRIM(hval) + 1
+
+    ALLOCATE(chint(chint_sz), chval(chval_sz))
+
+    ! Convert the hint & hint value from Fortran strings to C strings
+    ierr = f2cstring(iosys, TRIM(hint), chint, chint_sz, chint_sz,&
+                      cstr_add_null = .TRUE.)
+    IF(ierr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "Setting hint failed. Converting the hint name ",&
+                        "to a C string failed (hint =", TRIM(hint),&
+                        ", value =", TRIM(hval), ")"
+      ierr = pio_error(iosys, ierr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    ierr = f2cstring(iosys, TRIM(hval), chval, chval_sz, chval_sz,&
+                      cstr_add_null = .TRUE.)
+    IF(ierr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "Setting hint failed. Converting the hint value ",&
+                        "to a C string failed (hint =", TRIM(hint),&
+                        ", value =", TRIM(hval), ")"
+      ierr = pio_error(iosys, ierr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    cerr = PIOc_set_hint(iosys%iosysid, chint, chval)
+    IF(PRESENT(ierr)) THEN
+      ierr = INT(cerr)
+    ENDIF
+
+    DEALLOCATE(chint, chval)
+
+#ifdef TIMING
+    ! Ignore timing since the call is not costly
+    !call t_stopf("PIO:set_hint")
+#endif
+  END SUBROUTINE pio_set_hint
+
+!>
+!! @public
+!! @defgroup PIO_set_rearr_opts PIO_set_rearr_opts
+!! @brief Set the I/O data rerranger options for an I/O system
+!!
+!! @details
+!! @param[inout] iosys The handle to I/O system
+!! @param[in] comm_type @copydoc PIO_rearr_comm_t
+!! @param[in] fcd @copydoc PIO_rearr_comm_dir
+!! @param[in] enable_hs_c2i Enable handshake (compute procs to I/O procs)
+!! @param[in] enable_isend_c2i  Enable isends (compute procs to I/O procs)
+!! @param[in] max_pend_req_c2i  Maximum pending requests (compute procs to I/O procs)
+!! @param[in] enable_hs_i2c Enable handshake (I/O procs to compute procs)
+!! @param[in] enable_isend_i2c  Enable isends (I/O procs to compute procs)
+!! @param[in] max_pend_req_i2c  Maximum pending requests (I/O procs to compute procs)
+!! @returns @copydoc error_code
+!!
+!! @copydoc PIO_rearr_comm_fc_options
+!!
+  INTEGER FUNCTION pio_set_rearr_opts(iosys, comm_type, fcd,&
+                                      enable_hs_c2i, enable_isend_c2i,&
+                                      max_pend_req_c2i,&
+                                      enable_hs_i2c, enable_isend_i2c,&
+                                      max_pend_req_i2c) RESULT(ierr)
+
+    TYPE(iosystem_desc_t), INTENT(INOUT) :: iosys
+    INTEGER, INTENT(IN) :: comm_type, fcd
+    LOGICAL, INTENT(IN) :: enable_hs_c2i, enable_hs_i2c
+    LOGICAL, INTENT(IN) :: enable_isend_c2i, enable_isend_i2c
+    INTEGER, INTENT(IN) :: max_pend_req_c2i, max_pend_req_i2c
+    INTEGER(C_INT) :: cret
+
+    cret = PIOc_set_rearr_opts(iosys%iosysid,&
+                                INT(comm_type, C_INT), INT(fcd, C_INT),&
+                                LOGICAL(enable_hs_c2i, C_BOOL),&
+                                LOGICAL(enable_isend_c2i, C_BOOL),&
+                                INT(max_pend_req_c2i, C_INT),&
+                                LOGICAL(enable_hs_i2c, C_BOOL),&
+                                LOGICAL(enable_isend_i2c, C_BOOL),&
+                                INT(max_pend_req_i2c, C_INT))
+    ierr = INT(cret)
+
+  END FUNCTION pio_set_rearr_opts
+
 END MODULE spio_init

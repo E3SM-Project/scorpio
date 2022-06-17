@@ -123,4 +123,87 @@ INTERFACE
   END FUNCTION PIOc_finalize
 END INTERFACE
 
+INTERFACE
+!! @brief Fortran interface to C function to get the number of I/O tasks
+!! in an I/O subsystem
+!!
+!! @details
+!! @param[in] iosysid The handle to the I/O subsystem
+!! @param[out] pniotasks A pointer to an integer that is set to the number
+!!                        of I/O processes in the I/O subsystem
+!! @returns PIO_NOERR on success, an error code otherwise
+!!
+  INTEGER(C_INT) FUNCTION PIOc_get_numiotasks(iosysid, pniotasks)&
+                          bind(C,name="PIOc_get_numiotasks")
+    USE iso_c_binding
+
+    INTEGER(C_INT), INTENT(IN), VALUE :: iosysid
+    TYPE(C_PTR), INTENT(IN), VALUE :: pniotasks
+  END FUNCTION PIOc_get_numiotasks
+END INTERFACE
+
+INTERFACE
+!! @brief Fortran interface to C function to set hints
+!!
+!! @details
+!! This function can be used to set user hints for the library. If the
+!! hints are not recognized by the library (not library specific hints)
+!! the hints are assumed to be MPI library hints and set using the
+!! MPI_Info_set() call. This is a collective call on the I/O system.
+!!
+!! The hints are assumed to be [key, value] pairs of strings
+!!
+!! @param[in] iosysid The handle to the I/O subsystem
+!! @param[in] key The key for the hint
+!! @param[in] val The hint value
+!! @returns PIO_NOERR on success, an error code otherwise
+!!
+  INTEGER(C_INT) FUNCTION PIOc_set_hint(iosysid, key, val)&
+                          bind(C,name="PIOc_set_hint")
+    USE iso_c_binding
+
+    INTEGER(C_INT), INTENT(IN), VALUE :: iosysid
+    CHARACTER(C_CHAR), INTENT(IN), DIMENSION(*) :: key
+    CHARACTER(C_CHAR), INTENT(IN), DIMENSION(*) :: val
+  END FUNCTION PIOc_set_hint
+END INTERFACE
+
+INTERFACE
+!>
+!! @private
+!! @brief Set the rerranger options
+!!
+!! @details
+!! @param iosysid : The handle to pio iosystem
+!! @param comm_type : @copydoc PIO_rearr_comm_t
+!! @param fcd : @copydoc PIO_rearr_comm_dir
+!! @param enable_hs_c2i : Enable handshake (compute procs to io procs)
+!! @param enable_isend_c2i : Enable isends (compute procs to io procs)
+!! @param max_pend_req_c2i: Maximum pending requests (compute procs to io procs)
+!! @param enable_hs_i2c : Enable handshake (io procs to compute procs)
+!! @param enable_isend_i2c : Enable isends (io procs to compute procs)
+!! @param max_pend_req_i2c: Maximum pending requests (io procs to compute procs)
+!! @returns PIO_NOERR on success, an error code otherwise
+!!
+!! @copydoc PIO_rearr_comm_fc_options
+!!
+  INTEGER(C_INT) FUNCTION PIOc_set_rearr_opts(iosysid, comm_type, fcd,&
+                                              enable_hs_c2i, enable_isend_c2i,&
+                                              max_pend_req_c2i,&
+                                              enable_hs_i2c, enable_isend_i2c,&
+                                              max_pend_req_i2c)&
+                                              bind(C,name="PIOc_set_rearr_opts")
+    USE iso_c_binding
+
+    INTEGER(C_INT), INTENT(IN), VALUE :: iosysid
+    INTEGER(C_INT), INTENT(IN), VALUE :: comm_type
+    INTEGER(C_INT), INTENT(IN), VALUE :: fcd
+    LOGICAL(C_BOOL), INTENT(IN), VALUE :: enable_hs_c2i
+    LOGICAL(C_BOOL), INTENT(IN), VALUE :: enable_isend_c2i
+    INTEGER(C_INT), INTENT(IN), VALUE :: max_pend_req_c2i
+    LOGICAL(C_BOOL), INTENT(IN), VALUE :: enable_hs_i2c
+    LOGICAL(C_BOOL), INTENT(IN), VALUE :: enable_isend_i2c
+    INTEGER(C_INT), INTENT(IN), VALUE :: max_pend_req_i2c
+  END FUNCTION PIOc_set_rearr_opts
+END INTERFACE
 END MODULE spio_init_cint
