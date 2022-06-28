@@ -1,0 +1,2412 @@
+[1656431387.223273] [chr-0493:2980440:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.726080] [chr-0493:2980440:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.533555] [chr-0493:2980440:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+  Testing decomp: ./ne30_F_case_48602x72_512p.dat
+ pio_readdof start
+ pio_readdof end, read time =   0.40933445299999999     
+srun: error: chr-0500: task 507: Killed
+[1656431387.185544] [chr-0499:692989:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.740640] [chr-0499:692989:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.532410] [chr-0499:692989:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0499:692989:0:692989] ib_mlx5_log.c:174  Remote access on mlx5_0:1/IB (synd 0x13 vend 0x88 hw_synd 0/0)
+[chr-0499:692989:0:692989] ib_mlx5_log.c:174  DCI QP 0x9dd5 wqe[312]: RDMA_READ s-- [rqpn 0xb4a1 rlid 338] [rva 0x15534eca8010 rkey 0x280149] [va 0x155381e3d010 len 4080 lkey 0x28789f] 
+[1656431387.388608] [chr-0500:634165:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.749547] [chr-0500:634165:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.534081] [chr-0500:634165:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0500:634165:0:634165] ib_mlx5_log.c:174  Remote OP on mlx5_0:1/IB (synd 0x14 vend 0x89 hw_synd 0/0)
+[chr-0500:634165:0:634165] ib_mlx5_log.c:174  DCI QP 0x402e wqe[291]: RDMA_READ s-- [rqpn 0x5633 rlid 340] [rva 0x1553ee02ac00 rkey 0x2cdff3] [va 0x1553f6708c00 len 27067920 lkey 0x2d0e16] 
+srun: error: chr-0500: task 504: Killed
+srun: error: chr-0497: tasks 272,288,296,312: Killed
+==== backtrace (tid: 692989) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 6 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 7 0x0000000000232b77 mca_pml_ucx_send()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 8 0x00000000000d7c32 ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:58
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+srun: error: chr-0494: tasks 80,87,104,107: Killed
+[1656431387.463096] [chr-0499:693005:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.741332] [chr-0499:693005:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.533576] [chr-0499:693005:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0499:693005:0:693005] ib_mlx5_log.c:174  Remote access on mlx5_0:1/IB (synd 0x13 vend 0x88 hw_synd 0/0)
+[chr-0499:693005:0:693005] ib_mlx5_log.c:174  DCI QP 0x9fd7 wqe[309]: RDMA_READ s-- [rqpn 0xb34c rlid 338] [rva 0x155362f84810 rkey 0x2a03a0] [va 0x155394f2c810 len 4080 lkey 0x2a25b3] 
+srun: error: chr-0495: tasks 128,136,165,176,184: Killed
+srun: error: chr-0497: task 264: Killed
+srun: error: chr-0499: tasks 390,396,404,412,428: Killed
+[1656431387.276266] [chr-0495:1381710:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.744242] [chr-0495:1381710:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.532329] [chr-0495:1381710:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[1656431387.423985] [chr-0497:767478:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.749983] [chr-0497:767478:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.533072] [chr-0497:767478:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0495:1381710:0:1381710] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0495:1381710:0:1381710] ib_mlx5_log.c:174  DCI QP 0x1b357 wqe[330]: RDMA_READ s-- [rqpn 0x1c989 rlid 265] [rva 0x155105036210 rkey 0x2a3bcf] [va 0x1551344c3210 len 4080 lkey 0x2b46a4] 
+[chr-0497:767478:0:767478] ib_mlx5_log.c:174  Remote access on mlx5_0:1/IB (synd 0x13 vend 0x88 hw_synd 0/0)
+[chr-0497:767478:0:767478] ib_mlx5_log.c:174  DCI QP 0xb6d0 wqe[265]: RDMA_READ s-- [rqpn 0xcd2f rlid 317] [rva 0x1552106b6610 rkey 0x28fa00] [va 0x155243c98610 len 4080 lkey 0x290103] 
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x155553bdfb76 in mca_pml_ucx_send_nbr
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+#12  0x155553bdfb76 in mca_pml_ucx_send
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+==== backtrace (tid: 767478) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+#13  0x155553a84c31 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:58
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#14  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#15  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+#16  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+=================================
+#17  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#18  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#19  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#20  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#21  0x155554cf2bc1 in ???
+#22  0x155554ced7f5 in ???
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+[1656431387.535270] [chr-0497:767510:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.751990] [chr-0497:767510:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.533049] [chr-0497:767510:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+#23  0x155554ceb2bb in ???
+#24  0x155554cece3f in ???
+#25  0x155554ce91a3 in ???
+#26  0x155554ce9a0b in ???
+#27  0x155554c3a279 in ???
+#28  0x46b732 in ???
+#29  0x42d107 in ???
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+#30  0x42d431 in ???
+#31  0x4137fe in ???
+#32  0x40dd3e in ???
+#33  0x40ad14 in ???
+#34  0x410ff2 in ???
+#35  0x155552779492 in ???
+#36  0x40a48d in ???
+#37  0xffffffffffffffff in ???
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+==== backtrace (tid: 693005) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 6 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 7 0x0000000000232b77 mca_pml_ucx_send()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 8 0x00000000000d7c32 ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:58
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+=================================
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+#11  0x155553bdfb76 in mca_pml_ucx_send_nbr
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+#12  0x155553bdfb76 in mca_pml_ucx_send
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+#13  0x155553a84c31 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:58
+#14  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#15  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+[chr-0497:767510:0:767510] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0497:767510:0:767510] ib_mlx5_log.c:174  DCI QP 0xb77d wqe[259]: RDMA_READ s-- [rqpn 0xcceb rlid 317] [rva 0x155268ac9a10 rkey 0x27278f] [va 0x15529c4f5a10 len 4080 lkey 0x27e909] 
+#16  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+==== backtrace (tid: 767510) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+#17  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#18  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+#19  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+=================================
+#20  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#21  0x155554cf2bc1 in ???
+#22  0x155554ced7f5 in ???
+#23  0x155554ceb2bb in ???
+#24  0x155554cece3f in ???
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#25  0x155554ce91a3 in ???
+#26  0x155554ce9a0b in ???
+#27  0x155554c3a279 in ???
+#28  0x46b732 in ???
+#29  0x42d107 in ???
+#30  0x42d431 in ???
+#31  0x4137fe in ???
+#32  0x40dd3e in ???
+#33  0x40ad14 in ???
+#34  0x410ff2 in ???
+#35  0x155552779492 in ???
+#36  0x40a48d in ???
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#37  0xffffffffffffffff in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+[1656431387.373312] [chr-0494:1576337:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.746769] [chr-0494:1576337:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.533075] [chr-0494:1576337:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0494:1576337:0:1576337] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0494:1576337:0:1576337] ib_mlx5_log.c:174  DCI QP 0xb03 wqe[281]: SEND s-e [rqpn 0x1c989 rlid 265] [inl len 61] 
+[1656431387.538626] [chr-0493:2980441:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.727049] [chr-0493:2980441:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.532368] [chr-0493:2980441:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0493:2980441:0:2980441] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0493:2980441:0:2980441] ib_mlx5_log.c:174  DCI QP 0x1f5b2 wqe[305]: RDMA_READ s-- [rqpn 0x763 rlid 261] [rva 0x1553eb8eb210 rkey 0x27a50f] [va 0x155433894210 len 4080 lkey 0x29228d] 
+==== backtrace (tid:1381710) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+==== backtrace (tid:1576337) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 6 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 7 0x0000000000232b77 mca_pml_ucx_send()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 8 0x00000000000d7c32 ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:58
+srun: error: chr-0496: tasks 212,216,229,242,255: Killed
+srun: error: chr-0497: task 265: Aborted (core dumped)
+srun: error: chr-0497: task 297: Aborted (core dumped)
+srun: error: chr-0499: tasks 413,429: Aborted (core dumped)
+[1656431387.499489] [chr-0500:634171:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.749888] [chr-0500:634171:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.532214] [chr-0500:634171:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+==== backtrace (tid:2980441) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+[1656431387.619199] [chr-0498:732620:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.745358] [chr-0498:732620:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.532369] [chr-0498:732620:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+[1656431387.455957] [chr-0495:1381766:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.746840] [chr-0495:1381766:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.534220] [chr-0495:1381766:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+[1656431387.300983] [chr-0496:898318:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.737973] [chr-0496:898318:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.532121] [chr-0496:898318:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0500:634171:0:634171] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0500:634171:0:634171] ib_mlx5_log.c:174  DCI QP 0x4164 wqe[286]: RDMA_READ s-- [rqpn 0x5686 rlid 340] [rva 0x155403050410 rkey 0x2df6de] [va 0x155434bb1410 len 4080 lkey 0x2e9b62] 
+[1656431387.409359] [chr-0500:634169:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.749575] [chr-0500:634169:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.533760] [chr-0500:634169:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0498:732620:0:732620] ib_mlx5_log.c:174  Remote access on mlx5_0:1/IB (synd 0x13 vend 0x88 hw_synd 0/0)
+[chr-0498:732620:0:732620] ib_mlx5_log.c:174  DCI QP 0xdba4 wqe[329]: RDMA_READ s-- [rqpn 0xee8d rlid 272] [rva 0x15528fff6e10 rkey 0x261850] [va 0x1552bd550e10 len 4080 lkey 0x15defc] 
+[1656431387.415658] [chr-0495:1381764:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.746633] [chr-0495:1381764:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.532720] [chr-0495:1381764:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0495:1381766:0:1381766] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0495:1381766:0:1381766] ib_mlx5_log.c:174  DCI QP 0x1b47b wqe[332]: RDMA_READ s-- [rqpn 0x1c9d6 rlid 265] [rva 0x155182d38e10 rkey 0x2afd67] [va 0x1551b3768e10 len 4080 lkey 0x2ba5f0] 
+[1656431387.154967] [chr-0496:898320:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.738582] [chr-0496:898320:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.533253] [chr-0496:898320:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+[1656431386.761539] [chr-0499:692973:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.739748] [chr-0499:692973:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.533584] [chr-0499:692973:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0496:898318:0:898318] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0496:898318:0:898318] ib_mlx5_log.c:174  DCI QP 0x947 wqe[281]: SEND s-e [rqpn 0x1fff rlid 267] [inl len 61] 
+[1656431386.888322] [chr-0499:692971:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.739692] [chr-0499:692971:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.533548] [chr-0499:692971:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+=================================
+[chr-0500:634169:0:634169] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0500:634169:0:634169] ib_mlx5_log.c:174  DCI QP 0x4078 wqe[278]: SEND s-e [rqpn 0x5686 rlid 340] [inl len 61] 
+[chr-0495:1381764:0:1381764] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0495:1381764:0:1381764] ib_mlx5_log.c:174  DCI QP 0x1b407 wqe[333]: SEND s-e [rqpn 0x1c9d6 rlid 265] [inl len 61] 
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+[chr-0496:898320:0:898320] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0496:898320:0:898320] ib_mlx5_log.c:174  DCI QP 0x874 wqe[250]: RDMA_READ s-- [rqpn 0x1fff rlid 267] [rva 0x1551bc786410 rkey 0x297c73] [va 0x1551efd84410 len 4080 lkey 0x2a13e0] 
+[1656431387.413018] [chr-0494:1576313:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.744319] [chr-0494:1576313:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.532573] [chr-0494:1576313:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+==== backtrace (tid: 634169) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 6 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 7 0x0000000000232b77 mca_pml_ucx_send()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 8 0x00000000000d7c32 ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:58
+==== backtrace (tid:1381764) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 6 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 7 0x0000000000232b77 mca_pml_ucx_send()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 8 0x00000000000d7c32 ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:58
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+==== backtrace (tid: 898318) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 6 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 7 0x0000000000232b77 mca_pml_ucx_send()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 8 0x00000000000d7c32 ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:58
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+[chr-0499:692973:0:692973] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0499:692973:0:692973] ib_mlx5_log.c:174  DCI QP 0x9d27 wqe[335]: RDMA_READ s-- [rqpn 0xb45c rlid 338] [rva 0x1553316fda10 rkey 0x2721b8] [va 0x155364892a10 len 4080 lkey 0x279c0e] 
+#11  0x155553bdfb76 in mca_pml_ucx_send_nbr
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+#12  0x155553bdfb76 in mca_pml_ucx_send
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+#13  0x155553a84c31 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:58
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+=================================
+[chr-0499:692971:0:692971] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0499:692971:0:692971] ib_mlx5_log.c:174  DCI QP 0x9d57 wqe[300]: SEND s-e [rqpn 0xb45c rlid 338] [inl len 61] 
+#14  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#15  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+[1656431387.550181] [chr-0494:1576318:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.744373] [chr-0494:1576318:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.533624] [chr-0494:1576318:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+==== backtrace (tid: 692973) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+#16  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#17  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+==== backtrace (tid: 898320) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 6 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 7 0x0000000000232b77 mca_pml_ucx_send()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 8 0x00000000000d7c32 ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:58
+#11  0x155553bdfb76 in mca_pml_ucx_send_nbr
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+#12  0x155553bdfb76 in mca_pml_ucx_send
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+#18  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#13  0x155553a84c31 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:58
+30 0x000000000040a48e _start()  ???:0
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#19  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+#14  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#15  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+==== backtrace (tid: 692971) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 6 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 7 0x0000000000232b77 mca_pml_ucx_send()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 8 0x00000000000d7c32 ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:58
+#20  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#21  0x155554cf2bc1 in ???
+#22  0x155554ced7f5 in ???
+#23  0x155554ceb2bb in ???
+#24  0x155554cece3f in ???
+=================================
+#16  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#25  0x155554ce91a3 in ???
+#26  0x155554ce9a0b in ???
+#27  0x155554c3a279 in ???
+#28  0x46b732 in ???
+#29  0x42d107 in ???
+#30  0x42d431 in ???
+#31  0x4137fe in ???
+#32  0x40dd3e in ???
+#33  0x40ad14 in ???
+#34  0x410ff2 in ???
+#35  0x155552779492 in ???
+#36  0x40a48d in ???
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#17  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+#37  0xffffffffffffffff in ???
+#18  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+=================================
+#19  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+[chr-0494:1576313:0:1576313] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0494:1576313:0:1576313] ib_mlx5_log.c:174  DCI QP 0xb26 wqe[381]: SEND s-e [rqpn 0xc90 rlid 262] [inl len 61] 
+#20  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#21  0x155554cf2bc1 in ???
+#22  0x155554ced7f5 in ???
+#23  0x155554ceb2bb in ???
+#24  0x155554cece3f in ???
+#25  0x155554ce91a3 in ???
+#26  0x155554ce9a0b in ???
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+==== backtrace (tid:1576313) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 6 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 7 0x0000000000232b77 mca_pml_ucx_send()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 8 0x00000000000d7c32 ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:58
+#27  0x155554c3a279 in ???
+#28  0x46b732 in ???
+#29  0x42d107 in ???
+#30  0x42d431 in ???
+#31  0x4137fe in ???
+#32  0x40dd3e in ???
+#33  0x40ad14 in ???
+#34  0x410ff2 in ???
+#35  0x155552779492 in ???
+#36  0x40a48d in ???
+#37  0xffffffffffffffff in ???
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+=================================
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#11  0x155553bdfb76 in mca_pml_ucx_send_nbr
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+#12  0x155553bdfb76 in mca_pml_ucx_send
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#13  0x155553a84c31 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:58
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+#14  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#15  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+#16  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#17  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#11  0x155553bdfb76 in mca_pml_ucx_send_nbr
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+#12  0x155553bdfb76 in mca_pml_ucx_send
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+#18  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#13  0x155553a84c31 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:58
+#19  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#14  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#15  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#20  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#21  0x155554cf2bc1 in ???
+#22  0x155554ced7f5 in ???
+#23  0x155554ceb2bb in ???
+#24  0x155554cece3f in ???
+#25  0x155554ce91a3 in ???
+#26  0x155554ce9a0b in ???
+#16  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#27  0x155554c3a279 in ???
+#28  0x46b732 in ???
+#29  0x42d107 in ???
+#30  0x42d431 in ???
+#31  0x4137fe in ???
+#32  0x40dd3e in ???
+#33  0x40ad14 in ???
+#34  0x410ff2 in ???
+#35  0x155552779492 in ???
+#36  0x40a48d in ???
+#37  0xffffffffffffffff in ???
+#17  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#18  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+[chr-0494:1576318:0:1576318] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0494:1576318:0:1576318] ib_mlx5_log.c:174  DCI QP 0xced wqe[383]: RDMA_READ s-- [rqpn 0xbac rlid 262] [rva 0x1550dbc62010 rkey 0x2a003a] [va 0x155108c5c010 len 4080 lkey 0x2a3e67] 
+#19  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+==== backtrace (tid:1576318) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+#20  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#21  0x155554cf2bc1 in ???
+#22  0x155554ced7f5 in ???
+#23  0x155554ceb2bb in ???
+#24  0x155554cece3f in ???
+#25  0x155554ce91a3 in ???
+#26  0x155554ce9a0b in ???
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#27  0x155554c3a279 in ???
+#28  0x46b732 in ???
+#29  0x42d107 in ???
+#30  0x42d431 in ???
+#31  0x4137fe in ???
+#32  0x40dd3e in ???
+#33  0x40ad14 in ???
+#34  0x410ff2 in ???
+#35  0x155552779492 in ???
+#36  0x40a48d in ???
+#37  0xffffffffffffffff in ???
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x155553bdfb76 in mca_pml_ucx_send_nbr
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+#12  0x155553bdfb76 in mca_pml_ucx_send
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+#13  0x155553a84c31 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:58
+#14  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#15  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#16  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#17  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#18  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#19  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#20  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#21  0x155554cf2bc1 in ???
+#22  0x155554ced7f5 in ???
+#23  0x155554ceb2bb in ???
+#24  0x155554cece3f in ???
+#25  0x155554ce91a3 in ???
+#26  0x155554ce9a0b in ???
+#27  0x155554c3a279 in ???
+#28  0x46b732 in ???
+#29  0x42d107 in ???
+#30  0x42d431 in ???
+#31  0x4137fe in ???
+#32  0x40dd3e in ???
+#33  0x40ad14 in ???
+#34  0x410ff2 in ???
+#35  0x155552779492 in ???
+#36  0x40a48d in ???
+#37  0xffffffffffffffff in ???
+[1656431387.429415] [chr-0493:2980450:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.726186] [chr-0493:2980450:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.534227] [chr-0493:2980450:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0493:2980450:0:2980450] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0493:2980450:0:2980450] ib_mlx5_log.c:174  DCI QP 0x1f40c wqe[327]: RDMA_READ s-- [rqpn 0x93c rlid 261] [rva 0x155419940e10 rkey 0x2b8c1a] [va 0x15544beb1e10 len 4080 lkey 0x2b9a28] 
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x155553bdfb76 in mca_pml_ucx_send_nbr
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+#12  0x155553bdfb76 in mca_pml_ucx_send
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+#13  0x155553a84c31 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:58
+#14  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#15  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#16  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#17  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#18  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#19  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#20  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#21  0x155554cf2bc1 in ???
+#22  0x155554ced7f5 in ???
+#23  0x155554ceb2bb in ???
+#24  0x155554cece3f in ???
+#25  0x155554ce91a3 in ???
+#26  0x155554ce9a0b in ???
+#27  0x155554c3a279 in ???
+#28  0x46b732 in ???
+#29  0x42d107 in ???
+#30  0x42d431 in ???
+#31  0x4137fe in ???
+#32  0x40dd3e in ???
+#33  0x40ad14 in ???
+#34  0x410ff2 in ???
+#35  0x155552779492 in ???
+#36  0x40a48d in ???
+#37  0xffffffffffffffff in ???
+==== backtrace (tid: 634171) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+[1656431387.623647] [chr-0498:732664:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.747926] [chr-0498:732664:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.534081] [chr-0498:732664:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0498:732664:0:732664] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0498:732664:0:732664] ib_mlx5_log.c:174  DCI QP 0xdbe9 wqe[317]: RDMA_READ s-- [rqpn 0xeecf rlid 272] [rva 0x1553010cd010 rkey 0x2afe5d] [va 0x15532f657010 len 4080 lkey 0x2baa01] 
+[1656431387.624421] [chr-0498:732662:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.747866] [chr-0498:732662:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.532339] [chr-0498:732662:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0498:732662:0:732662] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0498:732662:0:732662] ib_mlx5_log.c:174  DCI QP 0xdc0d wqe[319]: SEND s-e [rqpn 0xeecf rlid 272] [inl len 61] 
+[1656431386.787322] [chr-0499:692987:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.741200] [chr-0499:692987:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.532855] [chr-0499:692987:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0499:692987:0:692987] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0499:692987:0:692987] ib_mlx5_log.c:174  DCI QP 0x9d3a wqe[229]: SEND s-e [rqpn 0xb4a1 rlid 338] [inl len 61] 
+srun: error: chr-0494: task 127: Aborted (core dumped)
+==== backtrace (tid: 732620) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 6 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 7 0x0000000000232b77 mca_pml_ucx_send()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 8 0x00000000000d7c32 ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:58
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+==== backtrace (tid:2980450) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+==== backtrace (tid: 692987) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 6 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 7 0x0000000000232b77 mca_pml_ucx_send()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 8 0x00000000000d7c32 ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:58
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#10  0x1555512dc1d9 in ???
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+#11  0x155553bdfb76 in mca_pml_ucx_send_nbr
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+#12  0x155553bdfb76 in mca_pml_ucx_send
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+#13  0x155553a84c31 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:58
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#14  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#15  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#16  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#17  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#18  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#11  0x155553bdfb76 in mca_pml_ucx_send_nbr
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+#12  0x155553bdfb76 in mca_pml_ucx_send
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+#19  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#13  0x155553a84c31 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:58
+#20  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#21  0x155554cf2bc1 in ???
+#22  0x155554ced7f5 in ???
+#23  0x155554ceb2bb in ???
+#24  0x155554cece3f in ???
+#14  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#15  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#25  0x155554ce91a3 in ???
+#26  0x155554ce9a0b in ???
+#27  0x155554c3a279 in ???
+#28  0x46b732 in ???
+#29  0x42d107 in ???
+#30  0x42d431 in ???
+#31  0x4137fe in ???
+#32  0x40dd3e in ???
+#33  0x40ad14 in ???
+#34  0x410ff2 in ???
+#16  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#35  0x155552779492 in ???
+#36  0x40a48d in ???
+#37  0xffffffffffffffff in ???
+#17  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+==== backtrace (tid: 732664) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+#18  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#19  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+#20  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#21  0x155554cf2bc1 in ???
+#22  0x155554ced7f5 in ???
+#23  0x155554ceb2bb in ???
+#24  0x155554cece3f in ???
+#25  0x155554ce91a3 in ???
+#26  0x155554ce9a0b in ???
+30 0x000000000040a48e _start()  ???:0
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#27  0x155554c3a279 in ???
+#28  0x46b732 in ???
+#29  0x42d107 in ???
+#30  0x42d431 in ???
+#31  0x4137fe in ???
+#32  0x40dd3e in ???
+#33  0x40ad14 in ???
+#34  0x410ff2 in ???
+#35  0x155552779492 in ???
+#36  0x40a48d in ???
+#37  0xffffffffffffffff in ???
+==== backtrace (tid: 732662) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 6 0x0000000000232b77 mca_pml_ucx_send_nbr()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+ 7 0x0000000000232b77 mca_pml_ucx_send()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 8 0x00000000000d7c32 ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:58
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x155553bdfb76 in mca_pml_ucx_send_nbr
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+#12  0x155553bdfb76 in mca_pml_ucx_send
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+#13  0x155553a84c31 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:58
+#14  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#15  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#16  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#17  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#18  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#19  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#20  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#21  0x155554cf2bc1 in ???
+#22  0x155554ced7f5 in ???
+#23  0x155554ceb2bb in ???
+#24  0x155554cece3f in ???
+#25  0x155554ce91a3 in ???
+#26  0x155554ce9a0b in ???
+#27  0x155554c3a279 in ???
+#28  0x46b732 in ???
+#29  0x42d107 in ???
+#30  0x42d431 in ???
+#31  0x4137fe in ???
+#32  0x40dd3e in ???
+#33  0x40ad14 in ???
+#34  0x410ff2 in ???
+#35  0x155552779492 in ???
+#36  0x40a48d in ???
+#37  0xffffffffffffffff in ???
+[1656431387.554376] [chr-0494:1576298:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.742762] [chr-0494:1576298:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.533735] [chr-0494:1576298:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+srun: error: chr-0494: task 103: Aborted (core dumped)
+srun: error: chr-0494: task 108: Aborted (core dumped)
+srun: error: chr-0498: tasks 327,343,357,364,371,378,383: Killed
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+[chr-0494:1576298:0:1576298] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0494:1576298:0:1576298] ib_mlx5_log.c:174  DCI QP 0xd35 wqe[338]: RDMA_READ s-- [rqpn 0xbf7 rlid 262] [rva 0x1554b3628e10 rkey 0x22d34f] [va 0x1554e4923e10 len 4080 lkey 0x3c743a] 
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+==== backtrace (tid:1576298) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+#11  0x155553bdfb76 in mca_pml_ucx_send_nbr
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:923
+#12  0x155553bdfb76 in mca_pml_ucx_send
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/pml/ucx/pml_ucx.c:944
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#13  0x155553a84c31 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:58
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+#14  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#15  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+#16  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#17  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#18  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#19  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#20  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+#21  0x155554cf2bc1 in ???
+#22  0x155554ced7f5 in ???
+#23  0x155554ceb2bb in ???
+#24  0x155554cece3f in ???
+#25  0x155554ce91a3 in ???
+#26  0x155554ce9a0b in ???
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+#27  0x155554c3a279 in ???
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#28  0x46b732 in ???
+#29  0x42d107 in ???
+#30  0x42d431 in ???
+#31  0x4137fe in ???
+#32  0x40dd3e in ???
+#33  0x40ad14 in ???
+#34  0x410ff2 in ???
+#35  0x155552779492 in ???
+#36  0x40a48d in ???
+#37  0xffffffffffffffff in ???
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+==== backtrace (tid:1381766) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+srun: error: chr-0496: tasks 211,213: Aborted (core dumped)
+srun: error: chr-0495: task 129: Aborted (core dumped)
+srun: error: chr-0495: task 147: Killed
+srun: error: chr-0494: task 88: Aborted (core dumped)
+srun: error: chr-0499: tasks 395,397,411: Aborted (core dumped)
+[1656431387.380970] [chr-0496:898337:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.738655] [chr-0496:898337:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.533276] [chr-0496:898337:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0496:898337:0:898337] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0496:898337:0:898337] ib_mlx5_log.c:174  DCI QP 0x9f8 wqe[306]: RDMA_READ s-- [rqpn 0x1f30 rlid 267] [rva 0x1551d3051410 rkey 0x21370e] [va 0x1552052fa410 len 4080 lkey 0x28aaba] 
+==== backtrace (tid: 898337) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+[1656431387.320209] [chr-0500:634133:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.747799] [chr-0500:634133:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.534060] [chr-0500:634133:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0500:634133:0:634133] ib_mlx5_log.c:174  Remote access on mlx5_0:1/IB (synd 0x13 vend 0x88 hw_synd 0/0)
+[chr-0500:634133:0:634133] ib_mlx5_log.c:174  DCI QP 0x3fb8 wqe[285]: RDMA_READ s-- [rqpn 0x55af rlid 340] [rva 0x155381ee4410 rkey 0x1cf515] [va 0x1553b53c9410 len 4080 lkey 0x17f2f9] 
+srun: error: chr-0498: tasks 328,370,372: Aborted (core dumped)
+==== backtrace (tid: 634133) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+srun: error: chr-0495: tasks 183,185: Aborted (core dumped)
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+srun: error: chr-0496: task 230: Aborted (core dumped)
+srun: error: chr-0493: tasks 0,9,11-12,25,32,38,41: Killed
+srun: error: chr-0493: tasks 1,10: Aborted (core dumped)
+srun: error: chr-0500: tasks 451,469,487,491,496,501-502: Killed
+srun: error: chr-0500: tasks 470,506,508: Aborted (core dumped)
+[1656431387.525914] [chr-0493:2980473:0]          parser.c:1895 UCX  INFO  UCX_* env variables: UCX_TLS=ib UCX_LOG_LEVEL=info
+[1656431387.728413] [chr-0493:2980473:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); 
+[1656431388.532358] [chr-0493:2980473:0]      ucp_worker.c:1957 UCX  INFO    ep_cfg[0]: tag(dc_mlx5/mlx5_0:1); rma(dc_mlx5/mlx5_0:1); 
+[chr-0493:2980473:0:2980473] ib_mlx5_log.c:174  Transport retry count exceeded on mlx5_0:1/IB (synd 0x15 vend 0x81 hw_synd 0/0)
+[chr-0493:2980473:0:2980473] ib_mlx5_log.c:174  DCI QP 0x1f50c wqe[369]: RDMA_READ s-- [rqpn 0x8ad rlid 261] [rva 0x15545e4cee10 rkey 0x12d418] [va 0x15545e4cee10 len 4080 lkey 0xa2844] 
+==== backtrace (tid:2980473) ====
+ 0 0x0000000000024249 uct_ib_mlx5_completion_with_err()  ???:0
+ 1 0x0000000000051b54 uct_dc_mlx5_iface_set_ep_failed()  ???:0
+ 2 0x000000000004b397 uct_dc_mlx5_ep_handle_failure()  ???:0
+ 3 0x000000000004d7da uct_dc_mlx5_ep_check()  ???:0
+ 4 0x00000000000351da ucp_worker_progress()  ???:0
+ 5 0x000000000003e6fc opal_progress()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/opal/runtime/opal_progress.c:231
+ 6 0x000000000008bacd ompi_request_wait_completion()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/../ompi/request/request.h:440
+ 7 0x000000000008bacd ompi_request_default_wait()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/request/req_wait.c:42
+ 8 0x00000000000d7c4a ompi_coll_base_sendrecv_actual()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.c:62
+ 9 0x00000000000d707b ompi_coll_base_sendrecv()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/base/coll_base_util.h:133
+10 0x000000000010ced0 ompi_coll_tuned_allgatherv_intra_dec_fixed()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+11 0x000000000016697a mca_fcoll_vulcan_file_write_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+12 0x00000000000c2b39 mca_common_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+13 0x00000000001aff57 mca_io_ompio_file_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+14 0x00000000000aaaae PMPI_File_write_at_all()  /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+15 0x000000000016fbc2 ncmpio_read_write()  ???:0
+16 0x000000000016a7f6 mgetput()  ncmpio_wait.c:0
+17 0x00000000001682bc req_aggregation()  ncmpio_wait.c:0
+18 0x0000000000169e40 wait_getput()  ncmpio_wait.c:0
+19 0x00000000001661a4 req_commit()  ncmpio_wait.c:0
+20 0x0000000000166a0c ncmpio_wait()  ???:0
+21 0x00000000000b727a ncmpi_wait_all()  ???:0
+22 0x000000000046b733 flush_output_buffer()  ???:0
+23 0x000000000042d108 sync_file()  pio_file.c:0
+24 0x000000000042d432 PIOc_closefile()  ???:0
+25 0x00000000004137ff __piolib_mod_MOD_closefile()  ???:0
+26 0x000000000040dd3f pioperformance_rearrtest.4019()  pioperformance_rearr.F90:0
+27 0x000000000040ad15 MAIN__()  pioperformance_rearr.F90:0
+28 0x0000000000410ff3 main()  ???:0
+29 0x0000000000023493 __libc_start_main()  ???:0
+30 0x000000000040a48e _start()  ???:0
+=================================
+
+Program received signal SIGABRT: Process abort signal.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x15555278d37f in ???
+#2  0x155552777db4 in ???
+#3  0x155550b1afb5 in ???
+#4  0x155550b203c4 in ???
+#5  0x155550b20563 in ???
+#6  0x15554dcfc248 in ???
+#7  0x15554dd29b53 in ???
+#8  0x15554dd23396 in ???
+#9  0x15554dd257d9 in ???
+#10  0x1555512dc1d9 in ???
+#11  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#12  0x155553a38acc in ompi_request_wait_completion
+	at ../ompi/request/request.h:440
+#13  0x155553a38acc in ompi_request_default_wait
+	at request/req_wait.c:42
+#14  0x155553a84c49 in ompi_coll_base_sendrecv_actual
+	at base/coll_base_util.c:62
+#15  0x155553a8407a in ompi_coll_base_sendrecv
+	at base/coll_base_util.h:133
+#16  0x155553a8407a in ompi_coll_base_allgatherv_intra_ring
+	at base/coll_base_allgatherv.c:272
+#17  0x155553ab9ecf in ompi_coll_tuned_allgatherv_intra_dec_fixed
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/tuned/coll_tuned_decision_fixed.c:1363
+#18  0x155553b13979 in mca_fcoll_vulcan_file_write_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/fcoll/vulcan/fcoll_vulcan_file_write_all.c:418
+#19  0x155553a6fb38 in mca_common_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_write.c:452
+#20  0x155553b5cf56 in mca_io_ompio_file_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_write.c:174
+#21  0x155553a57aad in PMPI_File_write_at_all
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_write_at_all.c:75
+#22  0x155554cf2bc1 in ???
+#23  0x155554ced7f5 in ???
+#24  0x155554ceb2bb in ???
+#25  0x155554cece3f in ???
+#26  0x155554ce91a3 in ???
+#27  0x155554ce9a0b in ???
+#28  0x155554c3a279 in ???
+#29  0x46b732 in ???
+#30  0x42d107 in ???
+#31  0x42d431 in ???
+#32  0x4137fe in ???
+#33  0x40dd3e in ???
+#34  0x40ad14 in ???
+#35  0x410ff2 in ???
+#36  0x155552779492 in ???
+#37  0x40a48d in ???
+#38  0xffffffffffffffff in ???
+srun: error: chr-0493: task 33: Aborted (core dumped)
+srun: Job step aborted: Waiting up to 92 seconds for job step to finish.
+slurmstepd: error: *** STEP 195239.0 ON chr-0493 CANCELLED AT 2022-06-28T10:53:10 DUE TO TIME LIMIT ***
+slurmstepd: error: *** JOB 195239 ON chr-0493 CANCELLED AT 2022-06-28T10:53:10 DUE TO TIME LIMIT ***
+srun: got SIGCONT
+srun: forcing job termination
