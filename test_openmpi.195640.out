@@ -1,0 +1,36 @@
+  Testing decomp: ./ne30_F_case_48602x72_512p.dat
+ pio_readdof start
+ pio_readdof end, read time =   0.49453004499999997     
+[chr-0499:747299] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+[chr-0499:747299] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+mca_common_ompio_file_close: error in Barrier 
+[chr-0499:747299] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+[chr-0499:747299] *** An error occurred in MPI_Barrier
+[chr-0499:747299] *** reported by process [4231528448,326]
+[chr-0499:747299] *** on communicator MPI COMMUNICATOR 3 SPLIT FROM 0
+[chr-0499:747299] *** MPI_ERR_OTHER: known error not in list
+[chr-0499:747299] *** MPI_ERRORS_ARE_FATAL (processes in this communicator will now abort,
+[chr-0499:747299] ***    and potentially your MPI job)
+slurmstepd: error: *** STEP 195640.0 ON chr-0494 CANCELLED AT 2022-06-29T11:51:06 ***
+slurmstepd: error: *** STEP 195640.0 ON chr-0494 CANCELLED AT 2022-06-29T11:51:06 ***
+[chr-0496:960071] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+[chr-0496:960071] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+mca_common_ompio_file_close: error in Barrier 
+[chr-0496:960071] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+[chr-0496:960071] *** An error occurred in MPI_Barrier
+[chr-0496:960071] *** reported by process [4231528448,153]
+[chr-0496:960071] *** on communicator MPI COMMUNICATOR 3 SPLIT FROM 0
+[chr-0496:960071] *** MPI_ERR_OTHER: known error not in list
+[chr-0496:960071] *** MPI_ERRORS_ARE_FATAL (processes in this communicator will now abort,
+[chr-0496:960071] ***    and potentially your MPI job)
+srun: Job step aborted: Waiting up to 92 seconds for job step to finish.
+srun: error: chr-0500: tasks 384-447: Killed
+srun: error: chr-0499: tasks 320-325,327-383: Killed
+srun: error: chr-0501: tasks 448-511: Killed
+srun: error: chr-0496: tasks 128-152,154-191: Killed
+srun: error: chr-0497: tasks 192-255: Killed
+srun: error: chr-0495: tasks 64-127: Killed
+srun: error: chr-0499: task 326: Exited with exit code 16
+srun: error: chr-0496: task 153: Exited with exit code 16
+srun: error: chr-0494: tasks 0-63: Killed
+srun: error: chr-0498: tasks 256-319: Killed
