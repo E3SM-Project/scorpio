@@ -1,0 +1,5 @@
+  Testing decomp: ./ne30_F_case_48602x72_512p.dat
+ pio_readdof start
+ pio_readdof end, read time =   0.39721905299999999     
+ nvars =          500 , nframes =            1 , gmaplen =               3499344 , init decomp time =    4.2363060000000230E-003 , write darray time =    3.7194721000000042E-002 , close file time =    50.483619660000002      , write time (write darray + close file) =    50.520784980000002     
+ RESULT: write    SUBSET         1       512       500      132.1133271540
