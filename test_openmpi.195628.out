@@ -1,0 +1,565 @@
+  Testing decomp: ./ne30_F_case_48602x72_512p.dat
+ pio_readdof start
+ pio_readdof end, read time =   0.49423992200000000     
+[chr-0500:685736] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+
+Program received signal SIGSEGV: Segmentation fault - invalid memory reference.
+
+Backtrace for this error:
+srun: error: chr-0496: task 154: Killed
+#0  0x15555278d3ff in ???
+#1  0x1555528b67c6 in ???
+#2  0x15555108e334 in ???
+#3  0x1555510906db in ???
+#4  0x155550b24f20 in ???
+#5  0x15555109078a in ???
+#6  0x1555512dc1d9 in ???
+#7  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#8  0x155552481fef in ???
+#9  0x15555246823e in ???
+#10  0x155553ab4bc9 in mca_coll_hcoll_barrier
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/hcoll/coll_hcoll_ops.c:29
+#11  0x155553a6d253 in mca_common_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_open.c:262
+#12  0x155553b5bf2d in mca_io_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_open.c:97
+#13  0x155553a2ff2b in file_destructor
+	at file/file.c:282
+#14  0x155553a305b0 in opal_obj_run_destructors
+	at ../opal/class/opal_object.h:483
+#15  0x155553a305b0 in ompi_file_close
+	at file/file.c:156
+#16  0x155553a543c5 in PMPI_File_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_close.c:60
+#17  0x155554cdea2a in ???
+#18  0x155554cdec79 in ???
+#19  0x155554c38bfd in ???
+#20  0x42d73b in ???
+#21  0x4137fe in ???
+#22  0x40dd3e in ???
+#23  0x40ad14 in ???
+#24  0x410ff2 in ???
+#25  0x155552779492 in ???
+#26  0x40a48d in ???
+#27  0xffffffffffffffff in ???
+srun: error: chr-0501: task 456: Killed
+srun: error: chr-0500: task 428: Killed
+srun: error: chr-0498: task 273: Killed
+[chr-0497:832179] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+
+Program received signal SIGSEGV: Segmentation fault - invalid memory reference.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x1555528b67c6 in ???
+#2  0x15555108e334 in ???
+#3  0x1555510906db in ???
+#4  0x155550b24f20 in ???
+#5  0x15555109078a in ???
+#6  0x1555512dc1d9 in ???
+#7  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#8  0x155552481fef in ???
+#9  0x15555246823e in ???
+#10  0x155553ab4bc9 in mca_coll_hcoll_barrier
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/hcoll/coll_hcoll_ops.c:29
+#11  0x155553a6d253 in mca_common_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_open.c:262
+#12  0x155553b5bf2d in mca_io_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_open.c:97
+#13  0x155553a2ff2b in file_destructor
+	at file/file.c:282
+#14  0x155553a305b0 in opal_obj_run_destructors
+	at ../opal/class/opal_object.h:483
+#15  0x155553a305b0 in ompi_file_close
+	at file/file.c:156
+#16  0x155553a543c5 in PMPI_File_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_close.c:60
+#17  0x155554cdea2a in ???
+#18  0x155554cdec79 in ???
+#19  0x155554c38bfd in ???
+#20  0x42d73b in ???
+#21  0x4137fe in ???
+#22  0x40dd3e in ???
+#23  0x40ad14 in ???
+#24  0x410ff2 in ???
+#25  0x155552779492 in ???
+#26  0x40a48d in ???
+#27  0xffffffffffffffff in ???
+srun: error: chr-0497: task 216: Killed
+srun: error: chr-0499: task 334: Killed
+[chr-0496:957103] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+
+Program received signal SIGSEGV: Segmentation fault - invalid memory reference.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x1555528b67c6 in ???
+#2  0x15555108e334 in ???
+#3  0x1555510906db in ???
+#4  0x155550b24f20 in ???
+#5  0x15555109078a in ???
+#6  0x1555512dc1d9 in ???
+#7  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#8  0x155552481fef in ???
+#9  0x15555246823e in ???
+#10  0x155553ab4bc9 in mca_coll_hcoll_barrier
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/hcoll/coll_hcoll_ops.c:29
+#11  0x155553a6d253 in mca_common_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_open.c:262
+#12  0x155553b5bf2d in mca_io_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_open.c:97
+#13  0x155553a2ff2b in file_destructor
+	at file/file.c:282
+#14  0x155553a305b0 in opal_obj_run_destructors
+	at ../opal/class/opal_object.h:483
+#15  0x155553a305b0 in ompi_file_close
+	at file/file.c:156
+#16  0x155553a543c5 in PMPI_File_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_close.c:60
+#17  0x155554cdea2a in ???
+#18  0x155554cdec79 in ???
+#19  0x155554c38bfd in ???
+#20  0x42d73b in ???
+#21  0x4137fe in ???
+#22  0x40dd3e in ???
+#23  0x40ad14 in ???
+#24  0x410ff2 in ???
+#25  0x155552779492 in ???
+#26  0x40a48d in ???
+#27  0xffffffffffffffff in ???
+srun: error: chr-0496: task 147: Killed
+srun: error: chr-0501: task 504: Killed
+srun: error: chr-0498: task 272: Killed
+srun: error: chr-0500: task 427: Segmentation fault (core dumped)
+srun: error: chr-0500: task 433: Killed
+[chr-0499:744352] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+
+Program received signal SIGSEGV: Segmentation fault - invalid memory reference.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x1555528b67c6 in ???
+#2  0x15555108e334 in ???
+#3  0x1555510906db in ???
+#4  0x155550b24f20 in ???
+#5  0x15555109078a in ???
+#6  0x1555512dc1d9 in ???
+#7  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#8  0x155552481fef in ???
+#9  0x15555246823e in ???
+#10  0x155553ab4bc9 in mca_coll_hcoll_barrier
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/hcoll/coll_hcoll_ops.c:29
+#11  0x155553a6d253 in mca_common_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_open.c:262
+#12  0x155553b5bf2d in mca_io_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_open.c:97
+#13  0x155553a2ff2b in file_destructor
+	at file/file.c:282
+#14  0x155553a305b0 in opal_obj_run_destructors
+	at ../opal/class/opal_object.h:483
+#15  0x155553a305b0 in ompi_file_close
+	at file/file.c:156
+#16  0x155553a543c5 in PMPI_File_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_close.c:60
+#17  0x155554cdea2a in ???
+#18  0x155554cdec79 in ???
+#19  0x155554c38bfd in ???
+#20  0x42d73b in ???
+#21  0x4137fe in ???
+#22  0x40dd3e in ???
+#23  0x40ad14 in ???
+#24  0x410ff2 in ???
+#25  0x155552779492 in ???
+#26  0x40a48d in ???
+#27  0xffffffffffffffff in ???
+srun: error: chr-0499: task 342: Killed
+srun: error: chr-0494: task 12: Killed
+srun: error: chr-0499: task 341: Segmentation fault (core dumped)
+srun: error: chr-0495: task 107: Killed
+srun: error: chr-0498: task 269: Killed
+srun: error: chr-0501: task 507: Killed
+srun: error: chr-0500: task 440: Killed
+srun: error: chr-0496: task 146: Segmentation fault (core dumped)
+srun: error: chr-0496: task 159: Killed
+srun: error: chr-0497: task 215: Segmentation fault (core dumped)
+srun: error: chr-0497: task 243: Killed
+[chr-0497:832206] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+
+Program received signal SIGSEGV: Segmentation fault - invalid memory reference.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x1555528b67c6 in ???
+#2  0x15555108e334 in ???
+#3  0x1555510906db in ???
+#4  0x155550b24f20 in ???
+#5  0x15555109078a in ???
+#6  0x1555512dc1d9 in ???
+#7  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#8  0x155552481fef in ???
+#9  0x15555246823e in ???
+#10  0x155553ab4bc9 in mca_coll_hcoll_barrier
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/hcoll/coll_hcoll_ops.c:29
+#11  0x155553a6d253 in mca_common_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_open.c:262
+#12  0x155553b5bf2d in mca_io_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_open.c:97
+#13  0x155553a2ff2b in file_destructor
+	at file/file.c:282
+#14  0x155553a305b0 in opal_obj_run_destructors
+	at ../opal/class/opal_object.h:483
+#15  0x155553a305b0 in ompi_file_close
+	at file/file.c:156
+#16  0x155553a543c5 in PMPI_File_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_close.c:60
+#17  0x155554cdea2a in ???
+#18  0x155554cdec79 in ???
+#19  0x155554c38bfd in ???
+#20  0x42d73b in ???
+#21  0x4137fe in ???
+#22  0x40dd3e in ???
+#23  0x40ad14 in ???
+#24  0x410ff2 in ???
+#25  0x155552779492 in ???
+#26  0x40a48d in ???
+#27  0xffffffffffffffff in ???
+[chr-0495:1436881] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+
+Program received signal SIGSEGV: Segmentation fault - invalid memory reference.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x1555528b67c6 in ???
+#2  0x15555108e334 in ???
+#3  0x1555510906db in ???
+#4  0x155550b24f20 in ???
+#5  0x15555109078a in ???
+#6  0x1555512dc1d9 in ???
+#7  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#8  0x155552481fef in ???
+#9  0x15555246823e in ???
+#10  0x155553ab4bc9 in mca_coll_hcoll_barrier
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/hcoll/coll_hcoll_ops.c:29
+#11  0x155553a6d253 in mca_common_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_open.c:262
+#12  0x155553b5bf2d in mca_io_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_open.c:97
+#13  0x155553a2ff2b in file_destructor
+	at file/file.c:282
+#14  0x155553a305b0 in opal_obj_run_destructors
+	at ../opal/class/opal_object.h:483
+#15  0x155553a305b0 in ompi_file_close
+	at file/file.c:156
+#16  0x155553a543c5 in PMPI_File_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_close.c:60
+#17  0x155554cdea2a in ???
+#18  0x155554cdec79 in ???
+#19  0x155554c38bfd in ???
+#20  0x42d73b in ???
+#21  0x4137fe in ???
+#22  0x40dd3e in ???
+#23  0x40ad14 in ???
+#24  0x410ff2 in ???
+#25  0x155552779492 in ???
+#26  0x40a48d in ???
+#27  0xffffffffffffffff in ???
+srun: error: chr-0501: task 491: Killed
+srun: error: chr-0500: task 412: Killed
+srun: error: chr-0495: task 105: Killed
+srun: error: chr-0498: task 285: Killed
+srun: error: chr-0494: task 11: Killed
+srun: error: chr-0499: task 354: Killed
+srun: error: chr-0497: task 232: Killed
+srun: error: chr-0497: task 242: Segmentation fault (core dumped)
+[chr-0494:1632517] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+
+Program received signal SIGSEGV: Segmentation fault - invalid memory reference.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x1555528b67c6 in ???
+#2  0x15555108e334 in ???
+#3  0x1555510906db in ???
+#4  0x155550b24f20 in ???
+#5  0x15555109078a in ???
+#6  0x1555512dc1d9 in ???
+#7  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#8  0x155552481fef in ???
+#9  0x15555246823e in ???
+#10  0x155553ab4bc9 in mca_coll_hcoll_barrier
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/hcoll/coll_hcoll_ops.c:29
+#11  0x155553a6d253 in mca_common_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_open.c:262
+#12  0x155553b5bf2d in mca_io_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_open.c:97
+#13  0x155553a2ff2b in file_destructor
+	at file/file.c:282
+#14  0x155553a305b0 in opal_obj_run_destructors
+	at ../opal/class/opal_object.h:483
+#15  0x155553a305b0 in ompi_file_close
+	at file/file.c:156
+#16  0x155553a543c5 in PMPI_File_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_close.c:60
+#17  0x155554cdea2a in ???
+#18  0x155554cdec79 in ???
+#19  0x155554c38bfd in ???
+#20  0x42d73b in ???
+#21  0x4137fe in ???
+#22  0x40dd3e in ???
+#23  0x40ad14 in ???
+#24  0x410ff2 in ???
+#25  0x155552779492 in ???
+#26  0x40a48d in ???
+#27  0xffffffffffffffff in ???
+srun: error: chr-0501: task 496: Killed
+srun: error: chr-0494: task 0: Killed
+srun: error: chr-0498: task 283: Killed
+srun: error: chr-0496: task 165: Killed
+[chr-0495:1436877] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+
+Program received signal SIGSEGV: Segmentation fault - invalid memory reference.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x1555528b67c6 in ???
+#2  0x15555108e334 in ???
+#3  0x1555510906db in ???
+#4  0x155550b24f20 in ???
+#5  0x15555109078a in ???
+#6  0x1555512dc1d9 in ???
+#7  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#8  0x155552481fef in ???
+#9  0x15555246823e in ???
+#10  0x155553ab4bc9 in mca_coll_hcoll_barrier
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/hcoll/coll_hcoll_ops.c:29
+#11  0x155553a6d253 in mca_common_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_open.c:262
+#12  0x155553b5bf2d in mca_io_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_open.c:97
+#13  0x155553a2ff2b in file_destructor
+	at file/file.c:282
+#14  0x155553a305b0 in opal_obj_run_destructors
+	at ../opal/class/opal_object.h:483
+#15  0x155553a305b0 in ompi_file_close
+	at file/file.c:156
+#16  0x155553a543c5 in PMPI_File_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_close.c:60
+#17  0x155554cdea2a in ???
+#18  0x155554cdec79 in ???
+#19  0x155554c38bfd in ???
+#20  0x42d73b in ???
+#21  0x4137fe in ???
+#22  0x40dd3e in ???
+#23  0x40ad14 in ???
+#24  0x410ff2 in ???
+#25  0x155552779492 in ???
+#26  0x40a48d in ???
+#27  0xffffffffffffffff in ???
+srun: error: chr-0494: task 10: Segmentation fault (core dumped)
+srun: error: chr-0495: tasks 100,104: Segmentation fault (core dumped)
+srun: error: chr-0495: task 101: Killed
+srun: error: chr-0501: task 469: Killed
+srun: error: chr-0499: task 353: Killed
+srun: error: chr-0496: task 172: Killed
+[chr-0500:685717] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+
+Program received signal SIGSEGV: Segmentation fault - invalid memory reference.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x1555528b67c6 in ???
+#2  0x15555108e334 in ???
+#3  0x1555510906db in ???
+#4  0x155550b24f20 in ???
+#5  0x15555109078a in ???
+#6  0x1555512dc1d9 in ???
+#7  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#8  0x155552481fef in ???
+#9  0x15555246823e in ???
+#10  0x155553ab4bc9 in mca_coll_hcoll_barrier
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/hcoll/coll_hcoll_ops.c:29
+#11  0x155553a6d253 in mca_common_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_open.c:262
+#12  0x155553b5bf2d in mca_io_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_open.c:97
+#13  0x155553a2ff2b in file_destructor
+	at file/file.c:282
+#14  0x155553a305b0 in opal_obj_run_destructors
+	at ../opal/class/opal_object.h:483
+#15  0x155553a305b0 in ompi_file_close
+	at file/file.c:156
+#16  0x155553a543c5 in PMPI_File_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_close.c:60
+#17  0x155554cdea2a in ???
+#18  0x155554cdec79 in ???
+#19  0x155554c38bfd in ???
+#20  0x42d73b in ???
+#21  0x4137fe in ???
+#22  0x40dd3e in ???
+#23  0x40ad14 in ???
+#24  0x410ff2 in ???
+#25  0x155552779492 in ???
+#26  0x40a48d in ???
+#27  0xffffffffffffffff in ???
+srun: error: chr-0498: task 296: Killed
+srun: error: chr-0500: task 408: Segmentation fault (core dumped)
+srun: error: chr-0500: task 409: Killed
+srun: error: chr-0494: task 25: Killed
+srun: error: chr-0497: task 201: Killed
+srun: error: chr-0496: task 176: Killed
+srun: error: chr-0499: task 357: Killed
+srun: error: chr-0494: task 9: Killed
+srun: error: chr-0498: task 299: Killed
+[chr-0495:1436867] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+
+Program received signal SIGSEGV: Segmentation fault - invalid memory reference.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x1555528b67c6 in ???
+#2  0x15555108e334 in ???
+#3  0x1555510906db in ???
+#4  0x155550b24f20 in ???
+#5  0x15555109078a in ???
+#6  0x1555512dc1d9 in ???
+#7  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#8  0x155552481fef in ???
+#9  0x15555246823e in ???
+#10  0x155553ab4bc9 in mca_coll_hcoll_barrier
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/hcoll/coll_hcoll_ops.c:29
+#11  0x155553a6d253 in mca_common_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_open.c:262
+#12  0x155553b5bf2d in mca_io_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_open.c:97
+#13  0x155553a2ff2b in file_destructor
+	at file/file.c:282
+#14  0x155553a305b0 in opal_obj_run_destructors
+	at ../opal/class/opal_object.h:483
+#15  0x155553a305b0 in ompi_file_close
+	at file/file.c:156
+#16  0x155553a543c5 in PMPI_File_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_close.c:60
+#17  0x155554cdea2a in ???
+#18  0x155554cdec79 in ???
+#19  0x155554c38bfd in ???
+#20  0x42d73b in ???
+#21  0x4137fe in ???
+#22  0x40dd3e in ???
+#23  0x40ad14 in ???
+#24  0x410ff2 in ???
+#25  0x155552779492 in ???
+#26  0x40a48d in ???
+#27  0xffffffffffffffff in ???
+srun: error: chr-0495: task 91: Killed
+srun: error: chr-0495: task 90: Segmentation fault (core dumped)
+[chr-0500:685709] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+
+Program received signal SIGSEGV: Segmentation fault - invalid memory reference.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x1555528b67c6 in ???
+#2  0x15555108e334 in ???
+#3  0x1555510906db in ???
+#4  0x155550b24f20 in ???
+#5  0x15555109078a in ???
+#6  0x1555512dc1d9 in ???
+#7  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#8  0x155552481fef in ???
+#9  0x15555246823e in ???
+#10  0x155553ab4bc9 in mca_coll_hcoll_barrier
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/hcoll/coll_hcoll_ops.c:29
+#11  0x155553a6d253 in mca_common_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_open.c:262
+#12  0x155553b5bf2d in mca_io_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_open.c:97
+#13  0x155553a2ff2b in file_destructor
+	at file/file.c:282
+#14  0x155553a305b0 in opal_obj_run_destructors
+	at ../opal/class/opal_object.h:483
+#15  0x155553a305b0 in ompi_file_close
+	at file/file.c:156
+#16  0x155553a543c5 in PMPI_File_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_close.c:60
+#17  0x155554cdea2a in ???
+#18  0x155554cdec79 in ???
+#19  0x155554c38bfd in ???
+#20  0x42d73b in ???
+#21  0x4137fe in ???
+#22  0x40dd3e in ???
+#23  0x40ad14 in ???
+#24  0x410ff2 in ???
+#25  0x155552779492 in ???
+#26  0x40a48d in ???
+#27  0xffffffffffffffff in ???
+srun: error: chr-0500: task 401: Killed
+srun: error: chr-0500: task 400: Segmentation fault (core dumped)
+srun: error: chr-0496: task 189: Killed
+srun: error: chr-0499: task 365: Killed
+srun: error: chr-0494: task 19: Killed
+srun: error: chr-0499: task 383: Killed
+srun: error: chr-0498: task 257: Killed
+srun: error: chr-0495: task 87: Killed
+srun: error: chr-0494: task 36: Killed
+[chr-0495:1436856] pml_ucx.c:910  Error: mca_pml_ucx_send_nbr failed: -25, Connection reset by remote peer
+srun: error: chr-0494: task 41: Killed
+
+Program received signal SIGSEGV: Segmentation fault - invalid memory reference.
+
+Backtrace for this error:
+#0  0x15555278d3ff in ???
+#1  0x1555528b67c6 in ???
+#2  0x15555108e334 in ???
+#3  0x1555510906db in ???
+#4  0x155550b24f20 in ???
+#5  0x15555109078a in ???
+#6  0x1555512dc1d9 in ???
+#7  0x1555515826fb in opal_progress
+	at runtime/opal_progress.c:231
+#8  0x155552481fef in ???
+#9  0x15555246823e in ???
+#10  0x155553ab4bc9 in mca_coll_hcoll_barrier
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/coll/hcoll/coll_hcoll_ops.c:29
+#11  0x155553a6d253 in mca_common_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/common/ompio/common_ompio_file_open.c:262
+#12  0x155553b5bf2d in mca_io_ompio_file_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mca/io/ompio/io_ompio_file_open.c:97
+#13  0x155553a2ff2b in file_destructor
+	at file/file.c:282
+#14  0x155553a305b0 in opal_obj_run_destructors
+	at ../opal/class/opal_object.h:483
+#15  0x155553a305b0 in ompi_file_close
+	at file/file.c:156
+#16  0x155553a543c5 in PMPI_File_close
+	at /tmp/svcbuilder/spack-stage-openmpi-4.1.3-sxfyy4knvddpewshfcc45heice7tzs7f/spack-src/ompi/mpi/c/profile/pfile_close.c:60
+#17  0x155554cdea2a in ???
+#18  0x155554cdec79 in ???
+#19  0x155554c38bfd in ???
+#20  0x42d73b in ???
+#21  0x4137fe in ???
+#22  0x40dd3e in ???
+#23  0x40ad14 in ???
+#24  0x410ff2 in ???
+#25  0x155552779492 in ???
+#26  0x40a48d in ???
+#27  0xffffffffffffffff in ???
+srun: error: chr-0495: task 80: Killed
+srun: error: chr-0495: task 79: Segmentation fault (core dumped)
+srun: error: chr-0494: task 46: Killed
+srun: error: chr-0494: task 53: Killed
+srun: Job step aborted: Waiting up to 92 seconds for job step to finish.
+slurmstepd: error: *** STEP 195628.0 ON chr-0494 CANCELLED AT 2022-06-29T10:17:12 DUE TO TIME LIMIT ***
+slurmstepd: error: *** JOB 195628 ON chr-0494 CANCELLED AT 2022-06-29T10:17:12 DUE TO TIME LIMIT ***
+srun: got SIGCONT
+srun: forcing job termination
