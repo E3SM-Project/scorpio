@@ -32,8 +32,10 @@ add_custom_target(genf90
   DEPENDS ${SPIO_GENF90_PATH}/genf90.pl)
 
 set (PIO_GenF90_SRCS pionfatt_mod.F90
-  pionfput_mod.F90
-  pionfget_mod.F90
+  spio_put_var.F90
+  spio_put_var_cint.F90
+  spio_get_var.F90
+  spio_get_var_cint.F90
   pio_support.F90
   spio_darray.F90
   spio_darray_cint.F90

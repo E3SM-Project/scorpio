@@ -1,0 +1,103 @@
+!>
+!! @file
+!! @brief C Interfaces for SCORPIO APIs to put/write non-distributed
+!! arrays into a file
+
+!> @internal
+!! @def __PIO_FILE__
+!! This macro is used to define the file name in user messages
+!!
+#define __PIO_FILE__ 'spio_put_cint'
+
+MODULE spio_put_cint
+  USE iso_c_binding
+  USE pio_types, ONLY : iosystem_desc_t, pio_rearr_opt_t
+  USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
+  IMPLICIT NONE
+
+INTERFACE
+! TYPE int,real,double
+!> @private
+!! @brief C function to write/put one element/datum (${TYPE}) to a
+!! variable in a file at a specified index (used by the Fortran interface)
+!!
+!! @details
+!! @param[in] fh The file handle/id to the file with the variable
+!! @param[in] varid The handle/id of the variable
+!! @param[in] cstart  The variable index at which to write the element/datum. This
+!!                    argument is an array and the size of the array needs to be equal
+!!                    to the number of dimensions for the variable. Each element in the
+!!                    array corresponds to the index for the variable dimension
+!!                    (subscripts referring to where the value is to be written)
+!!                    The indices start from 0.
+!! @param[in] val The value/datum being written out. The value is written out
+!!                to the variable at the index, @p idx, specified above.
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER(C_INT) FUNCTION PIOc_put_var1_{NCTYPE}(fh, varid, cstart, val) &
+                            bind(C,name="PIOc_put_var1_{NCTYPE}")
+    INTEGER(C_INT), INTENT(IN), value :: fh
+    INTEGER(C_INT), INTENT(IN), value :: varid
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), INTENT(IN) :: cstart(*)
+    {CTYPE} :: val
+  END FUNCTION PIOc_put_var1_{NCTYPE}
+END INTERFACE
+
+INTERFACE
+! TYPE text,int,real,double
+!> @private
+!! @brief C function to write/put specified number of elements (${TYPE})
+!! to a variable in a file at a specified index (used by the Fortran interface)
+!!
+!! @details
+!! @param[in] fh The file handle/id to the file with the variable
+!! @param[in] varid The handle/id of the variable
+!! @param[in] cstart The variable index at which the first element/datum is written
+!!                    out. The remaining elements (the number of elements is determined
+!!                    by the @p count array), if any, in @p val is written out as
+!!                    subsequent elements in the variable. This argument is an array
+!!                    and the size of the array needs to be equal to the number of
+!!                    dimensions for the variable. Each element in the array corresponds
+!!                    to the starting index for the variable dimension
+!!                    (subscripts referring to where the first value is to be written)
+!!                    The indices start from 0.
+!! @param[in] ccount  The number (count) of elements written out. This argument is an
+!!                    array and the size of the array needs to be equal to the number
+!!                    of dimensions of the variable. Each element in the array corresponds
+!!                    to the number of elements of that variable dimension being written
+!!                    out
+!! @param[in] val The array of values being written out. The values are written out
+!!                to the variable at the index, @p cstart, specified above. The array
+!!                needs to contain at least SIZE(ccount) values that are being written
+!!                out
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER(C_INT) FUNCTION PIOc_put_vara_{NCTYPE}(fh, varid, cstart, ccount, val) &
+                            bind(C,name="PIOc_put_vara_{NCTYPE}")
+    INTEGER(C_INT), INTENT(IN), value :: fh
+    INTEGER(C_INT), INTENT(IN), value :: varid
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), INTENT(IN) :: cstart(*)
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), INTENT(IN) :: ccount(*)
+    {CTYPE} :: val(*)
+  END FUNCTION PIOc_put_vara_{NCTYPE}
+END INTERFACE
+
+INTERFACE
+! TYPE text,int,real,double
+!> @private
+!! @brief C function to write/put all elements (${TYPE}) to a variable
+!! in a file (used by the Fortran interface)
+!!
+!! @details
+!! @param[in] fh The file handle/id to the file with the variable
+!! @param[in] varid The handle/id of the variable
+!! @param[in] val The array of values being written out. The number of elements
+!!                in the array needs to be equal to the dimensions of the variable
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER(C_INT) FUNCTION PIOc_put_var_{NCTYPE}(fh, varid, val) &
+                            bind(C,name="PIOc_put_var_{NCTYPE}")
+    INTEGER(C_INT), INTENT(IN), value :: fh
+    INTEGER(C_INT), INTENT(IN), value :: varid
+    {CTYPE} :: val(*)
+  END FUNCTION PIOc_put_var_{NCTYPE}
+END INTERFACE
+
+END MODULE spio_put_cint

@@ -1,0 +1,711 @@
+!> @file
+!! @brief SCORPIO APIs for writing non-distributed arrays
+!! This file contains the SCORPIO APIs for writing ("put"ting)
+!! non-distributed arrays
+!!
+
+!> @internal
+!! @def __PIO_FILE__
+!! This macro is used to define the file name in user messages
+!!
+#define __PIO_FILE__ 'spio_put.F90'
+
+MODULE spio_put
+  USE iso_c_binding
+  USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t
+  USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
+  USE spio_util, ONLY : f2cstring, get_text_var_sz, get_var_dim_sz
+  USE spio_err, ONLY  : pio_error, pio_warn
+  USE spio_put_cint
+  IMPLICIT NONE
+
+  PRIVATE
+  PUBLIC :: pio_put_var
+
+!> @defgroup PIO_put_var PIO_put_var
+!! @public
+!! @brief Write ("Put") a non-distributed array
+!!
+!! @details
+!! This API can be used to write non-distributed arrays to a file. These arrays
+!! have the same data across all the MPI processes in the I/O system (where the
+!! file was opened/created). However note that the library may not perform
+!! data consistency (that data across all the processes are the same) checks
+!! across MPI processes.
+!!
+!! This API is a collective call (Although the library might internally choose
+!! to make progress on the write from a single or small subset of MPI processes)
+!! on the I/O system associated with the file
+!! 
+  INTERFACE pio_put_var
+    !! pio_put_var_* versions of the functions write a single value (datum) in
+    !! a single call at a specified variable index.
+    !! Note that the value passed in is always DIMS=0 
+    MODULE PROCEDURE pio_put_var1_{TYPE}, pio_put_var1_vdesc_{TYPE}
+    !! pio_put_var_* versions of the functions write a slice/slab of the variable
+    !! defined by starts & counts for each dimension of the variable
+    !! Note that starts/counts do not make sense for 0d scalar variables since
+    !! these scalar variables have 0 dimensions
+    ! DIMS 1,2,3,4,5
+    MODULE PROCEDURE pio_put_vara_{DIMS}d_{TYPE}, pio_put_vara_vdesc_{DIMS}d_{TYPE}
+    !! pio_put_var_* versions of the functions write the entire variable in
+    !! a single call
+    ! DIMS 0,1,2,3,4,5
+    MODULE PROCEDURE pio_put_var_{DIMS}d_{TYPE}, pio_put_var_vdesc_{DIMS}d_{TYPE}
+  END INTERFACE
+
+CONTAINS
+
+! ========================================================================
+! pio_put_var() functions that write 1 element/datum at a specified index
+! i.e., pio_put_var1_* calls
+! ========================================================================
+! FIXME: pio_put_var1_{TYPE} can be handled by calling pio_put_vara_1d_{TYPE}
+! with val in a temp array, (/val/), & cnt(:) = 1
+
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Write/Put a string to a variable (character array) in a file at
+!! a specified index
+!! @details
+!! @param[in] file The handle to the file. @copydoc file_desc_t
+!! @param[in] varid The id of the variable being written out
+!! @param[in] start The variable index at which to write the text string. This
+!!                  argument is an array and the size of the array needs to be equal
+!!                  to the number of dimensions for the variable. Each element in the
+!!                  array corresponds to the index for the variable dimension
+!!                  (subscripts referring to where the value is to be written)
+!!                  The indices start from 1.
+!! @param[in] str The value, string, being written out.
+!! @retval ierr @copydoc error_return
+!!
+  INTEGER FUNCTION pio_put_var1_text (file, varid, start, str) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    INTEGER, INTENT(IN) :: varid, start(:)
+    CHARACTER(LEN=*), INTENT(IN) :: str
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    CHARACTER(C_CHAR), ALLOCATABLE :: cval(:)
+    INTEGER :: i
+    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:), ccount(:)
+    INTEGER :: ndims, clen
+
+#ifdef TIMING
+    CALL t_startf("PIO:put_var1_text")
+#endif
+    ierr = PIO_NOERR
+    IF(LEN(str) == 0) THEN
+      WRITE(log_msg, *) "An empty string was passed to the PIO_put_var() function,",&
+                        " pio_put_var1_text(), a collective C API call will be skipped",&
+                        " on this process. varid = ", varid, ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+    END IF
+
+    ierr = get_text_var_sz(file, varid, clen)
+    IF(ierr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "Getting size of the text variable failed, varid = ",&
+                        varid, ", file id = ", file%fh
+      ierr = pio_error(file%iosystem, ierr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    IF(clen < LEN_TRIM(str)) THEN
+      WRITE(log_msg, *) "The length of the string in the user buffer,",&
+                        LEN_TRIM(str),&
+                        " chars, is greater than the size of strings in the variable",&
+                        " being written to, ", clen, " chars. The string",&
+                        " will be truncated. varid = ", varid, ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
+    END IF
+
+    ! FIXME: We need to get the ndims from inquiring about the variable rather than
+    ! using the parameters provided by the user
+    ndims = SIZE(start)
+    IF(ndims <= 0) THEN
+      WRITE(log_msg, *) "Invalid index array, size of array == 0, varid = ",&
+                        varid, ", file id = ", file%fh
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    ALLOCATE(ccount(ndims))
+
+    ! ccount(ndims) chars from string str(:) is being written to the
+    ! NetCDF variable var(x)...(clen)
+    ! at var(1,...,start(ndims),...,x)...(1,...,start(1),...,clen)
+    !                   ^^^                      ^^^
+    ccount = 1
+    ! Write the entire string starting from [start(1), clen]
+    ! Note: The ccount/cstart passed to the C interface is in the
+    ! "C order" of dims, that is the reverse of the "Fortran order"
+    ! of the dims
+    ccount(ndims) = INT(MIN(clen - start(1) + 1, LEN(str)), PIO_OFFSET_KIND)
+
+    ALLOCATE(cstart(ndims))
+    DO i=1,ndims
+      cstart(i) = INT(start(ndims - i + 1), PIO_OFFSET_KIND)
+    END DO
+
+    ! NetCDF only supports character arrays
+    ! Convert string to a 1d CHARACTER array & adding a C NULL character
+    ! at the end of the string (since we are using C APIs to write the
+    ! string to the variable)
+    ALLOCATE(cval(INT(ccount(ndims)) + 1))
+    cval = C_NULL_CHAR
+    DO i=1,MIN(INT(ccount(ndims)),LEN_TRIM(str))
+      cval(i) = str(i:i)
+    END DO
+
+    ! The NetCDF varids start from 0 for C and 1 for Fortran, we use
+    ! the same convention here
+    ierr = PIOc_put_vara_text(file%fh, varid-1, cstart, ccount, cval)
+
+    DEALLOCATE(ccount, cstart, cval)
+#ifdef TIMING
+    CALL t_stopf("PIO:put_var1_text")
+#endif
+  END FUNCTION pio_put_var1_text
+
+! TYPE int,real,double
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Write/Put one element/datum ({TYPE}) to a variable in a file at
+!! a specified index
+!! @details
+!! @param[in] file The handle to the file. @copydoc file_desc_t
+!! @param[in] varid The id of the variable being written out
+!! @param[in] start The variable index at which to write the element/datum. This
+!!                  argument is an array and the size of the array needs to be equal
+!!                  to the number of dimensions for the variable. Each element in the
+!!                  array corresponds to the index for the variable dimension
+!!                  (subscripts referring to where the value is to be written)
+!!                  The indices start from 1.
+!! @param[in] val The value, ${TYPE}, being written out.
+!! @retval ierr @copydoc error_return
+!!
+  INTEGER FUNCTION pio_put_var1_{TYPE} (file, varid, start, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    INTEGER, INTENT(IN) :: varid, start(:)
+    {VTYPE}, INTENT(IN) :: val
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER :: ndims, i
+    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:)
+
+#ifdef TIMING
+    CALL t_startf("PIO:put_var1_{TYPE}")
+#endif
+    ierr = PIO_NOERR
+    ! FIXME : The number of dims should ideally be queried for the variable,
+    ! rather than deducing from user args
+    ndims = SIZE(start)
+    IF(ndims <= 0) THEN
+      WRITE(log_msg, *) "Empty index array passed to PIO_put_var function,",&
+                        " pio_put_var1_{TYPE}, a collective C API call will",&
+                        " be skipped on this process. varid = ", varid,&
+                        " file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+    ALLOCATE(cstart(ndims))
+    DO i=1,ndims
+      ! Note: The start indices in C start from 0
+      ! (Fortran indices start from 1)
+      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_KIND)
+    END DO
+
+    ierr = PIOc_put_var1_{NCTYPE} (file%fh, varid-1, cstart, val)
+    DEALLOCATE(cstart)
+#ifdef TIMING
+    CALL t_stopf("PIO:put_var1_{TYPE}")
+#endif
+  END FUNCTION pio_put_var1_{TYPE}
+
+! TYPE text,int,real,double
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Write/Put one element/datum ({TYPE}) to a variable in a file at
+!! a specified index
+!! @details
+!! @param[in] file The handle to the file. @copydoc file_desc_t
+!! @param[in] vdesc The handle to the variable being written out. @copydoc var_desc_t
+!! @param[in] start The variable index at which to write the element/datum. This
+!!                  argument is an array and the size of the array needs to be equal
+!!                  to the number of dimensions for the variable. Each element in the
+!!                  array corresponds to the index for the variable dimension
+!!                  (subscripts referring to where the value is to be written)
+!!                  The indices start from 1.
+!! @param[in] val The value, ${TYPE}, being written out.
+!! @retval ierr @copydoc error_return
+!!
+  INTEGER FUNCTION pio_put_var1_vdesc_{TYPE} (file, vdesc, start, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(var_desc_t), INTENT(IN) :: vdesc
+    INTEGER, INTENT(IN) :: start(:)
+    {VTYPE}, INTENT(IN) :: val
+
+    ierr = pio_put_var1_{TYPE} (file, vdesc%varid, start, val)
+  END FUNCTION pio_put_var1_vdesc_{TYPE}
+
+! ========================================================================
+! pio_put_var() FUNCTIONs that write a slice of data at specified
+! starts/counts
+! i.e., pio_put_vara_* CALLs
+! ========================================================================
+
+! DIMS 1,2,3,4,5
+!>
+!! @public
+!! @brief Function to write/put specified number of strings to a variable
+!! in a file at a specified index
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] varid The handle/id of the variable
+!! @param[in] start The variable index at which the first character is written
+!!                  out. The remaining chars (the number of chars is determined
+!!                  by the @p cnt array), if any, in @p val is written out as
+!!                  subsequent chars in the variable. This argument is an array
+!!                  and the size of the array needs to be equal to the number of
+!!                  dimensions for the variable. Each element in the array corresponds
+!!                  to the starting index for the variable dimension
+!!                  (subscripts referring to where the first char is to be written)
+!!                  The indices start from 1.
+!! @param[in] cnt The number (count) of chars written out. This argument is an
+!!                array and the size of the array needs to be equal to the number
+!!                of dimensions of the variable. Each element in the array corresponds
+!!                to the number of elements of that variable dimension being written
+!!                out
+!! @param[in] val The array of strings being written out. The strings are written out
+!!                to the variable at the index, @p cstart, specified above. The array
+!!                needs to contain at least PRODUCT(cnt) characters that are being written
+!!                out
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION pio_put_vara_{DIMS}d_text (file, varid, start, cnt, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    INTEGER, INTENT(IN) :: varid, start(:), cnt(:)
+    CHARACTER(LEN=*), INTENT(IN) :: val{DIMSTR}
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    CHARACTER(C_CHAR), ALLOCATABLE :: cval(:)
+    INTEGER :: cval_sz, clen, nstrs
+    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:), ccount(:)
+    INTEGER :: i, ndims
+
+#ifdef TIMING
+    CALL t_startf("PIO:put_vara_{DIMS}d_text")
+#endif
+    IF(SIZE(start) == 0) THEN
+      WRITE(log_msg, *) "Invalid start array passed to PIO_put_var() function,",&
+                        " pio_put_vara_{DIMS}d_text(). The size of the array == 0.",&
+                        " varid = ", varid, ", file id = ", file%fh 
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    IF(SIZE(cnt) == 0) THEN
+      WRITE(log_msg, *) "Invalid count array passed to PIO_put_var() function,",&
+                        " pio_put_vara_{DIMS}d_text(). The size of the array == 0.",&
+                        " varid = ", varid, ", file id = ", file%fh 
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    ! FIXME: The number of dimensions should be obtained by querying the variable
+    ! metadata, not from user args
+    ! The number of dimensions of the variable is assumed to be equal to the number
+    ! of consequtive elements of the cnt array argument that are > 0 
+    ndims = SIZE(cnt)
+    DO i=1,SIZE(cnt)
+      IF(cnt(i) <= 0) THEN
+        ndims = i-1
+        exit
+      END IF
+    END DO
+    IF(ndims == 0) THEN
+      WRITE(log_msg, *) "Invalid count array passed to PIO_put_var() function,",&
+                        " pio_put_vara_{DIMS}d_text(). The first element in the count",&
+                        " array is <= 0 (should be > 0). varid = ", varid, ", file id = ", file%fh 
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+    ALLOCATE(cstart(ndims), ccount(ndims))
+
+    ! Note: Convert the Fortran order of start/counts to C order (reverse of Fortran order)
+    ! Also in C starting indices start from 0 (In Fortran it starts from 1)
+    DO i=1,ndims
+      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_KIND)
+      ccount(i) = INT(cnt(ndims-i+1), PIO_OFFSET_KIND)
+    END DO
+
+    ! This manipulation is required to convert the fortran string to
+    ! a C CHARACTER array with all trailing space set to null
+    clen = LEN(val)
+    nstrs = SIZE(val)
+    cval_sz = clen * nstrs
+    IF(cval_sz > 0) THEN
+      ALLOCATE(cval(cval_sz))
+      ! Reshape the fortran array of strings to a contiguous 1d CHARACTER array.
+      ! The 1d CHARACTER array does not include string delimiters between the
+      ! different strings in the fortran array. The way the CHARACTERs in the
+      ! C string is written out is determined by the shape specified in the
+      ! start/count arrays provided by the user.
+      ! CHARACTER(LEN=3) :: ival[2] = [ "abc",
+      !                                 "def" ]
+      ! is converted to a single 1d CHARACTER array
+      ! cval[6] = [   'a',
+      !               'b',
+      !               'c',
+      !               'd',
+      !               'e',
+      !               'f' ]
+      CALL f2cstring(val, cval, cval_sz, clen, cstr_add_null = .false.)
+
+      ierr = PIOc_put_vara_text(file%fh, varid-1, cstart, ccount, cval)
+      DEALLOCATE(cval)
+    ELSE
+      WRITE(log_msg, *) "Empty {DIMS}d text data passed to PIO_put_var function,",&
+                        " put_vara_{DIMS}d_text, a collective C API call will",&
+                        " be skipped on this process. varid = ", varid,&
+                        " , file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+    END IF
+    DEALLOCATE(cstart, ccount)
+
+#ifdef TIMING
+    CALL t_stopf("PIO:put_vara_{DIMS}d_text")
+#endif
+  END FUNCTION pio_put_vara_{DIMS}d_text
+
+! TYPE int,real,double
+! DIMS 1,2,3,4,5
+!>
+!! @public
+!! @brief Function to write/put specified number of elements (${TYPE})
+!! to a variable in a file at a specified index
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] varid The handle/id of the variable
+!! @param[in] start The variable index at which the first element/datum is written
+!!                  out. The remaining elements (the number of elements is determined
+!!                  by the @p cnt array), if any, in @p val is written out as
+!!                  subsequent elements in the variable. This argument is an array
+!!                  and the size of the array needs to be equal to the number of
+!!                  dimensions for the variable. Each element in the array corresponds
+!!                  to the starting index for the variable dimension
+!!                  (subscripts referring to where the first value is to be written)
+!!                  The indices start from 1.
+!! @param[in] cnt The number (count) of elements written out. This argument is an
+!!                array and the size of the array needs to be equal to the number
+!!                of dimensions of the variable. Each element in the array corresponds
+!!                to the number of elements of that variable dimension being written
+!!                out
+!! @param[in] val The array of values being written out. The values are written out
+!!                to the variable at the index, @p cstart, specified above. The array
+!!                needs to contain at least PRODUCT(cnt) values that are being written
+!!                out
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION pio_put_vara_{DIMS}d_{TYPE} (file, varid, start, cnt, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    INTEGER, INTENT(IN) :: varid, start(:), cnt(:)
+    {VTYPE}, INTENT(IN) :: val{DIMSTR}
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:), ccount(:)
+    INTEGER :: i, ndims
+
+#ifdef TIMING
+    CALL t_startf("PIO:put_vara_{DIMS}d_{TYPE}")
+#endif
+    IF(SIZE(start) == 0) THEN
+      WRITE(log_msg, *) "Invalid start array passed to PIO_put_var() function,",&
+                        " pio_put_vara_{DIMS}d_{TYPE}(). The size of the array == 0.",&
+                        " varid = ", varid, ", file id = ", file%fh 
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    IF(SIZE(cnt) == 0) THEN
+      WRITE(log_msg, *) "Invalid count array passed to PIO_put_var() function,",&
+                        " pio_put_vara_{DIMS}d_{TYPE}(). The size of the array == 0.",&
+                        " varid = ", varid, ", file id = ", file%fh 
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    ! FIXME: The number of dimensions should be obtained by querying the variable
+    ! metadata, not from user args
+    ! The number of dimensions of the variable is assumed to be equal to the number
+    ! of consequtive elements of the cnt array argument that are > 0 
+    ndims = SIZE(cnt)
+    DO i=1,SIZE(cnt)
+      IF(cnt(i) <= 0) THEN
+        ndims = i-1
+        exit
+      END IF
+    END DO
+    IF(ndims == 0) THEN
+      WRITE(log_msg, *) "Invalid count array passed to PIO_put_var() function,",&
+                        " pio_put_vara_{DIMS}d_{TYPE}(). The first element in the count",&
+                        " array is <= 0 (should be > 0). varid = ", varid, ", file id = ", file%fh 
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+    ALLOCATE(cstart(ndims), ccount(ndims))
+
+    ! Note: Convert the Fortran order of start/counts to C order (reverse of Fortran order)
+    ! Also in C starting indices start from 0 (In Fortran it starts from 1)
+    DO i=1,ndims
+      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_KIND)
+      ccount(i) = INT(cnt(ndims-i+1), PIO_OFFSET_KIND)
+    END DO
+
+    ierr = PIOc_put_vara_{NCTYPE} (file%fh, varid-1, cstart, ccount, val)
+
+    DEALLOCATE(cstart(ndims), ccount(ndims))
+#ifdef TIMING
+    CALL t_stopf("PIO:put_vara_{DIMS}d_{TYPE}")
+#endif
+  END FUNCTION pio_put_vara_{DIMS}d_{TYPE}
+
+! DIMS 1,2,3,4,5
+!>
+!! @public
+!! @brief Function to write/put specified number of elements (${TYPE})
+!! to a variable in a file at a specified index
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] vdesc The handle to the variable. @copydoc var_desc_t
+!! @param[in] start The variable index at which the first element/datum is written
+!!                  out. The remaining elements (the number of elements is determined
+!!                  by the @p cnt array), if any, in @p val is written out as
+!!                  subsequent elements in the variable. This argument is an array
+!!                  and the size of the array needs to be equal to the number of
+!!                  dimensions for the variable. Each element in the array corresponds
+!!                  to the starting index for the variable dimension
+!!                  (subscripts referring to where the first value is to be written)
+!!                  The indices start from 1.
+!! @param[in] cnt The number (count) of elements written out. This argument is an
+!!                array and the size of the array needs to be equal to the number
+!!                of dimensions of the variable. Each element in the array corresponds
+!!                to the number of elements of that variable dimension being written
+!!                out
+!! @param[in] val The array of values being written out. The values are written out
+!!                to the variable at the index, @p cstart, specified above. The array
+!!                needs to contain at least PRODUCT(cnt) values that are being written
+!!                out
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION pio_put_vara_vdesc_{DIMS}d_{TYPE} (file, vdesc, start, cnt, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(var_desc_t), INTENT(IN) :: vdesc
+    INTEGER, INTENT(IN) ::  start(:), cnt(:)
+    {VTYPE}, INTENT(IN) :: val{DIMSTR}
+
+    ierr = put_vara_{DIMS}d_{TYPE} (file, vdesc%varid, start, cnt, val)
+
+  END FUNCTION pio_put_vara_vdesc_{DIMS}d_{TYPE}
+
+! ========================================================================
+! pio_put_var() FUNCTIONs that write the entire variable in a single CALL
+! i.e., pio_put_var_* CALLs
+! ========================================================================
+
+! DIMS 0,1,2,3,4,5
+!>
+!! @public
+!! @brief Function to write/put strings to a variable. The entire variable is
+!! written out in a single call.
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] varid The handle/id of the variable
+!! @param[in] val The array of strings being written out. The array of strings need
+!!                to contain the same number of characters as defined by the variable
+!!                dimensions.
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION put_var_{DIMS}d_text (file, varid, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    INTEGER, INTENT(IN) :: varid
+    CHARACTER(LEN=*), INTENT(IN) :: val{DIMSTR}
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    CHARACTER(C_CHAR), ALLOCATABLE :: cval(:)
+    INTEGER :: cval_sz, clen, nstrs
+
+#ifdef TIMING
+    CALL t_startf("PIO:put_var_{DIMS}d_text")
+#endif
+    ierr = PIO_NOERR
+    IF(LEN(ival) == 0) THEN
+      WRITE(log_msg, *) "Empty {DIMS}d text data passed to PIO_put_var function,",&
+                        " put_var_{DIMS}d_text, a collective C API call will",&
+                        " be skipped on this process. varid = ", varid,&
+                        ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+    END IF
+
+    ierr = get_text_var_sz(file, varid, clen, var_nstrs=nstrs)
+    IF(ierr /= PIO_NOERR) THEN
+      CALL piodie(__PIO_FILE__, __LINE__, "Getting text variable size failed")
+    END IF
+
+    IF(clen < LEN(ival)) THEN
+      WRITE(log_msg, *) "The length of the string in the user buffer ,",&
+                        LEN(ival),&
+                        " chars, is greater than the size of the variable",&
+                        " being written to, ", clen, " chars. The strings",&
+                        " may be truncated. varid = ", varid,&
+                        ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+    END IF
+
+    ! This manipulation is required to convert the fortran strings to
+    ! a c CHARACTER array with all trailing space set to null
+    IF(nstrs > 0) THEN
+      cval_sz = clen * nstrs
+    ELSE
+      cval_sz = clen
+    END IF
+
+    ALLOCATE(cval(cval_sz))
+    cval = C_NULL_CHAR
+    CALL f2cstring(ival, cval, cval_sz, clen, cstr_add_null = .false.)
+    ierr = PIOc_put_var_text(file%fh, varid-1, cval)
+    DEALLOCATE(cval)
+
+#ifdef TIMING
+    CALL t_stopf("PIO:put_var_{DIMS}d_text")
+#endif
+  END FUNCTION put_var_{DIMS}d_text
+
+! Note: We need a separate function for scalar variables because
+! multidimensional variables require the user arrays, val, to be
+! flattened out and these operations (size, reshape etc) are not
+! valid for scalars
+
+! TYPE int,real,double
+!>
+!! @public
+!! @brief Function to write/put all elements to a scalar variable. The entire variable is
+!! written out in a single call.
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] varid The handle/id of the variable
+!! @param[in] val The value being written out.
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION put_var_0d_{TYPE} (file, varid, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    INTEGER, INTENT(IN) :: varid
+    {VTYPE}, INTENT(IN) :: val
+
+#ifdef TIMING
+    CALL t_startf("PIO:put_var_0d_{TYPE}")
+#endif
+
+    ierr = PIOc_put_var_{NCTYPE} (file%fh, varid - 1, (/ival/))
+
+#ifdef TIMING
+    CALL t_stopf("PIO:put_var_0d_{TYPE}")
+#endif
+  END FUNCTION put_var_0d_{TYPE}
+
+! DIMS 1,2,3,4,5
+! TYPE int,real,double
+!>
+!! @public
+!! @brief Function to write/put all elements to a variable. The entire variable is
+!! written out in a single call.
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] varid The handle/id of the variable
+!! @param[in] val The array of elements being written out. The array of elements need
+!!                to contain the same number of elements as defined by the variable
+!!                dimensions.
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION put_var_{DIMS}d_{TYPE} (file, varid, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    INTEGER, INTENT(IN) :: varid
+    {VTYPE}, INTENT(IN) :: val{DIMSTR}
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    {VTYPE}, ALLOCATABLE :: cval(:), tmp_cval(:)
+    INTEGER(PIO_OFFSET_KIND) :: var_sz
+    INTEGER :: i, val_sz
+
+#ifdef TIMING
+    CALL t_startf("PIO:put_var_{DIMS}d_{TYPE}")
+#endif
+    val_sz = SIZE(val)
+    IF(val_sz > 0) THEN
+      ALLOCATE(cval(val_sz))
+      cval = reshape(val,(/val_sz/))
+
+      ierr = get_var_dim_sz(file, varid, var_sz)
+      IF(ierr /= PIO_NOERR) THEN
+        WRITE(log_msg, *) "Getting variable dimensions failed (varid = ", varid, ")"
+        ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+        RETURN
+      END IF
+
+      IF(INT(val_sz, PIO_OFFSET_KIND) >= var_sz) THEN
+        ierr = PIOc_put_var_{NCTYPE} (file%fh, varid - 1, cval)
+      ELSE
+        WRITE(log_msg, *) "The user buffer passed to PIO_put_var ",&
+                          "is smaller (total size of user buffer = ", SIZE(val),&
+                          " elements) than the size of the variable (total size ",&
+                          "of the variable = ", var_sz, " elements). Only part ",&
+                          "of the variable will be written out"
+        CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
+        ALLOCATE(tmp_cval(var_sz))
+        tmp_cval = 0
+        DO i=1,val_sz
+          tmp_cval(i) = cval(i)
+        END DO
+        ierr = PIOc_put_var_{NCTYPE} (file%fh, varid - 1, tmp_cval)
+        DEALLOCATE(tmp_cval)
+      END IF
+
+      DEALLOCATE(cval)
+    ELSE
+      WRITE(log_msg, *) "Empty {DIMS}d {TYPE} data passed to PIO_put_var function,",&
+                        " put_var_{DIMS}d_{TYPE}, a collective C API call will",&
+                        " be skipped on this process. varid = ", varid,&
+                        ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
+    END IF
+
+#ifdef TIMING
+    CALL t_stopf("PIO:put_var_{DIMS}d_{TYPE}")
+#endif
+  END FUNCTION put_var_{DIMS}d_{TYPE}
+
+! DIMS 0,1,2,3,4,5
+! TYPE text,int,real,double
+!>
+!! @public
+!! @brief Function to write/put all elements to a variable. The entire variable is
+!! written out in a single call.
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] vdesc The handle to the variable. @copydoc var_desc_t
+!! @param[in] val The array of elements being written out. The array of elements need
+!!                to contain the same number of elements as defined by the variable
+!!                dimensions.
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION pio_put_var_vdesc_{DIMS}d_{TYPE} (file, vdesc, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(var_desc_t), INTENT(IN) :: vdesc
+    {VTYPE}, INTENT(IN) :: val{DIMSTR}
+
+    ierr = put_var_{DIMS}d_{TYPE} (file, vdesc%varid, val)
+
+  END FUNCTION pio_put_var_vdesc_{DIMS}d_{TYPE}
+END MODULE spio_put

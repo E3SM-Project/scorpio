@@ -1,0 +1,708 @@
+!> @file
+!! @brief SCORPIO APIs for reading non-distributed arrays
+!! This file contains the SCORPIO APIs for reading ("get"ting)
+!! non-distributed arrays
+!!
+
+!> @internal
+!! @def __PIO_FILE__
+!! This macro is used to define the file name in user messages
+!!
+#define __PIO_FILE__ 'spio_get.F90'
+
+MODULE spio_get
+  USE iso_c_binding
+  USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t
+  USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
+  USE spio_util, ONLY : f2cstring, get_text_var_sz, get_var_dim_sz
+  USE spio_err, ONLY  : pio_error, pio_warn
+  USE spio_get_cint
+  IMPLICIT NONE
+
+  PRIVATE
+  PUBLIC :: pio_get_var
+
+!> @defgroup PIO_get_var PIO_get_var
+!! @public
+!! @brief Read ("Get") a non-distributed array
+!!
+!! @details
+!! This API can be used to read non-distributed arrays from a file. These arrays
+!! have the same data across all the MPI processes in the I/O system (where the
+!! file was opened/created).
+!!
+!! This API is a collective call (Although the library might internally choose
+!! to make progress on the read from a single or small subset of MPI processes)
+!! on the I/O system associated with the file
+!! 
+  INTERFACE pio_get_var
+    !! pio_get_var_* versions of the functions read a single value (datum) in
+    !! a single call at a specified variable index.
+    !! Note that the value passed in is always DIMS=0 
+    MODULE PROCEDURE pio_get_var1_{TYPE}, pio_get_var1_vdesc_{TYPE}
+    !! pio_get_var_* versions of the functions read a slice/slab of the variable
+    !! defined by starts & counts for each dimension of the variable
+    !! Note that starts/counts do not make sense for 0d scalar variables since
+    !! these scalar variables have 0 dimensions
+    ! DIMS 1,2,3,4,5
+    MODULE PROCEDURE pio_get_vara_{DIMS}d_{TYPE}, pio_get_vara_vdesc_{DIMS}d_{TYPE}
+    !! pio_get_var_* versions of the functions read the entire variable in
+    !! a single call
+    ! DIMS 0,1,2,3,4,5
+    MODULE PROCEDURE pio_get_var_{DIMS}d_{TYPE}, pio_get_var_vdesc_{DIMS}d_{TYPE}
+  END INTERFACE
+
+CONTAINS
+
+! ========================================================================
+! pio_get_var() functions that reads 1 element/datum at a specified index
+! i.e., pio_get_var1_* calls
+! ========================================================================
+
+!>
+!! @public
+!! @ingroup PIO_get_var
+!! @brief Read/get a string from a variable (character array) in a file at
+!! a specified index
+!! @details
+!! @param[in] file The handle to the file. @copydoc file_desc_t
+!! @param[in] varid The id of the variable being read
+!! @param[in] start The variable index at which to read the text string. This
+!!                  argument is an array and the size of the array needs to be equal
+!!                  to the number of dimensions for the variable. Each element in the
+!!                  array corresponds to the index for the variable dimension
+!!                  (subscripts referring to where the value is to be written)
+!!                  The indices start from 1.
+!! @param[out] str The value, string, is read into this argument.
+!! @retval ierr @copydoc error_return
+!!
+  INTEGER FUNCTION pio_get_var1_text (file, varid, start, str) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    INTEGER, INTENT(IN) :: varid, start(:)
+    CHARACTER(LEN=*), INTENT(OUT) :: str
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    CHARACTER(C_CHAR), ALLOCATABLE :: cval(:)
+    INTEGER :: i
+    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:), ccount(:)
+    INTEGER :: ndims, clen
+
+#ifdef TIMING
+    CALL t_startf("PIO:get_var1_text")
+#endif
+    ierr = PIO_NOERR
+    IF(LEN(str) == 0) THEN
+      WRITE(log_msg, *) "An empty string was passed to the PIO_get_var() function,",&
+                        " pio_get_var1_text(), a collective C API call will be skipped",&
+                        " on this process. varid = ", varid, ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+    END IF
+
+    ierr = get_text_var_sz(file, varid, clen)
+    IF(ierr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "Getting size of the text variable failed, varid = ",&
+                        varid, ", file id = ", file%fh
+      ierr = pio_error(file%iosystem, ierr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    IF(LEN(str) < clen) THEN
+      WRITE(log_msg, *) "The length of the user buffer/string,",&
+                        LEN(str),&
+                        " chars, is smaller than the size of strings in the variable",&
+                        " read,", clen, " chars. The string",&
+                        " will be truncated. varid = ", varid, ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
+    END IF
+
+    ! FIXME: We need to get the ndims from inquiring about the variable rather than
+    ! using the parameters provided by the user
+    ndims = SIZE(start)
+    IF(ndims <= 0) THEN
+      WRITE(log_msg, *) "Invalid start/index array, size of array == 0, varid = ",&
+                        varid, ", file id = ", file%fh
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    ALLOCATE(ccount(ndims))
+
+    ! ccount(ndims) chars from string str(:) is being read from the
+    ! NetCDF variable var(x)...(clen)
+    ! at var(1,...,start(ndims),...,x)...(1,...,start(1),...,clen)
+    !                   ^^^                      ^^^
+    ccount = 1
+    ! Read the entire string starting from [start(1), clen]
+    ! Note: The ccount/cstart passed to the C interface is in the
+    ! "C order" of dims, that is the reverse of the "Fortran order"
+    ! of the dims
+    ccount(ndims) = INT(MIN(clen - start(1) + 1, LEN(str)), PIO_OFFSET_KIND)
+
+    ALLOCATE(cstart(ndims))
+    DO i=1,ndims
+      cstart(i) = INT(start(ndims - i + 1), PIO_OFFSET_KIND)
+    END DO
+
+    ! NetCDF only supports character arrays, read using character arrays
+    ! and copy the read data back to the string
+    ALLOCATE(cval(INT(ccount(ndims))))
+    cval = C_NULL_CHAR
+
+    ! The NetCDF varids start from 0 for C and 1 for Fortran, we use
+    ! the same convention here
+    ierr = PIOc_get_vara_text(file%fh, varid-1, cstart, ccount, cval)
+
+    ! Copy the read data back to the user string (till the first C NULL char)
+    str = ''
+    DO i=1,MIN(INT(ccount(ndims)),LEN(str))
+      IF(cval(i) == C_NULL_CHAR) THEN
+        EXIT
+      END IF
+      str(i:i) = cval(i)
+    END DO
+
+    DEALLOCATE(ccount, cstart, cval)
+#ifdef TIMING
+    CALL t_stopf("PIO:get_var1_text")
+#endif
+  END FUNCTION pio_get_var1_text
+
+! TYPE int,real,double
+!>
+!! @public
+!! @ingroup PIO_get_var
+!! @brief Read/Get one element/datum ({TYPE}) from a variable in a file at
+!! a specified index
+!! @details
+!! @param[in] file The handle to the file. @copydoc file_desc_t
+!! @param[in] varid The id of the variable being written out
+!! @param[in] start The variable index at which to read the element/datum. This
+!!                  argument is an array and the size of the array needs to be equal
+!!                  to the number of dimensions for the variable. Each element in the
+!!                  array corresponds to the index for the variable dimension
+!!                  (subscripts referring to where the value is being read from)
+!!                  The indices start from 1.
+!! @param[out] val The value, ${TYPE}, is read into this variable
+!! @retval ierr @copydoc error_return
+!!
+  INTEGER FUNCTION pio_get_var1_{TYPE} (file, varid, start, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    INTEGER, INTENT(IN) :: varid, start(:)
+    {VTYPE}, INTENT(OUT) :: val
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER :: ndims, i
+    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:)
+
+#ifdef TIMING
+    CALL t_startf("PIO:get_var1_{TYPE}")
+#endif
+    ierr = PIO_NOERR
+    ! FIXME : The number of dims should ideally be queried for the variable,
+    ! rather than deducing from user args
+    ndims = SIZE(start)
+    IF(ndims <= 0) THEN
+      WRITE(log_msg, *) "Empty index array passed to PIO_get_var function,",&
+                        " pio_get_var1_{TYPE}, a collective C API call will",&
+                        " be skipped on this process. varid = ", varid,&
+                        " file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+    ALLOCATE(cstart(ndims))
+    DO i=1,ndims
+      ! Note: The start indices in C start from 0
+      ! (Fortran indices start from 1)
+      ! Also, the C functions need starts in the "C order", the reverse
+      ! of the "Fortran order"
+      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_KIND)
+    END DO
+
+    ! Variable ids in C start from 0 (In Fortran it starts from 1)
+    ierr = PIOc_get_var1_{NCTYPE} (file%fh, varid-1, cstart, val)
+    DEALLOCATE(cstart)
+#ifdef TIMING
+    CALL t_stopf("PIO:get_var1_{TYPE}")
+#endif
+  END FUNCTION pio_get_var1_{TYPE}
+
+! TYPE text,int,real,double
+!>
+!! @public
+!! @ingroup PIO_get_var
+!! @brief Read/Get one element/datum ({TYPE}) from a variable in a file at
+!! a specified index
+!! @details
+!! @param[in] file The handle to the file. @copydoc file_desc_t
+!! @param[in] vdesc The handle to the variable being written out. @copydoc var_desc_t
+!! @param[in] start The variable index at which to read the element/datum. This
+!!                  argument is an array and the size of the array needs to be equal
+!!                  to the number of dimensions for the variable. Each element in the
+!!                  array corresponds to the index for the variable dimension
+!!                  (subscripts referring to where the value is being read from)
+!!                  The indices start from 1.
+!! @param[in] val The value, ${TYPE}, is read into this argument
+!! @retval ierr @copydoc error_return
+!!
+  INTEGER FUNCTION pio_get_var1_vdesc_{TYPE} (file, vdesc, start, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(var_desc_t), INTENT(IN) :: vdesc
+    INTEGER, INTENT(IN) :: start(:)
+    {VTYPE}, INTENT(IN) :: val
+
+    ierr = pio_get_var1_{TYPE} (file, vdesc%varid, start, val)
+  END FUNCTION pio_get_var1_vdesc_{TYPE}
+
+! ========================================================================
+! pio_get_var() FUNCTIONs that read a slice of data at specified
+! starts/counts
+! i.e., pio_get_vara_* CALLs
+! ========================================================================
+
+! DIMS 1,2,3,4,5
+!>
+!! @public
+!! @brief Function to read/get specified number of strings from a variable
+!! in a file at a specified index
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] varid The handle/id of the variable
+!! @param[in] start The variable index at which the first character is read from.
+!!                  This argument is an array and the size of the array needs to
+!!                  be equal to the number of dimensions for the variable. Each
+!!                  element in the array corresponds to the starting index for
+!!                  the variable dimension
+!!                  The start indices start from 1.
+!! @param[in] cnt The number (count) of chars read. This argument is an
+!!                array and the size of the array needs to be equal to the number
+!!                of dimensions of the variable. Each element in the array corresponds
+!!                to the number of elements of that variable dimension read from the
+!!                variable
+!! @param[out] val  The value is read into the array of strings provided in this argument.
+!!                  The strings are read from the variable at index, @p start, specified above.
+!!                  The array needs to contain MAX(1, PRODUCT(cnt(2:VAR_NDIMS))) strings
+!!                  such that each string has at least cnt(1) characters to store the strings
+!!                  read from the variable
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION pio_get_vara_{DIMS}d_text (file, varid, start, cnt, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    INTEGER, INTENT(IN) :: varid, start(:), cnt(:)
+    CHARACTER(LEN=*), INTENT(OUT) :: val{DIMSTR}
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    CHARACTER(C_CHAR), ALLOCATABLE :: cval(:)
+    INTEGER :: cval_sz, clen, nstrs
+    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:), ccount(:)
+    INTEGER :: i, ndims
+
+#ifdef TIMING
+    CALL t_startf("PIO:get_vara_{DIMS}d_text")
+#endif
+    IF(SIZE(start) == 0) THEN
+      WRITE(log_msg, *) "Invalid start array passed to PIO_get_var() function,",&
+                        " pio_get_vara_{DIMS}d_text(). The size of the array == 0.",&
+                        " varid = ", varid, ", file id = ", file%fh 
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    IF(SIZE(cnt) == 0) THEN
+      WRITE(log_msg, *) "Invalid count array passed to PIO_get_var() function,",&
+                        " pio_get_vara_{DIMS}d_text(). The size of the array == 0.",&
+                        " varid = ", varid, ", file id = ", file%fh 
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    ierr = get_text_var_sz(file, varid, clen, var_nstrs=nstrs)
+    IF(ierr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "Getting size of the text variable failed, varid = ",&
+                        varid, ", file id = ", file%fh
+      ierr = pio_error(file%iosystem, ierr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    IF((LEN(val) < clen) .AND. (LEN(val) < cnt(1))) THEN
+      WRITE(log_msg, *) "The length of the strings in the user buffer/array,",&
+                        LEN(val),&
+                        " chars, is smaller than the size of strings in the variable",&
+                        " read,", clen, " chars or the size of strings being read,",&
+                        cnt(1), " chars. The string will be truncated, varid = ",&
+                        varid, ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
+    END IF
+
+    ! The last dimension in a character variable is the length of each string
+    ! in the variable
+    ndims = nstrs + 1
+    IF(SIZE(cnt) < ndims) THEN
+      WRITE(log_msg, *) "Invalid count array passed to PIO_get_var() function,",&
+                        " pio_get_vara_{DIMS}d_text(). The size of the array,",&
+                        SIZE(cnt), ", is smaller than the number of dimensions, ",&
+                        ndims, " of the variable, varid = ", varid, ", file id = ", file%fh
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    DO i=1,ndims
+      IF(cnt(i) <= 0) THEN
+        WRITE(log_msg, *) "Invalid count array passed to PIO_get_var() function,",&
+                          " pio_get_vara_{DIMS}d_text(). An element in the count",&
+                          " array is <= 0 (cnt(", i, ") = ", cnt(i),&
+                          " should be > 0). varid = ", varid, ", file id = ", file%fh 
+        ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+        RETURN
+      END IF
+    END DO
+    ALLOCATE(cstart(ndims), ccount(ndims))
+
+    ! Note: Convert the Fortran order of start/counts to C order (reverse of Fortran order)
+    ! Also in C starting indices start from 0 (In Fortran it starts from 1)
+    DO i=1,ndims
+      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_KIND)
+      ccount(i) = INT(cnt(ndims-i+1), PIO_OFFSET_KIND)
+    END DO
+
+    cval_sz = clen * nstrs
+    ALLOCATE(cval(cval_sz))
+    ierr = PIOc_get_vara_text(file%fh, varid-1, cstart, ccount, cval)
+    ! Reshape to the fortran array of strings from a contiguous 1d CHARACTER array.
+    ! The 1d CHARACTER array does not include string delimiters between the
+    ! different strings in the fortran array.
+    ! start() = [1, 1], cnt() = [3, 2] to read a variable V with >= 2 strings, each
+    ! >= 3 chars long
+    ! cval[6] = [   'a',
+    !               'b',
+    !               'c',
+    !               'd',
+    !               'e',
+    !               'f' ]
+    ! is converted to an array of Fortran strings
+    ! CHARACTER(LEN=3) :: ival[2] = [ "abc",
+    !                                 "def" ]
+    val = ' '
+    CALL c2fstring(cval, cval_sz, clen, val)
+
+    DEALLOCATE(cval)
+    DEALLOCATE(cstart, ccount)
+
+#ifdef TIMING
+    CALL t_stopf("PIO:get_vara_{DIMS}d_text")
+#endif
+  END FUNCTION pio_get_vara_{DIMS}d_text
+
+! TYPE int,real,double
+! DIMS 1,2,3,4,5
+!>
+!! @public
+!! @brief Function to read/get specified number of elements (${TYPE})
+!! from a variable in a file at a specified index
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] varid The handle/id of the variable
+!! @param[in] start The variable index at which the first element/datum is read.
+!!                  The remaining elements (the number of elements is determined
+!!                  by the @p cnt array), if any, in @p val is read from
+!!                  subsequent elements in the variable. This argument is an array
+!!                  and the size of the array needs to be equal to the number of
+!!                  dimensions for the variable. Each element in the array corresponds
+!!                  to the starting index for the variable dimension
+!!                  (subscripts referring to where the first value is read)
+!!                  The indices start from 1.
+!! @param[in] cnt The number of elements read from the variable. This argument is an
+!!                array and the size of the array needs to be equal to the number
+!!                of dimensions of the variable. Each element in the array corresponds
+!!                to the number of elements of that variable dimension being read
+!! @param[out] val  The array of values is read into this argument. The values are read
+!!                  from the variable at the index, @p cstart, specified above. The array
+!!                  needs to contain at least PRODUCT(cnt) elements for storing the
+!!                  values that are being read
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION pio_get_vara_{DIMS}d_{TYPE} (file, varid, start, cnt, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    INTEGER, INTENT(IN) :: varid, start(:), cnt(:)
+    {VTYPE}, TARGET, INTENT(OUT) :: val{DIMSTR}
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:), ccount(:)
+    INTEGER :: i, ndims
+
+#ifdef TIMING
+    CALL t_startf("PIO:get_vara_{DIMS}d_{TYPE}")
+#endif
+    IF(SIZE(start) == 0) THEN
+      WRITE(log_msg, *) "Invalid start array passed to PIO_get_var() function,",&
+                        " pio_get_vara_{DIMS}d_{TYPE}(). The size of the array == 0.",&
+                        " varid = ", varid, ", file id = ", file%fh 
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    IF(SIZE(cnt) == 0) THEN
+      WRITE(log_msg, *) "Invalid count array passed to PIO_get_var() function,",&
+                        " pio_get_vara_{DIMS}d_{TYPE}(). The size of the array == 0.",&
+                        " varid = ", varid, ", file id = ", file%fh 
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    ! FIXME: The number of dimensions should be obtained by querying the variable
+    ! metadata, not from user args
+    ! The number of dimensions of the variable is assumed to be equal to the number
+    ! of consequtive elements of the cnt array argument that are > 0 
+    ndims = SIZE(cnt)
+    DO i=1,SIZE(cnt)
+      IF(cnt(i) <= 0) THEN
+        ndims = i-1
+        exit
+      END IF
+    END DO
+    IF(ndims == 0) THEN
+      WRITE(log_msg, *) "Invalid count array passed to PIO_get_var() function,",&
+                        " pio_get_vara_{DIMS}d_{TYPE}(). The first element in the count",&
+                        " array is <= 0 (should be > 0). varid = ", varid, ", file id = ", file%fh 
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+    ALLOCATE(cstart(ndims), ccount(ndims))
+
+    ! Note: Convert the Fortran order of start/counts to C order (reverse of Fortran order)
+    ! Also in C starting indices start from 0 (In Fortran it starts from 1)
+    DO i=1,ndims
+      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_KIND)
+      ccount(i) = INT(cnt(ndims-i+1), PIO_OFFSET_KIND)
+    END DO
+
+    ierr = PIOc_get_vara_{NCTYPE} (file%fh, varid-1, cstart, ccount, val)
+
+    DEALLOCATE(cstart(ndims), ccount(ndims))
+#ifdef TIMING
+    CALL t_stopf("PIO:get_vara_{DIMS}d_{TYPE}")
+#endif
+  END FUNCTION pio_get_vara_{DIMS}d_{TYPE}
+
+! DIMS 1,2,3,4,5
+!>
+!! @public
+!! @brief Function to read/get specified number of elements (${TYPE})
+!! from a variable in a file at a specified index
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] vdesc The handle to the variable. @copydoc var_desc_t
+!! @param[in] start The variable index at which the first element/datum is read.
+!!                  The remaining elements (the number of elements is determined
+!!                  by the @p cnt array), if any, in @p val is read from
+!!                  subsequent elements in the variable. This argument is an array
+!!                  and the size of the array needs to be equal to the number of
+!!                  dimensions for the variable. Each element in the array corresponds
+!!                  to the starting index for the variable dimension
+!!                  (subscripts referring to where the first value is read)
+!!                  The indices start from 1.
+!! @param[in] cnt The number of elements read from the variable. This argument is an
+!!                array and the size of the array needs to be equal to the number
+!!                of dimensions of the variable. Each element in the array corresponds
+!!                to the number of elements of that variable dimension being read
+!! @param[out] val  The array of values is read into this argument. The values are read
+!!                  from the variable at the index, @p cstart, specified above. The array
+!!                  needs to contain at least PRODUCT(cnt) elements for storing the
+!!                  values that are being read
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION pio_get_vara_vdesc_{DIMS}d_{TYPE} (file, vdesc, start, cnt, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(var_desc_t), INTENT(IN) :: vdesc
+    INTEGER, INTENT(IN) ::  start(:), cnt(:)
+    {VTYPE}, INTENT(OUT) :: val{DIMSTR}
+
+    ierr = pio_get_vara_{DIMS}d_{TYPE} (file, vdesc%varid, start, cnt, val)
+
+  END FUNCTION pio_get_vara_vdesc_{DIMS}d_{TYPE}
+
+! ========================================================================
+! pio_get_var() FUNCTIONs that read the entire variable in a single CALL
+! i.e., pio_get_var_* CALLs
+! ========================================================================
+
+! DIMS 0,1,2,3,4,5
+!>
+!! @public
+!! @brief Function to read/get strings from a variable. The entire variable is
+!! written out in a single call.
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] varid The handle/id of the variable
+!! @param[out] val  The array of strings are read into this argument. The array of strings need
+!!                  to contain the same number of characters as defined by the variable
+!!                  dimensions (The lowest dimension of the variable is the length
+!!                  of each individual string)
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION pio_get_{DIMS}d_text (file, varid, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    INTEGER, INTENT(IN) :: varid
+    CHARACTER(LEN=*), INTENT(OUT) :: val{DIMSTR}
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    CHARACTER(C_CHAR), ALLOCATABLE :: cval(:)
+    INTEGER :: cval_sz, clen, nstrs
+
+#ifdef TIMING
+    CALL t_startf("PIO:get_var_{DIMS}d_text")
+#endif
+    ierr = PIO_NOERR
+    IF(LEN(val) == 0) THEN
+      WRITE(log_msg, *) "Empty {DIMS}d text data passed to PIO_get_var function,",&
+                        " get_var_{DIMS}d_text, a collective C API call will",&
+                        " be skipped on this process. varid = ", varid,&
+                        ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+    END IF
+
+    ierr = get_text_var_sz(file, varid, clen, var_nstrs=nstrs)
+    IF(ierr /= PIO_NOERR) THEN
+      CALL piodie(__PIO_FILE__, __LINE__, "Getting text variable size failed")
+    END IF
+
+    IF(LEN(val) < clen) THEN
+      WRITE(log_msg, *) "The length of the string in the user buffer ,",&
+                        LEN(val),&
+                        " chars, is smaller than the size of the variable",&
+                        " being read, ", clen, " chars. The strings",&
+                        " may be truncated. varid = ", varid,&
+                        ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+    END IF
+
+    IF(nstrs > 0) THEN
+      cval_sz = clen * nstrs
+    ELSE
+      cval_sz = clen
+    END IF
+
+    ALLOCATE(cval(cval_sz))
+    cval = C_NULL_CHAR
+    ierr = PIOc_get_var_text(file%fh, varid-1, cval)
+    CALL c2fstring(cval, cval_sz, clen, val)
+    DEALLOCATE(cval)
+
+#ifdef TIMING
+    CALL t_stopf("PIO:get_var_{DIMS}d_text")
+#endif
+  END FUNCTION pio_get_var_{DIMS}d_text
+
+! Note: We need a separate function for scalar variables because
+! multidimensional variables require the user arrays, val, to be
+! flattened out and these operations (size, reshape etc) are not
+! valid for scalars
+
+! TYPE int,real,double
+!>
+!! @public
+!! @brief Function to read/get all elements to a scalar variable. The entire variable is
+!! read in a single call.
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] varid The handle/id of the variable
+!! @param[out] val The value is read into this argument/variable.
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION pio_get_var_0d_{TYPE} (file, varid, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    INTEGER, INTENT(IN) :: varid
+    {VTYPE}, INTENT(OUT) :: val
+
+#ifdef TIMING
+    CALL t_startf("PIO:get_var_0d_{TYPE}")
+#endif
+
+    ierr = PIOc_get_var_{NCTYPE} (file%fh, varid - 1, (/val/))
+
+#ifdef TIMING
+    CALL t_stopf("PIO:get_var_0d_{TYPE}")
+#endif
+  END FUNCTION pio_get_var_0d_{TYPE}
+
+! DIMS 1,2,3,4,5
+! TYPE int,real,double
+!>
+!! @public
+!! @brief Function to read/get all elements from a variable. The entire variable is
+!! read in a single call.
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] varid The handle/id of the variable
+!! @param[out] val  The array of elements are read into this argument. The array of
+!!                  elements need to contain the same number of elements as defined
+!!                  by the variable dimensions.
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION pio_get_var_{DIMS}d_{TYPE} (file, varid, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    INTEGER, INTENT(IN) :: varid
+    {VTYPE}, INTENT(OUT) :: val{DIMSTR}
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER(PIO_OFFSET_KIND) :: var_sz
+    INTEGER :: i, val_sz
+
+#ifdef TIMING
+    CALL t_startf("PIO:get_var_{DIMS}d_{TYPE}")
+#endif
+    val_sz = SIZE(val)
+    IF(val_sz > 0) THEN
+      ierr = get_var_dim_sz(file, varid, var_sz)
+      IF(ierr /= PIO_NOERR) THEN
+        WRITE(log_msg, *) "Getting variable dimensions failed (varid = ",&
+                          varid, ", file id = ", file%fh, ")"
+        ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+        RETURN
+      END IF
+
+      IF(INT(val_sz, PIO_OFFSET_KIND) >= var_sz) THEN
+        ierr = PIOc_get_var_{NCTYPE} (file%fh, varid - 1, val)
+      ELSE
+        WRITE(log_msg, *) "The user buffer passed to PIO_get_var ",&
+                          "is smaller (total size of user buffer = ", val_sz,&
+                          " elements) than the size of the variable (total size ",&
+                          "of the variable = ", var_sz, " elements). varid = ",&
+                          varid, ", file id = ", file%fh
+        ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      END IF
+    ELSE
+      WRITE(log_msg, *) "Empty {DIMS}d {TYPE} data passed to PIO_get_var function,",&
+                        " get_var_{DIMS}d_{TYPE}, a collective C API call will",&
+                        " be skipped on this process. varid = ", varid,&
+                        ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
+    END IF
+
+#ifdef TIMING
+    CALL t_stopf("PIO:get_var_{DIMS}d_{TYPE}")
+#endif
+  END FUNCTION pio_get_var_{DIMS}d_{TYPE}
+
+! DIMS 0,1,2,3,4,5
+! TYPE text,int,real,double
+!>
+!! @public
+!! @brief Function to read/get all elements from a variable. The entire variable is
+!! read in a single call.
+!!
+!! @details
+!! @param[in] file The handle to the file with the variable. @copydoc file_desc_t
+!! @param[in] vdesc The handle to the variable. @copydoc var_desc_t
+!! @param[out] val  The array of elements are read in to this argument. The array of
+!!                  elements need to contain the same number of elements as defined
+!!                  by the variable dimensions.
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER FUNCTION pio_get_var_vdesc_{DIMS}d_{TYPE} (file, vdesc, val) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(var_desc_t), INTENT(IN) :: vdesc
+    {VTYPE}, INTENT(OUT) :: val{DIMSTR}
+
+    ierr = pio_get_var_{DIMS}d_{TYPE} (file, vdesc%varid, val)
+
+  END FUNCTION pio_get_var_vdesc_{DIMS}d_{TYPE}
+END MODULE spio_put
