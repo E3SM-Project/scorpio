@@ -73,9 +73,9 @@ int pair(int np, int p, int k)
  * @returns 0 for success, error code otherwise.
  * @author Jim Edwards
  */
-int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendtypes,
-              void *recvbuf, int *recvcounts, int *rdispls, MPI_Datatype *recvtypes,
-              MPI_Comm comm, rearr_comm_fc_opt_t *fc)
+int pio_swapm(const void *sendbuf, const int *sendcounts, const int *sdispls, const MPI_Datatype *sendtypes,
+              void *recvbuf, const int *recvcounts, const int *rdispls, const MPI_Datatype *recvtypes,
+              MPI_Comm comm, const rearr_comm_fc_opt_t *fc)
 {
     int ntasks;  /* Number of tasks in communicator comm. */
     int my_rank; /* Rank of this task in comm. */

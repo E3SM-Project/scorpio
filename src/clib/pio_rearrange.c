@@ -847,7 +847,7 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
  * @returns 0 on success, error code otherwise.
  * @author Jim Edwards
  */
-int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
+int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
                       void *rbuf, int nvars)
 {
     int ntasks;       /* Number of tasks in communicator. */
@@ -1086,7 +1086,7 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
  * @returns 0 on success, error code otherwise.
  * @author Jim Edwards
  */
-int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf,
+int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
                       void *rbuf)
 {
     MPI_Comm mycomm;

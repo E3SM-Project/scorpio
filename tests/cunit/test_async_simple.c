@@ -74,7 +74,7 @@ int main(int argc, char **argv)
 
         /* Initialize the IO system. */
         if ((ret = PIOc_init_async(test_comm, NUM_IO_PROCS, io_proc_list, COMPONENT_COUNT,
-                                   num_procs, (int **)proc_list, NULL, NULL, PIO_REARR_BOX, iosysid)))
+                                   num_procs, (const int **)proc_list, NULL, NULL, PIO_REARR_BOX, iosysid)))
             ERR(ERR_INIT);
 
         /* All the netCDF calls are only executed on the computation
