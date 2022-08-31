@@ -127,7 +127,7 @@ int PIOc_open(int iosysid, const char *path, int mode, int *ncidp)
  * @ingroup PIO_createfile
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_createfile(int iosysid, int *ncidp, int *iotype, const char *filename,
+int PIOc_createfile(int iosysid, int *ncidp, const int *iotype, const char *filename,
                     int mode)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */

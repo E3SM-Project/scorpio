@@ -1661,7 +1661,7 @@ int PIOc_readmap_from_f90(const char *file, int *ndims, int **gdims, PIO_Offset 
  * @returns 0 for success, error code otherwise.
  */
 int PIOc_write_nc_decomp(int iosysid, const char *filename, int cmode, int ioid,
-                         char *title, char *history, int fortran_order)
+                         const char *title, const char *history, int fortran_order)
 {
     iosystem_desc_t *ios; /* IO system info. */
     io_desc_t *iodesc;    /* Decomposition info. */
@@ -1887,7 +1887,7 @@ int PIOc_read_nc_decomp(int iosysid, const char *filename, int *ioidp, MPI_Comm 
  * @returns 0 for success, error code otherwise.
  */
 int pioc_write_nc_decomp_int(iosystem_desc_t *ios, const char *filename, int cmode, int ndims,
-                             int *global_dimlen, int num_tasks, int *task_maplen, int *map,
+                             const int *global_dimlen, int num_tasks, const int *task_maplen, const int *map,
                              const char *title, const char *history, int fortran_order)
 {
     int max_maplen = 0;
@@ -2430,7 +2430,7 @@ int PIOc_write_decomp(const char *file, int iosysid, int ioid, MPI_Comm comm)
  * @returns 0 for success, error code otherwise.
  */
 int PIOc_writemap(const char *file, int ioid, int ndims, const int *gdims, PIO_Offset maplen,
-                  PIO_Offset *map, MPI_Comm comm)
+                  const PIO_Offset *map, MPI_Comm comm)
 {
     int npes, myrank;
     PIO_Offset *nmaplen = NULL;
@@ -2619,7 +2619,7 @@ int PIO_get_avail_iotypes(char *buf, size_t sz)
  * @returns 0 for success, error code otherwise.
  * @ingroup PIO_createfile
  */
-int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filename,
+int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *filename,
                         int mode)
 {
     char tname[SPIO_TIMER_MAX_NAME];

@@ -109,8 +109,8 @@ PIO_Offset PIOc_set_buffer_size_limit(PIO_Offset limit)
  * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
-                            PIO_Offset arraylen, void *array, const int *frame,
-                            void **fillvalue, bool flushtodisk)
+                            PIO_Offset arraylen, const void *array, const int *frame,
+                            const void **fillvalue, bool flushtodisk)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -1850,8 +1850,8 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
  * @ingroup PIO_write_darray
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *array,
-                      void *fillvalue)
+int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const void *array,
+                      const void *fillvalue)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Info about file we are writing to. */

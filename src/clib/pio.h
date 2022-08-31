@@ -1100,7 +1100,7 @@ extern "C" {
     int PIOc_readmap_from_f90(const char *file,int *ndims, int **gdims, PIO_Offset *maplen,
                               PIO_Offset **map, int f90_comm);
     int PIOc_writemap(const char *file, int ioid, int ndims, const int *gdims, PIO_Offset maplen,
-                      PIO_Offset *map, MPI_Comm comm);
+                      const PIO_Offset *map, MPI_Comm comm);
     int PIOc_writemap_from_f90(const char *file, int ioid, int ndims, const int *gdims,
                                PIO_Offset maplen, const PIO_Offset *map, int f90_comm);
 
@@ -1109,15 +1109,15 @@ extern "C" {
 
     /* Write a decomposition file using netCDF. */
     int PIOc_write_nc_decomp(int iosysid, const char *filename, int cmode, int ioid,
-                             char *title, char *history, int fortran_order);
+                             const char *title, const char *history, int fortran_order);
 
     /* Read a netCDF decomposition file. */
     int PIOc_read_nc_decomp(int iosysid, const char *filename, int *ioid, MPI_Comm comm,
                             int pio_type, char *title, char *history, int *fortran_order);
 
     /* Initializing IO system for async. */
-    int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list, int component_count,
-                        int *num_procs_per_comp, int **proc_list, MPI_Comm *io_comm, MPI_Comm *comp_comm,
+    int PIOc_init_async(MPI_Comm world, int num_io_procs, const int *io_proc_list, int component_count,
+                        const int *num_procs_per_comp, const int **proc_list, MPI_Comm *io_comm, MPI_Comm *comp_comm,
                         int rearranger, int *iosysidp);
     
     int PIOc_Init_Intercomm(int component_count, MPI_Comm peer_comm, MPI_Comm *comp_comms,
@@ -1145,10 +1145,10 @@ extern "C" {
     /* Distributed data. */
     int PIOc_advanceframe(int ncid, int varid);
     int PIOc_setframe(int ncid, int varid, int frame);
-    int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *array,
-                          void *fillvalue);
+    int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const void *array,
+                          const void *fillvalue);
     int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars, PIO_Offset arraylen,
-                                void *array, const int *frame, void **fillvalue, bool flushtodisk);
+                                const void *array, const int *frame, const void **fillvalue, bool flushtodisk);
     int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *array);
     int PIOc_get_local_array_size(int ioid);
 
@@ -1157,7 +1157,7 @@ extern "C" {
     int PIOc_enddef(int ncid);
     int PIOc_sync(int ncid);
     int PIOc_deletefile(int iosysid, const char *filename);
-    int PIOc_createfile(int iosysid, int *ncidp,  int *iotype, const char *fname, int mode);
+    int PIOc_createfile(int iosysid, int *ncidp, const int *iotype, const char *fname, int mode);
     int PIOc_create(int iosysid, const char *path, int cmode, int *ncidp);
     int PIOc_openfile(int iosysid, int *ncidp, int *iotype, const char *fname, int mode);
     int PIOc_openfile2(int iosysid, int *ncidp, int *iotype, const char *fname, int mode);

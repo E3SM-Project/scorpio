@@ -129,7 +129,7 @@ extern "C" {
     void pio_push_request(file_desc_t *file, int request);
 
     /* Create a file (internal function). */
-    int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filename, int mode);
+    int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *filename, int mode);
 
     /* Open a file and learn about metadata. */
     int openfile_int(int iosysid, int *ncidp, int *iotype, const char *filename,
@@ -188,9 +188,9 @@ extern "C" {
     void CheckMPIReturn(int ierr, const char *file, int line);
 
     /* Like MPI_Alltoallw(), but with flow control. */
-    int pio_swapm(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype *sendtypes,
-                  void *recvbuf, int *recvcounts, int *rdispls, MPI_Datatype *recvtypes,
-                  MPI_Comm comm, rearr_comm_fc_opt_t *fc);
+    int pio_swapm(const void *sendbuf, const int *sendcounts, const int *sdispls, const MPI_Datatype *sendtypes,
+                  void *recvbuf, const int *recvcounts, const int *rdispls, const MPI_Datatype *recvtypes,
+                  MPI_Comm comm, const rearr_comm_fc_opt_t *fc);
 
     long long lgcd_array(int nain, long long* ain);
 
@@ -245,10 +245,10 @@ extern "C" {
 
 
     /* Move data from IO tasks to compute tasks. */
-    int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf, void *rbuf);
+    int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf, void *rbuf);
 
     /* Move data from compute tasks to IO tasks. */
-    int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, void *sbuf, void *rbuf,
+    int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf, void *rbuf,
                           int nvars);
 
     /* Allocate and initialize storage for decomposition information. */
@@ -375,7 +375,7 @@ extern "C" {
 
     /* Write a netCDF decomp file. */
     int pioc_write_nc_decomp_int(iosystem_desc_t *ios, const char *filename, int cmode, int ndims,
-                                 int *global_dimlen, int num_tasks, int *task_maplen, int *map,
+                                 const int *global_dimlen, int num_tasks, const int *task_maplen, const int *map,
                                  const char *title, const char *history, int fortran_order);
 
     /* Read a netCDF decomp file. */

@@ -1698,14 +1698,16 @@ int PIOc_iotype_available(int iotype)
  * @ingroup PIO_init
  * @author Ed Hartnett
  */
-int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
-                    int component_count, int *num_procs_per_comp, int **proc_list,
+int PIOc_init_async(MPI_Comm world, int num_io_procs, const int *io_proc_list,
+                    int component_count, const int *num_procs_per_comp, const int **proc_list,
                     MPI_Comm *user_io_comm, MPI_Comm *user_comp_comm, int rearranger,
                     int *iosysidp)
 {
     int my_rank;          /* Rank of this task. */
-    int **my_proc_list;   /* Array of arrays of procs for comp components. */
-    int *my_io_proc_list; /* List of processors in IO component. */
+    const int **my_proc_list = NULL;   /* Array of arrays of procs for comp components. */
+    int **proc_list_buf = NULL;        /* A temp buffer to be used in case the user does not provide the proc list. */
+    const int *my_io_proc_list = NULL; /* List of processors in IO component. */
+    int *io_proc_list_buf = NULL;      /* A temp buffer to be used in case the user does not provide the IO proc list. */
     int mpierr;           /* Return code from MPI functions. */
     int ret;              /* Return code. */
 
@@ -1756,7 +1758,7 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
     if (!io_proc_list)
     {
         LOG((3, "calculating processors for IO component"));
-        if (!(my_io_proc_list = malloc(num_io_procs * sizeof(int))))
+        if (!(io_proc_list_buf = malloc(num_io_procs * sizeof(int))))
         {
             GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -1764,9 +1766,10 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
         }
         for (int p = 0; p < num_io_procs; p++)
         {
-            my_io_proc_list[p] = p;
-            LOG((3, "my_io_proc_list[%d] = %d", p, my_io_proc_list[p]));
+            io_proc_list_buf[p] = p;
+            LOG((3, "io_proc_list_buf[%d] = %d", p, io_proc_list_buf[p]));
         }
+        my_io_proc_list = (const int *)io_proc_list_buf;
     }
     else
         my_io_proc_list = io_proc_list;
@@ -1778,7 +1781,7 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
         int last_proc = num_io_procs;
 
         /* Allocate space for array of arrays. */
-        if (!(my_proc_list = malloc((component_count) * sizeof(int *))))
+        if (!(proc_list_buf = malloc((component_count) * sizeof(int *))))
         {
             GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -1791,7 +1794,7 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
             LOG((3, "calculating processors for component %d num_procs_per_comp[cmp] = %d", cmp, num_procs_per_comp[cmp]));
 
             /* Allocate space for each array. */
-            if (!(my_proc_list[cmp] = malloc(num_procs_per_comp[cmp] * sizeof(int))))
+            if (!(proc_list_buf[cmp] = malloc(num_procs_per_comp[cmp] * sizeof(int))))
             {
                 GPTLstop("PIO:PIOc_init_async");
                 return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -1801,11 +1804,12 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
             int proc;
             for (proc = last_proc; proc < num_procs_per_comp[cmp] + last_proc; proc++)
             {
-                my_proc_list[cmp][proc - last_proc] = proc;
-                LOG((3, "my_proc_list[%d][%d] = %d", cmp, proc - last_proc, proc));
+                proc_list_buf[cmp][proc - last_proc] = proc;
+                LOG((3, "proc_list_buf[%d][%d] = %d", cmp, proc - last_proc, proc));
             }
             last_proc = proc;
         }
+        my_proc_list = (const int **)proc_list_buf;
     }
     else
         my_proc_list = proc_list;
@@ -2183,7 +2187,7 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
 
     /* Free resources if needed. */
     if (!io_proc_list)
-        free(my_io_proc_list);
+        free(io_proc_list_buf);
 
     if (in_io)
         if ((mpierr = MPI_Comm_free(&io_comm)))
@@ -2195,8 +2199,8 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
     if (!proc_list)
     {
         for (int cmp = 0; cmp < component_count; cmp++)
-            free(my_proc_list[cmp]);
-        free(my_proc_list);
+            free(proc_list_buf[cmp]);
+        free(proc_list_buf);
     }
 
     /* Free MPI groups. */
