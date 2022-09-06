@@ -1418,7 +1418,7 @@ static int check_adios2_need_to_flush(file_desc_t *file, adios_var_desc_t *av)
 
 #define ADIOS_CONVERT_ARRAY(array, arraylen, from_type, to_type, ierr, buf) \
 { \
-    from_type *d = (from_type*)array; \
+    const from_type *d = (const from_type*)array; \
     to_type *f = (to_type*)malloc(arraylen * sizeof(to_type)); \
     if (f) { \
         for (int i = 0; i < arraylen; ++i) \
@@ -1431,7 +1431,7 @@ static int check_adios2_need_to_flush(file_desc_t *file, adios_var_desc_t *av)
     } \
 }
 
-#define ADIOS_CONVERT_FROM(FROM_TYPE_ID, from_type) \
+#define ADIOS_CONVERT_FROM(FROM_TYPE_ID, from_type, array, arraylen, buf) \
 { \
     if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_DOUBLE) \
     { \
@@ -1484,25 +1484,26 @@ static int check_adios2_need_to_flush(file_desc_t *file, adios_var_desc_t *av)
 }
 
 static void *PIOc_convert_buffer_adios(file_desc_t *file, io_desc_t *iodesc,
-                                       adios_var_desc_t *av, void *array, int arraylen,
+                                       adios_var_desc_t *av, const void *array, int arraylen,
                                        int *ierr)
 {
     assert(file != NULL && iodesc != NULL && av != NULL && array != NULL && ierr != NULL);
-    void *buf = array;
+    void *buf = NULL;
     *ierr = 0;
 
-    ADIOS_CONVERT_FROM(PIO_DOUBLE, double);
-    ADIOS_CONVERT_FROM(PIO_FLOAT, float);
-    ADIOS_CONVERT_FROM(PIO_INT, int);
-    ADIOS_CONVERT_FROM(PIO_UINT, unsigned int);
-    ADIOS_CONVERT_FROM(PIO_SHORT, short int);
-    ADIOS_CONVERT_FROM(PIO_USHORT, unsigned short int);
-    ADIOS_CONVERT_FROM(PIO_INT64, int64_t);
-    ADIOS_CONVERT_FROM(PIO_UINT64, uint64_t);
-    ADIOS_CONVERT_FROM(PIO_CHAR, char);
-    ADIOS_CONVERT_FROM(PIO_BYTE, char);
-    ADIOS_CONVERT_FROM(PIO_UBYTE, unsigned char);
+    ADIOS_CONVERT_FROM(PIO_DOUBLE, double, array, arraylen, buf);
+    ADIOS_CONVERT_FROM(PIO_FLOAT, float, array, arraylen, buf);
+    ADIOS_CONVERT_FROM(PIO_INT, int, array, arraylen, buf);
+    ADIOS_CONVERT_FROM(PIO_UINT, unsigned int, array, arraylen, buf);
+    ADIOS_CONVERT_FROM(PIO_SHORT, short int, array, arraylen, buf);
+    ADIOS_CONVERT_FROM(PIO_USHORT, unsigned short int, array, arraylen, buf);
+    ADIOS_CONVERT_FROM(PIO_INT64, int64_t, array, arraylen, buf);
+    ADIOS_CONVERT_FROM(PIO_UINT64, uint64_t, array, arraylen, buf);
+    ADIOS_CONVERT_FROM(PIO_CHAR, char, array, arraylen, buf);
+    ADIOS_CONVERT_FROM(PIO_BYTE, char, array, arraylen, buf);
+    ADIOS_CONVERT_FROM(PIO_UBYTE, unsigned char, array, arraylen, buf);
 
+    assert(buf != NULL);
     return buf;
 }
 
@@ -1513,7 +1514,7 @@ static void *PIOc_convert_buffer_adios(file_desc_t *file, io_desc_t *iodesc,
         memcpy(temp_buf, array, sizeof(var_type)); \
 }
 
-void *PIOc_copy_one_element_adios(void *array, io_desc_t *iodesc)
+void *PIOc_copy_one_element_adios(const void *array, io_desc_t *iodesc)
 {
     assert(array != NULL && iodesc != NULL);
     void *temp_buf = NULL;
@@ -1547,7 +1548,7 @@ void *PIOc_copy_one_element_adios(void *array, io_desc_t *iodesc)
 
 static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
                                    io_desc_t *iodesc, PIO_Offset arraylen,
-                                   void *array, void *fillvalue)
+                                   const void *array, const void *fillvalue)
 {
     assert(file != NULL && iodesc != NULL);
     int ierr = PIO_NOERR;
@@ -1659,12 +1660,12 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
     }
 
     /* Convert variable's data from memory type (piotype) to output type (nc_type) */
-    void *databuf = array;
-    void *fillbuf = fillvalue;
+    void *temp_databuf = NULL;
+    void *temp_fillbuf = NULL;
     int need_to_free_databuf = 0;
     if (iodesc->piotype != av->nc_type)
     {
-        databuf = PIOc_convert_buffer_adios(file, iodesc, av, array, arraylen, &ierr);
+        temp_databuf = PIOc_convert_buffer_adios(file, iodesc, av, array, arraylen, &ierr);
         if (ierr != PIO_NOERR)
         {
             return pio_err(NULL, file, ierr, __FILE__, __LINE__,
@@ -1674,7 +1675,7 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
 
         if (fillvalue != NULL)
         {
-            fillbuf = PIOc_convert_buffer_adios(file, iodesc, av, fillvalue, 1, &ierr);
+            temp_fillbuf = PIOc_convert_buffer_adios(file, iodesc, av, fillvalue, 1, &ierr);
             if (ierr != PIO_NOERR)
             {
                 return pio_err(NULL, file, ierr, __FILE__, __LINE__,
@@ -1684,6 +1685,9 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
         }
         need_to_free_databuf = 1;
     }
+
+    const void *databuf = (need_to_free_databuf == 0)? array : temp_databuf;
+    const void *fillbuf = (need_to_free_databuf == 0)? fillvalue : temp_fillbuf;
 
     size_t num_block_writers = file->block_nprocs;
     int can_merge_buffers = 1;
@@ -1787,11 +1791,11 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
 
     if (need_to_free_databuf)
     {
-        if (databuf != NULL)
-            free(databuf);
+        if (temp_databuf != NULL)
+            free(temp_databuf);
 
-        if (fillbuf != NULL)
-            free(fillbuf);
+        if (temp_fillbuf != NULL)
+            free(temp_fillbuf);
     }
 
     if (temp_buf != NULL)
