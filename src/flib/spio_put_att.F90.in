@@ -1,0 +1,285 @@
+!> @file
+!! @brief SCORPIO APIs for writing attributes
+!! This file contains the SCORPIO APIs for writing ("put"ting)
+!! attributes (metadata) associated with variables
+!!
+
+!> @internal
+!! @def __PIO_FILE__
+!! This macro is used to define the file name in user messages
+!!
+#define __PIO_FILE__ 'spio_put_att.F90'
+
+MODULE spio_put_att
+  USE iso_c_binding
+  USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t
+  USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
+  USE spio_util, ONLY : f2cstring, get_text_var_sz, get_var_dim_sz
+  USE spio_err, ONLY  : pio_error, pio_warn
+  USE spio_put_cint
+  IMPLICIT NONE
+
+  PRIVATE
+  PUBLIC :: pio_put_att
+
+!> @defgroup PIO_put_att PIO_put_att
+!! @public
+!! @brief Write ("Put") a variable attribute
+!!
+!! @details
+!! This API can be used to write attributes associated with variables to a file.
+!! The variable attributes supported are scalar and a 1D array of values. These
+!! arrays/scalars have the same data across all the MPI processes in the I/O system
+!! (where the file was opened/created). However note that the library may not
+!! perform data consistency checks(that data across all the processes are the same)
+!! across MPI processes.
+!!
+!! This API is a collective call (Although the library might internally choose
+!! to make progress on the write from a single or small subset of MPI processes)
+!! on the I/O system associated with the file
+!! 
+  INTERFACE pio_put_att
+    !! pio_put_att* functions write a scalar (single value/datum) or a 1D array
+    !! of values as variable attributes
+
+    !! pio_put_att_fh_vid* versions of the function accepts a file id/handle &
+    !! a variable id/handle as arguments
+    ! DIMS 0,1
+    MODULE PROCEDURE pio_put_att_fh_vid_{DIMS}d_{TYPE}
+    !! pio_put_att_file_vid* versions of the function accepts a file desc &
+    !! a variable id/handle as arguments
+    ! DIMS 0,1
+    MODULE PROCEDURE pio_put_att_file_vid_{DIMS}d_{TYPE}
+    !! pio_put_att_file_vdesc* versions of the function accepts a file desc &
+    !! a variable desc as arguments
+    ! DIMS 0,1
+    MODULE PROCEDURE pio_put_att_file_vdesc_{DIMS}d_{TYPE}
+  END INTERFACE
+
+CONTAINS
+
+! DIMS 0,1
+!>
+!! @public
+!! @ingroup PIO_put_att
+!! @brief Write/Put a string attribute associated with a variable in a file
+!!
+!! @details
+!! @param[in] file The file handle. @copydoc file_desc_t
+!! @param[in] varid The id of the variable
+!! @param[in] attname  The name of the attribute
+!! @param[in] attval  The attribute value (string or an array of strings)
+!! @retval ierr @copydoc error_return
+!!
+  INTEGER FUNCTION pio_put_att_file_vid_{DIMS}d_text (file, varid, attname, attval) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    INTEGER, INTENT(IN) :: varid
+    CHARACTER(LEN=*), INTENT(IN) :: attname
+    CHARACTER(LEN=*), INTENT(IN) :: attval{DIMSTR}
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    CHARACTER(C_CHAR), ALLOCATABLE :: cval(:)
+    INTEGER :: i, clen, nstrs, cval_sz, ret
+
+#ifdef TIMING
+    CALL t_startf("PIO:put_att_file_vid_{DIMS}d_text")
+#endif
+    ierr = PIO_NOERR
+    IF(LEN_TRIM(attname) == 0) THEN
+      WRITE(log_msg, *) "Invalid attribute name (empty string) passed to pio_put_att() function,",&
+                        " pio_put_att_fh_vid_{DIMS}d_text(). varid = ", varid, ", file id = ", file%fh
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    clen = LEN(attval)
+#if {DIMS} == 0
+    nstrs = 1
+#else
+    nstrs = SIZE(attval)
+#endif
+    cval_sz = clen * nstrs
+
+    ! NetCDF only supports character arrays
+    ! Convert string to a 1d CHARACTER array & adding a C NULL character
+    ! at the end of the string (since we are using C APIs to write the
+    ! string to the variable)
+    ALLOCATE(cval(cval_sz))
+    cval = C_NULL_CHAR
+
+    CALL f2cstring(file%iosystem, val, cval, cval_sz, clen, cstr_add_null = .true.)
+
+    ! The NetCDF varids start from 0 for C and 1 for Fortran, we use
+    ! the same convention here
+    ret = PIOc_put_att_text(file%fh, INT(varid, C_INT) - 1,&
+                              TRIM(attname)//C_NULL_CHAR,&
+                              INT(cval_sz, PIO_OFFSET_KIND), cval)
+    ierr = INT(ret)
+
+    DEALLOCATE(cval)
+
+#ifdef TIMING
+    CALL t_stopf("PIO:put_att_file_vid_{DIMS}d_text")
+#endif
+  END FUNCTION pio_put_att_file_vid_{DIMS}d_text
+
+! FIXME : The file id in the var_desc_t and in file_desc_t have two different
+! types (INTEGER(i4) vs INTEGER(C_INT)). This should be fixed.
+
+! DIMS 0,1
+!>
+!! @public
+!! @ingroup PIO_put_att
+!! @brief Write/Put a string attribute associated with a variable in a file
+!!
+!! @details
+!! @param[in] fh The file handle/id
+!! @param[in] varid The id of the variable
+!! @param[in] attname  The name of the attribute
+!! @param[in] attval  The attribute value (string or an array of strings)
+!! @retval ierr @copydoc error_return
+!!
+  INTEGER FUNCTION pio_put_att_fh_vid_{DIMS}d_text (fh, varid, attname, attval) RESULT(ierr)
+    INTEGER, INTENT(IN) :: fh
+    INTEGER, INTENT(IN) :: varid
+    CHARACTER(LEN=*), INTENT(IN) :: attname
+    CHARACTER(LEN=*), INTENT(IN) :: attval{DIMSTR}
+
+    TYPE(file_desc_t) :: file
+    TYPE(iosystem_desc_t), TARGET :: iosys
+
+    iosys%iosysid = PIOc_get_iosystem(INT(fh, C_INT))
+    file%fh = fh
+    file%iosystem => iosys
+    
+    ierr = pio_put_att_file_vid_{DIMS}d_text(file, varid, attname, attval)
+  END FUNCTION pio_put_att_fh_vid_{DIMS}d_text
+
+! DIMS 0,1
+!>
+!! @public
+!! @ingroup PIO_put_att
+!! @brief Write/Put a string attribute associated with a variable in a file
+!!
+!! @details
+!! @param[in] file The file handle. @copydoc file_desc_t
+!! @param[in] vdesc The handle to the variable. @copydoc var_desc_t
+!! @param[in] attname  The name of the attribute
+!! @param[in] attval  The attribute value (string or an array of strings)
+!! @retval ierr @copydoc error_return
+!!
+  INTEGER FUNCTION pio_put_att_file_vdesc_{DIMS}d_text (file, vdesc, attname, attval) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    TYPE(var_desc_t), INTENT(IN) :: vdesc
+    CHARACTER(LEN=*), INTENT(IN) :: attname
+    CHARACTER(LEN=*), INTENT(IN) :: attval{DIMSTR}
+
+    ierr = pio_put_att_file_vid_{DIMS}d_text(file, INT(vdesc%varid), attname, attval)
+
+  END FUNCTION pio_put_att_file_vdesc_{DIMS}d_text
+
+! DIMS 0,1
+! TYPE int,real,double
+!>
+!! @public
+!! @ingroup PIO_put_att
+!! @brief Write/Put an attribute associated with a variable in a file
+!!
+!! @details
+!! @param[in] file The file handle. @copydoc file_desc_t
+!! @param[in] varid The id of the variable
+!! @param[in] attname  The name of the attribute
+!! @param[in] attval  The attribute value (a scalar value or an array of values)
+!! @retval ierr @copydoc error_return
+!!
+  INTEGER FUNCTION pio_put_att_file_vid_{DIMS}d_{TYPE} (file, varid, attname, attval) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    INTEGER, INTENT(IN) :: varid
+    CHARACTER(LEN=*), INTENT(IN) :: attname
+    {VTYPE}, INTENT(IN) :: attval{DIMSTR}
+
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER(PIO_OFFSET_KIND) :: attlen
+    INTEGER(C_INT) :: ret
+
+#ifdef TIMING
+    CALL t_startf("PIO:put_att_file_vid_{DIMS}d_{TYPE}")
+#endif
+    IF(LEN_TRIM(attname) == 0) THEN
+      WRITE(log_msg, *) "Invalid attribute name (empty string) passed to pio_put_att() function,",&
+                        " pio_put_att_fh_vid_0d_{TYPE}(). varid = ", varid, ", file id = ", file%fh
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+#if {DIMS} == 0
+    attlen = 1
+#else
+    attlen = INT(SIZE(attval), PIO_OFFSET_KIND)
+#endif
+
+    ret = PIOc_put_att_{NCTYPE} (file%fh, INT(varid, C_INT) - 1,&
+                                  TRIM(attname) // C_NULL_CHAR,&
+                                  PIO_{TYPE}, attlen,&
+                                  attval)
+    ierr = INT(ret)
+#ifdef TIMING
+    CALL t_stopf("PIO:put_att_file_vid_{DIMS}d_{TYPE}")
+#endif
+  END FUNCTION pio_put_att_file_vid_{DIMS}d_{TYPE}
+
+! DIMS 0,1
+! TYPE int,real,double
+!>
+!! @public
+!! @ingroup PIO_put_att
+!! @brief Write/Put an attribute associated with a variable in a file
+!!
+!! @details
+!! @param[in] fh The file handle/id
+!! @param[in] varid The id of the variable
+!! @param[in] attname  The name of the attribute
+!! @param[in] attval  The attribute value (a scalar value or an array of values)
+!! @retval ierr @copydoc error_return
+!!
+  INTEGER FUNCTION pio_put_att_fh_vid_{DIMS}d_{TYPE} (fh, varid, attname, attval) RESULT(ierr)
+    INTEGER, INTENT(IN) :: fh
+    INTEGER, INTENT(IN) :: varid
+    CHARACTER(LEN=*), INTENT(IN) :: attname{DIMSTR}
+    {VTYPE}, INTENT(IN) :: attval
+
+    TYPE(file_desc_t) :: file
+    TYPE(iosystem_desc_t), TARGET :: iosys
+
+    iosys%iosysid = PIOc_get_iosystem(INT(fh, C_INT))
+    file%fh = fh
+    file%iosystem => iosys
+    
+    ierr = pio_put_att_file_vid_{DIMS}d_{TYPE} (file, varid, attname, attval)
+  END FUNCTION pio_put_att_fh_vid_{DIMS}d_{TYPE}
+
+! DIMS 0,1
+! TYPE int,real,double
+!>
+!! @public
+!! @ingroup PIO_put_att
+!! @brief Write/Put an attribute associated with a variable in a file
+!!
+!! @details
+!! @param[in] file The file handle. @copydoc file_desc_t
+!! @param[in] vdesc The handle to the variable. @copydoc var_desc_t
+!! @param[in] attname  The name of the attribute
+!! @param[in] attval  The attribute value (a scalar value or an array of values)
+!! @retval ierr @copydoc error_return
+!!
+  INTEGER FUNCTION pio_put_att_file_vdesc_{DIMS}d_{TYPE} (file, vdesc, attname, attval) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    TYPE(var_desc_t), INTENT(IN) :: vdesc
+    CHARACTER(LEN=*), INTENT(IN) :: attname
+    {VTYPE}, INTENT(IN) :: attval{DIMSTR}
+
+    ierr = pio_put_att_file_vid_{DIMS}d_{TYPE} (file, varid, attname, attval)
+
+  END FUNCTION pio_put_att_file_vdesc_{DIMS}d_{TYPE}
+
+END MODULE spio_put_att

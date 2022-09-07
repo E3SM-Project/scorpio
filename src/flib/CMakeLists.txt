@@ -31,7 +31,11 @@ endif ()
 add_custom_target(genf90
   DEPENDS ${SPIO_GENF90_PATH}/genf90.pl)
 
-set (PIO_GenF90_SRCS pionfatt_mod.F90
+set (PIO_GenF90_SRCS
+  spio_get_att_cint.F90
+  spio_get_att.F90
+  spio_put_att_cint.F90
+  spio_put_att.F90
   spio_put_var.F90
   spio_put_var_cint.F90
   spio_get_var.F90
