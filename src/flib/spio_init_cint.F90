@@ -36,12 +36,12 @@ INTERFACE
 !! @param[in] rearr @copydoc PIO_rearr_method
 !! @param[in] prearr_opts Pointer to the I/O rearranger options to use for this
 !!                                  I/O subsystem. @copydoc PIO_rearr_options
-!! @param[out] iosysid The handle to the initialized I/O system is returned via
-!!                      this argument.
+!! @param[out] piosysid Pointer to the handle to the initialized I/O system
+!                       (I/O system handle is returned via this argument)
 !! @returns PIO_NOERR on success, an error code otherwise
   INTEGER(C_INT) FUNCTION PIOc_Init_Intracomm_from_F90(comm, nioprocs,&
                             ioprocs_stride, ioprocs_base,&
-                            rearr, prearr_opts, iosysid)&
+                            rearr, prearr_opts, piosysid)&
                           bind(C,name="PIOc_Init_Intracomm_from_F90")
     USE iso_c_binding
 
@@ -51,7 +51,7 @@ INTERFACE
     INTEGER(C_INT), VALUE :: ioprocs_base
     INTEGER(C_INT), VALUE :: rearr
     TYPE(C_PTR), VALUE :: prearr_opts
-    INTEGER(C_INT), VALUE :: iosysid
+    TYPE(C_PTR), VALUE :: piosysid
   END FUNCTION PIOc_Init_Intracomm_from_F90
 END INTERFACE
 

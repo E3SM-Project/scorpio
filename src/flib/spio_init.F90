@@ -110,6 +110,7 @@ CONTAINS
     INTEGER(C_INT), PARAMETER :: ROOT_RANK = 0
     TYPE(C_PTR) :: prearr_opts
     INTEGER(C_INT) :: cioprocs_base
+    INTEGER(C_INT), TARGET :: ciosysid
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
     INTEGER(C_INT) :: cerr
     INTEGER :: ret
@@ -130,10 +131,11 @@ CONTAINS
       prearr_opts = C_NULL_PTR
     ENDIF
 
-    iosys%iosysid = PIO_IOSYSID_INVALID
+    ciosysid = PIO_IOSYSID_INVALID
     cerr = PIOc_Init_Intracomm_from_F90(INT(comm, C_INT), INT(nioprocs, C_INT),&
             INT(ioprocs_stride, C_INT), cioprocs_base, INT(rearr, C_INT),&
-            prearr_opts, iosys%iosysid)
+            prearr_opts, C_LOC(ciosysid))
+    iosys%iosysid = ciosysid
     IF(PRESENT(ierr)) THEN
       ierr = INT(cerr)
     ELSE
