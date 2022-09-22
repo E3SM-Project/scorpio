@@ -1,5 +1,6 @@
 #!/usr/bin/env perl
 use strict;
+my $verbose=0;
 my $outfile;
 # Beginning with F90, Fortran has strict typing of variables based on "TKR"
 # (type, kind, and rank). In many cases we want to write subroutines that
@@ -136,6 +137,12 @@ foreach(@ARGV){
     $itypeflag=1 if($line =~ /TYPELONG/);
     $itypeflag=1 if($line =~ /TYPEOFFSET/);
 
+    if(defined $block){
+      if($verbose){
+        print "DBG: IN BLOCK : \"$line\"\n";
+      }
+    }
+
     if($contains==0){
       if($line=~/\s*!\s*DIMS\s+[\d,]+!*/){
         $dimmodifier=$line;
@@ -159,11 +166,17 @@ foreach(@ARGV){
         if($line=~/^\s*type[^[:alnum:]_].*(\{TYPE\}|\{DIMS\})/i or
             $line=~/^[^!]*(function|subroutine).*(\{TYPE\}|\{DIMS\})/i) {
           $block=$line;
+          if($verbose){
+            print "DBG: BLOCK STARTS : func/sub/type : \"$line\"\n";
+          }
           next;
         }
         if($line=~/^\s*interface.*(\{TYPE\}|\{DIMS\})/i) {
           $block_type="interface";
           $block=$line;
+          if($verbose){
+            print "DBG: BLOCK STARTS : interface : \"$line\"\n";
+          }
           next;
         }
       }
@@ -172,15 +185,24 @@ foreach(@ARGV){
           $line=~/^\s*end\s+(function|subroutine)\s+.*(\{TYPE\}|\{DIMS\})/i)){
         $line = $block.$line;
         undef $block;
+        if($verbose){
+          print "DBG: BLOCK ENDS : \"$line\"\n";
+        }
       }
       if($line=~/^\s*end\s*interface/i and
           defined $block) {
         $line = $block.$line;
         undef $block;
         undef $block_type;
+        if($verbose){
+          print "DBG: BLOCK ENDS : \"$line\"\n";
+        }
       }
       if(defined $block){
         $block = $block.$line;
+        if($verbose){
+          print "DBG: BLOCK CONTINUES : \"$line\"\n";
+        }
         next;
       }
       if(defined $dimmodifier){
@@ -195,6 +217,9 @@ foreach(@ARGV){
       push(@output, buildout($line));
       if(($line =~ /^\s*contains\s*!*/i && ! $in_type_block) or
           ($line =~ /^\s*!\s*Not a module/i)){
+        if($verbose){
+          print "DBG: FOUND CONTAINS : \"$line\"\n";
+        }
         $contains=1;
         next;
       }
@@ -293,6 +318,7 @@ sub writedtypes{
 
 sub buildout{
   my ($func) = @_;
+  #print "DBG: buildout(\"$func\")\n";
 
   my $outstr;
   my(@ldims, @ltypes);
