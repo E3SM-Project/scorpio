@@ -150,7 +150,7 @@ CONTAINS
 
     iodesc%ioid = PIO_IOID_INVALID
     cioid = PIO_IOID_INVALID
-    cerr = PIOc_initdecomp(iosys%iosysid, INT(dt, C_INT), INT(ndims, C_INT),&
+    cerr = PIOc_InitDecomp(iosys%iosysid, INT(dt, C_INT), INT(ndims, C_INT),&
                             C_LOC(cgdims), INT(mapsz, C_INT), C_LOC(cmap),&
                             C_LOC(cioid), prearr, pstart, pcnt)
     IF(PRESENT(ierr)) THEN

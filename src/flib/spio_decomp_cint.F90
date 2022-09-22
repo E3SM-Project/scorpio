@@ -66,10 +66,10 @@ INTERFACE
 !!                    not provided by the user, so pass C_NULL_PTR for
 !!                    cases where the start array is not available
 !! @returns PIO_NOERR on success, an error code otherwise
-  INTEGER(C_INT) FUNCTION PIOc_initdecomp(iosysid, dt, ndims,&
+  INTEGER(C_INT) FUNCTION PIOc_InitDecomp(iosysid, dt, ndims,&
                             gdims, mapsz, map, pioid,&
                             prearr, pstart, pcnt)&
-                          bind(C,name="PIOc_initdecomp")
+                          bind(C,name="PIOc_InitDecomp")
     USE iso_c_binding
 
     INTEGER(C_INT), VALUE :: iosysid
@@ -82,7 +82,7 @@ INTERFACE
     TYPE(C_PTR), VALUE :: prearr
     TYPE(C_PTR), VALUE :: pstart
     TYPE(C_PTR), VALUE :: pcnt
-  END FUNCTION PIOc_initdecomp
+  END FUNCTION PIOc_InitDecomp
 END INTERFACE
 
 INTERFACE
