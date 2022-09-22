@@ -15,6 +15,9 @@ MODULE spio_file
   USE iso_c_binding
   USE pio_types, ONLY : iosystem_desc_t, file_desc_t, var_desc_t, PIO_FMODE_CLR
   USE spio_file_cint
+#ifdef TIMING
+  use perf_mod, only : t_startf, t_stopf   !_EXTERNAL
+#endif
   IMPLICIT NONE
 
   PRIVATE

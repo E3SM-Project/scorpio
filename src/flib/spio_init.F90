@@ -22,6 +22,9 @@ MODULE spio_init
   USE spio_err, ONLY  : pio_error
   USE spio_util, ONLY : f2cstring
   USE spio_init_cint
+#ifdef TIMING
+  use perf_mod, only : t_startf, t_stopf   !_EXTERNAL
+#endif
   IMPLICIT NONE
 
   PRIVATE
