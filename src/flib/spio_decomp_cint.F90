@@ -118,4 +118,20 @@ INTERFACE
   END FUNCTION PIOc_get_local_array_size
 END INTERFACE
 
+INTERFACE
+!> @private
+!! @brief Synchronize contents of a file to the filesystem (all data written
+!! out to this file is flushed to the filesystem)
+!!
+!! @details
+!! @param[in] fh The handle/id to the file
+!! @return PIO_NOERR on success, an error code otherwise
+!!
+  INTEGER(C_INT) FUNCTION PIOc_sync(fh)&
+                          bind(C,name="PIOc_sync")
+    USE iso_c_binding
+    INTEGER(C_INT), VALUE :: fh
+  END FUNCTION PIOc_sync
+END INTERFACE
+
 END MODULE spio_decomp_cint

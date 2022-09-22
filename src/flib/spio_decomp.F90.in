@@ -243,7 +243,14 @@ CONTAINS
     ! FIXME : This is unfortunate since all writes (even writes
     ! with a different I/O decomposition) are synced here. This
     ! is unnecessary and needs to be fixed (a performance bug)
-    call syncfile(file)
+    cerr = PIOc_sync(file%fh)
+    IF(cerr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "File sync failed in PIO_freedecomp (PIO_freedecomp_file),",&
+                        " err = ", cerr, ", iosysid =", file%iosystem%iosysid,&
+                        ", ncid =", file%fh, ", ioid = ", iodesc%ioid
+      ret = pio_error(file%iosystem, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+      RETURN
+    END IF
 
     cerr = PIOc_freedecomp(file%iosystem%iosysid, iodesc%ioid)
     IF(PRESENT(ierr)) THEN
