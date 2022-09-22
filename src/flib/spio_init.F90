@@ -83,7 +83,7 @@ CONTAINS
 !! @param[in] rearr @copydoc PIO_rearr_method
 !! @param[out] iosys The handle to the initialized I/O system is returned via
 !!                    this argument. @copydoc iosystem_desc_t
-!! @param[in] ioprocs_base (Optional) The base (MPI rank of the 1st I/O process)
+!! @param[in] base (Optional) The base (MPI rank of the 1st I/O process)
 !!                                    rank for I/O processes. By default, MPI
 !!                                    rank 0 (in @p comm) is the base I/O process
 !! @param[in] rearr_opts (Optional) The I/O rearranger options to use for this
@@ -92,7 +92,7 @@ CONTAINS
 !! 
   SUBROUTINE pio_init_intracomm(comm_rank, comm, nioprocs, naggprocs,&
                                 ioprocs_stride, rearr, iosys,&
-                                ioprocs_base, rearr_opts, ierr)
+                                base, rearr_opts, ierr)
     INTEGER, INTENT(IN) :: comm_rank
     INTEGER, INTENT(IN) :: comm
     INTEGER, INTENT(IN) :: nioprocs
@@ -100,7 +100,7 @@ CONTAINS
     INTEGER, INTENT(IN) :: ioprocs_stride
     INTEGER, INTENT(IN) :: rearr
     TYPE(iosystem_desc_t), INTENT(OUT) :: iosys
-    INTEGER, OPTIONAL, INTENT(IN) :: ioprocs_base
+    INTEGER, OPTIONAL, INTENT(IN) :: base
     TYPE(pio_rearr_opt_t), OPTIONAL, TARGET, INTENT(IN) :: rearr_opts
     INTEGER, OPTIONAL, INTENT(OUT) :: ierr
 
@@ -115,8 +115,8 @@ CONTAINS
     call t_startf("PIO:init")
 #endif
 
-    IF(PRESENT(ioprocs_base)) THEN
-      cioprocs_base = ioprocs_base
+    IF(PRESENT(base)) THEN
+      cioprocs_base = base
     ELSE
       cioprocs_base = ROOT_RANK
     ENDIF
