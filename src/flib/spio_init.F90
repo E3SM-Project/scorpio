@@ -139,12 +139,15 @@ CONTAINS
     IF(PRESENT(ierr)) THEN
       ierr = INT(cerr)
     ELSE
-      WRITE(log_msg, *) "PIO_Init (pio_init_intracomm) failed, ",&
-                        "comm = ", comm, ", nioprocs=", nioprocs,&
-                        ", ioprocs_stride = ", ioprocs_stride,&
-                        ", ioprocs_base = ", INT(cioprocs_base),&
-                        ", rearr = ", rearr, ", err = ", cerr
-      ret = pio_error(comm, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+      IF(cerr /= PIO_NOERR) THEN
+        WRITE(log_msg, *) "PIO_Init (pio_init_intracomm) failed, ",&
+                          "comm = ", comm, ", nioprocs=", nioprocs,&
+                          ", ioprocs_stride = ", ioprocs_stride,&
+                          ", ioprocs_base = ", INT(cioprocs_base),&
+                          ", rearr = ", rearr, ", err = ", cerr
+        ret = pio_error(comm, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+        RETURN
+      END IF
     ENDIF
 
 #ifdef TIMING
@@ -244,10 +247,13 @@ CONTAINS
     IF(PRESENT(ierr)) THEN
       ierr = INT(cerr)
     ELSE
-      WRITE(log_msg, *) "PIO_Init (pio_init_intercomm) failed, ",&
-                        "ncomps = ", ncomps, ", peer_comm = ", peer_comm,&
-                        "io_comm = ", io_comm, ", err = ", cerr
-      ret = pio_error(peer_comm, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+      IF(cerr /= PIO_NOERR) THEN
+        WRITE(log_msg, *) "PIO_Init (pio_init_intercomm) failed, ",&
+                          "ncomps = ", ncomps, ", peer_comm = ", peer_comm,&
+                          "io_comm = ", io_comm, ", err = ", cerr
+        ret = pio_error(peer_comm, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+        RETURN
+      END IF
     ENDIF
 
     DO i=1,ncomps
