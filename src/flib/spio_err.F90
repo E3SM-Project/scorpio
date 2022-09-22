@@ -242,7 +242,7 @@ CONTAINS
     INTEGER(C_INT) :: ceh
     INTEGER(C_INT) :: cerr, ret
 
-    ceh = PIOc_Set_IOSystem_Error_handling(iosysid, eh)
+    ceh = PIOc_Set_IOSystem_Error_Handling(iosysid, eh)
     IF(PRESENT(old_eh)) THEN
       old_eh = INT(ceh)
     END IF
@@ -272,7 +272,7 @@ CONTAINS
     INTEGER(C_INT) :: ceh
     INTEGER(C_INT) :: cerr, ret
 
-    ceh = PIOc_Set_IOSystem_Error_handling(iosys%iosysid, eh)
+    ceh = PIOc_Set_IOSystem_Error_Handling(iosys%iosysid, eh)
     IF(PRESENT(old_eh)) THEN
       old_eh = INT(ceh)
     END IF
@@ -306,7 +306,7 @@ CONTAINS
     INTEGER(C_INT) :: ceh
     INTEGER(C_INT) :: cerr, ret
 
-    ceh = PIOc_Set_IOSystem_Error_handling(file%iosystem%iosysid, eh)
+    ceh = PIOc_Set_IOSystem_Error_Handling(file%iosystem%iosysid, eh)
     IF(PRESENT(old_eh)) THEN
       old_eh = INT(ceh)
     END IF

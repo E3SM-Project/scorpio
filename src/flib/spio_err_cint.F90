@@ -77,13 +77,13 @@ INTERFACE
 !! @param[in] eh  The new error handler to use for the I/O system
 !!                @copydoc PIO_error_method
 !! @returns The old error handler used by the I/O system
-  INTEGER(C_INT) FUNCTION PIOc_Set_IOSystem_Error_handling(iosysid, eh)&
-                          bind(C,name="PIOc_Set_IOSystem_Error_handling")
+  INTEGER(C_INT) FUNCTION PIOc_Set_IOSystem_Error_Handling(iosysid, eh)&
+                          bind(C,name="PIOc_Set_IOSystem_Error_Handling")
     USE iso_c_binding
 
     INTEGER(C_INT), VALUE :: iosysid
     INTEGER(C_INT), VALUE :: eh
-  END FUNCTION PIOc_Set_IOSystem_Error_handling
+  END FUNCTION PIOc_Set_IOSystem_Error_Handling
 END INTERFACE
 
 END MODULE spio_err_cint
