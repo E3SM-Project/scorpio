@@ -179,6 +179,14 @@ foreach(@ARGV){
           }
           next;
         }
+        if($line=~/^\s*interface.*/i) {
+          $block_type="interface";
+          $block=$line;
+          if($verbose){
+            print "DBG: BLOCK STARTS : interface2 : \"$line\"\n";
+          }
+          next;
+        }
       }
       if(not defined $block_type and
           ($line=~/^\s*end\s+type\s+.*(\{TYPE\}|\{DIMS\})/i or
