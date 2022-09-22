@@ -46,6 +46,7 @@ MODULE spio_err
 !!        @copydoc PIO_error_method
 !!
   INTERFACE pio_seterrorhandling
+    MODULE PROCEDURE pio_seterrorhandling_iosysid
     MODULE PROCEDURE pio_seterrorhandling_iosys
     MODULE PROCEDURE pio_seterrorhandling_file
   END INTERFACE
@@ -220,6 +221,36 @@ CONTAINS
     END IF
 
   END SUBROUTINE pio_setdebuglevel
+
+!> @ingroup PIO_seterrorhandling
+!> @public
+!! @brief Set the error handler to use for an I/O system
+!!
+!! @param[in] iosysid The id/handle of the I/O subsystem where the error
+!!                    handler needs to be set. @copydoc iosystem_desc_t
+!! @param[in] eh  The error handler method to use for this I/O subsystem.
+!!                @copydoc PIO_error_method
+!! @param[out] old_eh (Optional) The old error handler method used by the
+!!                    I/O subsystem.
+!! @param[out] ierr (Optional) @copydoc error_return
+  SUBROUTINE pio_seterrorhandling_iosysid(iosysid, eh, old_eh, ierr)
+    INTEGER, INTENT(IN) :: iosysid
+    INTEGER, INTENT(IN) :: eh
+    INTEGER, OPTIONAL, INTENT(OUT) :: old_eh
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    INTEGER(C_INT) :: ceh
+    INTEGER(C_INT) :: cerr, ret
+
+    ceh = PIOc_Set_IOSystem_Error_handling(iosysid, eh)
+    IF(PRESENT(old_eh)) THEN
+      old_eh = INT(ceh)
+    END IF
+    IF(PRESENT(ierr)) THEN
+      ierr = PIO_NOERR
+    END IF
+
+  END SUBROUTINE pio_seterrorhandling_iosysid
 
 !> @ingroup PIO_seterrorhandling
 !> @public
