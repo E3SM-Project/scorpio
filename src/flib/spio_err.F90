@@ -212,7 +212,7 @@ CONTAINS
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
     INTEGER(C_INT) :: cerr, ret
 
-    cerr = PIO_set_log_level(lvl)
+    cerr = PIOc_set_log_level(lvl)
     IF(PRESENT(ierr)) THEN
       ierr = INT(cerr)
     ELSE

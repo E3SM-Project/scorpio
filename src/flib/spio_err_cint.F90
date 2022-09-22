@@ -61,12 +61,12 @@ INTERFACE
 !!
 !! @param[in] lvl The new debug level for debug messages
 !! @returns Returns PIO_NOERR on success, an error code otherwise
-  INTEGER(C_INT) FUNCTION PIO_set_log_level(lvl)&
-                          bind(C,name="PIO_set_log_level")
+  INTEGER(C_INT) FUNCTION PIOc_set_log_level(lvl)&
+                          bind(C,name="PIOc_set_log_level")
     USE iso_c_binding
 
     INTEGER(C_INT), VALUE :: lvl
-  END FUNCTION PIO_set_log_level
+  END FUNCTION PIOc_set_log_level
 END INTERFACE
 
 INTERFACE
