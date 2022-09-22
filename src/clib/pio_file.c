@@ -292,8 +292,6 @@ static int sync_file(int ncid)
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
-        ierr = end_adios2_step(file, ios);
-
         if (file->mode & PIO_WRITE)
         {
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -563,7 +561,7 @@ int PIOc_closefile(int ncid)
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
-        if (file->engineH != NULL)
+        if (file->adios_io_process == 1 && file->engineH != NULL)
         {
             LOG((2, "ADIOS close file %s", file->filename));
 
@@ -596,7 +594,8 @@ int PIOc_closefile(int ncid)
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
                 }
-                return ierr;
+                return pio_err(NULL, file, ierr, __FILE__, __LINE__,
+                               "adios2_begin_step failed for file (%s)", pio_get_fname_from_file(file));
             }
 
             adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, "/__pio__/fillmode");
@@ -631,7 +630,9 @@ int PIOc_closefile(int ncid)
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                         spio_ltimer_stop(file->io_fstats->tot_timer_name);
                     }
-                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Defining (ADIOS) attribute (name=/__pio__/fillmode) failed for file (%s, ncid=%d)", pio_get_fname_from_file(file), file->pio_ncid);
+                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Defining (ADIOS) attribute (name=/__pio__/fillmode) failed for file (%s, ncid=%d)",
+                                   pio_get_fname_from_file(file), file->pio_ncid);
                 }
             }
 
@@ -661,7 +662,9 @@ int PIOc_closefile(int ncid)
                 }
             }
 
+            GPTLstart("end_adios2_step_PIOc_closefile");
             ierr = end_adios2_step(file, ios);
+            GPTLstop("end_adios2_step_PIOc_closefile");
             if (ierr != PIO_NOERR)
             {
                 if (file->iotype == PIO_IOTYPE_ADIOS)
@@ -690,7 +693,8 @@ int PIOc_closefile(int ncid)
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
                 }
-                return ierr;
+                return pio_err(NULL, file, ierr, __FILE__, __LINE__,
+                               "adios2_end_step failed for file (%s)", pio_get_fname_from_file(file));
             }
 
             adios2_error adiosErr = adios2_close(file->engineH);
@@ -720,8 +724,9 @@ int PIOc_closefile(int ncid)
                     }
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                  }
-                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Closing (ADIOS) file (%s, ncid=%d) failed (adios2_error=%s)", pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+                }
+                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Closing (ADIOS) file (%s, ncid=%d) failed (adios2_error=%s)",
+                               pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
             }
 
             file->engineH = NULL;
@@ -729,18 +734,27 @@ int PIOc_closefile(int ncid)
 
         for (int i = 0; i < file->num_dim_vars; i++)
         {
-            free(file->dim_names[i]);
-            file->dim_names[i] = NULL;
+            if (file->dim_names[i] != NULL)
+            {
+                free(file->dim_names[i]);
+                file->dim_names[i] = NULL;
+            }
         }
 
         file->num_dim_vars = 0;
 
         for (int i = 0; i < file->num_vars; i++)
         {
-            free(file->adios_vars[i].name);
-            file->adios_vars[i].name = NULL;
-            free(file->adios_vars[i].gdimids);
-            file->adios_vars[i].gdimids = NULL;
+            if (file->adios_vars[i].name != NULL)
+            {
+                free(file->adios_vars[i].name);
+                file->adios_vars[i].name = NULL;
+            }
+            if (file->adios_vars[i].gdimids != NULL)
+            {
+                free(file->adios_vars[i].gdimids);
+                file->adios_vars[i].gdimids = NULL;
+            }
             file->adios_vars[i].adios_varid = NULL;
             file->adios_vars[i].decomp_varid = NULL;
             file->adios_vars[i].frame_varid = NULL;
@@ -770,8 +784,6 @@ int PIOc_closefile(int ncid)
                 file->adios_vars[i].num_wb_buffer = NULL;
                 file->adios_vars[i].num_wb_cnt = 0;
             }
-
-            file->adios_vars[i].elem_size = 0;
         }
 
         file->num_vars = 0;
@@ -779,8 +791,11 @@ int PIOc_closefile(int ncid)
         /* Track attributes */
         for (int i = 0; i < file->num_attrs; i++)
         {
-            free(file->adios_attrs[i].att_name);
-            file->adios_attrs[i].att_name = NULL;
+            if (file->adios_attrs[i].att_name != NULL)
+            {
+                free(file->adios_attrs[i].att_name);
+                file->adios_attrs[i].att_name = NULL;
+            }
         }
 
         file->num_attrs = 0;
@@ -812,9 +827,6 @@ int PIOc_closefile(int ncid)
                 file->block_list = NULL;
             }
         }
-
-        MPI_Comm_free(&(file->node_comm));
-        MPI_Comm_free(&(file->block_comm));
 
 #ifdef _ADIOS_BP2NC_TEST /* Comment out for large scale run */
 #ifdef _PNETCDF
@@ -860,8 +872,11 @@ int PIOc_closefile(int ncid)
                             "C_API_ConvertBPToNC(infile = %s, outfile = %s, piotype = %s) failed", file->filename, outfilename, conv_iotype);
         }
 #endif
-
-        free(file->filename);
+        if (file->filename != NULL)
+        {
+            free(file->filename);
+            file->filename = NULL;
+        }
 
         if (file->iotype == PIO_IOTYPE_ADIOS)
         {

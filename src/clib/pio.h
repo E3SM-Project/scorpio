@@ -47,6 +47,7 @@
 #ifdef _PNETCDF
 #include <pnetcdf.h>
 #endif
+
 #ifdef _ADIOS2
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -55,7 +56,7 @@
 #include <adios2_c.h>
 
 #define ADIOS_PIO_MAX_DECOMPS 1024 /* Maximum number of decomps */
-#define MAX_STEP_CALLS 512 /* Maximum number of application steps before adios end step is called */
+#define MAX_STEP_CALLS 128 /* Maximum number of application steps before adios end step is called */
 #define MAX_ADIOS_BUFFER_COUNT (MAX_STEP_CALLS + 16) /* Maximum buffer size for aggregating decomp_id, frame_id, and fillval_id values */
 #define BLOCK_MAX_BUFFER ((unsigned long)INT_MAX) /* 2GB limit of MPI_Gatherv */
 /* adios end step is called if the number of blocks written out exceeds BLOCK_COUNT_THRESHOLD */
@@ -752,6 +753,12 @@ typedef struct iosystem_desc_t
 #ifdef _ADIOS2
     /* ADIOS handle */
     adios2_adios *adiosH;
+    int adios_io_process;
+    MPI_Comm adios_comm;
+    int adios_rank, num_adiostasks;
+    /* Block merging setup */
+    MPI_Comm block_comm;
+    int block_myrank, block_nprocs;
 #endif
 
     /** I/O statistics associated with this I/O system */
@@ -815,7 +822,7 @@ typedef struct adios_var_desc_t
 
     /** Type converted from NC type to adios type */
     adios2_type adios_type;
-    int adios_type_size;
+    size_t adios_type_size;
 
     /** Number of dimensions */
     int ndims;
@@ -849,9 +856,6 @@ typedef struct adios_var_desc_t
     int32_t *num_wb_buffer;
     int32_t decomp_cnt, frame_cnt, fillval_cnt, num_wb_cnt;
     int32_t max_buffer_cnt;
-
-    /* for merging blocks */
-    size_t elem_size;
 } adios_var_desc_t;
 
 /* Track attributes */
@@ -950,6 +954,7 @@ typedef struct file_desc_t
      * during ADIOS metadata write operation.
      *
      * if num_written_blocks * BLOCK_METADATA_SIZE >= BLOCK_COUNT_THRESHOLD, call adios2_end_step
+     * (Not implemented in this version. adios2_end_step is called if num_step_calls >= max_step_calls (= MAX_STEP_CALLS))
      */
     unsigned int num_written_blocks;
 
@@ -983,18 +988,20 @@ typedef struct file_desc_t
     /** Number of global attributes defined. Needed to support PIOc_inq_nattrs() */
     int num_gattrs;
 
-    /* ADIOS: assume all procs are also IO tasks */
-    int myrank;
-    int num_all_procs;
+    /* all procs rank, etc */
+    MPI_Comm all_comm;
+    int all_rank, num_alltasks;
+
+    /* ADIOS rank, etc */
+    int adios_io_process;
+    MPI_Comm adios_comm;
+    int adios_rank, num_adiostasks;
 
     /* Merging distributed array blocks to reduce I/O overhead */
-    /* ADIOS: grouping of processes for block merging */
-    MPI_Comm node_comm;
-    int node_myrank, node_nprocs;
+    /* Grouping of processes for block merging */
     MPI_Comm block_comm;
     int block_myrank, block_nprocs;
     int *block_list;
-    MPI_Comm all_comm;
 
     /* Buffers for merging distributed array blocks */
     unsigned int *array_counts;
@@ -1002,7 +1009,7 @@ typedef struct file_desc_t
     unsigned int *array_disp;
     unsigned int array_disp_size;
     char *block_array;
-    unsigned int block_array_size;
+    size_t block_array_size;
 
     /* Track attributes */
     /** attribute information. Allow PIO_MAX_VARS for now. */
