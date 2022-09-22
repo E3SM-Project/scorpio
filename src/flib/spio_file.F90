@@ -14,6 +14,7 @@
 MODULE spio_file
   USE iso_c_binding
   USE pio_types, ONLY : iosystem_desc_t, file_desc_t, var_desc_t, PIO_FMODE_CLR
+  USE pio_kinds, ONLY : PIO_OFFSET_KIND
   USE spio_file_cint
 #ifdef TIMING
   use perf_mod, only : t_startf, t_stopf   !_EXTERNAL
@@ -195,7 +196,7 @@ CONTAINS
   SUBROUTINE pio_setframe(file, vdesc, frame, ierr)
     TYPE(file_desc_t), INTENT(IN) :: file
     TYPE(var_desc_t), INTENT(IN) :: vdesc
-    INTEGER, INTENT(IN) :: frame
+    INTEGER(PIO_OFFSET_KIND), INTENT(IN) :: frame
     INTEGER, OPTIONAL, INTENT(OUT) :: ierr
 
     INTEGER(C_INT) :: cerr
