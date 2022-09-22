@@ -305,7 +305,7 @@ CONTAINS
 #endif
 
     IF(ASSOCIATED(file%iosystem)) THEN
-      cis_open = PIOc_File_is_open(file%fh)
+      cis_open = PIOc_File_is_Open(file%fh)
       IF(cis_open == 1) THEN
         file_is_open = .true.
       ENDIF

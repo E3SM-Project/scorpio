@@ -147,11 +147,11 @@ INTERFACE
 !! @param[in] fh The handle/id to the file
 !! @return PIO_NOERR on success, an error code otherwise
 !!
-  INTEGER(C_INT) FUNCTION PIOc_File_is_open(fh)&
-                          bind(C,name="PIOc_File_is_open")
+  INTEGER(C_INT) FUNCTION PIOc_File_is_Open(fh)&
+                          bind(C,name="PIOc_File_is_Open")
     USE iso_c_binding
     INTEGER(C_INT), VALUE :: fh
-  END FUNCTION PIOc_File_is_open
+  END FUNCTION PIOc_File_is_Open
 END INTERFACE
 
 END MODULE spio_file_cint
