@@ -8,15 +8,19 @@
 !! @def __PIO_FILE__
 !! This macro is used to define the file name in user messages
 !!
-#define __PIO_FILE__ 'spio_put.F90'
+#define __PIO_FILE__ 'spio_put_var.F90'
 
-MODULE spio_put
+MODULE spio_put_var
   USE iso_c_binding
-  USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t
-  USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
+  USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t, PIO_MAX_NAME,&
+                        PIO_EINTERNAL, PIO_NOERR
+  USE pio_kinds, ONLY : i4, i8, r4, r8, PIO_OFFSET_F2C_TYPE_KIND
   USE spio_util, ONLY : f2cstring, get_text_var_sz, get_var_dim_sz
   USE spio_err, ONLY  : pio_error, pio_warn
-  USE spio_put_cint
+  USE spio_put_var_cint
+#ifdef TIMING
+  USE perf_mod, ONLY  : t_startf, t_stopf
+#endif
   IMPLICIT NONE
 
   PRIVATE
@@ -41,13 +45,18 @@ MODULE spio_put
     !! pio_put_var_* versions of the functions write a single value (datum) in
     !! a single call at a specified variable index.
     !! Note that the value passed in is always DIMS=0 
+    ! DIMS 0
     MODULE PROCEDURE pio_put_var1_{TYPE}, pio_put_var1_vdesc_{TYPE}
+  END INTERFACE
+  INTERFACE pio_put_var
     !! pio_put_var_* versions of the functions write a slice/slab of the variable
     !! defined by starts & counts for each dimension of the variable
     !! Note that starts/counts do not make sense for 0d scalar variables since
     !! these scalar variables have 0 dimensions
     ! DIMS 1,2,3,4,5
     MODULE PROCEDURE pio_put_vara_{DIMS}d_{TYPE}, pio_put_vara_vdesc_{DIMS}d_{TYPE}
+  END INTERFACE
+  INTERFACE pio_put_var
     !! pio_put_var_* versions of the functions write the entire variable in
     !! a single call
     ! DIMS 0,1,2,3,4,5
@@ -88,7 +97,7 @@ CONTAINS
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
     CHARACTER(C_CHAR), ALLOCATABLE :: cval(:)
     INTEGER :: i
-    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:), ccount(:)
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), ALLOCATABLE :: cstart(:), ccount(:)
     INTEGER :: ndims, clen
 
 #ifdef TIMING
@@ -99,7 +108,7 @@ CONTAINS
       WRITE(log_msg, *) "An empty string was passed to the PIO_put_var() function,",&
                         " pio_put_var1_text(), a collective C API call will be skipped",&
                         " on this process. varid = ", varid, ", file id = ", file%fh
-      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
     END IF
 
     ierr = get_text_var_sz(file, varid, clen)
@@ -140,11 +149,11 @@ CONTAINS
     ! Note: The ccount/cstart passed to the C interface is in the
     ! "C order" of dims, that is the reverse of the "Fortran order"
     ! of the dims
-    ccount(ndims) = INT(MIN(clen - start(1) + 1, LEN(str)), PIO_OFFSET_KIND)
+    ccount(ndims) = INT(MIN(clen - start(1) + 1, LEN(str)), PIO_OFFSET_F2C_TYPE_KIND)
 
     ALLOCATE(cstart(ndims))
     DO i=1,ndims
-      cstart(i) = INT(start(ndims - i + 1), PIO_OFFSET_KIND)
+      cstart(i) = INT(start(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
     END DO
 
     ! NetCDF only supports character arrays
@@ -192,7 +201,7 @@ CONTAINS
 
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
     INTEGER :: ndims, i
-    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:)
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), ALLOCATABLE :: cstart(:)
 
 #ifdef TIMING
     CALL t_startf("PIO:put_var1_{TYPE}")
@@ -206,14 +215,14 @@ CONTAINS
                         " pio_put_var1_{TYPE}, a collective C API call will",&
                         " be skipped on this process. varid = ", varid,&
                         " file id = ", file%fh
-      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
       RETURN
     END IF
     ALLOCATE(cstart(ndims))
     DO i=1,ndims
       ! Note: The start indices in C start from 0
       ! (Fortran indices start from 1)
-      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_KIND)
+      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_F2C_TYPE_KIND)
     END DO
 
     ierr = PIOc_put_var1_{NCTYPE} (file%fh, varid-1, cstart, val)
@@ -292,7 +301,7 @@ CONTAINS
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
     CHARACTER(C_CHAR), ALLOCATABLE :: cval(:)
     INTEGER :: cval_sz, clen, nstrs
-    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:), ccount(:)
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), ALLOCATABLE :: cstart(:), ccount(:)
     INTEGER :: i, ndims
 
 #ifdef TIMING
@@ -337,8 +346,8 @@ CONTAINS
     ! Note: Convert the Fortran order of start/counts to C order (reverse of Fortran order)
     ! Also in C starting indices start from 0 (In Fortran it starts from 1)
     DO i=1,ndims
-      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_KIND)
-      ccount(i) = INT(cnt(ndims-i+1), PIO_OFFSET_KIND)
+      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_F2C_TYPE_KIND)
+      ccount(i) = INT(cnt(ndims-i+1), PIO_OFFSET_F2C_TYPE_KIND)
     END DO
 
     ! This manipulation is required to convert the fortran string to
@@ -362,7 +371,13 @@ CONTAINS
       !               'd',
       !               'e',
       !               'f' ]
-      CALL f2cstring(val, cval, cval_sz, clen, cstr_add_null = .false.)
+      ierr = f2cstring(file%iosystem, val, cval, cval_sz, clen, cstr_add_null = .false.)
+      IF(ierr /= PIO_NOERR) THEN
+        WRITE(log_msg, *) "Error converting Fortran strings to C strings in PIO_put_var() function,",&
+                          " pio_put_vara_{DIMS}d_text().varid = ", varid, ", file id = ", file%fh 
+        ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+        RETURN
+      END IF
 
       ierr = PIOc_put_vara_text(file%fh, varid-1, cstart, ccount, cval)
       DEALLOCATE(cval)
@@ -371,7 +386,7 @@ CONTAINS
                         " put_vara_{DIMS}d_text, a collective C API call will",&
                         " be skipped on this process. varid = ", varid,&
                         " , file id = ", file%fh
-      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
     END IF
     DEALLOCATE(cstart, ccount)
 
@@ -415,7 +430,8 @@ CONTAINS
     {VTYPE}, INTENT(IN) :: val{DIMSTR}
 
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
-    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:), ccount(:)
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), ALLOCATABLE :: cstart(:), ccount(:)
+    INTEGER(C_INT) :: ret
     INTEGER :: i, ndims
 
 #ifdef TIMING
@@ -460,13 +476,14 @@ CONTAINS
     ! Note: Convert the Fortran order of start/counts to C order (reverse of Fortran order)
     ! Also in C starting indices start from 0 (In Fortran it starts from 1)
     DO i=1,ndims
-      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_KIND)
-      ccount(i) = INT(cnt(ndims-i+1), PIO_OFFSET_KIND)
+      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_F2C_TYPE_KIND)
+      ccount(i) = INT(cnt(ndims-i+1), PIO_OFFSET_F2C_TYPE_KIND)
     END DO
 
-    ierr = PIOc_put_vara_{NCTYPE} (file%fh, varid-1, cstart, ccount, val)
+    ret = PIOc_put_vara_{NCTYPE} (file%fh, varid-1, cstart, ccount, val)
+    ierr = INT(ret)
 
-    DEALLOCATE(cstart(ndims), ccount(ndims))
+    DEALLOCATE(cstart, ccount)
 #ifdef TIMING
     CALL t_stopf("PIO:put_vara_{DIMS}d_{TYPE}")
 #endif
@@ -506,7 +523,7 @@ CONTAINS
     INTEGER, INTENT(IN) ::  start(:), cnt(:)
     {VTYPE}, INTENT(IN) :: val{DIMSTR}
 
-    ierr = put_vara_{DIMS}d_{TYPE} (file, vdesc%varid, start, cnt, val)
+    ierr = pio_put_vara_{DIMS}d_{TYPE} (file, vdesc%varid, start, cnt, val)
 
   END FUNCTION pio_put_vara_vdesc_{DIMS}d_{TYPE}
 
@@ -528,7 +545,7 @@ CONTAINS
 !!                to contain the same number of characters as defined by the variable
 !!                dimensions.
 !! @returns PIO_NOERR on success, an error code otherwise
-  INTEGER FUNCTION put_var_{DIMS}d_text (file, varid, val) RESULT(ierr)
+  INTEGER FUNCTION pio_put_var_{DIMS}d_text (file, varid, val) RESULT(ierr)
     TYPE(file_desc_t), INTENT(INOUT) :: file
     INTEGER, INTENT(IN) :: varid
     CHARACTER(LEN=*), INTENT(IN) :: val{DIMSTR}
@@ -541,27 +558,31 @@ CONTAINS
     CALL t_startf("PIO:put_var_{DIMS}d_text")
 #endif
     ierr = PIO_NOERR
-    IF(LEN(ival) == 0) THEN
+    IF(LEN(val) == 0) THEN
       WRITE(log_msg, *) "Empty {DIMS}d text data passed to PIO_put_var function,",&
                         " put_var_{DIMS}d_text, a collective C API call will",&
                         " be skipped on this process. varid = ", varid,&
                         ", file id = ", file%fh
-      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
     END IF
 
     ierr = get_text_var_sz(file, varid, clen, var_nstrs=nstrs)
     IF(ierr /= PIO_NOERR) THEN
-      CALL piodie(__PIO_FILE__, __LINE__, "Getting text variable size failed")
+      WRITE(log_msg, *) "Getting the size of the text variable failed in PIO_put_var",&
+                        " function, put_var_{DIMS}d_text. varid = ", varid,&
+                        ", file id = ", file%fh
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
     END IF
 
-    IF(clen < LEN(ival)) THEN
+    IF(clen < LEN(val)) THEN
       WRITE(log_msg, *) "The length of the string in the user buffer ,",&
-                        LEN(ival),&
+                        LEN(val),&
                         " chars, is greater than the size of the variable",&
                         " being written to, ", clen, " chars. The strings",&
                         " may be truncated. varid = ", varid,&
                         ", file id = ", file%fh
-      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
     END IF
 
     ! This manipulation is required to convert the fortran strings to
@@ -574,14 +595,21 @@ CONTAINS
 
     ALLOCATE(cval(cval_sz))
     cval = C_NULL_CHAR
-    CALL f2cstring(ival, cval, cval_sz, clen, cstr_add_null = .false.)
+    ierr = f2cstring(file%iosystem, val, cval, cval_sz, clen, cstr_add_null = .false.)
+    IF(ierr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "Converting Fortran strings to C strings failed in PIO_put_var",&
+                        " function, put_var_{DIMS}d_text. varid = ", varid,&
+                        ", file id = ", file%fh
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
     ierr = PIOc_put_var_text(file%fh, varid-1, cval)
     DEALLOCATE(cval)
 
 #ifdef TIMING
     CALL t_stopf("PIO:put_var_{DIMS}d_text")
 #endif
-  END FUNCTION put_var_{DIMS}d_text
+  END FUNCTION pio_put_var_{DIMS}d_text
 
 ! Note: We need a separate function for scalar variables because
 ! multidimensional variables require the user arrays, val, to be
@@ -599,7 +627,7 @@ CONTAINS
 !! @param[in] varid The handle/id of the variable
 !! @param[in] val The value being written out.
 !! @returns PIO_NOERR on success, an error code otherwise
-  INTEGER FUNCTION put_var_0d_{TYPE} (file, varid, val) RESULT(ierr)
+  INTEGER FUNCTION pio_put_var_0d_{TYPE} (file, varid, val) RESULT(ierr)
     TYPE(file_desc_t), INTENT(INOUT) :: file
     INTEGER, INTENT(IN) :: varid
     {VTYPE}, INTENT(IN) :: val
@@ -608,12 +636,12 @@ CONTAINS
     CALL t_startf("PIO:put_var_0d_{TYPE}")
 #endif
 
-    ierr = PIOc_put_var_{NCTYPE} (file%fh, varid - 1, (/ival/))
+    ierr = PIOc_put_var_{NCTYPE} (file%fh, varid - 1, (/val/))
 
 #ifdef TIMING
     CALL t_stopf("PIO:put_var_0d_{TYPE}")
 #endif
-  END FUNCTION put_var_0d_{TYPE}
+  END FUNCTION pio_put_var_0d_{TYPE}
 
 ! DIMS 1,2,3,4,5
 ! TYPE int,real,double
@@ -629,7 +657,7 @@ CONTAINS
 !!                to contain the same number of elements as defined by the variable
 !!                dimensions.
 !! @returns PIO_NOERR on success, an error code otherwise
-  INTEGER FUNCTION put_var_{DIMS}d_{TYPE} (file, varid, val) RESULT(ierr)
+  INTEGER FUNCTION pio_put_var_{DIMS}d_{TYPE} (file, varid, val) RESULT(ierr)
     TYPE(file_desc_t), INTENT(INOUT) :: file
     INTEGER, INTENT(IN) :: varid
     {VTYPE}, INTENT(IN) :: val{DIMSTR}
@@ -649,12 +677,13 @@ CONTAINS
 
       ierr = get_var_dim_sz(file, varid, var_sz)
       IF(ierr /= PIO_NOERR) THEN
-        WRITE(log_msg, *) "Getting variable dimensions failed (varid = ", varid, ")"
+        WRITE(log_msg, *) "Getting variable dimensions failed (varid = ", varid,&
+                          ", file id = ", file%fh, ")"
         ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
         RETURN
       END IF
 
-      IF(INT(val_sz, PIO_OFFSET_KIND) >= var_sz) THEN
+      IF(INT(val_sz, PIO_OFFSET_F2C_TYPE_KIND) >= var_sz) THEN
         ierr = PIOc_put_var_{NCTYPE} (file%fh, varid - 1, cval)
       ELSE
         WRITE(log_msg, *) "The user buffer passed to PIO_put_var ",&
@@ -684,7 +713,7 @@ CONTAINS
 #ifdef TIMING
     CALL t_stopf("PIO:put_var_{DIMS}d_{TYPE}")
 #endif
-  END FUNCTION put_var_{DIMS}d_{TYPE}
+  END FUNCTION pio_put_var_{DIMS}d_{TYPE}
 
 ! DIMS 0,1,2,3,4,5
 ! TYPE text,int,real,double
@@ -705,7 +734,7 @@ CONTAINS
     TYPE(var_desc_t), INTENT(IN) :: vdesc
     {VTYPE}, INTENT(IN) :: val{DIMSTR}
 
-    ierr = put_var_{DIMS}d_{TYPE} (file, vdesc%varid, val)
+    ierr = pio_put_var_{DIMS}d_{TYPE} (file, vdesc%varid, val)
 
   END FUNCTION pio_put_var_vdesc_{DIMS}d_{TYPE}
-END MODULE spio_put
+END MODULE spio_put_var

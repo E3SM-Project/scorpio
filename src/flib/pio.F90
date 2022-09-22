@@ -72,8 +72,8 @@ module pio
 
   use pionfatt_mod, only : PIO_put_att   => put_att,        &
        PIO_get_att   => get_att
-  use pionfput_mod, only : PIO_put_var   => put_var
-  use pionfget_mod, only : PIO_get_var   => get_var
+  use spio_put_var, only : PIO_put_var
+  use spio_get_var, only : PIO_get_var
   use pio_support, only: pio_writedof
   use iso_c_binding
 

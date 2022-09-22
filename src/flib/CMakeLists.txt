@@ -296,7 +296,7 @@ set (PIO_Fortran_MODS ${CMAKE_CURRENT_BINARY_DIR}/pio.mod
   ${CMAKE_CURRENT_BINARY_DIR}/spio_darray.mod
   ${CMAKE_CURRENT_BINARY_DIR}/piodarray.mod
   ${CMAKE_CURRENT_BINARY_DIR}/pionfatt_mod.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/pionfput_mod.mod)
+  ${CMAKE_CURRENT_BINARY_DIR}/spio_put_var.mod)
 
 # Install libpiof.a
 install (TARGETS piof DESTINATION lib)

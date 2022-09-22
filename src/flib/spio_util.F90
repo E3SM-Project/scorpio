@@ -15,7 +15,7 @@ MODULE spio_util
                         PIO_IOSYSID_INVALID, PIO_FH_INVALID, PIO_MAX_NAME,&
                         PIO_EINTERNAL, PIO_NOERR
   USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
-  USE spio_err, ONLY  : pio_error
+  USE spio_err, ONLY  : pio_error, pio_warn
   USE spio_util_cint
 #ifdef TIMING
   USE perf_mod, ONLY : t_startf, t_stopf   !_EXTERNAL

@@ -8,15 +8,19 @@
 !! @def __PIO_FILE__
 !! This macro is used to define the file name in user messages
 !!
-#define __PIO_FILE__ 'spio_get.F90'
+#define __PIO_FILE__ 'spio_get_var.F90'
 
-MODULE spio_get
+MODULE spio_get_var
   USE iso_c_binding
-  USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t
-  USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
-  USE spio_util, ONLY : f2cstring, get_text_var_sz, get_var_dim_sz
+  USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t, PIO_MAX_NAME,&
+                        PIO_NOERR, PIO_EINTERNAL
+  USE pio_kinds, ONLY : i4, i8, r4, r8, PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
+  USE spio_util, ONLY : c2fstring, get_text_var_sz, get_var_dim_sz
   USE spio_err, ONLY  : pio_error, pio_warn
-  USE spio_get_cint
+  USE spio_get_var_cint
+#ifdef TIMING
+  USE perf_mod, ONLY  : t_startf, t_stopf
+#endif
   IMPLICIT NONE
 
   PRIVATE
@@ -40,12 +44,16 @@ MODULE spio_get
     !! a single call at a specified variable index.
     !! Note that the value passed in is always DIMS=0 
     MODULE PROCEDURE pio_get_var1_{TYPE}, pio_get_var1_vdesc_{TYPE}
+  END INTERFACE
+  INTERFACE pio_get_var
     !! pio_get_var_* versions of the functions read a slice/slab of the variable
     !! defined by starts & counts for each dimension of the variable
     !! Note that starts/counts do not make sense for 0d scalar variables since
     !! these scalar variables have 0 dimensions
     ! DIMS 1,2,3,4,5
     MODULE PROCEDURE pio_get_vara_{DIMS}d_{TYPE}, pio_get_vara_vdesc_{DIMS}d_{TYPE}
+  END INTERFACE
+  INTERFACE pio_get_var
     !! pio_get_var_* versions of the functions read the entire variable in
     !! a single call
     ! DIMS 0,1,2,3,4,5
@@ -84,7 +92,7 @@ CONTAINS
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
     CHARACTER(C_CHAR), ALLOCATABLE :: cval(:)
     INTEGER :: i
-    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:), ccount(:)
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), ALLOCATABLE :: cstart(:), ccount(:)
     INTEGER :: ndims, clen
 
 #ifdef TIMING
@@ -95,7 +103,7 @@ CONTAINS
       WRITE(log_msg, *) "An empty string was passed to the PIO_get_var() function,",&
                         " pio_get_var1_text(), a collective C API call will be skipped",&
                         " on this process. varid = ", varid, ", file id = ", file%fh
-      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
     END IF
 
     ierr = get_text_var_sz(file, varid, clen)
@@ -136,11 +144,11 @@ CONTAINS
     ! Note: The ccount/cstart passed to the C interface is in the
     ! "C order" of dims, that is the reverse of the "Fortran order"
     ! of the dims
-    ccount(ndims) = INT(MIN(clen - start(1) + 1, LEN(str)), PIO_OFFSET_KIND)
+    ccount(ndims) = INT(MIN(clen - start(1) + 1, LEN(str)), PIO_OFFSET_F2C_TYPE_KIND)
 
     ALLOCATE(cstart(ndims))
     DO i=1,ndims
-      cstart(i) = INT(start(ndims - i + 1), PIO_OFFSET_KIND)
+      cstart(i) = INT(start(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
     END DO
 
     ! NetCDF only supports character arrays, read using character arrays
@@ -192,7 +200,7 @@ CONTAINS
 
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
     INTEGER :: ndims, i
-    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:)
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), ALLOCATABLE :: cstart(:)
 
 #ifdef TIMING
     CALL t_startf("PIO:get_var1_{TYPE}")
@@ -206,7 +214,7 @@ CONTAINS
                         " pio_get_var1_{TYPE}, a collective C API call will",&
                         " be skipped on this process. varid = ", varid,&
                         " file id = ", file%fh
-      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
       RETURN
     END IF
     ALLOCATE(cstart(ndims))
@@ -215,7 +223,7 @@ CONTAINS
       ! (Fortran indices start from 1)
       ! Also, the C functions need starts in the "C order", the reverse
       ! of the "Fortran order"
-      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_KIND)
+      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_F2C_TYPE_KIND)
     END DO
 
     ! Variable ids in C start from 0 (In Fortran it starts from 1)
@@ -248,7 +256,7 @@ CONTAINS
     TYPE(file_desc_t), INTENT(INOUT) :: file
     TYPE(var_desc_t), INTENT(IN) :: vdesc
     INTEGER, INTENT(IN) :: start(:)
-    {VTYPE}, INTENT(IN) :: val
+    {VTYPE}, INTENT(OUT) :: val
 
     ierr = pio_get_var1_{TYPE} (file, vdesc%varid, start, val)
   END FUNCTION pio_get_var1_vdesc_{TYPE}
@@ -259,6 +267,7 @@ CONTAINS
 ! i.e., pio_get_vara_* CALLs
 ! ========================================================================
 
+! TYPE text
 ! DIMS 1,2,3,4,5
 !>
 !! @public
@@ -293,7 +302,7 @@ CONTAINS
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
     CHARACTER(C_CHAR), ALLOCATABLE :: cval(:)
     INTEGER :: cval_sz, clen, nstrs
-    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:), ccount(:)
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), ALLOCATABLE :: cstart(:), ccount(:)
     INTEGER :: i, ndims
 
 #ifdef TIMING
@@ -360,8 +369,8 @@ CONTAINS
     ! Note: Convert the Fortran order of start/counts to C order (reverse of Fortran order)
     ! Also in C starting indices start from 0 (In Fortran it starts from 1)
     DO i=1,ndims
-      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_KIND)
-      ccount(i) = INT(cnt(ndims-i+1), PIO_OFFSET_KIND)
+      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_F2C_TYPE_KIND)
+      ccount(i) = INT(cnt(ndims-i+1), PIO_OFFSET_F2C_TYPE_KIND)
     END DO
 
     cval_sz = clen * nstrs
@@ -382,7 +391,16 @@ CONTAINS
     ! CHARACTER(LEN=3) :: ival[2] = [ "abc",
     !                                 "def" ]
     val = ' '
-    CALL c2fstring(cval, cval_sz, clen, val)
+    IF(ierr == PIO_NOERR) THEN
+      ierr = c2fstring(file%iosystem, cval, cval_sz, clen, val)
+      IF(ierr /= PIO_NOERR) THEN
+        WRITE(log_msg, *) "Converting C strings to Fortran strings failed in PIO_get_var()",&
+                          " function, pio_get_vara_{DIMS}d_text().",&
+                          " varid = ", varid, ", file id = ", file%fh 
+        ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+        RETURN
+      END IF
+    END IF
 
     DEALLOCATE(cval)
     DEALLOCATE(cstart, ccount)
@@ -426,7 +444,7 @@ CONTAINS
     {VTYPE}, TARGET, INTENT(OUT) :: val{DIMSTR}
 
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
-    INTEGER(PIO_OFFSET_KIND), ALLOCATABLE :: cstart(:), ccount(:)
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), ALLOCATABLE :: cstart(:), ccount(:)
     INTEGER :: i, ndims
 
 #ifdef TIMING
@@ -471,13 +489,13 @@ CONTAINS
     ! Note: Convert the Fortran order of start/counts to C order (reverse of Fortran order)
     ! Also in C starting indices start from 0 (In Fortran it starts from 1)
     DO i=1,ndims
-      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_KIND)
-      ccount(i) = INT(cnt(ndims-i+1), PIO_OFFSET_KIND)
+      cstart(i) = INT(start(ndims-i+1) - 1, PIO_OFFSET_F2C_TYPE_KIND)
+      ccount(i) = INT(cnt(ndims-i+1), PIO_OFFSET_F2C_TYPE_KIND)
     END DO
 
     ierr = PIOc_get_vara_{NCTYPE} (file%fh, varid-1, cstart, ccount, val)
 
-    DEALLOCATE(cstart(ndims), ccount(ndims))
+    DEALLOCATE(cstart, ccount)
 #ifdef TIMING
     CALL t_stopf("PIO:get_vara_{DIMS}d_{TYPE}")
 #endif
@@ -525,6 +543,7 @@ CONTAINS
 ! i.e., pio_get_var_* CALLs
 ! ========================================================================
 
+! TYPE text
 ! DIMS 0,1,2,3,4,5
 !>
 !! @public
@@ -539,7 +558,7 @@ CONTAINS
 !!                  dimensions (The lowest dimension of the variable is the length
 !!                  of each individual string)
 !! @returns PIO_NOERR on success, an error code otherwise
-  INTEGER FUNCTION pio_get_{DIMS}d_text (file, varid, val) RESULT(ierr)
+  INTEGER FUNCTION pio_get_var_{DIMS}d_text (file, varid, val) RESULT(ierr)
     TYPE(file_desc_t), INTENT(INOUT) :: file
     INTEGER, INTENT(IN) :: varid
     CHARACTER(LEN=*), INTENT(OUT) :: val{DIMSTR}
@@ -554,15 +573,18 @@ CONTAINS
     ierr = PIO_NOERR
     IF(LEN(val) == 0) THEN
       WRITE(log_msg, *) "Empty {DIMS}d text data passed to PIO_get_var function,",&
-                        " get_var_{DIMS}d_text, a collective C API call will",&
+                        " pio_get_var_{DIMS}d_text, a collective C API call will",&
                         " be skipped on this process. varid = ", varid,&
                         ", file id = ", file%fh
-      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
     END IF
 
     ierr = get_text_var_sz(file, varid, clen, var_nstrs=nstrs)
     IF(ierr /= PIO_NOERR) THEN
-      CALL piodie(__PIO_FILE__, __LINE__, "Getting text variable size failed")
+      WRITE(log_msg, *) "Getting text variable size failed in the PIO_get_var() function,",&
+                        " pio_get_var_{DIMS}d_text(). varid = ", varid, ", file id = ", file%fh 
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
     END IF
 
     IF(LEN(val) < clen) THEN
@@ -572,7 +594,7 @@ CONTAINS
                         " being read, ", clen, " chars. The strings",&
                         " may be truncated. varid = ", varid,&
                         ", file id = ", file%fh
-      CALL pio_warn(file%iosystem, __PIO__FILE__, __LINE__, TRIM(log_msg))
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
     END IF
 
     IF(nstrs > 0) THEN
@@ -584,7 +606,16 @@ CONTAINS
     ALLOCATE(cval(cval_sz))
     cval = C_NULL_CHAR
     ierr = PIOc_get_var_text(file%fh, varid-1, cval)
-    CALL c2fstring(cval, cval_sz, clen, val)
+    IF(ierr == PIO_NOERR) THEN
+      ierr = c2fstring(file%iosystem, cval, cval_sz, clen, val)
+      IF(ierr /= PIO_NOERR) THEN
+        WRITE(log_msg, *) "Converting C strings to Fortran strings failed in PIO_get_var()",&
+                          " function, pio_get_var_{DIMS}d_text().",&
+                          " varid = ", varid, ", file id = ", file%fh 
+        ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+        RETURN
+      END IF
+    END IF
     DEALLOCATE(cval)
 
 #ifdef TIMING
@@ -613,19 +644,21 @@ CONTAINS
     INTEGER, INTENT(IN) :: varid
     {VTYPE}, INTENT(OUT) :: val
 
+    {VTYPE} :: tmp_val(1)
 #ifdef TIMING
     CALL t_startf("PIO:get_var_0d_{TYPE}")
 #endif
 
-    ierr = PIOc_get_var_{NCTYPE} (file%fh, varid - 1, (/val/))
+    ierr = PIOc_get_var_{NCTYPE} (file%fh, varid - 1, tmp_val)
+    val = tmp_val(1)
 
 #ifdef TIMING
     CALL t_stopf("PIO:get_var_0d_{TYPE}")
 #endif
   END FUNCTION pio_get_var_0d_{TYPE}
 
-! DIMS 1,2,3,4,5
 ! TYPE int,real,double
+! DIMS 1,2,3,4,5
 !>
 !! @public
 !! @brief Function to read/get all elements from a variable. The entire variable is
@@ -645,7 +678,7 @@ CONTAINS
 
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
     INTEGER(PIO_OFFSET_KIND) :: var_sz
-    INTEGER :: i, val_sz
+    INTEGER :: val_sz
 
 #ifdef TIMING
     CALL t_startf("PIO:get_var_{DIMS}d_{TYPE}")
@@ -683,8 +716,8 @@ CONTAINS
 #endif
   END FUNCTION pio_get_var_{DIMS}d_{TYPE}
 
-! DIMS 0,1,2,3,4,5
 ! TYPE text,int,real,double
+! DIMS 0,1,2,3,4,5
 !>
 !! @public
 !! @brief Function to read/get all elements from a variable. The entire variable is
@@ -705,4 +738,4 @@ CONTAINS
     ierr = pio_get_var_{DIMS}d_{TYPE} (file, vdesc%varid, val)
 
   END FUNCTION pio_get_var_vdesc_{DIMS}d_{TYPE}
-END MODULE spio_put
+END MODULE spio_get_var
