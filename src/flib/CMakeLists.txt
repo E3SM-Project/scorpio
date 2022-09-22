@@ -81,7 +81,6 @@ set (PIO_Fortran_SRCS
   pio_nf.F90
   pio.F90
   pio_types.F90
-  piolib_mod.F90
   pio_nf_utils.F90)
 
 add_library (piof ${PIO_Fortran_SRCS} ${PIO_GenF90_SRCS} ${SPIO_CMAKE_GEN_SRCS})

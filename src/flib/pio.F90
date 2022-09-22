@@ -11,13 +11,14 @@ module pio
 
   use pio_kinds, only :  pio_offset_kind
 
-  use piolib_mod, only : pio_initdecomp, &
-       pio_openfile, pio_closefile, pio_createfile, pio_setdebuglevel, &
-       pio_seterrorhandling, pio_setframe, pio_init, pio_get_local_array_size, &
-       pio_freedecomp, pio_syncfile, &
-       pio_finalize, pio_set_hint, pio_getnumiotasks, pio_file_is_open, &
-       PIO_deletefile, PIO_get_numiotasks, PIO_iotype_available, &
-       pio_set_rearr_opts
+  use spio_decomp, only : pio_initdecomp, pio_freedecomp, pio_get_local_array_size
+  use spio_init, only : pio_init, pio_finalize, pio_getnumiotasks, pio_get_numiotasks,&
+                        pio_set_hint, pio_set_rearr_opts
+  use spio_file, only : pio_openfile, pio_createfile, pio_closefile,&
+                        pio_deletefile, pio_setframe, pio_advanceframe,&
+                        pio_syncfile, pio_file_is_open
+  use spio_misc_api, only : pio_set_buffer_size_limit, pio_iotype_available
+  use spio_err, only : pio_setdebuglevel, pio_seterrorhandling
 
   use pio_types, only : io_desc_t, file_desc_t, var_desc_t, iosystem_desc_t, &
        pio_rearr_opt_t, pio_rearr_comm_fc_opt_t, pio_rearr_comm_fc_2d_enable,&
