@@ -44,7 +44,7 @@
 !
    
    integer, parameter, public :: PIO_OFFSET_KIND=@PIO_OFFSET_F_KIND@
-   integer, parameter, public :: PIO_OFFSET_F2C_TYPE_KIND=kind(@PIO_OFFSET_F2C_TYPE_KIND@)
+   integer, parameter, public :: PIO_OFFSET_F2C_TYPE_KIND=@PIO_OFFSET_F2C_TYPE_KIND@
 
 !EOP
 !BOC
