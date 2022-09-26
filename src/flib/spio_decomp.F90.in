@@ -69,7 +69,7 @@ CONTAINS
 !!                    @copydoc io_desc_t
 !! @param[in] rearr (Optional) The data rearranger to use for this I/O
 !!                  decomposition. @copydoc PIO_rearr_method
-!! @param[in] start (Optional) The start array containing the local
+!! @param[in] iostart (Optional) The start array containing the local
 !!                  start index for all the dimensions. i.e., start(i)
 !!                  contains the starting index for data in the current
 !!                  process for dimension i and size(start) = number of
@@ -77,7 +77,7 @@ CONTAINS
 !!                  in for trivial (e.g. block cyclic) decompositions.
 !!                  The library internally calculates this value if
 !!                  not provided by the user.
-!! @param[in] cnt (Optional) The count array containing the local
+!! @param[in] iocount (Optional) The count array containing the local
 !!                  count for all the dimensions. i.e., count(i) contains
 !!                  the number of elements of data in the current
 !!                  process for dimension i and size(count) = number of
@@ -88,15 +88,15 @@ CONTAINS
 !! @param[out] ierr (Optional) @copydoc error_return
 !!
   SUBROUTINE pio_initdecomp_{TYPE}(iosys, dt, gdims, map, iodesc,&
-                                    rearr, start, cnt, ierr)
+                                    rearr, iostart, iocount, ierr)
     TYPE(iosystem_desc_t), INTENT(IN) :: iosys
     INTEGER, INTENT(IN) :: dt
     INTEGER, INTENT(IN) :: gdims(:)
     {VTYPE}, INTENT(IN) :: map(:)
     TYPE(io_desc_t), INTENT(INOUT) :: iodesc
     INTEGER, TARGET, OPTIONAL, INTENT(IN) :: rearr
-    INTEGER(PIO_OFFSET_KIND), DIMENSION(:), OPTIONAL, INTENT(IN) :: start
-    INTEGER(PIO_OFFSET_KIND), DIMENSION(:), OPTIONAL, INTENT(IN) :: cnt
+    INTEGER(PIO_OFFSET_KIND), DIMENSION(:), OPTIONAL, INTENT(IN) :: iostart
+    INTEGER(PIO_OFFSET_KIND), DIMENSION(:), OPTIONAL, INTENT(IN) :: iocount
     INTEGER, OPTIONAL, INTENT(OUT) :: ierr
 
     INTEGER :: ndims, mapsz
@@ -133,13 +133,13 @@ CONTAINS
       prearr = C_NULL_PTR
     ENDIF
 
-    IF(PRESENT(start) .AND. PRESENT(cnt))THEN
+    IF(PRESENT(iostart) .AND. PRESENT(iocount))THEN
       ALLOCATE(cstart(ndims), ccnt(ndims))
       ! Convert Fortran dimension order, leftmost fastest varying, to C order,
       ! rightmost fastest varying
       DO i=1,ndims
-        cstart(i) = INT(start(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
-        ccnt(i) = INT(cnt(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
+        cstart(i) = INT(iostart(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
+        ccnt(i) = INT(iocount(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
       END DO
       pstart = C_LOC(cstart)
       pcnt = C_LOC(ccnt)
@@ -162,7 +162,7 @@ CONTAINS
     ENDIF
 
     iodesc%ioid = cioid
-    IF(PRESENT(start) .AND. PRESENT(cnt))THEN
+    IF(PRESENT(iostart) .AND. PRESENT(iocount))THEN
       DEALLOCATE(cstart, ccnt)
     ENDIF
     DEALLOCATE(cmap)
