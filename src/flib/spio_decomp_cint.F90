@@ -87,6 +87,63 @@ END INTERFACE
 
 INTERFACE
 !> @private
+!! @brief Initialize a block cyclic I/O decomposition
+!!
+!! @details
+!! @param[in] iosysid The handle to the I/O subsystem associated with
+!!                    the I/O decomposition.
+!! @param[in] dt    The type of the data in memory. Note that users
+!!                  can use an I/O decomposition representing data in
+!!                  memory with type T1 (e.g. real(r8)) to write data
+!!                  for a variable with a different type, say T2
+!!                  (e.g. real(r4)) as long as T1 can be safely
+!!                  typecasted to T2. @copydoc PIO_kinds
+!! @param[in] ndims The number of dimensions of the data represented
+!!                  by this I/O decomposition
+!! @param[in] gdims The global dimensions of the I/O decomposition. The
+!!                  array is of size @p ndims and the dimensions are
+!!                  specified in C order (fastest changing index is
+!!                  the rightmost index)
+!! @param[in] pstart  Pointer to the start index array for the I/O
+!!                    decomposition map for the block cyclic decomposition.
+!!                    Each element in the array corresponds to the start
+!!                    index for the I/O decomposition  (pstart[i]
+!!                    contains the start index for dimension i in the
+!!                    current process). The size of this array needs
+!!                    to be equal to the number of dimensions of the
+!!                    variables/data represented by this I/O decomposition.
+!!                    The elements in the array are in the C order of
+!!                    variable dimension (rightmost fastest varying)
+!! @param[in] pcount  Pointer to the count array for the I/O decomposition
+!!                    map for the block cyclic decomposition. Each
+!!                    element in the array corresponds to the number of
+!!                    elements for the I/O decomposition  (pcount[i]
+!!                    contains the number of elements for dimension i in
+!!                    the current process). The size of this array needs
+!!                    to be equal to the number of dimensions of the
+!!                    variables/data represented by this I/O decomposition
+!!                    The elements in the array are in the C order of
+!!                    variable dimension (rightmost fastest varying)
+!! @param[out] pioid A pointer to the I/O decomposition id. The handle
+!!                   to the I/O decomposition is returned via this arg.
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER(C_INT) FUNCTION PIOc_InitDecomp_bc(iosysid, dt, ndims,&
+                            gdims, pstart, pcount, pioid)&
+                          bind(C,name="PIOc_InitDecomp_bc")
+    USE iso_c_binding
+
+    INTEGER(C_INT), VALUE :: iosysid
+    INTEGER(C_INT), VALUE :: dt
+    INTEGER(C_INT), VALUE :: ndims
+    TYPE(C_PTR), VALUE :: gdims
+    TYPE(C_PTR), VALUE :: pstart
+    TYPE(C_PTR), VALUE :: pcount
+    TYPE(C_PTR), VALUE :: pioid
+  END FUNCTION PIOc_InitDecomp_bc
+END INTERFACE
+
+INTERFACE
+!> @private
 !! @brief Free/Finalize an I/O decomposition
 !!
 !! @details

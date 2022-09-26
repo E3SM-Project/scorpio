@@ -33,6 +33,9 @@ MODULE spio_decomp
     ! TYPE int,offset
     MODULE PROCEDURE pio_initdecomp_{TYPE}
   END INTERFACE
+  INTERFACE pio_initdecomp
+    MODULE PROCEDURE pio_initdecomp_bc
+  END INTERFACE
 
 !> @defgroup PIO_freedecomp PIO_freedecomp
 !! @brief Free an I/O decomposition
@@ -171,6 +174,94 @@ CONTAINS
     CALL t_stopf("PIO:initdecomp")
 #endif
   END SUBROUTINE pio_initdecomp_{TYPE}
+
+!> @ingroup PIO_initdecomp
+!! @public
+!! @brief Initialize a block cyclic I/O decomposition
+!!
+!! @details
+!! @param[in] iosys The handle to the I/O subsystem associated with
+!!                  the I/O decomposition. @copydoc iosystem_desc_t
+!! @param[in] dt    The type of the data in memory. Note that users
+!!                  can use an I/O decomposition representing data in
+!!                  memory with type T1 (e.g. real(r8)) to write data
+!!                  for a variable with a different type, say T2
+!!                  (e.g. real(r4)) as long as T1 can be safely
+!!                  typecasted to T2. @copydoc PIO_kinds
+!! @param[in] gdims The global dimensions of the I/O decomposition
+!! @param[in] mapstart  The starting indices for the I/O decomposition
+!!                      map for the block cyclic decomposition. Each
+!!                      element in the array corresponds to the start
+!!                      index for the I/O decomposition  (mapstart[i]
+!!                      contains the start index for dimension i in the
+!!                      current process). The size of this array needs
+!!                      to be equal to the number of dimensions of the
+!!                      variables/data represented by this I/O decomposition
+!! @param[in] mapcount  The number of elements (count)in the I/O decomposition
+!!                      map for the block cyclic decomposition. Each
+!!                      element in the array corresponds to the number of
+!!                      elements for the I/O decomposition  (mapcount[i]
+!!                      contains the number of elements for dimension i in
+!!                      the current process). The size of this array needs
+!!                      to be equal to the number of dimensions of the
+!!                      variables/data represented by this I/O decomposition
+!! @param[out] iodesc The handle to the I/O decomposition is returned
+!!                    via this arg.
+!!                    @copydoc io_desc_t
+!! @param[out] ierr (Optional) @copydoc error_return
+!!
+  SUBROUTINE pio_initdecomp_bc(iosys, dt, gdims, mapstart, mapcount,&
+                                    iodesc, ierr)
+    TYPE(iosystem_desc_t), INTENT(IN) :: iosys
+    INTEGER, INTENT(IN) :: dt
+    INTEGER, INTENT(IN) :: gdims(:)
+    INTEGER(PIO_OFFSET_KIND), INTENT(IN) :: mapstart(:), mapcount(:)
+    TYPE(io_desc_t), INTENT(INOUT) :: iodesc
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    INTEGER :: ndims
+    INTEGER(C_INT), TARGET :: cgdims(SIZE(gdims))
+    INTEGER(C_INT), TARGET :: cioid
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), DIMENSION(:), TARGET, ALLOCATABLE :: cstart, ccnt
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER(C_INT) :: i, cerr, ret
+
+#ifdef TIMING
+    CALL t_startf("PIO:initdecomp")
+#endif
+
+    ndims = SIZE(gdims)
+    ALLOCATE(cstart(ndims), ccnt(ndims))
+    ! Convert Fortran dimension order, leftmost fastest varying, to C order,
+    ! rightmost fastest varying
+    DO i=1,ndims
+      cgdims(i) = INT(gdims(ndims - i + 1), C_INT)
+      cstart(i) = INT(mapstart(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
+      ccnt(i) = INT(mapcount(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
+    END DO
+
+    iodesc%ioid = PIO_IOID_INVALID
+    cioid = PIO_IOID_INVALID
+    cerr = PIOc_InitDecomp_bc(iosys%iosysid, INT(dt, C_INT), INT(ndims, C_INT),&
+                            C_LOC(cgdims), C_LOC(cstart), C_LOC(ccnt),&
+                            C_LOC(cioid))
+    IF(PRESENT(ierr)) THEN
+      ierr = INT(cerr)
+    ELSE
+      WRITE(log_msg, *) "PIO_initdecomp (PIO_initdecomp_bc) failed, err =",&
+                        cerr, ", iosysid =", iosys%iosysid, ", gdims = ", gdims
+      ret = pio_error(iosys, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+      DEALLOCATE(cstart, ccnt)
+      RETURN
+    ENDIF
+
+    iodesc%ioid = cioid
+    DEALLOCATE(cstart, ccnt)
+
+#ifdef TIMING
+    CALL t_stopf("PIO:initdecomp")
+#endif
+  END SUBROUTINE pio_initdecomp_bc
 
 !> @ingroup PIO_freedecomp
 !! @public
