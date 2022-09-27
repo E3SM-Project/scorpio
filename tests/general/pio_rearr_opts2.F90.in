@@ -167,7 +167,7 @@ SUBROUTINE create_file_and_var(iotype, ret)
   use pio_rearr_opts2_tgv
   implicit none
 
-  integer, intent(in) :: iotype
+  integer, intent(inout) :: iotype
   integer, intent(out) :: ret
 
   type(file_desc_t) :: pio_file
@@ -203,7 +203,7 @@ SUBROUTINE open_file_and_get_var(pio_file, iotype, pio_var, ret)
   implicit none
 
   type(file_desc_t), intent(out) :: pio_file
-  integer, intent(in) :: iotype
+  integer, intent(inout) :: iotype
   type(var_desc_t), intent(out) :: pio_var
   integer, intent(out) :: ret
 
