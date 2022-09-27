@@ -36,7 +36,11 @@ CONTAINS
 !! @param[in] iosys The handle to the I/O system. @copydoc iosystem_desc_t
 !! @param[out] file The handle to the opened file is returned via this arg.
 !!              @copydoc file_desc_t
-!! @param[in] iotype @copydoc PIO_iotype
+!! @param[inout] iotype The I/O type to use to open the file. The library
+!!                      can modify the I/O type when retrying with other
+!!                      I/O types (when the user specified I/O type fails).
+!!                      If a different I/O type is used by the library this
+!!                      argument is updated accordingly. @copydoc PIO_iotype
 !! @param[in] fname The name of the file to be opened
 !! @param[in] mode (Optional) The file access mode. @copydoc open_file_modes
 !! @return @copydoc error_return
@@ -44,11 +48,11 @@ CONTAINS
   INTEGER FUNCTION pio_openfile(iosys, file, iotype, fname, mode) RESULT(ierr)
     TYPE(iosystem_desc_t), TARGET, INTENT(IN) :: iosys
     TYPE(file_desc_t), INTENT(OUT) :: file
-    INTEGER, INTENT(IN) :: iotype
+    INTEGER, INTENT(INOUT) :: iotype
     CHARACTER(LEN=*), INTENT(IN) :: fname
     INTEGER, OPTIONAL, INTENT(IN) :: mode
 
-    INTEGER(C_INT) :: cmode, cerr
+    INTEGER(C_INT) :: ciotype, cmode, cerr
 
 #ifdef TIMING
     call t_startf("PIO:openfile")
@@ -60,10 +64,16 @@ CONTAINS
       cmode = INT(PIO_FMODE_CLR, C_INT)
     ENDIF
 
-    cerr = PIOc_openfile(iosys%iosysid, file%fh, INT(iotype, C_INT),&
+    ! Note: The I/O type is provided by the user but can be overridden
+    ! (and modified) by the library. e.g. When the library retries
+    ! opening files with a different I/O type (when the user specified
+    ! I/O type fails to open the file)
+    ciotype = INT(iotype, C_INT)
+    cerr = PIOc_openfile(iosys%iosysid, file%fh, ciotype,&
                           trim(fname) // C_NULL_CHAR, cmode)
     ierr = INT(cerr)
 
+    iotype = INT(ciotype)
     file%iosystem => iosys
 
 #ifdef TIMING
@@ -80,7 +90,11 @@ CONTAINS
 !! @param[in] iosys The handle to the I/O system. @copydoc iosystem_desc_t
 !! @param[out] file The handle to the created file is returned via this arg.
 !!              @copydoc file_desc_t
-!! @param[in] iotype @copydoc PIO_iotype
+!! @param[inout] iotype The I/O type to use to create the file. The library
+!!                      can modify the I/O type when retrying with other
+!!                      I/O types (when the user specified I/O type fails).
+!!                      If a different I/O type is used by the library this
+!!                      argument is updated accordingly. @copydoc PIO_iotype
 !! @param[in] fname The name of the file to be created
 !! @param[in] mode (Optional) The file access mode. @copydoc create_file_modes
 !! @return @copydoc error_return
@@ -88,11 +102,11 @@ CONTAINS
   INTEGER FUNCTION pio_createfile(iosys, file, iotype, fname, mode) RESULT(ierr)
     TYPE(iosystem_desc_t), TARGET, INTENT(IN) :: iosys
     TYPE(file_desc_t), INTENT(OUT) :: file
-    INTEGER, INTENT(IN) :: iotype
+    INTEGER, INTENT(INOUT) :: iotype
     CHARACTER(LEN=*), INTENT(IN) :: fname
     INTEGER, OPTIONAL, INTENT(IN) :: mode
 
-    INTEGER(C_INT) :: cmode, cerr
+    INTEGER(C_INT) :: ciotype, cmode, cerr
 
 #ifdef TIMING
     call t_startf("PIO:createfile")
@@ -104,10 +118,16 @@ CONTAINS
       cmode = INT(PIO_FMODE_CLR, C_INT)
     ENDIF
 
-    cerr = PIOc_createfile(iosys%iosysid, file%fh, INT(iotype, C_INT),&
+    ! Note: The I/O type is provided by the user but can be overridden
+    ! (and modified) by the library. e.g. When the library retries
+    ! creating files with a different I/O type (when the user specified
+    ! I/O type fails to create the file)
+    ciotype = INT(iotype, C_INT)
+    cerr = PIOc_createfile(iosys%iosysid, file%fh, ciotype,&
                           trim(fname) // C_NULL_CHAR, cmode)
     ierr = INT(cerr)
 
+    iotype = INT(ciotype)
     file%iosystem => iosys
 
 #ifdef TIMING

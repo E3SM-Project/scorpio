@@ -14,7 +14,7 @@ INTERFACE
 !! @details
 !! @param[in] iosysid The handle/id to the I/O system.
 !! @param[out] fh The handle/id to the opened file is returned via this arg.
-!! @param[in] iotype @copydoc PIO_iotype
+!! @param[inout] iotype @copydoc PIO_iotype
 !! @param[in] fname The name of the file to be opened
 !! @param[in] mode The file access mode. @copydoc open_file_modes
 !! @return PIO_NOERR on success, an error code otherwise
@@ -23,8 +23,8 @@ INTERFACE
                           bind(C,name="PIOc_openfile")
     USE iso_c_binding
     INTEGER(C_INT), VALUE :: iosysid
-    INTEGER(C_INT), VALUE :: fh
-    INTEGER(C_INT), VALUE :: iotype
+    INTEGER(C_INT)  :: fh
+    INTEGER(C_INT)  :: iotype
     CHARACTER(C_CHAR), DIMENSION(*) :: fname
     INTEGER(C_INT), VALUE :: mode
   END FUNCTION PIOc_openfile
@@ -37,7 +37,7 @@ INTERFACE
 !! @details
 !! @param[in] iosysid The handle/id to the I/O system.
 !! @param[out] fh The handle/id to the created file is returned via this arg.
-!! @param[in] iotype @copydoc PIO_iotype
+!! @param[inout] iotype @copydoc PIO_iotype
 !! @param[in] fname The name of the file to be created
 !! @param[in] mode The file access mode. @copydoc create_file_modes
 !! @return PIO_NOERR on success, an error code otherwise
@@ -46,8 +46,8 @@ INTERFACE
                           bind(C,name="PIOc_createfile")
     USE iso_c_binding
     INTEGER(C_INT), VALUE :: iosysid
-    INTEGER(C_INT), VALUE :: fh
-    INTEGER(C_INT), VALUE :: iotype
+    INTEGER(C_INT)  :: fh
+    INTEGER(C_INT)  :: iotype
     CHARACTER(C_CHAR), DIMENSION(*) :: fname
     INTEGER(C_INT), VALUE :: mode
   END FUNCTION PIOc_createfile
