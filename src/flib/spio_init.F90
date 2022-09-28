@@ -416,7 +416,7 @@ CONTAINS
     INTEGER, OPTIONAL, INTENT(OUT) :: ierr
 
     CHARACTER(C_CHAR), DIMENSION(:), ALLOCATABLE :: chint, chval
-    INTEGER :: chint_sz, chval_sz
+    INTEGER :: chint_sz, chval_sz, lerr
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
     INTEGER(C_INT) :: cerr
 
@@ -432,23 +432,29 @@ CONTAINS
     ALLOCATE(chint(chint_sz), chval(chval_sz))
 
     ! Convert the hint & hint value from Fortran strings to C strings
-    ierr = f2cstring(iosys, TRIM(hint), chint, chint_sz, chint_sz,&
+    lerr = f2cstring(iosys, TRIM(hint), chint, chint_sz, chint_sz,&
                       cstr_add_null = .TRUE.)
-    IF(ierr /= PIO_NOERR) THEN
+    IF(lerr /= PIO_NOERR) THEN
+      IF(PRESENT(ierr)) THEN
+        ierr = lerr
+      END IF
       WRITE(log_msg, *) "Setting hint failed. Converting the hint name ",&
                         "to a C string failed (hint =", TRIM(hint),&
                         ", value =", TRIM(hval), ")"
-      ierr = pio_error(iosys, ierr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      lerr = pio_error(iosys, lerr, __PIO_FILE__, __LINE__, TRIM(log_msg))
       RETURN
     END IF
 
-    ierr = f2cstring(iosys, TRIM(hval), chval, chval_sz, chval_sz,&
+    lerr = f2cstring(iosys, TRIM(hval), chval, chval_sz, chval_sz,&
                       cstr_add_null = .TRUE.)
-    IF(ierr /= PIO_NOERR) THEN
+    IF(lerr /= PIO_NOERR) THEN
+      IF(PRESENT(ierr)) THEN
+        ierr = lerr
+      END IF
       WRITE(log_msg, *) "Setting hint failed. Converting the hint value ",&
                         "to a C string failed (hint =", TRIM(hint),&
                         ", value =", TRIM(hval), ")"
-      ierr = pio_error(iosys, ierr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      lerr = pio_error(iosys, lerr, __PIO_FILE__, __LINE__, TRIM(log_msg))
       RETURN
     END IF
 
