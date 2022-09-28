@@ -115,6 +115,10 @@ CONTAINS
     CALL t_startf("PIO:initdecomp")
 #endif
 
+    IF(PRESENT(ierr)) THEN
+      ierr = PIO_NOERR
+    ENDIF
+
     ndims = SIZE(gdims)
     mapsz = SIZE(map)
     ! Convert Fortran dimension order, leftmost fastest varying, to C order,
@@ -157,12 +161,18 @@ CONTAINS
     cerr = PIOc_InitDecomp(iosys%iosysid, INT(dt, C_INT), INT(ndims, C_INT),&
                             C_LOC(cgdims), INT(mapsz, C_INT), C_LOC(cmap),&
                             C_LOC(cioid), prearr, pstart, pcnt)
-    IF(PRESENT(ierr)) THEN
-      ierr = INT(cerr)
-    ELSE
-      WRITE(log_msg, *) "PIO_initdecomp (PIO_initdecomp_{TYPE}) failed, err =",&
-                        cerr, ", iosysid =", iosys%iosysid, ", gdims = ", gdims
-      ret = pio_error(iosys, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+    IF(cerr /= PIO_NOERR) THEN
+      IF(PRESENT(iostart) .AND. PRESENT(iocount))THEN
+        DEALLOCATE(cstart, ccnt)
+      ENDIF
+      DEALLOCATE(cmap)
+      IF(PRESENT(ierr)) THEN
+        ierr = INT(cerr)
+      ELSE
+        WRITE(log_msg, *) "PIO_initdecomp (PIO_initdecomp_{TYPE}) failed, err =",&
+                          cerr, ", iosysid =", iosys%iosysid, ", gdims = ", gdims
+        ret = pio_error(iosys, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+      ENDIF
     ENDIF
 
     iodesc%ioid = INT(cioid, i4)
@@ -231,6 +241,10 @@ CONTAINS
     CALL t_startf("PIO:initdecomp")
 #endif
 
+    IF(PRESENT(ierr)) THEN
+      ierr = PIO_NOERR
+    ENDIF
+
     ndims = SIZE(gdims)
     ALLOCATE(cstart(ndims), ccnt(ndims))
     ! Convert Fortran dimension order, leftmost fastest varying, to C order,
@@ -247,14 +261,17 @@ CONTAINS
     cerr = PIOc_InitDecomp_bc(iosys%iosysid, INT(dt, C_INT), INT(ndims, C_INT),&
                             C_LOC(cgdims), C_LOC(cstart), C_LOC(ccnt),&
                             C_LOC(cioid))
-    IF(PRESENT(ierr)) THEN
-      ierr = INT(cerr)
-    ELSE
-      WRITE(log_msg, *) "PIO_initdecomp (PIO_initdecomp_bc) failed, err =",&
-                        cerr, ", iosysid =", iosys%iosysid, ", gdims = ", gdims
-      ret = pio_error(iosys, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+    IF(cerr /= PIO_NOERR) THEN
       DEALLOCATE(cstart, ccnt)
-      RETURN
+      IF(PRESENT(ierr)) THEN
+        ierr = INT(cerr)
+      ELSE
+        WRITE(log_msg, *) "PIO_initdecomp (PIO_initdecomp_bc) failed, err =",&
+                          cerr, ", iosysid =", iosys%iosysid, ", gdims = ", gdims
+        ret = pio_error(iosys, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+        DEALLOCATE(cstart, ccnt)
+        RETURN
+      ENDIF
     ENDIF
 
     iodesc%ioid = INT(cioid, i4)
