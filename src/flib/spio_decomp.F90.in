@@ -165,7 +165,7 @@ CONTAINS
       ret = pio_error(iosys, INT(cerr), __FILE__, __LINE__, trim(log_msg))
     ENDIF
 
-    iodesc%ioid = cioid
+    iodesc%ioid = INT(cioid, i4)
     IF(PRESENT(iostart) .AND. PRESENT(iocount))THEN
       DEALLOCATE(cstart, ccnt)
     ENDIF
@@ -257,7 +257,7 @@ CONTAINS
       RETURN
     ENDIF
 
-    iodesc%ioid = cioid
+    iodesc%ioid = INT(cioid, i4)
     DEALLOCATE(cstart, ccnt)
 
 #ifdef TIMING
@@ -289,7 +289,7 @@ CONTAINS
     CALL t_startf("PIO:freedecomp")
 #endif
 
-    cerr = PIOc_freedecomp(iosys%iosysid, iodesc%ioid)
+    cerr = PIOc_freedecomp(iosys%iosysid, INT(iodesc%ioid, C_INT))
     IF(PRESENT(ierr)) THEN
       ierr = INT(cerr)
     ELSE
@@ -345,7 +345,7 @@ CONTAINS
       RETURN
     END IF
 
-    cerr = PIOc_freedecomp(file%iosystem%iosysid, iodesc%ioid)
+    cerr = PIOc_freedecomp(file%iosystem%iosysid, INT(iodesc%ioid, C_INT))
     IF(PRESENT(ierr)) THEN
       ierr = INT(cerr)
     ELSE
@@ -386,7 +386,7 @@ CONTAINS
     INTEGER(C_INT) :: clsz
 
     ! FIXME: Change the C interface function to return error codes
-    clsz = PIOc_get_local_array_size(iodesc%ioid)
+    clsz = PIOc_get_local_array_size(INT(iodesc%ioid, C_INT))
     IF(PRESENT(ierr)) THEN
       IF(clsz >= 0) THEN
         ierr = PIO_NOERR
