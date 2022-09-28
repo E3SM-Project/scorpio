@@ -139,9 +139,10 @@ CONTAINS
     IF(PRESENT(iostart) .AND. PRESENT(iocount))THEN
       ALLOCATE(cstart(ndims), ccnt(ndims))
       ! Convert Fortran dimension order, leftmost fastest varying, to C order,
-      ! rightmost fastest varying
+      ! rightmost fastest varying. Also, in C the start indices start from 0
+      ! (Fortran it starts from 1)
       DO i=1,ndims
-        cstart(i) = INT(iostart(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
+        cstart(i) = INT(iostart(ndims - i + 1) - 1, PIO_OFFSET_F2C_TYPE_KIND)
         ccnt(i) = INT(iocount(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
       END DO
       pstart = C_LOC(cstart)
@@ -233,10 +234,11 @@ CONTAINS
     ndims = SIZE(gdims)
     ALLOCATE(cstart(ndims), ccnt(ndims))
     ! Convert Fortran dimension order, leftmost fastest varying, to C order,
-    ! rightmost fastest varying
+    ! rightmost fastest varying. Also, in C the start indices start from 0
+    ! (In Fortran start indices start from 1)
     DO i=1,ndims
       cgdims(i) = INT(gdims(ndims - i + 1), C_INT)
-      cstart(i) = INT(mapstart(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
+      cstart(i) = INT(mapstart(ndims - i + 1) - 1, PIO_OFFSET_F2C_TYPE_KIND)
       ccnt(i) = INT(mapcount(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
     END DO
 
