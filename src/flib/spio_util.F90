@@ -959,16 +959,18 @@ CONTAINS
 !!                    returned in this arg
 !! @param var_nstrs (Optional) The number of strings in the variable is
 !!                    returned in this arg
+!! @param var_ndims (Optional) The number of dimensions in the variable
 !! @param var_dim_sz  (Optional) The dimension sizes of the variable is
 !!                      returned in this arg
 !! @returns @copydoc error_code
 !!
   INTEGER FUNCTION get_text_var_sz(file, varid, var_slen,&
-                                    var_nstrs, var_dim_sz) RESULT(ierr)
+                                    var_nstrs, var_ndims, var_dim_sz) RESULT(ierr)
     TYPE(file_desc_t), INTENT(IN) :: file
     INTEGER, INTENT(IN) :: varid
     INTEGER, INTENT(OUT) :: var_slen
     INTEGER, INTENT(OUT), OPTIONAL :: var_nstrs
+    INTEGER, INTENT(OUT), OPTIONAL :: var_ndims
     INTEGER, INTENT(OUT), OPTIONAL :: var_dim_sz(:)
 
     INTEGER :: ndims = 0
@@ -983,6 +985,9 @@ CONTAINS
     IF(PRESENT(var_nstrs)) THEN
       var_nstrs = 0
     END IF
+    IF(PRESENT(var_ndims)) THEN
+      var_ndims = 0
+    END IF
 
     ! Get the number of dimensions in variable
     cerr = PIOc_inq_varndims(file%fh, varid-1, ndims)
@@ -993,6 +998,10 @@ CONTAINS
       ierr = INT(cerr)
       RETURN
     END IF
+    IF(PRESENT(var_ndims)) THEN
+      var_ndims = ndims
+    END IF
+
     IF(ndims == 0) THEN
       ! A scalar character variable
       var_slen = 1
@@ -1079,14 +1088,16 @@ CONTAINS
 !! @param varid Id of the queried variable
 !! @param var_sz  The total size of the variable is
 !!                      returned in this arg
+!! @param var_ndims (Optional) The number of dimensions in the variable
 !! @param var_dim_sz  (Optional) The dimension sizes of the variable is
 !!                      returned in this arg
 !! @returns @copydoc error_code
 !!
-  INTEGER FUNCTION get_var_dim_sz(file, varid, var_sz, var_dim_sz) RESULT(ierr)
+  INTEGER FUNCTION get_var_dim_sz(file, varid, var_sz, var_ndims, var_dim_sz) RESULT(ierr)
     TYPE(file_desc_t), INTENT(IN) :: file
     INTEGER, INTENT(IN) :: varid
     INTEGER(PIO_OFFSET_KIND), INTENT(OUT) :: var_sz
+    INTEGER, INTENT(OUT), OPTIONAL :: var_ndims
     INTEGER(PIO_OFFSET_KIND), INTENT(INOUT), ALLOCATABLE, OPTIONAL :: var_dim_sz(:)
 
     INTEGER :: ndims = 0
@@ -1098,6 +1109,10 @@ CONTAINS
 
     ierr = PIO_NOERR
 
+    IF(PRESENT(var_ndims)) THEN
+      var_ndims = 0
+    END IF
+
     var_sz = 0
     ! Get the number of dimensions in variable
     cerr = PIOc_inq_varndims(file%fh, varid-1, ndims)
@@ -1108,6 +1123,11 @@ CONTAINS
       ierr = INT(cerr)
       RETURN
     END IF
+
+    IF(PRESENT(var_ndims)) THEN
+      var_ndims = ndims
+    END IF
+
     IF(ndims == 0) THEN
       ! A scalar variable
       var_sz = 1
