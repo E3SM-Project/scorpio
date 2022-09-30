@@ -324,7 +324,7 @@ CONTAINS
       RETURN
     END IF
 
-    ierr = get_text_var_sz(file, varid, clen, var_nstrs=nstrs)
+    ierr = get_text_var_sz(file, varid, clen, var_nstrs=nstrs, var_ndims=ndims)
     IF(ierr /= PIO_NOERR) THEN
       WRITE(log_msg, *) "Getting size of the text variable failed, varid = ",&
                         varid, ", file id = ", file%fh
@@ -332,6 +332,8 @@ CONTAINS
       RETURN
     END IF
 
+    ! The last dimension in a character variable is the length of each string
+    ! in the variable
     IF((LEN(val) < clen) .AND. (LEN(val) < cnt(1))) THEN
       WRITE(log_msg, *) "The length of the strings in the user buffer/array,",&
                         LEN(val),&
@@ -342,9 +344,6 @@ CONTAINS
       CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
     END IF
 
-    ! The last dimension in a character variable is the length of each string
-    ! in the variable
-    ndims = nstrs + 1
     IF(SIZE(cnt) < ndims) THEN
       WRITE(log_msg, *) "Invalid count array passed to PIO_get_var() function,",&
                         " pio_get_vara_{DIMS}d_text(). The size of the array,",&
