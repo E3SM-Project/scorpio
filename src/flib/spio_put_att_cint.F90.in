@@ -29,6 +29,8 @@ INTERFACE
 !! @returns PIO_NOERR on success, an error code otherwise
   INTEGER(C_INT) FUNCTION PIOc_put_att_text(fh, varid, attname, attlen, attval) &
                             bind(C,name="PIOc_put_att_text")
+    USE iso_c_binding
+    USE pio_kinds, ONLY : PIO_OFFSET_F2C_TYPE_KIND
     INTEGER(C_INT), INTENT(IN), VALUE :: fh
     INTEGER(C_INT), INTENT(IN), VALUE :: varid
     CHARACTER(C_CHAR), INTENT(IN), DIMENSION(:) :: attname
@@ -53,6 +55,8 @@ INTERFACE
 !! @returns PIO_NOERR on success, an error code otherwise
   INTEGER(C_INT) FUNCTION PIOc_put_att_{NCTYPE}(fh, varid, attname, atttype, attlen, attval) &
                             bind(C,name="PIOc_put_att_{NCTYPE}")
+    USE iso_c_binding
+    USE pio_kinds, ONLY : PIO_OFFSET_F2C_TYPE_KIND
     INTEGER(C_INT), INTENT(IN), VALUE :: fh
     INTEGER(C_INT), INTENT(IN), VALUE :: varid
     CHARACTER(C_CHAR), INTENT(IN), DIMENSION(:) :: attname
@@ -73,6 +77,7 @@ INTERFACE
 !! -1 on error
   INTEGER(C_INT) FUNCTION PIOc_get_iosystem(fh) &
                             bind(C,name="PIOc_get_iosystem")
+    USE iso_c_binding
     INTEGER(C_INT), INTENT(IN), VALUE :: fh
   END FUNCTION PIOc_get_iosystem
 END INTERFACE
