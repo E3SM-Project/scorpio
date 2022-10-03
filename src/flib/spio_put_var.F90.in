@@ -153,7 +153,7 @@ CONTAINS
 
     ALLOCATE(cstart(ndims))
     DO i=1,ndims
-      cstart(i) = INT(start(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
+      cstart(i) = INT(start(ndims - i + 1) - 1, PIO_OFFSET_F2C_TYPE_KIND)
     END DO
 
     ! NetCDF only supports character arrays
