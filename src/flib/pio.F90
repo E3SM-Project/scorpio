@@ -71,8 +71,8 @@ module pio
        PIO_strerror, &
        PIO_copy_att
 
-  use pionfatt_mod, only : PIO_put_att   => put_att,        &
-       PIO_get_att   => get_att
+  use spio_put_att, only : PIO_put_att
+  use spio_get_att, only : PIO_get_att
   use spio_put_var, only : PIO_put_var
   use spio_get_var, only : PIO_get_var
   use pio_support, only: pio_writedof
