@@ -16,7 +16,7 @@ MODULE spio_put_att
   USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
   USE spio_util, ONLY : f2cstring, get_text_var_sz, get_var_dim_sz
   USE spio_err, ONLY  : pio_error, pio_warn
-  USE spio_put_cint
+  USE spio_put_att_cint
   IMPLICIT NONE
 
   PRIVATE
