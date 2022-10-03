@@ -409,6 +409,18 @@ sub buildout{
       $str =~ s/{CTYPE}/$ctype->{$type}/g;
       $outstr.=$str;
     }
+  }elsif($func =~ /{NCTYPE}/){
+    my ($type);
+    foreach $type (@ltypes){
+      my $str = $func;
+      $str =~ s/{TYPE}/$type/g;
+      $str =~ s/{VTYPE}/$vtype->{$type}/g;
+      $str =~ s/{ITYPE}/$itype->{$type}/g;
+      $str =~ s/{MPITYPE}/$mpitype->{$type}/g;
+      $str =~ s/{NCTYPE}/$nctype->{$type}/g;
+      $str =~ s/{CTYPE}/$ctype->{$type}/g;
+      $outstr.=$str;
+    }
   }else{
     $outstr=$func;
   }
