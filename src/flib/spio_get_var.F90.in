@@ -353,6 +353,7 @@ CONTAINS
       RETURN
     END IF
 
+    cval_sz = 1
     DO i=1,ndims
       IF(cnt(i) <= 0) THEN
         WRITE(log_msg, *) "Invalid count array passed to PIO_get_var() function,",&
@@ -362,6 +363,7 @@ CONTAINS
         ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
         RETURN
       END IF
+      cval_sz = cval_sz * cnt(i)
     END DO
     ALLOCATE(cstart(ndims), ccount(ndims))
 
@@ -372,7 +374,6 @@ CONTAINS
       ccount(i) = INT(cnt(ndims-i+1), PIO_OFFSET_F2C_TYPE_KIND)
     END DO
 
-    cval_sz = clen * nstrs
     ALLOCATE(cval(cval_sz))
     ierr = PIOc_get_vara_text(file%fh, varid-1, cstart, ccount, cval)
     ! Reshape to the fortran array of strings from a contiguous 1d CHARACTER array.
