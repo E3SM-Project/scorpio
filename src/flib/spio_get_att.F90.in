@@ -12,11 +12,16 @@
 
 MODULE spio_get_att
   USE iso_c_binding
-  USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t
-  USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
-  USE spio_util, ONLY : f2cstring, get_text_var_sz, get_var_dim_sz
+  USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t, PIO_MAX_NAME,&
+                        pio_int, pio_real, pio_double, pio_char,&
+                        PIO_NOERR, PIO_EINTERNAL
+  USE pio_kinds, ONLY : i4, i8, r4, r8, PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
+  USE spio_util, ONLY : c2fstring, get_text_var_sz, get_var_dim_sz
   USE spio_err, ONLY  : pio_error, pio_warn
   USE spio_get_att_cint
+#ifdef TIMING
+  USE perf_mod, ONLY  : t_startf, t_stopf
+#endif
   IMPLICIT NONE
 
   PRIVATE
@@ -74,10 +79,10 @@ CONTAINS
     TYPE(file_desc_t), INTENT(IN) :: file
     INTEGER, INTENT(IN) :: varid
     CHARACTER(LEN=*), INTENT(IN) :: attname
-    CHARACTER(LEN=*), INTENT(IN) :: attval{DIMSTR}
+    CHARACTER(LEN=*), INTENT(OUT) :: attval{DIMSTR}
 
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
-    CHARACTER(C_CHAR), ALLOCATABLE :: cval(:)
+    CHARACTER(C_CHAR), ALLOCATABLE, TARGET :: cval(:)
     INTEGER :: i, clen, nstrs, cval_sz, ret
 
 #ifdef TIMING
@@ -108,9 +113,15 @@ CONTAINS
     ! the same convention here
     ret = PIOc_get_att_text(file%fh, INT(varid, C_INT) - 1,&
                               TRIM(attname)//C_NULL_CHAR,&
-                              INT(cval_sz, PIO_OFFSET_KIND), cval)
+                              C_LOC(cval))
 
-    CALL c2fstring(file%iosystem, cval, cval_sz, clen, val)
+    ierr = c2fstring(file%iosystem, cval, cval_sz, clen, attval)
+    IF(ierr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "Unable to convert C strings to Fortran strings in pio_get_att() function,",&
+                        " pio_get_att_file_vid_{DIMS}d_text(). varid = ", varid, ", file id = ", file%fh
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
 
     ierr = INT(ret)
 
@@ -142,7 +153,7 @@ CONTAINS
     CHARACTER(LEN=*), INTENT(OUT) :: attval{DIMSTR}
 
     TYPE(file_desc_t) :: file
-    TYPE(iosystem_desc_t) :: ios
+    TYPE(iosystem_desc_t), TARGET :: ios
 
     ! Initialize a dummy file & iosystem (corresponding to fh)
     ios%iosysid = PIOc_get_iosystem(fh)
@@ -176,7 +187,7 @@ CONTAINS
 
   END FUNCTION pio_get_att_file_vdesc_{DIMS}d_text
 
-! DIMS 0.1
+! DIMS 0,1
 ! TYPE int,real,double
 !>
 !! @public
@@ -195,7 +206,7 @@ CONTAINS
     TYPE(file_desc_t), INTENT(IN) :: file
     INTEGER, INTENT(IN) :: varid
     CHARACTER(LEN=*), INTENT(IN) :: attname
-    {VTYPE}, INTENT(OUT) :: attval{DIMSTR}
+    {VTYPE}, INTENT(OUT), TARGET :: attval{DIMSTR}
 
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
     INTEGER(PIO_OFFSET_KIND) :: attlen
@@ -219,8 +230,7 @@ CONTAINS
 
     ret = PIOc_get_att_{NCTYPE} (file%fh, INT(varid, C_INT) - 1,&
                                   TRIM(attname) // C_NULL_CHAR,&
-                                  PIO_{TYPE}, attlen,&
-                                  attval)
+                                  C_LOC(attval))
     ierr = INT(ret)
 #ifdef TIMING
     CALL t_stopf("PIO:get_att_file_vid_{DIMS}d_{TYPE}")
@@ -249,14 +259,14 @@ CONTAINS
     {VTYPE}, INTENT(OUT) :: attval{DIMSTR}
 
     TYPE(file_desc_t) :: file
-    TYPE(iosystem_desc_t) :: ios
+    TYPE(iosystem_desc_t), TARGET :: ios
 
     ! Initialize a dummy file & iosystem (corresponding to fh)
     ios%iosysid = PIOc_get_iosystem(fh)
     file%fh = INT(fh, C_INT)
     file%iosystem => ios
 
-    ierr = PIOc_get_att_file_vid_{DIMS}d_{TYPE} (file, varid, attname, attval)
+    ierr = pio_get_att_file_vid_{DIMS}d_{TYPE} (file, varid, attname, attval)
   END FUNCTION pio_get_att_fh_vid_{DIMS}d_{TYPE}
 
 ! DIMS 0,1
@@ -280,7 +290,7 @@ CONTAINS
     CHARACTER(LEN=*), INTENT(IN) :: attname
     {VTYPE}, INTENT(OUT) :: attval{DIMSTR}
 
-    ierr = PIOc_get_att_file_vid_{DIMS}d_{TYPE} (file, INT(vdesc%varid), attname, attval)
+    ierr = pio_get_att_file_vid_{DIMS}d_{TYPE} (file, INT(vdesc%varid), attname, attval)
 
   END FUNCTION pio_get_att_file_vdesc_{DIMS}d_{TYPE}
 

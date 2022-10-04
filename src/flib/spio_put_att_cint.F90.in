@@ -25,7 +25,7 @@ INTERFACE
 !! @param[in] varid The handle/id of the variable
 !! @param[in] attname The name of the attribute
 !! @param[in] attlen  The length/size of the attribute (length/size of @p attval)
-!! @param[in] attval  The attribute value
+!! @param[in] attval  Pointer to the attribute value (C_CHAR array)
 !! @returns PIO_NOERR on success, an error code otherwise
   INTEGER(C_INT) FUNCTION PIOc_put_att_text(fh, varid, attname, attlen, attval) &
                             bind(C,name="PIOc_put_att_text")
@@ -33,9 +33,9 @@ INTERFACE
     USE pio_kinds, ONLY : PIO_OFFSET_F2C_TYPE_KIND
     INTEGER(C_INT), INTENT(IN), VALUE :: fh
     INTEGER(C_INT), INTENT(IN), VALUE :: varid
-    CHARACTER(C_CHAR), INTENT(IN), DIMENSION(:) :: attname
+    CHARACTER(C_CHAR), INTENT(IN) :: attname(*)
     INTEGER(PIO_OFFSET_F2C_TYPE_KIND), INTENT(IN), VALUE :: attlen
-    CHARACTER(C_CHAR), INTENT(IN), DIMENSION(:) :: attval
+    TYPE(C_PTR), INTENT(IN), VALUE :: attval
   END FUNCTION PIOc_put_att_text
 END INTERFACE
 
@@ -51,7 +51,7 @@ INTERFACE
 !! @param[in] attname The name of the attribute
 !! @param[in] atttype The type of the attribute. @copydoc PIO_kinds
 !! @param[in] attlen  The size of the attribute (length/size of @p attval)
-!! @param[in] attval  The attribute value
+!! @param[in] attval  The pointer to the attribute value
 !! @returns PIO_NOERR on success, an error code otherwise
   INTEGER(C_INT) FUNCTION PIOc_put_att_{NCTYPE}(fh, varid, attname, atttype, attlen, attval) &
                             bind(C,name="PIOc_put_att_{NCTYPE}")
@@ -59,10 +59,10 @@ INTERFACE
     USE pio_kinds, ONLY : PIO_OFFSET_F2C_TYPE_KIND
     INTEGER(C_INT), INTENT(IN), VALUE :: fh
     INTEGER(C_INT), INTENT(IN), VALUE :: varid
-    CHARACTER(C_CHAR), INTENT(IN), DIMENSION(:) :: attname
+    CHARACTER(C_CHAR), INTENT(IN) :: attname(*)
     INTEGER(C_INT), INTENT(IN), VALUE :: atttype
     INTEGER(PIO_OFFSET_F2C_TYPE_KIND), INTENT(IN), VALUE :: attlen
-    {CTYPE}, INTENT(IN), DIMENSION(:) :: attval
+    TYPE(C_PTR), INTENT(IN), VALUE :: attval
   END FUNCTION PIOc_put_att_{NCTYPE}
 END INTERFACE
 

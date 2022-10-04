@@ -24,15 +24,15 @@ INTERFACE
 !! @param[in] fh The file handle/id to the file with the variable
 !! @param[in] varid The handle/id of the variable
 !! @param[in] attname The name of the attribute
-!! @param[out] attval  The attribute value
+!! @param[out] attval  Pointer to the attribute value
 !! @returns PIO_NOERR on success, an error code otherwise
-  INTEGER(C_INT) FUNCTION PIOc_get_att_{NCTYPE}(fh, varid, attname, atttype, attval) &
+  INTEGER(C_INT) FUNCTION PIOc_get_att_{NCTYPE}(fh, varid, attname, attval) &
                             bind(C,name="PIOc_get_att_{NCTYPE}")
     USE iso_c_binding
     INTEGER(C_INT), INTENT(IN), VALUE :: fh
     INTEGER(C_INT), INTENT(IN), VALUE :: varid
-    CHARACTER(C_CHAR), INTENT(IN), DIMENSION(:) :: attname
-    {CTYPE}, INTENT(OUT), DIMENSION(:) :: attval
+    CHARACTER(C_CHAR), INTENT(IN) :: attname(*)
+    TYPE(C_PTR), INTENT(IN), VALUE :: attval
   END FUNCTION PIOc_get_att_{NCTYPE}
 END INTERFACE
 
