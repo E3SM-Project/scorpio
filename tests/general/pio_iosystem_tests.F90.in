@@ -315,8 +315,8 @@ PIO_TF_AUTO_TEST_SUB_BEGIN two_iosystems_even_all
   end if
 PIO_TF_AUTO_TEST_SUB_END two_iosystems_even_all
 
-! Create a file with one iosystem - with odd procs, and open/read with
-! the same iosystem - with even procs
+! Create a file with one iosystem - with even procs, and open/read with
+! the same iosystem - with odd procs
 PIO_TF_AUTO_TEST_SUB_BEGIN one_iosystem_odd_even
   implicit none
 
@@ -347,14 +347,14 @@ PIO_TF_AUTO_TEST_SUB_BEGIN one_iosystem_odd_even
   do i=1,num_iotypes
     PIO_TF_LOG(0,*) "Testing : ", iotype_descs(i)
     ! Create one file to be opened later - odd procs
-    if(.not. is_even) then
+    if(is_even) then
       call create_file(odd_even_comm, odd_even_iosys, iotypes(i), &
                         fname, attname, dimname, ret)
     end if
     PIO_TF_CHECK_ERR(ret, "Failed to create file :" // fname)
 
     ! Open file from even procs
-    if(is_even) then
+    if(.not. is_even) then
       call open_and_check_file(odd_even_comm, odd_even_iosys, iotypes(i), &
                       pio_file, fname, attname, dimname, .false., ret)
     end if
