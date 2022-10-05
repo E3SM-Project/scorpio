@@ -546,6 +546,18 @@ int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
     }
 #endif
 
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        if (sizep)
+            *sizep = hdf5_get_nc_type_size(xtype);
+
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return PIO_NOERR;
+    }
+#endif
+
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
     {
@@ -776,6 +788,36 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
             }
             printf("\n");
 
+            if (name)
+                name[0] = '\0';
+
+            if (lenp)
+                *lenp = 0;
+
+            ierr = PIO_EBADDIM;
+        }
+
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return ierr;
+    }
+#endif
+
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        if (0 <= dimid && dimid < file->hdf5_num_dims)
+        {
+            if (name)
+                strcpy(name, file->hdf5_dims[dimid].name);
+
+            if (lenp)
+                *lenp = file->hdf5_dims[dimid].len;
+
+            ierr = PIO_NOERR;
+        }
+        else
+        {
             if (name)
                 name[0] = '\0';
 
@@ -1127,6 +1169,36 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
                 *nattsp = file->adios_vars[varid].nattrs;
 
             strncpy(file->varlist[varid].vname, file->adios_vars[varid].name, PIO_MAX_NAME);
+
+            ierr = PIO_NOERR;
+        }
+        else
+            ierr = PIO_EBADID;
+
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return ierr;
+    }
+#endif
+
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        if (varid < file->hdf5_num_vars)
+        {
+            if (name)
+                strcpy(name, file->hdf5_vars[varid].name);
+
+            if (xtypep)
+                *xtypep = file->hdf5_vars[varid].nc_type;
+
+            if (ndimsp)
+                *ndimsp = file->hdf5_vars[varid].ndims;
+
+            if (dimidsp)
+                memcpy(dimidsp, file->hdf5_vars[varid].hdf5_dimids, file->hdf5_vars[varid].ndims * sizeof(int));
+
+            strncpy(file->varlist[varid].vname, file->hdf5_vars[varid].name, PIO_MAX_NAME);
 
             ierr = PIO_NOERR;
         }
@@ -2530,6 +2602,16 @@ int PIOc_set_fill(int ncid, int fillmode, int *old_modep)
     }
 #endif
 
+#ifdef _HDF5
+    /* Skip PIOc_set_fill() for HDF5 type so far */
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return PIO_NOERR;
+    }
+#endif
+
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
     {
@@ -2542,7 +2624,7 @@ int PIOc_set_fill(int ncid, int fillmode, int *old_modep)
 #endif /* _PNETCDF */
 
 #ifdef _NETCDF
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_HDF5 && file->do_io)
             ierr = nc_set_fill(file->fh, fillmode, old_modep);
 #endif /* _NETCDF */
     }
@@ -2753,6 +2835,17 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
     }
 #endif
 
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        file->hdf5_dims[file->hdf5_num_dims].name = strdup(name);
+        file->hdf5_dims[file->hdf5_num_dims].len = len;
+        file->hdf5_dims[file->hdf5_num_dims].has_coord_var = false;
+        *idp = file->hdf5_num_dims;
+        file->hdf5_num_dims++;
+    }
+#endif
+
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
     {
@@ -2762,7 +2855,7 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
 #endif /* _PNETCDF */
 
 #ifdef _NETCDF
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_HDF5 && file->do_io)
             ierr = nc_def_dim(file->fh, name, (size_t)len, idp);
 #endif /* _NETCDF */
     }
@@ -3063,6 +3156,72 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
     }
 #endif
 
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        assert(file->hdf5_num_vars < PIO_MAX_VARS);
+        file->hdf5_vars[file->hdf5_num_vars].name = strdup(name);
+        file->hdf5_vars[file->hdf5_num_vars].alt_name = NULL;
+        file->hdf5_vars[file->hdf5_num_vars].nc_type = xtype;
+        file->hdf5_vars[file->hdf5_num_vars].ndims = ndims;
+        file->hdf5_vars[file->hdf5_num_vars].is_coord_var = false;
+
+        file->hdf5_vars[file->hdf5_num_vars].hdf5_dimids = (int*)malloc(ndims * sizeof(int));
+        if (file->hdf5_vars[file->hdf5_num_vars].hdf5_dimids == NULL)
+        {
+            const char *vname = (name) ? name : "UNKNOWN";
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Defining variable %s in file %s (ncid=%d) using HDF5 iotype failed. Out of memory allocating %lld bytes for global dimensions",
+                           vname, pio_get_fname_from_file(file), ncid, (unsigned long long) (ndims * sizeof(int)));
+        }
+        memcpy(file->hdf5_vars[file->hdf5_num_vars].hdf5_dimids, dimidsp, ndims * sizeof(int));
+
+        for (int d = 0; d < file->hdf5_num_dims; d++)
+        {
+            char* dim_name = file->hdf5_dims[d].name;
+
+            /* This variable has the same name as a dimension */
+            if (strncmp(name, dim_name, PIO_MAX_NAME) == 0)
+            {
+                /* This variable is a coordinate variable */
+                if (ndims > 0 && dimidsp[0] == d)
+                {
+                    file->hdf5_vars[file->hdf5_num_vars].is_coord_var = true;
+                    file->hdf5_dims[d].has_coord_var = true;
+                }
+                else
+                {
+                    /* Use alternative name for this variable to avoid name clash */
+                    const char* non_coord_prpend = "_nc4_non_coord_";
+                    int alt_name_len = strlen(name) + strlen(non_coord_prpend) + 1;
+                    assert(alt_name_len < PIO_MAX_NAME);
+
+                    char* alt_name = malloc(alt_name_len);
+                    if (alt_name == NULL)
+                    {
+                        const char *vname = (name) ? name : "UNKNOWN";
+                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                       "Defining variable %s in file %s (ncid=%d) using HDF5 iotype failed. Out of memory allocating %lld bytes for alternative variable name",
+                                       vname, pio_get_fname_from_file(file), ncid, (unsigned long long)alt_name_len);
+                    }
+
+                    snprintf(alt_name, alt_name_len, "%s%s", non_coord_prpend, name);
+                    file->hdf5_vars[file->hdf5_num_vars].alt_name = alt_name;
+                }
+
+                break;
+            }
+        }
+
+        *varidp = file->hdf5_num_vars;
+        file->hdf5_num_vars++;
+    }
+#endif
+
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
     {
@@ -3081,7 +3240,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
 #endif /* _PNETCDF */
 
 #ifdef _NETCDF
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_HDF5 && file->do_io)
         {
             ierr = nc_def_var(file->fh, name, xtype, ndims, dimidsp, varidp);
             if (ierr != PIO_NOERR)
@@ -3124,6 +3283,91 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
         }
 #endif /* _NETCDF4 */
 
+#ifdef _HDF5
+        if (file->iotype == PIO_IOTYPE_HDF5)
+        {
+            herr_t herr;
+            hid_t h5_xtype;
+            hid_t sid;
+            hid_t dcpl_id;
+            hsize_t cdim[H5S_MAX_RANK], dims[H5S_MAX_RANK], mdims[H5S_MAX_RANK];
+            int i;
+
+            for (i = 0; i < ndims; i++)
+                dims[i] = mdims[i] = file->hdf5_dims[dimidsp[i]].len;
+
+            dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+            H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED);
+
+            if (xtype == NC_CHAR)
+            {
+                /* String type */
+                h5_xtype = H5Tcopy(H5T_C_S1);
+                H5Tset_strpad(h5_xtype, H5T_STR_NULLTERM);
+                H5Tset_cset(h5_xtype, H5T_CSET_ASCII);
+            }
+            else
+                h5_xtype = nc_type_to_hdf5_type(xtype);
+
+            file->hdf5_vars[*varidp].hdf5_type = h5_xtype;
+
+            if (ndims > 0 && dims[0] == PIO_UNLIMITED)
+            {
+                mdims[0] = H5S_UNLIMITED;
+
+                /* Chunk size along rec dim is always 1 */
+                cdim[0] = 1;
+                for (i = 1; i < ndims; i++)
+                    cdim[i] = mdims[i];
+
+                herr = H5Pset_chunk(dcpl_id, ndims, cdim);
+            }
+
+            sid = H5Screate_simple(ndims, dims, mdims);
+            const char* dataset_name = (file->hdf5_vars[*varidp].alt_name == NULL)? name : file->hdf5_vars[*varidp].alt_name;
+            file->hdf5_vars[*varidp].hdf5_dataset_id = H5Dcreate2(file->hdf5_file_id, dataset_name, h5_xtype, sid, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+            if (file->hdf5_vars[*varidp].hdf5_dataset_id < 0)
+            {
+                const char *vname = (name) ? name : "UNKNOWN";
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                               "Defining variable %s in file %s (ncid=%d) using HDF5 iotype failed. H5Dcreate2() for variable %s failed.",
+                               vname, pio_get_fname_from_file(file), ncid, dataset_name);
+            }
+
+            H5Sclose(sid);
+            H5Pclose(dcpl_id);
+
+            /* Write the hidden coordinates attribute, which lists the dimids of this variable. */
+            if (ndims > 0)
+            {
+                hsize_t coords_len[1];
+                hid_t coords_space_id, coords_att_id;
+                htri_t attr_exists;
+
+                coords_len[0] = ndims;
+                coords_space_id = H5Screate_simple(1, coords_len, coords_len);
+
+                /* H5Aexists() returns zero (false), a positive (true) or a negative (failure) value */
+                attr_exists = H5Aexists(file->hdf5_vars[*varidp].hdf5_dataset_id, "_Netcdf4Coordinates");
+                if (attr_exists > 0)
+                    coords_att_id = H5Aopen(file->hdf5_vars[*varidp].hdf5_dataset_id, "_Netcdf4Coordinates", H5P_DEFAULT);
+                else if (attr_exists == 0)
+                    coords_att_id = H5Acreate2(file->hdf5_vars[*varidp].hdf5_dataset_id, "_Netcdf4Coordinates",
+                                              H5T_NATIVE_INT, coords_space_id, H5P_DEFAULT, H5P_DEFAULT);
+                else
+                {
+                    /* Error determining whether an attribute with a given name exists on an object */
+                }
+
+                H5Awrite(coords_att_id, H5T_NATIVE_INT, dimidsp);
+
+                H5Sclose(coords_space_id);
+                H5Aclose(coords_att_id);
+            }
+        }
+#endif /* _HDF5 */
     }
 
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);

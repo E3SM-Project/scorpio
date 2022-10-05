@@ -509,6 +509,7 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
     {
     case PIO_IOTYPE_NETCDF4P:
     case PIO_IOTYPE_PNETCDF:
+    case PIO_IOTYPE_HDF5:
         if ((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
                                            DARRAY_DATA, frame)))
         {
@@ -2051,6 +2052,9 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const 
     file->io_fstats->wb += vdesc->type_size * iodesc->llen;
 
     /* If we don't know the fill value for this var, get it. */
+/* TODO handle fill values for HDF5 type later */
+if (file->iotype != PIO_IOTYPE_HDF5)
+{
     if (!vdesc->fillvalue)
     {
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -2074,6 +2078,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const 
         spio_ltimer_start(file->io_fstats->wr_timer_name);
         spio_ltimer_start(file->io_fstats->tot_timer_name);
     }
+}
 
     /* Is this a record variable? The user must set the vdesc->record
      * value by calling PIOc_setframe() before calling this

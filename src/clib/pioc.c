@@ -285,6 +285,34 @@ int PIOc_setframe(int ncid, int varid, int frame)
     }
 #endif
 
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        if (frame >= 0)
+        {
+            if (ios->ioproc)
+            {
+                hsize_t dims[H5S_MAX_RANK];
+                hsize_t mdims[H5S_MAX_RANK];
+
+                /* Get current dimension size */
+                hid_t file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
+
+                int ndim = H5Sget_simple_extent_dims(file_space_id, dims, mdims);
+
+                H5Sclose(file_space_id);
+
+                /* Extend record dimension if needed */
+                if (ndim > 0 && mdims[0] == H5S_UNLIMITED && dims[0] < (hsize_t)(frame + 1))
+                {
+                    dims[0] = frame + 1;
+                    H5Dextend(file->hdf5_vars[varid].hdf5_dataset_id, dims);
+                }
+            }
+        }
+    }
+#endif
+
     return PIO_NOERR;
 }
 

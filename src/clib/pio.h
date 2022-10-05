@@ -877,6 +877,48 @@ typedef struct adios_att_desc_t
 } adios_att_desc_t;
 #endif /* _ADIOS2 */
 
+#ifdef _HDF5
+typedef struct hdf5_dim_desc_t
+{
+    /** Dimension name */
+    char* name;
+
+    /** Dimension length */
+    PIO_Offset len;
+
+    /** True if the dimension has a coordinate variable */
+    bool has_coord_var;
+
+    hid_t hdf5_dataset_id;
+} hdf5_dim_desc_t;
+
+typedef struct hdf5_var_desc_t
+{
+    /** Variable name */
+    char* name;
+
+    /* Alternative name for a non-coordinate variable with the same name as a dimension */
+    char* alt_name;
+
+    /** NC type give at def_var time */
+    int nc_type;
+
+    /** Type converted from NC type to HDF5 type */
+    hid_t hdf5_type;
+
+    /** Number of dimensions */
+    int ndims;
+
+    /** Dimension IDs of the variable */
+    int* hdf5_dimids;
+
+    /** True if the variable is a coordinate variable */
+    bool is_coord_var;
+
+    hid_t hdf5_dataset_id;
+} hdf5_var_desc_t;
+#endif
+
 /**
  * File descriptor structure.
  *
@@ -980,6 +1022,26 @@ typedef struct file_desc_t
     /** Store current frameid for end_step in PIO_setframe */
     int current_frame;
 #endif /* _ADIOS2 */
+
+#ifdef _HDF5
+    hid_t hdf5_file_id;
+
+    /* Collective dataset transfer property list, used by H5Dwrite */
+    hid_t dxplid_coll;
+
+    /* Independent dataset transfer property list, used by H5Dwrite */
+    hid_t dxplid_indep;
+
+    struct hdf5_dim_desc_t hdf5_dims[PIO_MAX_DIMS];
+
+    /** Number of dims defined */
+    int hdf5_num_dims;
+
+    struct hdf5_var_desc_t hdf5_vars[PIO_MAX_VARS];
+
+    /** Number of vars defined */
+    int hdf5_num_vars;
+#endif /* _HDF5 */
 
     /* File name - cached */
     char fname[PIO_MAX_NAME + 1];
@@ -1543,6 +1605,14 @@ extern "C" {
     unsigned long get_adios2_io_cnt();
     int begin_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
     int end_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
+#ifndef strdup
+    char *strdup(const char *str);
+#endif
+#endif
+
+#ifdef _HDF5
+    hid_t nc_type_to_hdf5_type(nc_type xtype);
+    PIO_Offset hdf5_get_nc_type_size(nc_type xtype);
 #ifndef strdup
     char *strdup(const char *str);
 #endif
