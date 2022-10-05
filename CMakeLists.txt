@@ -49,6 +49,7 @@ option (PIO_LIMIT_CACHED_IO_REGIONS  "Limit the number of non-contiguous regions
 option (WITH_PNETCDF         "Require the use of PnetCDF"                   ON)
 option (WITH_NETCDF          "Require the use of NetCDF"                    ON)
 option (WITH_ADIOS2          "Require the use of ADIOS 2.x"                 OFF)
+option (WITH_HDF5            "Require the use of HDF5"                      OFF)
 option (ADIOS_BP2NC_TEST     "Enable testing of BP to NetCDF conversion"    OFF)
 #===== Testing Options =====
 option (PIO_ENABLE_TESTS  "Enable the testing builds"                       OFF)

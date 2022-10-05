@@ -28,6 +28,9 @@
 #if PIO_USE_ADIOS
   #define _ADIOS2 1
 #endif
+#if PIO_USE_HDF5
+  #define _HDF5 1
+#endif
 #if PIO_USE_MICRO_TIMING
   #define PIO_MICRO_TIMING 1
 #endif
@@ -61,6 +64,10 @@
 
 adios2_adios *get_adios2_adios();
 unsigned long get_adios2_io_cnt();
+#endif
+#ifdef _HDF5
+#include <hdf5.h>
+#include <hdf5_hl.h>
 #endif
 
 /* PIO_OFFSET_C_TYPENAME is defined in pio_config.h */
@@ -306,6 +313,11 @@ typedef PIO_OFFSET_C_TYPENAME PIO_Offset;
 /** Define error codes for ADIOS. */
 #define PIO_EADIOSREAD (-300)
 #define PIO_EADIOS2ERR (-301)
+#endif
+
+#ifdef _HDF5
+/** Define error codes for HDF5. */
+#define PIO_EHDF5ERR (-700)
 #endif
 
 #ifdef PIO_MICRO_TIMING
@@ -1036,7 +1048,10 @@ enum PIO_IOTYPE
     PIO_IOTYPE_NETCDF4P = 4,
 
     /** ADIOS parallel */
-    PIO_IOTYPE_ADIOS = 5
+    PIO_IOTYPE_ADIOS = 5,
+
+    /** HDF5 parallel */
+    PIO_IOTYPE_HDF5 = 6
 };
 
 /**

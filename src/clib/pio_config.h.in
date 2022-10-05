@@ -68,6 +68,10 @@
  *  0 otherwise */
 #define PIO_USE_ADIOS @PIO_USE_ADIOS@
 
+/** Set to 1 if the library is configured to use the HDF5 library,
+ *  0 otherwise */
+#define PIO_USE_HDF5 @PIO_USE_HDF5@
+
 /** Set to 1 if the library is configured to use Micro timing,
  *  0 otherwise */
 #define PIO_USE_MICRO_TIMING @USE_MICRO_TIMING@
