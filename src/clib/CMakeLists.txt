@@ -140,6 +140,25 @@ else ()
   set(PIO_USE_ADIOS 0)
 endif ()
 
+#===== HDF5-C =====
+if (WITH_HDF5)
+  find_package (HDF5 COMPONENTS HL C)
+  if (HDF5_C_FOUND)
+    message(STATUS "HDF5 C library dependencies: ${HDF5_C_LIBRARIES} ${HDF5_HL_LIBRARIES}")
+    set(PIO_USE_HDF5 1)
+    target_include_directories (pioc
+      PUBLIC ${HDF5_C_INCLUDE_DIRS} ${HDF5_HL_INCLUDE_DIRS})
+    target_link_libraries (pioc
+      PUBLIC ${HDF5_C_LIBRARIES} ${HDF5_HL_LIBRARIES} ${CMAKE_DL_LIBS})
+  else ()
+    message(STATUS "Could not find HDF5 library, disabling support for HDF5")
+    set(PIO_USE_HDF5 0)
+  endif ()
+else ()
+  message(STATUS "Disabling support for HDF5")
+  set(PIO_USE_HDF5 0)
+endif ()
+
 # We expect PnetCDF or NetCDF to be available
 if (NOT PnetCDF_C_FOUND AND NOT NetCDF_C_FOUND)
   message (FATAL_ERROR "Could not find PnetCDF and NetCDF libraries. SCORPIO requires PnetCDF and/or NetCDF C libraries")

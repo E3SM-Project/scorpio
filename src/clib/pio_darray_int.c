@@ -171,6 +171,9 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     var_desc_t *vdesc;     /* Pointer to var info struct. */
     int dsize;             /* Data size (for one region). */
+#ifdef _HDF5
+    hsize_t dsize_all = 0; /* Data size of all regions. */
+#endif
     int ierr = PIO_NOERR;
 
     /* Check inputs. */
@@ -219,7 +222,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                 break;
             }
 
-            /* IO tasks will run the netCDF/pnetcdf functions to write the data. */
+            /* IO tasks will run the netCDF/pnetcdf/hdf5 functions to write the data. */
             switch (file->iotype)
             {
 #ifdef _NETCDF4
@@ -409,6 +412,93 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                          * current process, on the current process
                          */
                         vdesc->nreqs++;
+                    }
+
+                    /* Free resources. */
+                    for (int i = 0; i < rrcnt; i++)
+                    {
+                        free(startlist[i]);
+                        free(countlist[i]);
+                    }
+                }
+                break;
+#endif
+#ifdef _HDF5
+            case PIO_IOTYPE_HDF5:
+                /* Get the total number of data elements we are
+                 * writing for this region. */
+                dsize = 1;
+                for (int i = 0; i < fndims; i++)
+                    dsize *= count[i];
+                LOG((3, "dsize = %d", dsize));
+
+                if (dsize > 0)
+                {
+                    dsize_all += dsize;
+
+                    /* Allocate storage for start/count arrays for
+                     * this region. */
+                    if (!(startlist[rrcnt] = calloc(fndims, sizeof(PIO_Offset))))
+                    {
+                        ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                          "Writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5 iotype failed. Out of memory allocating buffer (%lld bytes) for array to store starts of I/O regions written out to file", nvars, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (fndims * sizeof(PIO_Offset)));
+                        break;
+                    }
+                    if (!(countlist[rrcnt] = calloc(fndims, sizeof(PIO_Offset))))
+                    {
+                        ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                          "Writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5 iotype failed. Out of memory allocating buffer (%lld bytes) for array to store counts of I/O regions written out to file", nvars, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (fndims * sizeof(PIO_Offset)));
+                        break;
+                    }
+
+                    /* Copy the start/count arrays for this region. */
+                    for (int i = 0; i < fndims; i++)
+                    {
+                        startlist[rrcnt][i] = start[i];
+                        countlist[rrcnt][i] = count[i];
+                        LOG((3, "startlist[%d][%d] = %d countlist[%d][%d] = %d", rrcnt, i,
+                             startlist[rrcnt][i], rrcnt, i, countlist[rrcnt][i]));
+                    }
+                    rrcnt++;
+                }
+
+                /* Do this when we reach the last region. */
+                if (regioncnt == num_regions - 1)
+                {
+                    /* For each variable to be written. */
+                    for (int nv = 0; nv < nvars; nv++)
+                    {
+                        /* Get the var info. */
+                        vdesc = file->varlist + varids[nv];
+
+                        /* If this is a record (or quasi-record) var, set the start for
+                         * the record dimension. */
+                        if (vdesc->record >= 0 && fndims > 1)
+                            for (int rc = 0; rc < rrcnt; rc++)
+                                startlist[rc][0] = frame[nv];
+
+                        hid_t file_space_id = H5Dget_space(file->hdf5_vars[varids[nv]].hdf5_dataset_id);
+
+                        H5S_seloper_t op = H5S_SELECT_SET;
+
+                        for (int i = 0; i < rrcnt; i++)
+                        {
+                            /* Union hyperslabs of all regions */
+                            H5Sselect_hyperslab(file_space_id, op, (hsize_t*)startlist[i], NULL, (hsize_t*)countlist[i], NULL);
+                            op = H5S_SELECT_OR;
+                        }
+
+                        hid_t mem_space_id = H5Screate_simple(1, &dsize_all, NULL);
+
+                        /* Get a pointer to the data. */
+                        bufptr = (void *)((char *)iobuf + nv * iodesc->mpitype_size * llen);
+
+                        /* Collective write */
+                        hid_t mem_type_id = nc_type_to_hdf5_type(iodesc->piotype);
+                        H5Dwrite(file->hdf5_vars[varids[nv]].hdf5_dataset_id, mem_type_id, mem_space_id, file_space_id, file->dxplid_coll, bufptr);
+
+                        H5Sclose(file_space_id);
+                        H5Sclose(mem_space_id);
                     }
 
                     /* Free resources. */

@@ -400,6 +400,11 @@ static int sync_file(int ncid)
                 ierr = flush_output_buffer(file, true, 0);
                 break;
 #endif
+#ifdef _HDF5
+            case PIO_IOTYPE_HDF5:
+                ierr = PIO_NOERR;
+                break;
+#endif
             default:
                 spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -921,6 +926,31 @@ int PIOc_closefile(int ncid)
             ierr = ncmpi_close(file->fh);
             break;
 #endif
+#ifdef _HDF5
+        case PIO_IOTYPE_HDF5:
+            ierr = PIO_NOERR;
+
+            H5Pclose(file->dxplid_coll);
+            H5Pclose(file->dxplid_indep);
+
+            for (int i = 0; i < file->hdf5_num_dims; i++)
+            {
+                if (!file->hdf5_dims[i].has_coord_var)
+                    H5Dclose(file->hdf5_dims[i].hdf5_dataset_id);
+            }
+
+            for (int i = 0; i < file->hdf5_num_vars; i++)
+            {
+                H5Dclose(file->hdf5_vars[i].hdf5_dataset_id);
+
+                if (file->hdf5_vars[i].nc_type == NC_CHAR)
+                    H5Tclose(file->hdf5_vars[i].hdf5_type);
+            }
+
+            H5Fclose(file->hdf5_file_id);
+
+            break;
+#endif
         default:
             GPTLstop("PIO:PIOc_closefile");
             if (file->mode & PIO_WRITE)
@@ -953,6 +983,33 @@ int PIOc_closefile(int ncid)
         return pio_err(NULL, file, ierr, __FILE__, __LINE__,
                         "Closing file (%s, ncid=%d) failed. Underlying I/O library (iotype=%s) call failed", pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
     }
+
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        for (int i = 0; i < file->hdf5_num_dims; i++)
+        {
+            free(file->hdf5_dims[i].name);
+            file->hdf5_dims[i].name = NULL;
+        }
+
+        file->hdf5_num_dims = 0;
+
+        for (int i = 0; i < file->hdf5_num_vars; i++)
+        {
+            free(file->hdf5_vars[i].name);
+            file->hdf5_vars[i].name = NULL;
+
+            free(file->hdf5_vars[i].alt_name);
+            file->hdf5_vars[i].alt_name = NULL;
+
+            free(file->hdf5_vars[i].hdf5_dimids);
+            file->hdf5_vars[i].hdf5_dimids = NULL;
+        }
+
+        file->hdf5_num_vars = 0;
+    }
+#endif
 
     if (file->mode & PIO_WRITE)
     {

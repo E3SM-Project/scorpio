@@ -335,6 +335,10 @@ CONTAINS
       ! adios
       num_iotypes = num_iotypes + 1
 #endif
+#ifdef _HDF5
+      ! hdf5
+      num_iotypes = num_iotypes + 1
+#endif
 
     ! ALLOCATE with 0 elements ok?
     ALLOCATE(iotypes(num_iotypes))
@@ -351,6 +355,12 @@ CONTAINS
       ! adios
       iotypes(i) = PIO_iotype_adios
       iotype_descs(i) = "ADIOS"
+      i = i + 1
+#endif
+#ifdef _HDF5
+      ! hdf5
+      iotypes(i) = PIO_iotype_hdf5
+      iotype_descs(i) = "HDF5"
       i = i + 1
 #endif
 #ifdef _NETCDF4
@@ -442,6 +452,10 @@ CONTAINS
       ! adios
       num_iotypes = num_iotypes + 1
 #endif
+#ifndef _HDF5
+      ! hdf5
+      num_iotypes = num_iotypes + 1
+#endif
 
     ! ALLOCATE with 0 elements ok?
     ALLOCATE(iotypes(num_iotypes))
@@ -473,6 +487,12 @@ CONTAINS
       ! adios
       iotypes(i) = PIO_iotype_adios
       iotype_descs(i) = "ADIOS"
+      i = i + 1
+#endif
+#ifndef _HDF5
+      ! hdf5
+      iotypes(i) = PIO_iotype_hdf5
+      iotype_descs(i) = "HDF5"
       i = i + 1
 #endif
   END SUBROUTINE
@@ -508,6 +528,10 @@ CONTAINS
       ! adios
       num_iotypes = num_iotypes + 1
 #endif
+#ifdef _HDF5
+      ! hdf5
+      num_iotypes = num_iotypes + 1
+#endif
 
     ! ALLOCATE with 0 elements ok?
     ALLOCATE(iotypes(num_iotypes))
@@ -524,6 +548,12 @@ CONTAINS
       ! adios
       iotypes(i) = PIO_iotype_adios
       iotype_descs(i) = "ADIOS"
+      i = i + 1
+#endif
+#ifdef _HDF5
+      ! hdf5
+      iotypes(i) = PIO_iotype_hdf5
+      iotype_descs(i) = "HDF5"
       i = i + 1
 #endif
 #ifdef _NETCDF4
@@ -579,6 +609,10 @@ CONTAINS
       ! adios
       num_iotypes = num_iotypes + 1
 #endif
+#ifndef _HDF5
+      ! hdf5
+      num_iotypes = num_iotypes + 1
+#endif
 
     ! ALLOCATE with 0 elements ok?
     ALLOCATE(iotypes(num_iotypes))
@@ -589,6 +623,12 @@ CONTAINS
       ! adios
       iotypes(i) = PIO_iotype_adios
       iotype_descs(i) = "ADIOS"
+      i = i + 1
+#endif
+#ifndef _HDF5
+      ! adios
+      iotypes(i) = PIO_iotype_hdf5
+      iotype_descs(i) = "HDF5"
       i = i + 1
 #endif
 #ifndef _NETCDF
@@ -1259,6 +1299,11 @@ CONTAINS
         (str == "adios") .OR.&
         (str == "ADIOS")) THEN
       PIO_TF_Iotype_from_str = PIO_IOTYPE_ADIOS
+    ELSE IF((str == "PIO_IOTYPE_HDF5") .OR.&
+        (str == "pio_iotype_hdf5") .OR.&
+        (str == "hdf5") .OR.&
+        (str == "HDF5")) THEN
+      PIO_TF_Iotype_from_str = PIO_IOTYPE_HDF5
     ELSE
       PRINT *, "PIO_TF: Invalid iotype specified,", trim(iotype_str), "), resetting to PIO_IOTYPE_PNETCDF..."
     END IF

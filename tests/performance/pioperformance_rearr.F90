@@ -7,7 +7,7 @@ program pioperformance_rearr
   use mpi
 #endif
   use pio, only : pio_iotype_netcdf, pio_iotype_pnetcdf, pio_iotype_netcdf4p, &
-       pio_iotype_netcdf4c, pio_iotype_adios, pio_rearr_subset, pio_rearr_box, PIO_MAX_NAME,&
+       pio_iotype_netcdf4c, pio_iotype_adios, pio_iotype_hdf5, pio_rearr_subset, pio_rearr_box, PIO_MAX_NAME,&
         pio_rearr_opt_t, pio_rearr_comm_p2p, pio_rearr_comm_coll,&
         pio_rearr_comm_fc_2d_disable, pio_rearr_comm_fc_1d_comp2io,&
         pio_rearr_comm_fc_1d_io2comp, pio_rearr_comm_fc_2d_enable,&
@@ -214,6 +214,8 @@ contains
       pio_type = PIO_IOTYPE_PNETCDF
     else if(pio_typename .eq. 'adios') then
       pio_type = PIO_IOTYPE_ADIOS
+    else if(pio_typename .eq. 'hdf5') then
+      pio_type = PIO_IOTYPE_HDF5
     else
       !print *, "ERROR: Unrecognized pio type :", pio_typename,&
       !          __FILE__, __LINE__
