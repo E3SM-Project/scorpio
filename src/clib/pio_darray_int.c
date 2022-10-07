@@ -16,7 +16,6 @@
 #ifdef PIO_MICRO_TIMING
 #include "pio_timer.h"
 #endif
-#include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
 
 /* 10MB default limit. */

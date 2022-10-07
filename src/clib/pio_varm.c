@@ -1,7 +1,6 @@
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
-#include "spio_io_summary.h"
 
 ///
 /// PIO interface to nc_put_varm

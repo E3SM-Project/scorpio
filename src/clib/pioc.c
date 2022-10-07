@@ -14,7 +14,6 @@
 #include "pio_timer.h"
 #endif
 #include "pio_sdecomps_regex.h"
-#include "spio_io_summary.h"
 
 bool fortran_order = false;
 
@@ -1130,13 +1129,6 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
                         "PIO Init failed. Out of memory allocating %lld bytes for I/O system descriptor", (unsigned long long) sizeof(iosystem_desc_t));
     }
 
-    ios->io_fstats = calloc(1, sizeof(spio_io_fstats_summary_t));
-    if(!(ios->io_fstats))
-    {
-        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "PIO Init failed. Out of memory allocating %lld bytes for I/O statistics in the I/O system descriptor", (unsigned long long) sizeof(spio_io_fstats_summary_t));
-    }
-
     ios->sname[0] = '\0';
     ios->io_comm = MPI_COMM_NULL;
     ios->intercomm = MPI_COMM_NULL;
@@ -1290,11 +1282,6 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
         /* Not a fatal error */
         LOG((0, "Creating a unique name for the iosystem (iosysid=%d) failed, ret = %d", *iosysidp, ret));
     }
-
-    /* Set the timer names for this iosystem */
-    snprintf(ios->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "PIO:wr_%s", ios->sname);
-    snprintf(ios->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "PIO:rd_%s", ios->sname);
-    snprintf(ios->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "PIO:tot_%s", ios->sname);
 
     LOG((2, "Init_Intracomm complete iosysid = %d", *iosysidp));
 
@@ -1458,14 +1445,6 @@ int PIOc_finalize(int iosysid)
                             "PIO Finalize failed on iosytem (%d). Error sending async msg for PIO_MSG_FINALIZE", iosysid);
         }
     }
-
-    ierr = spio_write_io_summary(ios);
-    if(ierr != PIO_NOERR)
-    {
-        return pio_err(ios, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
-                        "PIO Finalize failed on iosytem (%d). Unable to write I/O summary for the iosystem", iosysid);
-    }
-    free(ios->io_fstats);
 
     /* Free this memory that was allocated in init_intracomm. */
     if (ios->ioranks)
@@ -1867,12 +1846,6 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, const int *io_proc_list,
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "PIO Init (async) failed. Out of memory");
         }
-        iosys[cmp1]->io_fstats = calloc(1, sizeof(spio_io_fstats_summary_t));
-        if(!(iosys[cmp1]->io_fstats))
-        {
-            return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "PIO init (async) failed. Out of memory allocating %lld bytes for storing I/O statistics in the I/O system descriptor for component %d", (unsigned long long) sizeof(spio_io_fstats_summary_t), cmp1);
-        }
   }
 
     /* Create group for world. */
@@ -2182,10 +2155,6 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, const int *io_proc_list,
             /* Not Fatal error */
             LOG((0, "Creating a unique name for the iosystem (iosysid=%d) failed,ret = %d", my_iosys->iosysid, ret));
         }
-        /* Set the timer names for this iosystem */
-        snprintf(my_iosys->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "PIO:wr_%s", my_iosys->sname);
-        snprintf(my_iosys->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "PIO:rd_%s", my_iosys->sname);
-        snprintf(my_iosys->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "PIO:tot_%s", my_iosys->sname);
     } /* next computational component */
 
     /* Initialize async message signatures */
@@ -2382,12 +2351,6 @@ int PIOc_init_intercomm(int component_count, const MPI_Comm peer_comm,
             GPTLstop("PIO:PIOc_init_intercomm");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "PIO init (async) failed. Out of memory allocating %lld bytes for storing I/O system descriptor for component %d", (unsigned long long) sizeof(iosystem_desc_t), i);
-        }
-        iosys[i]->io_fstats = calloc(1, sizeof(spio_io_fstats_summary_t));
-        if(!(iosys[i]->io_fstats))
-        {
-            return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "PIO init (async) failed. Out of memory allocating %lld bytes for storing I/O statistics in the I/O system descriptor for component %d", (unsigned long long) sizeof(spio_io_fstats_summary_t), i);
         }
 
         /* Initialize the iosystem */
@@ -2817,10 +2780,6 @@ int PIOc_init_intercomm(int component_count, const MPI_Comm peer_comm,
             /* Not Fatal error */
             LOG((0, "Creating a unique name for the iosystem (iosysid=%d) failed,ret = %d", iosys[i]->iosysid, ret));
         }
-        /* Set the timer names for this iosystem */
-        snprintf(iosys[i]->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "PIO:wr_%s", iosys[i]->sname);
-        snprintf(iosys[i]->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "PIO:rd_%s", iosys[i]->sname);
-        snprintf(iosys[i]->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "PIO:tot_%s", iosys[i]->sname);
     }
 
     /* The comp_comms array is freed. The communicators will be freed internally

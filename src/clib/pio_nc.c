@@ -20,7 +20,6 @@
 #ifdef PIO_MICRO_TIMING
 #include "pio_timer.h"
 #endif
-#include "spio_io_summary.h"
 
 #ifdef _ADIOS2
 int get_adios2_type_size(adios2_type type, const void *var)
@@ -4484,7 +4483,6 @@ int PIOc_copy_att(int incid, int ivarid, const char *name,
   assert(ifile);
   ios = ifile->iosystem;
   spio_ltimer_start(ios->io_fstats->tot_timer_name);
-  GPTLstart(ifile->io_fstats->tot_timer_name);
   assert(ios);
 
   /* User must provide name shorter than PIO_MAX_NAME +1. */
@@ -4492,7 +4490,6 @@ int PIOc_copy_att(int incid, int ivarid, const char *name,
     const char *aname = (name) ? name : "UNKNOWN";
     const char *err_msg = (!name) ? "The pointer to attribute name is NULL" : "The length of attribute name exceeds PIO_MAX_NAME";
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-    GPTLstop(ifile->io_fstats->tot_timer_name);
     return pio_err(ios, ifile, PIO_EINVAL, __FILE__, __LINE__,
                     "Copying attribute, %s, associated with variable %s (varid=%d) failed on file %s (ncid=%d). %s", aname, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, err_msg);
   }
@@ -4500,7 +4497,6 @@ int PIOc_copy_att(int incid, int ivarid, const char *name,
   /* Find file corresponding to the output file id */
   if((ierr = pio_get_file(oncid, &ofile))){
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-    GPTLstop(ifile->io_fstats->tot_timer_name);
     return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
                     "Copying attribute (%s) associated with variable (varid=%d) failed on file (ncid=%d). Unable to query internal structure associated with the output file id", name, ovarid, oncid);
   }
@@ -4511,13 +4507,11 @@ int PIOc_copy_att(int incid, int ivarid, const char *name,
   assert(ofile->iosystem);
   if(ofile->iosystem->iosysid != ifile->iosystem->iosysid){
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-    GPTLstop(ifile->io_fstats->tot_timer_name);
     return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
                     "Copying attribute, %s, associated with variable %s (varid=%d) from file %s (ncid=%d, iosystem id = %d) to %s (ncid=%d, iosystem id =%d) failed. The two files operate on different iosystems, we currently do not support copying attributes between files operating on two different iosystems", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, ifile->iosystem->iosysid, pio_get_fname_from_file(ofile), oncid, ofile->iosystem->iosysid);
   }
   if(ofile->iotype != ifile->iotype){
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-    GPTLstop(ifile->io_fstats->tot_timer_name);
     return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
                     "Copying attribute, %s, associated with variable %s (varid=%d) from file %s (ncid=%d, iosystem id = %d, iotype=%s) to %s (ncid=%d, iosystem id =%d, iotype=%s) failed. The iotypes of the two files are different, we currently do not support copying attributes between files with different iotypes", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, ifile->iosystem->iosysid, pio_iotype_to_string(ifile->iotype), pio_get_fname_from_file(ofile), oncid, ofile->iosystem->iosysid, pio_iotype_to_string(ofile->iotype));
   }
@@ -4529,7 +4523,6 @@ int PIOc_copy_att(int incid, int ivarid, const char *name,
     PIO_SEND_ASYNC_MSG(ios, msg, &ierr, incid, ivarid, namelen, name, oncid, ovarid);
     if(ierr != PIO_NOERR){
       spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-      GPTLstop(ifile->io_fstats->tot_timer_name);
       return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                       "Copying attribute, %s, associated with variable %s (varid=%d) from file %s (ncid=%d) to %s (ncid=%d, varid=%d) failed. Unable to send asynchronous message, PIO_MSG_COPY_ATT, on iosystem (iosysid=%d)", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, pio_get_fname_from_file(ofile), oncid, ovarid, ios->iosysid);
     }
@@ -4564,7 +4557,6 @@ int PIOc_copy_att(int incid, int ivarid, const char *name,
             nc_type att_type;
             PIO_Offset att_len = 0, type_sz = 0;
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            GPTLstop(ifile->io_fstats->tot_timer_name);
             ierr = PIOc_inq_att(ifile->fh, ivarid, name, &att_type, &att_len);
             if(ierr != PIO_NOERR){
               ierr = pio_err(ios, ifile, ierr, __FILE__, __LINE__,
@@ -4597,19 +4589,16 @@ int PIOc_copy_att(int incid, int ivarid, const char *name,
             }
             free(pbuf);
             spio_ltimer_start(ios->io_fstats->tot_timer_name);
-            GPTLstart(ifile->io_fstats->tot_timer_name);
             break;
           }
   } /* switch(file->iotype) */
 
   if(ierr != PIO_NOERR){
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-    GPTLstop(ifile->io_fstats->tot_timer_name);
     return pio_err(ios, ifile, ierr, __FILE__, __LINE__,
             "Copying attribute, %s, associated with variable %s (varid=%d) in file %s (ncid=%d) to file %s (ncid=%d) failed with iotype = %s (%d)", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, pio_get_fname_from_file(ofile), oncid, pio_iotype_to_string(ifile->iotype), ifile->iotype);
   }
 
   spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-  GPTLstop(ifile->io_fstats->tot_timer_name);
   return PIO_NOERR;
 }

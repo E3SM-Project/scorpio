@@ -15,7 +15,6 @@
 #include "pio_timer.h"
 #endif
 #include "pio_sdecomps_regex.h"
-#include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
 
 /* uint64_t definition */
@@ -2048,9 +2047,6 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const 
         spio_ltimer_start(file->io_fstats->tot_timer_name);
     }
 
-    ios->io_fstats->wb += vdesc->type_size * iodesc->llen;
-    file->io_fstats->wb += vdesc->type_size * iodesc->llen;
-
     /* If we don't know the fill value for this var, get it. */
 /* TODO handle fill values for HDF5 type later */
 if (file->iotype != PIO_IOTYPE_HDF5)
@@ -2533,8 +2529,6 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
         spio_ltimer_start(file->io_fstats->tot_timer_name);
     }
 
-    ios->io_fstats->rb += vdesc->type_size * iodesc->llen;
-    file->io_fstats->rb += vdesc->type_size * iodesc->llen;
 
 #ifdef PIO_MICRO_TIMING
     mtimer_start(file->varlist[varid].rd_mtimer);

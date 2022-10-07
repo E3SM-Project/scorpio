@@ -754,9 +754,6 @@ typedef struct iosystem_desc_t
     adios2_adios *adiosH;
 #endif
 
-    /** I/O statistics associated with this I/O system */
-    struct spio_io_fstats_summary *io_fstats;
-
     /** Pointer to the next iosystem_desc_t in the list. */
     struct iosystem_desc_t *next;
 } iosystem_desc_t;
@@ -1079,9 +1076,6 @@ typedef struct file_desc_t
      * variables binned on the I/O decomposition used by
      * the variable */
     void *mvcache;
-
-    /** I/O statistics associated with this file */
-    struct spio_io_fstats_summary *io_fstats;
 
     /** Pointer to the next file_desc_t in the list of open files. */
     struct file_desc_t *next;
@@ -1621,5 +1615,9 @@ extern "C" {
 #if defined(__cplusplus)
 }
 #endif
+
+#define spio_ltimer_start(Expression) ;
+#define spio_ltimer_stop(Expression) ;
+
 
 #endif  // _PIO_H_

@@ -161,7 +161,6 @@ int pio_delete_file_from_list(int ncid)
             }
 
             free(cfile->unlim_dimids);
-            free(cfile->io_fstats);
             spio_file_mvcache_finalize(cfile);
             /* Free the memory used for this file. */
             free(cfile);
@@ -196,11 +195,6 @@ int spio_write_all_file_iostats(iosystem_desc_t *iosysp)
         if(pf->iosystem == iosysp)
         {
             assert(pf->iosystem->iosysid == iosysp->iosysid);
-            ret = spio_write_file_io_summary(pf);
-            if(ret != PIO_NOERR)
-            {
-                return ret;
-            }
         }
     }
     return ret;

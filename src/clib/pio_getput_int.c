@@ -12,7 +12,6 @@
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
-#include "spio_io_summary.h"
 
 /**
  * Write a netCDF attribute of any type, converting to any type.
@@ -254,8 +253,6 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 
         if (file->myrank == MPI_ROOT)
         {
-            ios->io_fstats->wb += len * atttype_len;
-            file->io_fstats->wb += len * atttype_len;
         }
 
         char att_name[PIO_MAX_NAME];
@@ -374,8 +371,6 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         {
             if (ios->iomaster == MPI_ROOT)
             {
-                ios->io_fstats->wb += len * atttype_len;
-                file->io_fstats->wb += len * atttype_len;
             }
 
             switch(memtype)
@@ -418,8 +413,6 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         {
             if (ios->iomaster == MPI_ROOT)
             {
-                ios->io_fstats->wb += len * atttype_len;
-                file->io_fstats->wb += len * atttype_len;
             }
 
             switch(memtype)
@@ -661,9 +654,6 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         LOG((2, "PIOc_get_att_tc bcast complete attlen = %d atttype_len = %d memtype_len = %d", attlen, atttype_len,
              memtype_len));
     }
-
-    ios->io_fstats->rb += attlen * atttype_len;
-    file->io_fstats->rb += attlen * atttype_len;
 
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
@@ -1268,9 +1258,6 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     }
     LOG((2, "PIOc_get_vars_tc bcasting data complete"));
 
-    ios->io_fstats->rb += num_elem * typelen;
-    file->io_fstats->rb += num_elem * typelen;
-
     GPTLstop("PIO:PIOc_get_vars_tc");
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1769,9 +1756,6 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     }
                 }
 
-                ios->io_fstats->wb += num_elem * typelen;
-                file->io_fstats->wb += num_elem * typelen;
-
                 assert((strlen("/__pio__/var/") + strlen(av->name)) < PIO_MAX_NAME);
                 snprintf(vname, PIO_MAX_NAME, "/__pio__/var/%s", av->name);
                 av->adios_varid = adios2_inquire_variable(file->ioH, vname);
@@ -1890,9 +1874,6 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 }
                 buf_size *= av->adios_type_size;
                 av_size += buf_size;
-
-                ios->io_fstats->wb += num_elem * typelen;
-                file->io_fstats->wb += num_elem * typelen;
 
                 /* PIOc_put_var may be called multiple times with different start/count values
                  * for a variable. ADIOS should output data for each of those calls not just
@@ -2303,9 +2284,6 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         }
                     }
 
-                    ios->io_fstats->wb += num_elem * typelen;
-                    file->io_fstats->wb += num_elem * typelen;
-
                     switch(xtype)
                     {
                     case NC_BYTE:
@@ -2383,8 +2361,6 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 /* Only the IO master actually does the call. */
                 if (ios->iomaster == MPI_ROOT)
                 {
-                    ios->io_fstats->wb += num_elem * typelen;
-                    file->io_fstats->wb += num_elem * typelen;
                     switch(xtype)
                     {
                     case NC_BYTE:
@@ -2445,8 +2421,6 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         {
             LOG((2, "PIOc_put_vars_tc calling netcdf function file->iotype = %d",
                  file->iotype));
-            ios->io_fstats->wb += num_elem * typelen;
-            file->io_fstats->wb += num_elem * typelen;
             switch(xtype)
             {
 #ifdef _NETCDF

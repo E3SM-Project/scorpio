@@ -5,7 +5,6 @@
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
-#include "spio_io_summary.h"
 
 #ifdef _ADIOS2
 #include "../../tools/adios2pio-nm/adios2pio-nm-lib-c.h"
@@ -890,8 +889,6 @@ int PIOc_closefile(int ncid)
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
         }
 
-        spio_write_file_io_summary(file);
-
         /* Delete file from our list of open files. */
         pio_delete_file_from_list(ncid);
 
@@ -1020,8 +1017,6 @@ int PIOc_closefile(int ncid)
     }
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-
-    spio_write_file_io_summary(file);
 
     /* Delete file from our list of open files. */
     pio_delete_file_from_list(ncid);

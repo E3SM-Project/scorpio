@@ -19,7 +19,6 @@
 #ifdef _HDF5
 #include <sys/stat.h>
 #endif
-#include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
 
 #define VERSNO 2001
@@ -2693,7 +2692,6 @@ int PIO_get_avail_iotypes(char *buf, size_t sz)
 int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *filename,
                         int mode)
 {
-    char tname[SPIO_TIMER_MAX_NAME];
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function codes. */
@@ -2732,27 +2730,9 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                         "Creating file (%s) failed. Out of memory allocating %lld bytes for the file descriptor", filename, (unsigned long long) (sizeof(file_desc_t)));
     }
 
-    file->io_fstats = calloc(sizeof(spio_io_fstats_summary_t), 1);
-    if(!(file->io_fstats))
-    {
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Creating file (%s) failed. Out of memory allocating %lld bytes for caching file I/O statistics", filename, (unsigned long long) (sizeof(spio_io_fstats_summary_t)));
-    }
-
     /* Fill in some file values. */
     file->fh = -1;
     strncpy(file->fname, filename, PIO_MAX_NAME);
-    ierr = pio_create_uniq_str(ios, NULL, tname, SPIO_TIMER_MAX_NAME, "tmp_", "_file");
-    if(ierr != PIO_NOERR)
-    {
-        /* Not a fatal error */
-        LOG((0, "Creating a unique name for the write timer for file (%s, ncid=%d) failed, ret = %d", file->fname, file->pio_ncid, ierr));
-        tname[0] = '\0';
-    }
-
-    snprintf(file->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "PIO:wr_%s", tname);
-    snprintf(file->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "PIO:rd_%s", tname);
-    snprintf(file->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "PIO:tot_%s", tname);
 
     spio_ltimer_start(file->io_fstats->wr_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
@@ -3352,7 +3332,6 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        free(file->io_fstats);
         free(file);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
     }
@@ -3368,7 +3347,6 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        free(file->io_fstats);
         free(file);
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                         "Creating file (%s) failed. Internal error", filename);
@@ -3505,7 +3483,6 @@ int check_unlim_use(int ncid)
 int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filename,
                         int mode, int retry)
 {
-    char tname[SPIO_TIMER_MAX_NAME];
     iosystem_desc_t *ios;      /* Pointer to io system information. */
     file_desc_t *file;         /* Pointer to file information. */
     int imode;                 /* Internal mode val for netcdf4 file open. */
@@ -3551,29 +3528,9 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                         "Opening file (%s) failed. Out of memory allocating %lld bytes for the file structure", filename, (unsigned long long) (sizeof(*file)));
     }
 
-    file->io_fstats = calloc(sizeof(spio_io_fstats_summary_t), 1);
-    if(!(file->io_fstats))
-    {
-        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Opening file (%s) failed. Out of memory allocating %lld bytes for caching file I/O statistics", filename, (unsigned long long) (sizeof(spio_io_fstats_summary_t)));
-    }
-
     /* Fill in some file values. */
     file->fh = -1;
     strncpy(file->fname, filename, PIO_MAX_NAME);
-    ierr = pio_create_uniq_str(ios, NULL, tname, SPIO_TIMER_MAX_NAME, "tmp_", "_file");
-    if(ierr != PIO_NOERR)
-    {
-        /* Not a fatal error */
-        LOG((0, "Creating a unique name for the write timer for file (%s, ncid=%d) failed, ret = %d", file->fname, file->pio_ncid, ierr));
-        tname[0] = '\0';
-    }
-
-    snprintf(file->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "PIO:wr_%s", tname);
-    snprintf(file->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "PIO:rd_%s", tname);
-    snprintf(file->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "PIO:tot_%s", tname);
 
     /* FIXME: Files can be opened for rds and writes */
     spio_ltimer_start(file->io_fstats->rd_timer_name);
@@ -3730,7 +3687,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
 
-                free(file->io_fstats);
                 free(file);
                 PIO_get_avail_iotypes(avail_iotypes, PIO_MAX_NAME);
                 return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
@@ -3805,7 +3761,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        free(file->io_fstats);
         free(file);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
     }
@@ -3818,7 +3773,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        free(file->io_fstats);
         free(file);
         LOG((1, "PIOc_openfile_retry failed, ierr = %d", ierr));
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
