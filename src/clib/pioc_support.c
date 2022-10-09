@@ -2741,6 +2741,7 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 
     /* Fill in some file values. */
     file->fh = -1;
+    file->reserve_extra_header_space = true; /* Set to true for creating output NetCDF files only. */
     strncpy(file->fname, filename, PIO_MAX_NAME);
     ierr = pio_create_uniq_str(ios, NULL, tname, SPIO_TIMER_MAX_NAME, "tmp_", "_file");
     if(ierr != PIO_NOERR)
@@ -3562,6 +3563,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
     /* Fill in some file values. */
     file->fh = -1;
+    file->reserve_extra_header_space = false; /* Set to true for creating output NetCDF files only. */
     strncpy(file->fname, filename, PIO_MAX_NAME);
     ierr = pio_create_uniq_str(ios, NULL, tname, SPIO_TIMER_MAX_NAME, "tmp_", "_file");
     if(ierr != PIO_NOERR)
@@ -4046,24 +4048,35 @@ int pioc_change_def(int ncid, int is_enddef)
          * space in the header when creating NetCDF files. The current calls
          * to nc_enddef()/ncmpi_enddef() need to be replaced with nc__enddef
          * ()/ncmpi__enddef() (note the double underscore).
+         *
+         * This reservation should be made only once: after the header section
+         * is expanded, a new reservation may involve moving (shifting) data,
+         * which can be very expensive if the data sections are huge.
          */
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
             if (is_enddef)
             {
-                /* Sets the pad at the end of the "header" section. */
-                const MPI_Offset h_minfree = 10 * 1024; /* The recommended size by Charlie Zender (NCO developer) is 10 KB */
+                if (file->reserve_extra_header_space)
+                {
+                    /* Sets the pad at the end of the "header" section. */
+                    const MPI_Offset h_minfree = 10 * 1024; /* The recommended size by Charlie Zender (NCO developer) is 10 KB */
 
-                /* Controls the alignment of the beginning of the data section for fixed-size/record variables. */
-                const MPI_Offset v_align = 4; /* For fixed-size variables, needs to be left as the default (4 bytes) */
-                const MPI_Offset r_align = 4; /* For record variables, needs to be left as the default (4 bytes) */
+                    /* Controls the alignment of the beginning of the data section for fixed-size/record variables. */
+                    const MPI_Offset v_align = 4; /* For fixed-size variables, needs to be left as the default (4 bytes) */
+                    const MPI_Offset r_align = 4; /* For record variables, needs to be left as the default (4 bytes) */
 
-                /* Sets the pad at the end of the data section for fixed-size variables. */
-                const MPI_Offset v_minfree = 0; /* This can be left as default (0) */
+                    /* Sets the pad at the end of the data section for fixed-size variables. */
+                    const MPI_Offset v_minfree = 0; /* This can be left as default (0) */
 
-                /* ncmpi__enddef has been available since PnetCDF 1.5.0 (PNETCDF_MIN_VER_REQD is currently 1.8.1) */
-                ierr = ncmpi__enddef(file->fh, h_minfree, v_align, v_minfree, r_align);
+                    /* ncmpi__enddef has been available since PnetCDF 1.5.0 (PNETCDF_MIN_VER_REQD is currently 1.8.1) */
+                    ierr = ncmpi__enddef(file->fh, h_minfree, v_align, v_minfree, r_align);
+
+                    file->reserve_extra_header_space = false;
+                }
+                else
+                    ierr = ncmpi_enddef(file->fh);
             }
             else
                 ierr = ncmpi_redef(file->fh);
@@ -4078,18 +4091,25 @@ int pioc_change_def(int ncid, int is_enddef)
                 if (file->iotype == PIO_IOTYPE_NETCDF)
                 {
 #ifdef NETCDF_C_NC__ENDDEF_EXISTS
-                    /* Sets the pad at the end of the "header" section. */
-                    const size_t h_minfree = 10 * 1024; /* The recommended size by Charlie Zender (NCO developer) is 10 KB */
+                    if (file->reserve_extra_header_space)
+                    {
+                        /* Sets the pad at the end of the "header" section. */
+                        const size_t h_minfree = 10 * 1024; /* The recommended size by Charlie Zender (NCO developer) is 10 KB */
 
-                    /* Controls the alignment of the beginning of the data section for fixed-size/record variables. */
-                    const size_t v_align = 4; /* For fixed-size variables, needs to be left as the default (4 bytes) */
-                    const size_t r_align = 4; /* For record variables, needs to be left as the default (4 bytes) */
+                        /* Controls the alignment of the beginning of the data section for fixed-size/record variables. */
+                        const size_t v_align = 4; /* For fixed-size variables, needs to be left as the default (4 bytes) */
+                        const size_t r_align = 4; /* For record variables, needs to be left as the default (4 bytes) */
 
-                    /* Sets the pad at the end of the data section for fixed-size variables. */
-                    const size_t v_minfree = 0; /* This can be left as default (0) */
+                        /* Sets the pad at the end of the data section for fixed-size variables. */
+                        const size_t v_minfree = 0; /* This can be left as default (0) */
 
-                    /* nc__enddef has been available since NetCDF 3.x (NETCDF_C_MIN_VER_REQD is currently 4.3.3) */
-                    ierr = nc__enddef(file->fh, h_minfree, v_align, v_minfree, r_align);
+                        /* nc__enddef has been available since NetCDF 3.x (NETCDF_C_MIN_VER_REQD is currently 4.3.3) */
+                        ierr = nc__enddef(file->fh, h_minfree, v_align, v_minfree, r_align);
+
+                        file->reserve_extra_header_space = false;
+                    }
+                    else
+                        ierr = nc_enddef(file->fh);
 #else
                     /* CAUTION: nc__enddef may not be available on future NetCDF implementations, switch back to nc_enddef. */
                     ierr = nc_enddef(file->fh);
