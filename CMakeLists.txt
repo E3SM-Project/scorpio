@@ -195,6 +195,20 @@ else()
   endif()
 endif()
 
+# Reserve some extra space in the header when creating NetCDF files. The recommended size by Charlie Zender (NCO developer) is 10 KB
+set(DEF_SPIO_RESERVED_FILE_HDR_SZ 10240)
+if(DEFINED PIO_RESERVED_FILE_HEADER_SIZE)
+  if(PIO_RESERVED_FILE_HEADER_SIZE GREATER_EQUAL 0)
+    message(STATUS "Reserving some extra space in the header when creating NetCDF files, requested bytes = " ${PIO_RESERVED_FILE_HEADER_SIZE})
+  else()
+    message(WARNING "User-defined PIO_RESERVED_FILE_HEADER_SIZE is invalid, setting it to " ${DEF_SPIO_RESERVED_FILE_HDR_SZ} " (default)")
+    set(PIO_RESERVED_FILE_HEADER_SIZE ${DEF_SPIO_RESERVED_FILE_HDR_SZ})
+  endif()
+else()
+  set(PIO_RESERVED_FILE_HEADER_SIZE ${DEF_SPIO_RESERVED_FILE_HDR_SZ})
+  message(STATUS "Reserving some extra space in the header when creating NetCDF files, requested bytes = " ${PIO_RESERVED_FILE_HEADER_SIZE} " (default)")
+endif()
+
 #==============================================================================
 #  DETECT SYSTEM/COMPILERS (and set compiler specific options)
 #==============================================================================

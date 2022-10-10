@@ -52,6 +52,9 @@
 /** Striping unit hint in bytes for a Lustre or GPFS file system. */
 #define PIO_STRIPING_UNIT @PIO_STRIPING_UNIT@
 
+/** Extra bytes reserved in the header when creating NetCDF files. */
+#define PIO_RESERVED_FILE_HEADER_SIZE @PIO_RESERVED_FILE_HEADER_SIZE@
+
 /** Set to 1 if the library is configured to use the PnetCDF library,
  *  0 otherwise */
 #define PIO_USE_PNETCDF @PIO_USE_PNETCDF@

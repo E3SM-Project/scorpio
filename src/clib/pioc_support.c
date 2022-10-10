@@ -4060,8 +4060,10 @@ int pioc_change_def(int ncid, int is_enddef)
             {
                 if (file->reserve_extra_header_space)
                 {
-                    /* Sets the pad at the end of the "header" section. */
-                    const MPI_Offset h_minfree = 10 * 1024; /* The recommended size by Charlie Zender (NCO developer) is 10 KB */
+                    /* Sets the pad at the end of the "header" section.
+                     * The recommended size by Charlie Zender (NCO developer) is 10 KB */
+                    assert(PIO_RESERVED_FILE_HEADER_SIZE >= 0);
+                    const MPI_Offset h_minfree = PIO_RESERVED_FILE_HEADER_SIZE;
 
                     /* Controls the alignment of the beginning of the data section for fixed-size/record variables. */
                     const MPI_Offset v_align = 4; /* For fixed-size variables, needs to be left as the default (4 bytes) */
@@ -4093,8 +4095,10 @@ int pioc_change_def(int ncid, int is_enddef)
 #ifdef NETCDF_C_NC__ENDDEF_EXISTS
                     if (file->reserve_extra_header_space)
                     {
-                        /* Sets the pad at the end of the "header" section. */
-                        const size_t h_minfree = 10 * 1024; /* The recommended size by Charlie Zender (NCO developer) is 10 KB */
+                        /* Sets the pad at the end of the "header" section.
+                         * The recommended size by Charlie Zender (NCO developer) is 10 KB */
+                        assert(PIO_RESERVED_FILE_HEADER_SIZE >= 0);
+                        const MPI_Offset h_minfree = PIO_RESERVED_FILE_HEADER_SIZE;
 
                         /* Controls the alignment of the beginning of the data section for fixed-size/record variables. */
                         const size_t v_align = 4; /* For fixed-size variables, needs to be left as the default (4 bytes) */
