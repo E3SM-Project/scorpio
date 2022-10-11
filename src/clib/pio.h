@@ -1089,6 +1089,10 @@ typedef struct file_desc_t
     /** True if this task should participate in IO (only true for one
      * task with netcdf serial files. */
     int do_io;
+
+    /** True if we need reserve some extra space in the header when
+     * creating NetCDF files to accommodate anticipated changes. */
+    bool reserve_extra_header_space;
 } file_desc_t;
 
 /**
