@@ -6,8 +6,10 @@
 module pio_types
     use pio_kinds
     use iso_c_binding
+    use spio_netcdf_types, only : PIO_CONTIGUOUS, PIO_CHUNKED, PIO_COMPACT
     implicit none
     private
+
     !-------------------------------------------
     !  data structure to describe decomposition
     !-------------------------------------------
@@ -301,9 +303,13 @@ module pio_types
    double precision, public, parameter :: PIO_FILL_DOUBLE = 9.9692099683868690e+36;
 #endif
 #endif
+
    integer, public, parameter :: PIO_num_OST =  16
    ! Generic error code for internal errors in the library
    integer, public, parameter :: PIO_EINTERNAL = -501
+
+   ! Export types from spio_netcdf_types
+   public :: PIO_CONTIGUOUS, PIO_CHUNKED, PIO_COMPACT
 
 !>
 !! @defgroup PIO_rearr_comm_t PIO_rearr_comm_t

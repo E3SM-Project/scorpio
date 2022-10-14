@@ -82,6 +82,7 @@ set (PIO_Fortran_SRCS
   spio_file.F90
   spio_misc_api_cint.F90
   spio_misc_api.F90
+  spio_netcdf_types.F90
   pio_nf.F90
   pio.F90
   pio_types.F90

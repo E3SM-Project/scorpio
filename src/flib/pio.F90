@@ -35,7 +35,8 @@ module pio
 #endif
        pio_64bit_offset, pio_64bit_data, &
        pio_internal_error, pio_bcast_error, pio_reduce_error,&
-          pio_return_error, pio_default
+          pio_return_error, pio_default,&
+       pio_contiguous, pio_chunked, pio_compact
 
   use spio_misc_api, only : pio_set_buffer_size_limit
   use spio_darray, only : pio_read_darray, pio_write_darray
