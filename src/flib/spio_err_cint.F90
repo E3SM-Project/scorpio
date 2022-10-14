@@ -86,4 +86,22 @@ INTERFACE
   END FUNCTION PIOc_Set_IOSystem_Error_Handling
 END INTERFACE
 
+INTERFACE
+!> @private
+!! @brief Get a descriptive string/text for an error code
+!!
+!! @param[in] errcode The error code
+!! @param[out] errmsg The error message corresponding to the error code
+!! @param[in] errmsg_len The length of the user buffer, @p errmsg
+!! @returns Returns PIO_NOERR on success, an error code otherwise
+  INTEGER(C_INT) FUNCTION PIOc_strerror(errcode, errmsg, errmsg_len)&
+                          bind(C,name="PIOc_strerror")
+    USE iso_c_binding
+
+    INTEGER(C_INT), VALUE :: errcode
+    CHARACTER(C_CHAR), DIMENSION(*) :: errmsg
+    INTEGER(C_SIZE_T), VALUE :: errmsg_len
+  END FUNCTION PIOc_strerror
+END INTERFACE
+
 END MODULE spio_err_cint

@@ -18,7 +18,7 @@ module pio
                         pio_deletefile, pio_setframe, pio_advanceframe,&
                         pio_syncfile, pio_file_is_open
   use spio_misc_api, only : pio_set_buffer_size_limit, pio_iotype_available
-  use spio_err, only : pio_setdebuglevel, pio_seterrorhandling
+  use spio_err, only : pio_setdebuglevel, pio_seterrorhandling, pio_strerror, pio_set_log_level
 
   use pio_types, only : io_desc_t, file_desc_t, var_desc_t, iosystem_desc_t, &
        pio_rearr_opt_t, pio_rearr_comm_fc_opt_t, pio_rearr_comm_fc_2d_enable,&
@@ -62,14 +62,12 @@ module pio
        PIO_def_var   ,        &
        PIO_def_var_deflate   ,        &
        PIO_redef     ,          &
-       PIO_set_log_level,          &
        PIO_inquire_variable , &
        PIO_inquire_dimension, &
        PIO_set_chunk_cache, &
        PIO_get_chunk_cache, &
        PIO_set_var_chunk_cache, &
        PIO_get_var_chunk_cache, &
-       PIO_strerror, &
        PIO_copy_att
 
   use spio_put_att, only : PIO_put_att

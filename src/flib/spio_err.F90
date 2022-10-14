@@ -21,7 +21,8 @@ MODULE spio_err
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: pio_error, pio_warn, pio_setdebuglevel, pio_seterrorhandling
+  PUBLIC :: pio_error, pio_warn, pio_setdebuglevel, pio_seterrorhandling,&
+            pio_strerror, pio_set_log_level
 
 !> @defgroup PIO_error PIO_error
 !! @brief Handles error codes in the Fortran interface
@@ -315,4 +316,49 @@ CONTAINS
     END IF
 
   END SUBROUTINE pio_seterrorhandling_file
+
+!> @defgroup PIO_strerror
+!!
+!! @brief Get a descriptive string/text for an error code
+!!
+!! @param[in] errcode The error code
+!! @param[out] errmsg The error message corresponding to the error code
+!! @returns Returns PIO_NOERR on success, the error code, err_num,
+!! otherwise
+  INTEGER FUNCTION pio_strerror(errcode, errmsg) RESULT(ierr)
+    INTEGER, INTENT(IN) :: errcode
+    CHARACTER(LEN=*), INTENT(OUT) :: errmsg
+
+    CHARACTER(C_CHAR) :: cerrmsg(PIO_MAX_NAME)
+    INTEGER :: i
+
+    cerrmsg = C_NULL_CHAR
+    errmsg = ' '
+    ierr = PIOc_strerror(errcode, cerrmsg, INT(PIO_MAX_NAME, C_SIZE_T))
+    IF(ierr == PIO_NOERR) THEN
+      ! FIXME: Since we don't have access to the I/O system we cannot use c2fstring here
+      DO i=1,MIN(PIO_MAX_NAME, LEN(errmsg))
+        IF(cerrmsg(i) == C_NULL_CHAR) THEN
+          EXIT
+        END IF
+        errmsg(i:i) = cerrmsg(i)
+      END DO
+    END IF
+
+  END FUNCTION pio_strerror
+
+!> @defgroup PIO_set_log_level
+!!
+!! @brief Set the log level for the I/O library
+!!
+!! @param[in] log_level The new log level for the I/O library
+!! @returns Returns PIO_NOERR on success, the error code, err_num,
+!! otherwise
+  INTEGER FUNCTION pio_set_log_level(log_level) RESULT(ierr)
+    INTEGER, INTENT(IN) :: log_level
+
+    ierr = PIOc_set_log_level(log_level)
+
+  END FUNCTION pio_set_log_level
+
 END MODULE spio_err
