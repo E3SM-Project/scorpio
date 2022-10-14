@@ -71,6 +71,20 @@ endforeach ()
 #==============================================================================
 
 set (PIO_Fortran_SRCS
+  spio_inq_file_cint.F90
+  spio_inq_file.F90
+  spio_inq_att_cint.F90
+  spio_inq_att.F90
+  spio_inq_dim_cint.F90
+  spio_inq_dim.F90
+  spio_inq_var_cint.F90
+  spio_inq_var.F90
+  spio_def_var_cint.F90
+  spio_def_var.F90
+  spio_def_file_cint.F90
+  spio_def_file.F90
+  spio_def_dim_cint.F90
+  spio_def_dim.F90
   spio_util_cint.F90
   spio_util.F90
   spio_err_cint.F90

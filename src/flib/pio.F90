@@ -38,37 +38,24 @@ module pio
           pio_return_error, pio_default,&
        pio_contiguous, pio_chunked, pio_compact
 
-  use spio_misc_api, only : pio_set_buffer_size_limit
+  use spio_misc_api, only : pio_set_buffer_size_limit,  pio_iotype_available,&
+                            pio_set_chunk_cache, pio_get_chunk_cache,&
+                            pio_copy_att
   use spio_darray, only : pio_read_darray, pio_write_darray
 
-  use pio_nf, only:        &
-       PIO_enddef,            &
-       PIO_inquire ,          &
-       PIO_inq_attname ,  &
-       PIO_inq_att ,          &
-       PIO_inq_attlen ,    &
-       PIO_inq_varid ,      &
-       PIO_inq_varname ,  &
-       PIO_inq_vartype ,  &
-       PIO_inq_varndims ,&
-       PIO_inq_vardimid ,&
-       PIO_inq_varnatts ,&
-       PIO_inq_var_deflate ,&
-       PIO_inq_dimid ,      &
-       PIO_inq_dimname ,  &
-       PIO_inq_dimlen ,    &
-       PIO_inq_unlimdim, &
-       PIO_def_dim   ,        &
-       PIO_def_var   ,        &
-       PIO_def_var_deflate   ,        &
-       PIO_redef     ,          &
-       PIO_inquire_variable , &
-       PIO_inquire_dimension, &
-       PIO_set_chunk_cache, &
-       PIO_get_chunk_cache, &
-       PIO_set_var_chunk_cache, &
-       PIO_get_var_chunk_cache, &
-       PIO_copy_att
+  use spio_def_file, only : pio_enddef, pio_redef
+  use spio_inq_file, only : pio_inq_nvars, pio_inq_ndims, pio_inq_natts, pio_inq_unlimdim,&
+                            pio_inquire
+  use spio_def_var, only :  pio_def_var, pio_def_var_deflate, pio_def_var_chunking,&
+                            pio_set_var_chunk_cache, pio_get_var_chunk_cache
+  use spio_inq_var, only :  pio_inq_varid, pio_inq_varname, pio_inq_vartype, pio_inq_varndims,&
+                            pio_inq_varnatts, pio_inq_vardimid, pio_inq_var_deflate,&
+                            pio_inquire_variable
+  use spio_def_dim, only :  pio_def_dim
+  use spio_inq_dim, only :  pio_inq_dimid, pio_inq_dimname, pio_inq_dimlen,&
+                            pio_inquire_dimension
+  use spio_inq_att, only :  pio_inq_attid, pio_inq_attname, pio_inq_atttype, pio_inq_attlen,&
+                            pio_inq_att
 
   use spio_put_att, only : PIO_put_att
   use spio_get_att, only : PIO_get_att
