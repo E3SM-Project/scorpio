@@ -857,11 +857,11 @@ static int needs_to_write_decomp(file_desc_t *file, int ioid)
 static int register_decomp(file_desc_t *file, int ioid)
 {
     assert(file != NULL);
-    if (file->n_written_ioids >= ADIOS_PIO_MAX_DECOMPS)
+    if ((file->n_written_ioids + 1) > PIO_MAX_ADIOS_DECOMPS)
     {
         return pio_err(NULL, file, PIO_EINVAL, __FILE__, __LINE__,
-                       "Registering (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). I/O decompositions registered (%d) exceeds the maximum decompositions (%d) allowed for the file",
-                       ioid, pio_get_fname_from_file(file), file->pio_ncid, file->n_written_ioids, ADIOS_PIO_MAX_DECOMPS);
+                       "Registering (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). I/O decompositions registered: %d, the maximum decompositions allowed: %d",
+                       ioid, pio_get_fname_from_file(file), file->pio_ncid, file->n_written_ioids, PIO_MAX_ADIOS_DECOMPS);
     }
 
     file->written_ioids[file->n_written_ioids] = ioid;

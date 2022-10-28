@@ -55,9 +55,7 @@
 #include <limits.h>
 #include <adios2_c.h>
 
-#define ADIOS_PIO_MAX_DECOMPS 1024 /* Maximum number of decomps */
-#define MAX_STEP_CALLS 128 /* Maximum number of application steps before adios end step is called */
-#define MAX_ADIOS_BUFFER_COUNT (MAX_STEP_CALLS + 16) /* Maximum buffer size for aggregating decomp_id, frame_id, and fillval_id values */
+#define MAX_ADIOS_BUFFER_COUNT (PIO_MAX_CACHED_STEPS_FOR_ADIOS + 16) /* Maximum buffer size for aggregating decomp_id, frame_id, and fillval_id values */
 #define BLOCK_MAX_BUFFER ((unsigned long)INT_MAX) /* 2GB limit of MPI_Gatherv */
 /* adios end step is called if the number of blocks written out exceeds BLOCK_COUNT_THRESHOLD */
 #define BLOCK_COUNT_THRESHOLD ((unsigned long)(1024 * 1024 * 1024 * 1.9))
@@ -954,7 +952,7 @@ typedef struct file_desc_t
      * during ADIOS metadata write operation.
      *
      * if num_written_blocks * BLOCK_METADATA_SIZE >= BLOCK_COUNT_THRESHOLD, call adios2_end_step
-     * (Not implemented in this version. adios2_end_step is called if num_step_calls >= max_step_calls (= MAX_STEP_CALLS))
+     * (Not implemented in this version. adios2_end_step is called if num_step_calls >= max_step_calls (= PIO_MAX_CACHED_STEPS_FOR_ADIOS))
      */
     unsigned int num_written_blocks;
 
@@ -1024,7 +1022,7 @@ typedef struct file_desc_t
 
     /** Array for decompositions that has been written already (must write only once) */
     int n_written_ioids;
-    int written_ioids[ADIOS_PIO_MAX_DECOMPS]; /* written_ioids[N] = ioid if that decomp has been already written, */
+    int written_ioids[PIO_MAX_ADIOS_DECOMPS]; /* written_ioids[N] = ioid if that decomp has been already written, */
 
     /** Store current frameid for end_step in PIO_setframe */
     int current_frame;

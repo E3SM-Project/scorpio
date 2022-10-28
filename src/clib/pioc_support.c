@@ -357,7 +357,7 @@ static int initialize_adios2_variables(iosystem_desc_t *ios, file_desc_t *file)
     }
 
     /* Call adios end step in PIOc_setframe(), if num_step_calls>max_step_calls */
-    file->max_step_calls = MAX_STEP_CALLS;
+    file->max_step_calls = PIO_MAX_CACHED_STEPS_FOR_ADIOS;
     file->num_step_calls = 0;
     file->current_frame = -1;
     file->begin_step_called = 0;
