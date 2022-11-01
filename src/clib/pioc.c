@@ -249,39 +249,56 @@ int PIOc_setframe(int ncid, int varid, int frame)
     /* Add end_step here. Check for frame value of the ncid. */
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
-        if (file->current_frame < 0)
+        GPTLstart("PIOc_setframe_adios2");
+        if (file->adios_io_process == 1)
         {
-            file->current_frame = frame;
-        }
-        else if (file->current_frame != frame)
-        {
-            if (file->mode & PIO_WRITE)
+            if (file->current_frame < 0)
             {
-                spio_ltimer_start(ios->io_fstats->wr_timer_name);
-                spio_ltimer_start(file->io_fstats->wr_timer_name);
-                GPTLstart("PIO:write_total");
-                GPTLstart("PIO:write_total_adios");
+                file->current_frame = frame;
             }
-            spio_ltimer_start(ios->io_fstats->tot_timer_name);
-            spio_ltimer_start(file->io_fstats->tot_timer_name);
-
-            ret = end_adios2_step(file, ios);
-
-            if (file->mode & PIO_WRITE)
+            else if (file->current_frame != frame)
             {
-                spio_ltimer_stop(ios->io_fstats->wr_timer_name);
-                spio_ltimer_stop(file->io_fstats->wr_timer_name);
-                GPTLstop("PIO:write_total");
-                GPTLstop("PIO:write_total_adios");
+                if (file->mode & PIO_WRITE)
+                {
+                    spio_ltimer_start(ios->io_fstats->wr_timer_name);
+                    spio_ltimer_start(file->io_fstats->wr_timer_name);
+                    GPTLstart("PIO:write_total");
+                    GPTLstart("PIO:write_total_adios");
+                }
+                spio_ltimer_start(ios->io_fstats->tot_timer_name);
+                spio_ltimer_start(file->io_fstats->tot_timer_name);
+
+                file->num_step_calls = file->num_step_calls + 1;
+                if (file->num_step_calls >= file->max_step_calls)
+                {
+                    GPTLstart("end_adios2_step_PIOc_setframe");
+                    ret = end_adios2_step(file, ios);
+                    GPTLstop("end_adios2_step_PIOc_setframe");
+                    file->num_step_calls = 0;
+                }
+
+                if (file->mode & PIO_WRITE)
+                {
+                    spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                    GPTLstop("PIO:write_total");
+                    GPTLstop("PIO:write_total_adios");
+                }
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+                if (ret != PIO_NOERR)
+                {
+                    GPTLstop("PIOc_setframe_adios2");
+                    return pio_err(ios, file, ret, __FILE__, __LINE__,
+                                   "ADIOS end step failed for file (%s) for var (%s). (iosysid=%d)",
+                                   pio_get_fname_from_file(file), pio_get_vname_from_file(file, varid), ios->iosysid);
+                }
+
+                file->current_frame = frame;
             }
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
-
-            if (ret != PIO_NOERR)
-                return ret;
-
-            file->current_frame = frame;
         }
+        GPTLstop("PIOc_setframe_adios2");
     }
 #endif
 
@@ -1021,6 +1038,98 @@ unsigned long get_adios2_io_cnt()
 {
     return adios2_io_cnt++;
 }
+
+static int init_adios_comm(iosystem_desc_t *ios)
+{
+    int mpierr = MPI_SUCCESS;
+
+    /**** Group processes for block merging ****/
+    MPI_Info info = MPI_INFO_NULL;
+    mpierr = MPI_Info_create(&info);
+    if (mpierr != MPI_SUCCESS)
+    {
+        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
+
+    MPI_Comm nodeComm = MPI_COMM_NULL;
+    int nodeNProc, nodeRank;
+    mpierr = MPI_Comm_split_type(ios->union_comm, MPI_COMM_TYPE_SHARED, 0, info, &nodeComm);
+    if (mpierr != MPI_SUCCESS)
+    {
+        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
+
+    MPI_Comm_rank(nodeComm, &nodeRank);
+    MPI_Comm_size(nodeComm, &nodeNProc);
+
+    /* Compute the io_group_size per node */
+    int io_group_size;
+    if (ios->num_iotasks <= 0 || ios->num_iotasks > ios->num_comptasks)
+    {
+        io_group_size = nodeNProc;
+    }
+    else
+    {
+        io_group_size = ios->num_comptasks / ios->num_iotasks;
+        if ((io_group_size * ios->num_iotasks) != ios->num_comptasks)
+        {
+            io_group_size++;
+        }
+
+        if (io_group_size > nodeNProc)
+        {
+            io_group_size = nodeNProc;
+        }
+    }
+
+    /* Cluster processes on the same node into I/O groups */
+    int io_color = (int)(nodeRank / io_group_size);
+
+    MPI_Comm nodeBlockComm = MPI_COMM_NULL;
+    int nodeBlockNProc, nodeBlockRank;
+    mpierr = MPI_Comm_split(nodeComm, io_color, 0, &nodeBlockComm);
+    if (mpierr != MPI_SUCCESS)
+    {
+        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
+
+    MPI_Comm_rank(nodeBlockComm, &nodeBlockRank);
+    MPI_Comm_size(nodeBlockComm, &nodeBlockNProc);
+
+    ios->block_comm = nodeBlockComm;
+    ios->block_myrank = nodeBlockRank;
+    ios->block_nprocs = nodeBlockNProc;
+
+    ios->adios_io_process = 0;
+    if (nodeBlockRank == 0)
+    {
+        ios->adios_io_process = 1;
+    }
+
+    ios->adios_comm = MPI_COMM_NULL;
+    mpierr = MPI_Comm_split(ios->union_comm, ios->adios_io_process, 0, &(ios->adios_comm));
+    if (mpierr != MPI_SUCCESS)
+    {
+        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
+
+    MPI_Comm_rank(ios->adios_comm, &(ios->adios_rank));
+    MPI_Comm_size(ios->adios_comm, &(ios->num_adiostasks));
+
+    if (nodeComm != MPI_COMM_NULL)
+    {
+        MPI_Comm_free(&nodeComm);
+        nodeComm = MPI_COMM_NULL;
+    }
+
+    if (info != MPI_INFO_NULL)
+    {
+        MPI_Info_free(&info);
+        info = MPI_INFO_NULL;
+    }
+
+    return PIO_NOERR;
+}
 #endif
 
 /**
@@ -1160,11 +1269,22 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
 
 #ifdef _ADIOS2
     /* Initialize ADIOS for each io system */
-    ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
-    if (ios->adiosH == NULL)
+    ios->adiosH = NULL;
+    ret = init_adios_comm(ios);
+    if (ret != PIO_NOERR)
     {
         GPTLstop("PIO:PIOc_Init_Intracomm");
         return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
+    }
+
+    if (ios->adios_io_process == 1)
+    {
+        ios->adiosH = adios2_init(ios->adios_comm, adios2_debug_mode_on);
+        if (ios->adiosH == NULL)
+        {
+            GPTLstop("PIO:PIOc_Init_Intracomm");
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
+        }
     }
 #endif
 
@@ -1517,16 +1637,28 @@ int PIOc_finalize(int iosysid)
 #endif
 
 #ifdef _ADIOS2
-    if (ios->adiosH != NULL)
+    if (ios->adios_io_process == 1 && ios->adiosH != NULL)
     {
         adios2_error adiosErr = adios2_finalize(ios->adiosH);
         if (adiosErr != adios2_error_none)
         {
             GPTLstop("PIO:PIOc_finalize");
-            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)", convert_adios2_error_to_string(adiosErr), iosysid);
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)",
+                           convert_adios2_error_to_string(adiosErr), iosysid);
         }
-
         ios->adiosH = NULL;
+    }
+
+    if (ios->block_comm != MPI_COMM_NULL)
+    {
+        MPI_Comm_free(&(ios->block_comm));
+        ios->block_comm = MPI_COMM_NULL;
+    }
+
+    if (ios->adios_comm != MPI_COMM_NULL)
+    {
+        MPI_Comm_free(&(ios->adios_comm));
+        ios->adios_comm = MPI_COMM_NULL;
     }
 #endif
 

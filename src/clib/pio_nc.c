@@ -799,7 +799,15 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
 
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        return ierr;
+
+        /* A failure to inquire is not fatal */
+        if (ierr != PIO_NOERR)
+        {
+            LOG((1, "PIOc_inq_dim with ADIOS type failed, ierr = %d", ierr));
+            return ierr;
+        }
+
+        return PIO_NOERR;
     }
 #endif
 
@@ -1032,7 +1040,15 @@ int PIOc_inq_dimid(int ncid, const char *name, int *idp)
 
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        return ierr;
+
+        /* A failure to inquire is not fatal */
+        if (ierr != PIO_NOERR)
+        {
+            LOG((1, "PIOc_inq_dimid with ADIOS type failed, ierr = %d", ierr));
+            return ierr;
+        }
+
+        return PIO_NOERR;
     }
 #endif
  
@@ -1177,7 +1193,15 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
 
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        return ierr;
+
+        /* A failure to inquire is not fatal */
+        if (ierr != PIO_NOERR)
+        {
+            LOG((1, "PIOc_inq_var with ADIOS type failed, ierr = %d", ierr));
+            return ierr;
+        }
+
+        return PIO_NOERR;
     }
 #endif
 
@@ -1614,7 +1638,15 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
 
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        return ierr;
+
+        /* A failure to inquire is not fatal */
+        if (ierr != PIO_NOERR)
+        {
+            LOG((1, "PIOc_inq_varid with ADIOS type failed, ierr = %d", ierr));
+            return ierr;
+        }
+
+        return PIO_NOERR;
     }
 #endif
 
@@ -1801,7 +1833,15 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
 
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        return ierr;
+
+        /* A failure to inquire is not fatal */
+        if (ierr != PIO_NOERR)
+        {
+            LOG((1, "PIOc_inq_att with ADIOS type failed, ierr = %d", ierr));
+            return ierr;
+        }
+
+        return PIO_NOERR;
     }
 #endif
 
@@ -2776,22 +2816,29 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            return ierr;
+            return pio_err(NULL, file, ierr, __FILE__, __LINE__,
+                           "adios2_begin_step failed for file (%s)", pio_get_fname_from_file(file));
         }
 
         char dimname[PIO_MAX_NAME];
         snprintf(dimname, PIO_MAX_NAME, "/__pio__/dim/%s", name);
-        adios2_variable *variableH = adios2_inquire_variable(file->ioH, dimname);
-        if (variableH == NULL)
+        adios2_variable *variableH = NULL;
+        if (file->adios_io_process == 1)
         {
-            variableH = adios2_define_variable(file->ioH, dimname, adios2_type_uint64_t,
-                                               0, NULL, NULL, NULL,
-                                               adios2_constant_dims_false);
+            variableH = adios2_inquire_variable(file->ioH, dimname);
             if (variableH == NULL)
             {
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)", dimname, pio_get_fname_from_file(file), file->pio_ncid);
+                variableH = adios2_define_variable(file->ioH, dimname, adios2_type_uint64_t,
+                                                   0, NULL, NULL, NULL,
+                                                   adios2_constant_dims_false);
+                if (variableH == NULL)
+                {
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                                   dimname, pio_get_fname_from_file(file), file->pio_ncid);
+                }
             }
         }
 
@@ -2800,15 +2847,19 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
         file->dim_values[file->num_dim_vars] = len;
         *idp = file->num_dim_vars;
         ++file->num_dim_vars;
-        adios2_error adiosErr = adios2_put(file->engineH, variableH, &len, adios2_mode_sync);
-        file->num_written_blocks += file->num_all_procs;
-        if (adiosErr != adios2_error_none)
+        adios2_error adiosErr = adios2_error_none;
+        if (file->adios_io_process == 1)
         {
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
-                           dimname, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+            adiosErr = adios2_put(file->engineH, variableH, &len, adios2_mode_sync);
+            if (adiosErr != adios2_error_none)
+            {
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                               dimname, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+            }
+            file->num_written_blocks += file->num_alltasks;
         }
 
         if (len == PIO_UNLIMITED)
@@ -3028,14 +3079,15 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            return ierr;
+            return pio_err(NULL, file, ierr, __FILE__, __LINE__,
+                           "adios2_begin_step failed for file (%s)", pio_get_fname_from_file(file));
         }
 
         assert(file->num_vars < PIO_MAX_VARS);
         file->adios_vars[file->num_vars].name = strdup(name);
         file->adios_vars[file->num_vars].nc_type = xtype;
         file->adios_vars[file->num_vars].adios_type = PIOc_get_adios_type(xtype);
-        file->adios_vars[file->num_vars].adios_type_size = get_adios2_type_size(file->adios_vars[file->num_vars].adios_type, NULL);
+        file->adios_vars[file->num_vars].adios_type_size = (size_t)get_adios2_type_size(file->adios_vars[file->num_vars].adios_type, NULL);
         file->adios_vars[file->num_vars].nattrs = 0;
         file->adios_vars[file->num_vars].ndims = ndims;
         file->adios_vars[file->num_vars].adios_varid = NULL;
@@ -3052,9 +3104,6 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
         file->adios_vars[file->num_vars].num_wb_buffer = NULL;
         file->adios_vars[file->num_vars].num_wb_cnt = 0;
         file->adios_vars[file->num_vars].max_buffer_cnt = MAX_ADIOS_BUFFER_COUNT;
-
-        /* Block merge */
-        file->adios_vars[file->num_vars].elem_size = 0;
 
         file->adios_vars[file->num_vars].gdimids = (int*) malloc(ndims * sizeof(int));
         if (file->adios_vars[file->num_vars].gdimids == NULL)
@@ -3075,7 +3124,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
         /* This is needed to reconstruct the variable during conversion from BP to NetCDF */
         {
             adios_var_desc_t *av = &(file->adios_vars[*varidp]);
-            if (file->myrank == 0)
+            if (file->adios_io_process == 1 && file->adios_rank == 0)
             {
                 char att_name[PIO_MAX_NAME];
                 assert((strlen("/__pio__/var/") + strlen(av->name) + strlen("/def/ndims")) < PIO_MAX_NAME);

@@ -211,7 +211,8 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             GPTLstop("PIO:PIOc_put_att_tc_adios");
             GPTLstop("PIO:write_total_adios");
-            return ierr;
+            return pio_err(NULL, file, ierr, __FILE__, __LINE__,
+                           "adios2_begin_step failed for file (%s)", pio_get_fname_from_file(file));
         }
 
         adios2_type adios_type = PIOc_get_adios_type(atttype);
@@ -242,7 +243,9 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             GPTLstop("PIO:PIOc_put_att_tc_adios");
             GPTLstop("PIO:write_total_adios");
-            return PIO_EMAXATTS;
+            return pio_err(NULL, file, PIO_EMAXATTS, __FILE__, __LINE__,
+                           "num_attrs (%d) is larger than or equal to pio_max_vars (%d) for file (%s)",
+                           num_attrs, PIO_MAX_VARS, pio_get_fname_from_file(file));
         }
         file->adios_attrs[num_attrs].att_name = strdup(name);
         file->adios_attrs[num_attrs].att_len = len;
@@ -252,37 +255,40 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         file->adios_attrs[num_attrs].adios_type = adios_type;
         file->num_attrs++;
 
-        if (file->myrank == MPI_ROOT)
+        if (file->all_rank == MPI_ROOT)
         {
             ios->io_fstats->wb += len * atttype_len;
             file->io_fstats->wb += len * atttype_len;
         }
 
         char att_name[PIO_MAX_NAME];
-        snprintf(att_name, PIO_MAX_NAME, "%s/%s", path, name);
-        adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, att_name);
-        if (attributeH == NULL)
+        if (file->adios_io_process == 1)
         {
-            if (NC_CHAR == atttype || adios2_type_string == adios_type)
-                attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_string, op);
-            else
-                attributeH = adios2_define_attribute(file->ioH, att_name, adios_type, op);
-
+            snprintf(att_name, PIO_MAX_NAME, "%s/%s", path, name);
+            adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, att_name);
             if (attributeH == NULL)
             {
-                GPTLstop("PIO:PIOc_put_att_tc");
-                GPTLstop("PIO:write_total");
-                spio_ltimer_stop(ios->io_fstats->wr_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->wr_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                GPTLstop("PIO:PIOc_put_att_tc_adios");
-                GPTLstop("PIO:write_total_adios");
-                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
-                                att_name, pio_get_fname_from_file(file), file->pio_ncid);
+                if (NC_CHAR == atttype || adios2_type_string == adios_type)
+                    attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_string, op);
+                else
+                    attributeH = adios2_define_attribute(file->ioH, att_name, adios_type, op);
+
+                if (attributeH == NULL)
+                {
+                    GPTLstop("PIO:PIOc_put_att_tc");
+                    GPTLstop("PIO:write_total");
+                    spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    GPTLstop("PIO:PIOc_put_att_tc_adios");
+                    GPTLstop("PIO:write_total_adios");
+                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
+                                   att_name, pio_get_fname_from_file(file), file->pio_ncid);
+                }
+                file->num_written_blocks += 1;
             }
-            file->num_written_blocks += 1;
         }
 
         GPTLstop("PIO:PIOc_put_att_tc");
@@ -1707,7 +1713,8 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             GPTLstop("PIO:PIOc_put_vars_tc_adios");
             GPTLstop("PIO:write_total_adios");
-            return ierr;
+            return pio_err(NULL, file, ierr, __FILE__, __LINE__,
+                           "adios2_begin_step failed for file (%s)", pio_get_fname_from_file(file));
         }
 
         adios2_error adiosErr = adios2_error_none;
@@ -1742,7 +1749,7 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         {
             /* Only the IO master does the IO, so we are not really
              * getting parallel IO here. */
-            if (file->myrank == 0)
+            if (file->adios_io_process == 1 && file->adios_rank == 0)
             {
                 if (start)
                 {
@@ -1837,7 +1844,7 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             }
 
             /* Only the IO master actually does these ADIOS calls. */
-            if (file->myrank == 0)
+            if (file->adios_io_process == 1 && file->adios_rank == 0)
             {
                 /* Write start and count arrays to be able to reconstruct the variable during conversion. */
                 int64_t pio_var_start[PIO_MAX_DIMS], pio_var_count[PIO_MAX_DIMS];
@@ -2014,7 +2021,7 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
 
         /* Only the IO master actually does these ADIOS calls. */
-        if (file->myrank == 0)
+        if (file->adios_io_process == 1 && file->adios_rank == 0)
         {
             char att_name[PIO_MAX_NAME];
             assert((strlen("/__pio__/var/") + strlen("/def/ndims") + strlen(av->name)) < PIO_MAX_NAME);
