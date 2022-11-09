@@ -3725,7 +3725,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     }
 
     /* Broadcast open mode to all tasks. */
-    if ((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+    if ((mpierr = MPI_Bcast_Wrapper(&file->mode, 1, MPI_INT, ios->ioroot, ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -4467,7 +4467,7 @@ int calc_var_rec_sz(int ncid, int varid)
               * dimlen[i]; 
         }
     }
-    mpierr = MPI_Bcast(&(file->varlist[varid].vrsize), 1, MPI_OFFSET,
+    mpierr = MPI_Bcast_Wrapper(&(file->varlist[varid].vrsize), 1, MPI_OFFSET,
                         ios->ioroot, ios->my_comm);
     if(mpierr != MPI_SUCCESS)
     {
@@ -5922,3 +5922,23 @@ int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file)
     return PIO_NOERR;
 }
 #endif
+
+int MPI_Bcast_Wrapper(void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm)
+{
+    int rank = -1;
+    int size = -1;
+    static long counter = 0;
+
+    counter++;
+
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &size);
+
+    if (rank == size - 1)
+    {
+        printf("MPI_Bcast is called, counter = %ld\n", counter);
+        fflush(stdout);
+    }
+
+    return MPI_Bcast(buffer, count, datatype, root, comm);
+}

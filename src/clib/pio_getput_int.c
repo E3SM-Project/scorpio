@@ -792,7 +792,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 
     /* Broadcast results to all tasks. */
     LOG((2, "bcasting att values attlen = %d memtype_len = %d", attlen, memtype_len));
-    if ((mpierr = MPI_Bcast(ip, (int)attlen * memtype_len, MPI_BYTE, ios->ioroot,
+    if ((mpierr = MPI_Bcast_Wrapper(ip, (int)attlen * memtype_len, MPI_BYTE, ios->ioroot,
                             ios->my_comm)))
     {
         GPTLstop("PIO:PIOc_get_att_tc");
@@ -1268,7 +1268,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     /* Send the data. */
     LOG((2, "PIOc_get_vars_tc bcasting data num_elem = %d typelen = %d ios->ioroot = %d", num_elem,
          typelen, ios->ioroot));
-    if ((mpierr = MPI_Bcast(buf, num_elem * typelen, MPI_BYTE, ios->ioroot, ios->my_comm)))
+    if ((mpierr = MPI_Bcast_Wrapper(buf, num_elem * typelen, MPI_BYTE, ios->ioroot, ios->my_comm)))
     {
         GPTLstop("PIO:PIOc_get_vars_tc");
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);

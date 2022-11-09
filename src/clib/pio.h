@@ -1653,6 +1653,8 @@ extern "C" {
     int end_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
 #endif
 
+    int MPI_Bcast_Wrapper(void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm);
+
 #if defined(__cplusplus)
 }
 #endif

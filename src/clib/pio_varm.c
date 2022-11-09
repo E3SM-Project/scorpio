@@ -1139,7 +1139,7 @@ int PIOc_get_varm_uchar (int ncid, int varid, const PIO_Offset start[], const PI
 
     if (ios->async || bcast ||
         (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        MPI_Bcast_Wrapper(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1217,7 +1217,7 @@ int PIOc_get_varm_schar (int ncid, int varid, const PIO_Offset start[], const PI
 
     if (ios->async || bcast ||
         (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        MPI_Bcast_Wrapper(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1295,7 +1295,7 @@ int PIOc_get_varm_double (int ncid, int varid, const PIO_Offset start[], const P
 
     if (ios->async || bcast ||
         (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        MPI_Bcast_Wrapper(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1373,7 +1373,7 @@ int PIOc_get_varm_text (int ncid, int varid, const PIO_Offset start[], const PIO
 
     if (ios->async || bcast ||
         (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        MPI_Bcast_Wrapper(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1451,7 +1451,7 @@ int PIOc_get_varm_int (int ncid, int varid, const PIO_Offset start[], const PIO_
 
     if (ios->async || bcast ||
         (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        MPI_Bcast_Wrapper(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1529,7 +1529,7 @@ int PIOc_get_varm_uint (int ncid, int varid, const PIO_Offset start[], const PIO
 
     if (ios->async || bcast ||
         (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        MPI_Bcast_Wrapper(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1602,7 +1602,7 @@ int PIOc_get_varm (int ncid, int varid, const PIO_Offset start[], const PIO_Offs
 
     if (ios->async || bcast ||
         (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        MPI_Bcast_Wrapper(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1680,7 +1680,7 @@ int PIOc_get_varm_float (int ncid, int varid, const PIO_Offset start[], const PI
 
     if (ios->async || bcast ||
         (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        MPI_Bcast_Wrapper(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1758,7 +1758,7 @@ int PIOc_get_varm_long (int ncid, int varid, const PIO_Offset start[], const PIO
 
     if (ios->async || bcast ||
         (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        MPI_Bcast_Wrapper(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1836,7 +1836,7 @@ int PIOc_get_varm_ushort (int ncid, int varid, const PIO_Offset start[], const P
 
     if (ios->async || bcast ||
         (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        MPI_Bcast_Wrapper(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1914,7 +1914,7 @@ int PIOc_get_varm_longlong (int ncid, int varid, const PIO_Offset start[], const
 
     if (ios->async || bcast ||
         (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        MPI_Bcast_Wrapper(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1992,7 +1992,7 @@ int PIOc_get_varm_short (int ncid, int varid, const PIO_Offset start[], const PI
 
     if (ios->async || bcast ||
         (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        MPI_Bcast_Wrapper(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -2070,7 +2070,7 @@ int PIOc_get_varm_ulonglong (int ncid, int varid, const PIO_Offset start[], cons
 
     if (ios->async || bcast ||
         (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        MPI_Bcast_Wrapper(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
