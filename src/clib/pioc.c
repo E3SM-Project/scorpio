@@ -806,7 +806,7 @@ int PIOc_InitDecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, in
 
         /* Depending on array size and io-blocksize the actual number
          * of io tasks used may vary. */
-        if ((mpierr = MPI_Bcast(&(iodesc->num_aiotasks), 1, MPI_INT, ios->ioroot,
+        if ((mpierr = MPI_Bcast_Wrapper(&(iodesc->num_aiotasks), 1, MPI_INT, ios->ioroot,
                                 ios->my_comm)))
         {
             GPTLstop("PIO:PIOc_initdecomp");

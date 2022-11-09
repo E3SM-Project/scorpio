@@ -235,7 +235,7 @@ int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast_Wrapper(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -249,7 +249,7 @@ int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (ndimsp)
-        if ((mpierr = MPI_Bcast(ndimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(ndimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -257,7 +257,7 @@ int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
         }
 
     if (nvarsp)
-        if ((mpierr = MPI_Bcast(nvarsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(nvarsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -265,7 +265,7 @@ int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
         }
 
     if (ngattsp)
-        if ((mpierr = MPI_Bcast(ngattsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(ngattsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -273,7 +273,7 @@ int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
         }
 
     if (unlimdimidp)
-        if ((mpierr = MPI_Bcast(unlimdimidp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(unlimdimidp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -469,7 +469,7 @@ int PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
 #endif
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast_Wrapper(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -484,7 +484,7 @@ int PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
     }
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
-    if ((mpierr = MPI_Bcast(&tmp_nunlimdims, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+    if ((mpierr = MPI_Bcast_Wrapper(&tmp_nunlimdims, 1, MPI_INT, ios->ioroot, ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -492,7 +492,7 @@ int PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
     }
     
     if (nunlimdimsp)
-        if ((mpierr = MPI_Bcast(nunlimdimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(nunlimdimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -500,7 +500,7 @@ int PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
         }
 
     if (unlimdimidsp)
-        if ((mpierr = MPI_Bcast(unlimdimidsp, tmp_nunlimdims, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(unlimdimidsp, tmp_nunlimdims, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -644,14 +644,14 @@ int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
         int slen;
         if (ios->iomaster == MPI_ROOT)
             slen = strlen(name);
-        if ((mpierr = MPI_Bcast(&slen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(&slen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
         if (!mpierr)
-            if ((mpierr = MPI_Bcast((void *)name, slen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
+            if ((mpierr = MPI_Bcast_Wrapper((void *)name, slen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
             {
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -659,7 +659,7 @@ int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
             }
     }
     if (sizep)
-        if ((mpierr = MPI_Bcast(sizep , 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(sizep , 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -754,7 +754,7 @@ int PIOc_inq_format(int ncid, int *formatp)
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (formatp)
-        if ((mpierr = MPI_Bcast(formatp , 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(formatp , 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -919,7 +919,7 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast_Wrapper(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -940,13 +940,13 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
         LOG((2, "bcasting results my_comm = %d", ios->my_comm));
         if (ios->iomaster == MPI_ROOT)
             slen = strlen(name);
-        if ((mpierr = MPI_Bcast(&slen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(&slen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
-        if ((mpierr = MPI_Bcast((void *)name, slen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper((void *)name, slen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -955,7 +955,7 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
     }
 
     if (lenp)
-        if ((mpierr = MPI_Bcast(lenp , 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(lenp , 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1153,7 +1153,7 @@ int PIOc_inq_dimid(int ncid, const char *name, int *idp)
     LOG((3, "nc_inq_dimid call complete ierr = %d", ierr));
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast_Wrapper(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1169,7 +1169,7 @@ int PIOc_inq_dimid(int ncid, const char *name, int *idp)
 
     /* Broadcast results. */
     if (idp)
-        if ((mpierr = MPI_Bcast(idp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(idp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1419,7 +1419,7 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast_Wrapper(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1436,13 +1436,13 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
     /* Broadcast the results for non-null pointers. */
     if (ios->iomaster == MPI_ROOT)
         slen = strlen(my_name);
-    if ((mpierr = MPI_Bcast(&slen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+    if ((mpierr = MPI_Bcast_Wrapper(&slen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
     }
-    if ((mpierr = MPI_Bcast((void *)my_name, slen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
+    if ((mpierr = MPI_Bcast_Wrapper((void *)my_name, slen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1505,7 +1505,7 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
     }
 #endif
 
-    if ((mpierr = MPI_Bcast(&(file->varlist[varid].rec_var), 1, MPI_INT, ios->ioroot, ios->my_comm)))
+    if ((mpierr = MPI_Bcast_Wrapper(&(file->varlist[varid].rec_var), 1, MPI_INT, ios->ioroot, ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1513,7 +1513,7 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
     }
 
     if (xtypep)
-        if ((mpierr = MPI_Bcast(xtypep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(xtypep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1524,7 +1524,7 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
     {
         LOG((2, "PIOc_inq_var about to Bcast ndims = %d ios->ioroot = %d ios->my_comm = %d",
              *ndimsp, ios->ioroot, ios->my_comm));
-        if ((mpierr = MPI_Bcast(ndimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(ndimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1534,13 +1534,13 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
     }
     if (dimidsp)
     {
-        if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(&ndims, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
-        if ((mpierr = MPI_Bcast(dimidsp, ndims, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(dimidsp, ndims, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1548,7 +1548,7 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
         }
     }
     if (nattsp)
-        if ((mpierr = MPI_Bcast(nattsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(nattsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1778,7 +1778,7 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast_Wrapper(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1794,7 +1794,7 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (varidp)
-        if ((mpierr = MPI_Bcast(varidp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(varidp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2005,7 +2005,7 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast_Wrapper(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2021,14 +2021,14 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
 
     /* Broadcast results. */
     if (xtypep)
-        if ((mpierr = MPI_Bcast(xtypep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(xtypep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (lenp)
-        if ((mpierr = MPI_Bcast(lenp, 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(lenp, 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2165,14 +2165,14 @@ int PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
     if (name)
     {
         int namelen = strlen(name);
-        if ((mpierr = MPI_Bcast(&namelen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(&namelen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
         /* Casting to void to avoid warnings on some compilers. */
-        if ((mpierr = MPI_Bcast((void *)name, namelen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper((void *)name, namelen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2277,7 +2277,7 @@ int PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast_Wrapper(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2293,7 +2293,7 @@ int PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
 
     /* Broadcast results. */
     if (idp)
-        if ((mpierr = MPI_Bcast(idp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(idp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2825,7 +2825,7 @@ int PIOc_set_fill(int ncid, int fillmode, int *old_modep)
     if (old_modep)
     {
         LOG((2, "old_mode = %d", *old_modep));
-        if ((mpierr = MPI_Bcast(old_modep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(old_modep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -3065,7 +3065,7 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (idp)
-        if ((mpierr = MPI_Bcast(idp , 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(idp , 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -3195,7 +3195,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
         }
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
-        if ((mpierr = MPI_Bcast(&invalid_unlim_dim, 1, MPI_INT, ios->comproot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(&invalid_unlim_dim, 1, MPI_INT, ios->comproot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -3578,7 +3578,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
     /* Broadcast results. */
     /* FIXME: varidp should be valid, no need to check it here */
     if (varidp)
-        if ((mpierr = MPI_Bcast(varidp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(varidp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -3773,13 +3773,13 @@ int PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_value
         }
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
-        if ((mpierr = MPI_Bcast(&xtype, 1, MPI_INT, ios->comproot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(&xtype, 1, MPI_INT, ios->comproot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
-        if ((mpierr = MPI_Bcast(&type_size, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(&type_size, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -3919,13 +3919,13 @@ int PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
         }
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
-        if ((mpierr = MPI_Bcast(&xtype, 1, MPI_INT, ios->comproot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(&xtype, 1, MPI_INT, ios->comproot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
-        if ((mpierr = MPI_Bcast(&type_size, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(&type_size, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -4029,14 +4029,14 @@ int PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (no_fill)
-        if ((mpierr = MPI_Bcast(no_fill, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(no_fill, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (fill_valuep)
-        if ((mpierr = MPI_Bcast(fill_valuep, type_size, MPI_CHAR, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(fill_valuep, type_size, MPI_CHAR, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);

@@ -1664,6 +1664,8 @@ extern "C" {
 #endif
 #endif
 
+    int MPI_Bcast_Wrapper(void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm);
+
 #if defined(__cplusplus)
 }
 #endif
