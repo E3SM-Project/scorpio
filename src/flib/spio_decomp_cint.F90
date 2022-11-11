@@ -191,4 +191,74 @@ INTERFACE
   END FUNCTION PIOc_sync
 END INTERFACE
 
+INTERFACE
+!! @public
+!! @brief Read an I/O decomposition from a file
+!!
+!! @details
+!! @param[in] fname The name of the input file with the I/O decomposition
+!! @param[out] ndims  The number of dimensions in the I/O decomposition
+!!                    is returned in this arg
+!! @param[out] gdims  Pointer to a 1D array where the global dimensions
+!!                    of the I/O decomposition will be saved. The array
+!!                    is allocated by the library
+!! @param[out] mapsz  The size of the I/O decomposition map, @p map, is
+!!                    returned in this arg
+!! @param[out] map    Pointer to a 1D array where the I/O decomposition
+!!                    mapping (between the local data index and the global
+!!                    linearized index for each local data element) will
+!!                    be saved. The array is allocated by the library
+!! @param[in] comm  The MPI communicator (that contains the MPI processes
+!!                  in the I/O system associated with the I/O decomposition)
+!! @return PIO_NOERR on success, an error code otherwise
+!!
+  INTEGER(C_INT) FUNCTION PIOc_readmap_from_f90(fname, ndims, gdims, mapsz,&
+                            map, comm)&
+                            bind(C,name="PIOc_readmap_from_f90")
+    USE iso_c_binding
+    USE pio_kinds, ONLY : PIO_OFFSET_F2C_TYPE_KIND 
+
+    CHARACTER(C_CHAR), DIMENSION(*), INTENT(IN) :: fname
+    INTEGER(C_INT), INTENT(OUT) :: ndims
+    TYPE(C_PTR), INTENT(OUT) :: gdims
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), INTENT(OUT) :: mapsz
+    TYPE(C_PTR), INTENT(OUT) :: map
+    INTEGER(C_INT), VALUE, INTENT(IN) :: comm
+  END FUNCTION PIOc_readmap_from_f90
+END INTERFACE
+
+INTERFACE
+!! @public
+!! @brief Write an I/O decomposition to a file
+!!
+!! @details
+!! @param[in] fname The name of the input file with the I/O decomposition
+!! @param[in] ioid  The id of the I/O decomposition
+!! @param[in] ndims  The number of dimensions in the I/O decomposition
+!! @param[in] gdims  Pointer to a 1D array with the global dimensions
+!!                    of the I/O decomposition
+!! @param[in] mapsz  The size of the I/O decomposition map, @p map
+!! @param[in] map    Pointer to a 1D array with the I/O decomposition
+!!                    mapping (between the local data index and the global
+!!                    linearized index for each local data element)
+!! @param[in] comm  The MPI communicator (that contains the MPI processes
+!!                  in the I/O system associated with the I/O decomposition)
+!! @return PIO_NOERR on success, an error code otherwise
+!!
+  INTEGER(C_INT) FUNCTION PIOc_writemap_from_f90(fname, ioid, ndims, gdims,&
+                            mapsz, map, comm)&
+                            bind(C,name="PIOc_writemap_from_f90")
+    USE iso_c_binding
+    USE pio_kinds, ONLY : PIO_OFFSET_F2C_TYPE_KIND 
+
+    CHARACTER(C_CHAR), DIMENSION(*), INTENT(IN) :: fname
+    INTEGER(C_INT), VALUE, INTENT(IN) :: ioid
+    INTEGER(C_INT), VALUE, INTENT(IN) :: ndims
+    INTEGER(C_INT), DIMENSION(*), INTENT(IN) :: gdims
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), VALUE, INTENT(IN) :: mapsz
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), DIMENSION(*), INTENT(IN) :: map
+    INTEGER(C_INT), VALUE, INTENT(IN) :: comm
+  END FUNCTION PIOc_writemap_from_f90
+END INTERFACE
+
 END MODULE spio_decomp_cint

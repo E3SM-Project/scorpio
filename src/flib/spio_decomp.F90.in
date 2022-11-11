@@ -25,7 +25,8 @@ MODULE spio_decomp
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: pio_initdecomp, pio_freedecomp, pio_get_local_array_size
+  PUBLIC :: pio_initdecomp, pio_freedecomp, pio_get_local_array_size,&
+            pio_readdof, pio_writedof
 
 !> @defgroup PIO_initdecomp PIO_initdecomp
 !! @brief Initialize an I/O decomposition
@@ -44,6 +45,19 @@ MODULE spio_decomp
     MODULE PROCEDURE pio_freedecomp_file
   END INTERFACE
 
+!> @defgroup PIO_readdof PIO_readdof
+!! @brief Write/Save the I/O decomposition
+  INTERFACE pio_readdof
+    ! TYPE int,offset
+    MODULE PROCEDURE pio_readdof_{TYPE}
+  END INTERFACE
+
+!> @defgroup PIO_writedof PIO_writedof
+!! @brief Write/Save the I/O decomposition
+  INTERFACE pio_writedof
+    ! TYPE int,offset
+    MODULE PROCEDURE pio_writedof_{TYPE}
+  END INTERFACE
 CONTAINS
 
 ! TYPE int,offset
@@ -415,4 +429,136 @@ CONTAINS
     lsz = INT(clsz)
 
   END FUNCTION pio_get_local_array_size
+
+! TYPE int,offset
+!> @ingroup PIO_readdof
+!! @public
+!! @brief Read an I/O decomposition from a file (saved using PIO_writedof())
+!!
+!! @details
+!! @param[in] fname The name of the input file with the I/O decomposition
+!! @param[out] ndims  The number of dimensions in the I/O decomposition
+!!                    is returned in this arg
+!! @param[out] gdims  Pointer to a 1D array where the global dimensions
+!!                    of the I/O decomposition will be saved. The array
+!!                    is allocated by the library
+!! @param[out] map    Pointer to a 1D array where the I/O decomposition
+!!                    mapping (between the local data index and the global
+!!                    linearized index for each local data element) will
+!!                    be saved. The array is allocated by the library
+!!                    e.g. If after partitioning the local array contains
+!!                    A(2,3) and A(3,3) of an array A[4x4], the map will
+!!                    contain [10, 11] corrsponding to the linearized
+!!                    indices of A(2,3) & A(3,3)
+!! @param[in] comm  The MPI communicator (that contains the MPI processes
+!!                  in the I/O system associated with the I/O decomposition)
+!! @param[out] ierr (Optional) @copydoc error_return
+!!
+  SUBROUTINE pio_readdof_{TYPE}(fname, ndims, gdims, map, comm, ierr)
+    ! Note: The old interface supported an optional argument, punit, that is no
+    ! longer used/supported
+    CHARACTER(LEN=*), INTENT(IN) :: fname
+    INTEGER, INTENT(OUT) :: ndims
+    INTEGER, POINTER, INTENT(OUT) :: gdims(:)
+    {VTYPE}, POINTER, INTENT(OUT) :: map(:)
+    INTEGER, INTENT(IN) :: comm
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    INTEGER(C_INT) :: ret, cndims
+    TYPE(C_PTR) :: cgdims, cmap
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND) :: cmapsz
+#ifdef TIMING
+    CALL t_startf("PIO:readdof")
+#endif
+
+    ret = PIOc_readmap_from_f90(TRIM(fname) // C_NULL_CHAR, cndims, cgdims,&
+                                  cmapsz, cmap, INT(comm, C_INT))
+
+    ndims = INT(cndims)
+
+    ! Convert the C pointers (pointing to buffers allocated by the C library)
+    ! to Fortran pointers
+    ! FIXME: This kind of pointer conversion can be problematic when the
+    ! size of Fortran integers differ from C integers
+    CALL C_F_POINTER(cgdims, gdims, (/ndims/))
+    ! FIXME: This conversion assumes that the types of map(:),
+    ! PIO_OFFSET_KIND/INTEGER, and cmap(:), PIO_OFFSET_F2C_TYPE_KIND, are
+    ! compatible. The code below instead needs to be copying with type casts
+    CALL C_F_POINTER(cmap, map, (/cmapsz/))
+
+    IF(PRESENT(ierr)) THEN
+      ierr = INT(ret)
+    END IF
+
+#ifdef TIMING
+    CALL t_stopf("PIO:readdof")
+#endif
+  END SUBROUTINE pio_readdof_{TYPE}
+
+! TYPE int,offset
+!> @ingroup PIO_writedof
+!! @public
+!! @brief Write/Save an I/O decomposition
+!!
+!! @details
+!! @param[in] fname The name of the output file where the I/O decomposition
+!!                  will be saved/written out
+!! @param[in] gdims The global dimensions of the I/O decomposition
+!! @param[in] map   The mapping between local data index and the global
+!!                  linearized index for each local data element
+!!                  e.g. If after partitioning the local array contains
+!!                  A(2,3) and A(3,3) of an array A[4x4], the map needs
+!!                  to contain [10, 11] corrsponding to the linearized
+!!                  indices of A(2,3) & A(3,3)
+!! @param[in] comm  The MPI communicator (that contains the MPI processes
+!!                  in the I/O system associated with the I/O
+!!                  decomposition)
+!! @param[in] ioid  (Optional) The I/O decomposition id
+!! @param[out] ierr (Optional) @copydoc error_return
+!!
+  SUBROUTINE pio_writedof_{TYPE}(fname, gdims, map, comm, ioid, ierr)
+    ! Note: The old interface supported an optional argument, punit, that is no
+    ! longer used/supported
+    CHARACTER(LEN=*), INTENT(IN) :: fname
+    INTEGER, INTENT(IN) :: gdims(:)
+    {VTYPE}, INTENT(IN) :: map(:)
+    INTEGER, INTENT(IN) :: comm
+    INTEGER, OPTIONAL, INTENT(IN) :: ioid
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    INTEGER :: i
+    INTEGER(C_INT) :: ret, cioid, ndims
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND) :: mapsz
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), DIMENSION(:), ALLOCATABLE :: cmap
+#ifdef TIMING
+    CALL t_startf("PIO:writedof")
+#endif
+
+    IF(PRESENT(ioid)) THEN
+      cioid = ioid
+    ELSE
+      cioid = PIO_IOID_INVALID
+    END IF
+
+    ndims = INT(SIZE(gdims), C_INT)
+    mapsz = INT(SIZE(map), PIO_OFFSET_F2C_TYPE_KIND)
+    ALLOCATE(cmap(mapsz))
+    DO i=1,SIZE(map)
+      cmap(i) = INT(map(i), PIO_OFFSET_F2C_TYPE_KIND)
+    END DO
+
+    ret = PIOc_writemap_from_f90(TRIM(fname) // C_NULL_CHAR, cioid, ndims, gdims,&
+                                  mapsz, cmap, INT(comm, C_INT))
+
+    DEALLOCATE(cmap)
+
+    IF(PRESENT(ierr)) THEN
+      ierr = INT(ret)
+    END IF
+
+#ifdef TIMING
+    CALL t_stopf("PIO:writedof")
+#endif
+  END SUBROUTINE pio_writedof_{TYPE}
+
 END MODULE spio_decomp

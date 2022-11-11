@@ -11,7 +11,8 @@ module pio
 
   use pio_kinds, only :  pio_offset_kind
 
-  use spio_decomp, only : pio_initdecomp, pio_freedecomp, pio_get_local_array_size
+  use spio_decomp, only : pio_initdecomp, pio_freedecomp, pio_get_local_array_size,&
+                          pio_readdof, pio_writedof
   use spio_init, only : pio_init, pio_finalize, pio_getnumiotasks, pio_get_numiotasks,&
                         pio_set_hint, pio_set_rearr_opts
   use spio_file, only : pio_openfile, pio_createfile, pio_closefile,&
@@ -61,7 +62,6 @@ module pio
   use spio_get_att, only : PIO_get_att
   use spio_put_var, only : PIO_put_var
   use spio_get_var, only : PIO_get_var
-  use pio_support, only: pio_writedof
   use iso_c_binding
 
   implicit none
