@@ -29,8 +29,9 @@ MODULE spio_init
 
   PRIVATE
   PUBLIC :: pio_init, pio_finalize,&
+            pio_iosystem_is_active, pio_iotask_rank, pio_iam_iotask,&
             pio_getnumiotasks, pio_get_numiotasks, pio_set_hint,&
-            pio_set_rearr_opts
+            pio_set_rearr_opts, pio_set_blocksize
 
 !> @defgroup pio_init
 !! @public
@@ -363,6 +364,109 @@ CONTAINS
 #endif
   END SUBROUTINE pio_finalize
 
+!> @defgroup PIO_iosystem_is_active
+!! @public
+!! @brief Query if an I/O subsystem is active
+!!
+!! @details
+!! @param[in] iosys The handle to the I/O system. @copydoc iosystem_desc_t
+!! @param[out] is_active Set to .TRUE. is the I/O system is active,
+!!                        .FALSE. otherwise
+!! @param[out] ierr (Optional) @copydoc error_return
+!!
+  SUBROUTINE pio_iosystem_is_active(iosys, is_active, ierr)
+    TYPE(iosystem_desc_t), INTENT(IN) :: iosys
+    LOGICAL, INTENT(OUT) :: is_active
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    LOGICAL(C_BOOL) :: cis_active
+    INTEGER(C_INT) :: cerr
+
+#ifdef TIMING
+    ! Ignore timing since the call is not costly
+    ! call t_startf("PIO:pio_iosystem_is_active")
+#endif
+
+    cerr = PIOc_iosystem_is_active(iosys%iosysid, cis_active)
+    IF(PRESENT(ierr)) THEN
+      ierr = INT(cerr)
+    ENDIF
+
+    is_active = cis_active
+
+#ifdef TIMING
+    ! Ignore timing since the call is not costly
+    ! call t_stopf("PIO:pio_iosystem_is_active")
+#endif
+  END SUBROUTINE pio_iosystem_is_active
+
+!> @defgroup PIO_iotask_rank
+!! @public
+!! @brief Query the rank of the current process in the I/O system
+!!
+!! @details
+!! @param[in] iosys The handle to the I/O system. @copydoc iosystem_desc_t
+!! @param[out] ierr (Optional) @copydoc error_return
+!! @returns The rank of the current process in the I/O system
+!!
+  INTEGER FUNCTION pio_iotask_rank(iosys, ierr) RESULT(rank)
+    TYPE(iosystem_desc_t), INTENT(IN) :: iosys
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    INTEGER(C_INT) :: cerr, crank
+
+#ifdef TIMING
+    ! Ignore timing since the call is not costly
+    ! call t_startf("PIO:pio_iotask_rank")
+#endif
+
+    cerr = PIOc_iotask_rank(iosys%iosysid, crank)
+    IF(PRESENT(ierr)) THEN
+      ierr = INT(cerr)
+    ENDIF
+
+    rank = INT(crank)
+
+#ifdef TIMING
+    ! Ignore timing since the call is not costly
+    ! call t_stopf("PIO:pio_iotask_rank")
+#endif
+  END FUNCTION pio_iotask_rank
+
+!> @defgroup PIO_iam_iotask
+!! @public
+!! @brief Query if the current process is an I/O process/task in the I/O system
+!!
+!! @details
+!! @param[in] iosys The handle to the I/O system. @copydoc iosystem_desc_t
+!! @param[out] ierr (Optional) @copydoc error_return
+!! @returns .TRUE. if the current I/O process/task is an I/O process,
+!!          .FALSE. otherwise
+!!
+  LOGICAL FUNCTION pio_iam_iotask(iosys, ierr) RESULT(is_iotask)
+    TYPE(iosystem_desc_t), INTENT(IN) :: iosys
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    INTEGER(C_INT) :: cerr
+    LOGICAL(C_BOOL) :: cis_iotask
+
+#ifdef TIMING
+    ! Ignore timing since the call is not costly
+    ! call t_startf("PIO:pio_iam_iotask")
+#endif
+
+    cerr = PIOc_iam_iotask(iosys%iosysid, cis_iotask)
+    IF(PRESENT(ierr)) THEN
+      ierr = INT(cerr)
+    ENDIF
+
+    is_iotask = cis_iotask
+#ifdef TIMING
+    ! Ignore timing since the call is not costly
+    ! call t_stopf("PIO:pio_iam_iotask")
+#endif
+  END FUNCTION pio_iam_iotask
+
 !> @ingroup PIO_getnumiotasks
 !! @public
 !! @brief Get the number of I/O processes/tasks in the I/O subsystem
@@ -514,5 +618,38 @@ CONTAINS
     ierr = INT(cret)
 
   END FUNCTION pio_set_rearr_opts
+
+!> @defgroup PIO_set_blocksize
+!! @public
+!! @brief Set the size of the blocks used by the BOX rearranger.
+!!
+!! @details
+!! The internal BOX rearranger rearranges data into contiguous blocks on
+!! the I/O processes. This call sets the size (approx) of these contiguous
+!! blocks on the I/O processes.
+!! @param[in] blocksz The new block size
+!! @param[out] ierr (Optional) @copydoc error_return
+!!
+  SUBROUTINE pio_set_blocksize(blocksz, ierr)
+    INTEGER, INTENT(IN) :: blocksz
+    INTEGER, OPTIONAL, INTENT(OUT) :: ierr
+
+    INTEGER(C_INT) :: cerr
+
+#ifdef TIMING
+    ! Ignore timing since the call is not costly
+    ! call t_startf("PIO:pio_set_blocksize")
+#endif
+
+    cerr = PIOc_set_blocksize(blocksz)
+    IF(PRESENT(ierr)) THEN
+      ierr = INT(cerr)
+    ENDIF
+
+#ifdef TIMING
+    ! Ignore timing since the call is not costly
+    ! call t_stopf("PIO:pio_set_blocksize")
+#endif
+  END SUBROUTINE pio_set_blocksize
 
 END MODULE spio_init

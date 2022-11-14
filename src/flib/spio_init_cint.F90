@@ -124,6 +124,62 @@ INTERFACE
 END INTERFACE
 
 INTERFACE
+!! @private
+!! @brief Query if an I/O subsystem is active
+!!
+!! @details
+!! @param[in] iosysid The id/handle to the I/O system.
+!! @param[out] is_active Set to true is the I/O system is active,
+!!                        false otherwise
+!! @returns PIO_NOERR on success, an error code otherwise
+!!
+  INTEGER(C_INT) FUNCTION PIOc_iosystem_is_active(iosysid, is_active)&
+                          bind(C,name="PIOc_iosystem_is_active")
+    USE iso_c_binding
+
+    INTEGER(C_INT), INTENT(IN), VALUE :: iosysid
+    LOGICAL(C_BOOL), INTENT(OUT) :: is_active
+  END FUNCTION PIOc_iosystem_is_active
+END INTERFACE
+
+INTERFACE
+!! @privatge
+!! @brief Query the rank of the current process in the I/O system
+!!
+!! @details
+!! @param[in] iosysid The id/handle to the I/O system.
+!! @param[out] rank The rank of the current process in the I/O system
+!! @returns PIO_NOERR on success, an error code otherwise
+!!
+  INTEGER(C_INT) FUNCTION PIOc_iotask_rank(iosysid, rank)&
+                          bind(C,name="PIOc_iotask_rank")
+    USE iso_c_binding
+
+    INTEGER(C_INT), INTENT(IN), VALUE :: iosysid
+    INTEGER(C_INT), INTENT(OUT) :: rank
+  END FUNCTION PIOc_iotask_rank
+END INTERFACE
+
+INTERFACE
+!! @private
+!! @brief Query if the current process is an I/O process/task in the I/O system
+!!
+!! @details
+!! @param[in] iosysid The id/handle to the I/O system.
+!! @param[out] is_iotask Set to true if the current process is an I/O process in
+!!                        the I/O system, false otherwise
+!! @returns PIO_NOERR on success, an error code otherwise
+!!
+  INTEGER(C_INT) FUNCTION PIOc_iam_iotask(iosysid, is_iotask)&
+                          bind(C,name="PIOc_iam_iotask")
+    USE iso_c_binding
+
+    INTEGER(C_INT), INTENT(IN), VALUE :: iosysid
+    LOGICAL(C_BOOL), INTENT(OUT) :: is_iotask
+  END FUNCTION PIOc_iam_iotask
+END INTERFACE
+
+INTERFACE
 !! @brief Fortran interface to C function to get the number of I/O tasks
 !! in an I/O subsystem
 !!
@@ -206,4 +262,21 @@ INTERFACE
     INTEGER(C_INT), INTENT(IN), VALUE :: max_pend_req_i2c
   END FUNCTION PIOc_set_rearr_opts
 END INTERFACE
+
+INTERFACE
+!! @private
+!! @brief Set the size of the blocks used by the BOX rearranger.
+!!
+!! @details
+!! @param[in] blocksz The new block size
+!! @returns PIO_NOERR on success, an error code otherwise
+!!
+  INTEGER(C_INT) FUNCTION PIOc_set_blocksize(blocksz)&
+                          bind(C,name="PIOc_set_blocksize")
+    USE iso_c_binding
+
+    INTEGER(C_INT), INTENT(IN), VALUE :: blocksz
+  END FUNCTION PIOc_set_blocksize
+END INTERFACE
+
 END MODULE spio_init_cint

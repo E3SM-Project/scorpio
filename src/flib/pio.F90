@@ -13,8 +13,9 @@ module pio
 
   use spio_decomp, only : pio_initdecomp, pio_freedecomp, pio_get_local_array_size,&
                           pio_readdof, pio_writedof
-  use spio_init, only : pio_init, pio_finalize, pio_getnumiotasks, pio_get_numiotasks,&
-                        pio_set_hint, pio_set_rearr_opts
+  use spio_init, only : pio_init, pio_finalize, pio_iosystem_is_active,&
+                        pio_iotask_rank, pio_iam_iotask, pio_getnumiotasks, pio_get_numiotasks,&
+                        pio_set_hint, pio_set_rearr_opts, pio_set_blocksize
   use spio_file, only : pio_openfile, pio_createfile, pio_closefile,&
                         pio_deletefile, pio_setframe, pio_advanceframe,&
                         pio_syncfile, pio_file_is_open
@@ -66,95 +67,6 @@ module pio
 
   implicit none
   public
-contains
-!>
-!! @public
-!! @defgroup PIO_set_blocksize
-!<
-!>
-!! @public
-!! @ingroup PIO_set_blocksize
-!! @brief Set the target blocksize for the box rearranger
-!<
-  subroutine pio_set_blocksize(blocksize)
-    integer :: blocksize
-    integer :: ierr
-    interface
-       integer(C_INT) function PIOc_set_blocksize(blocksize) &
-            bind(C,name="PIOc_set_blocksize")
-         use iso_c_binding
-         integer(C_INT), intent(in), value :: blocksize
-       end function PIOc_set_blocksize
-    end interface
-    ierr = PIOc_set_blocksize(blocksize)
-  end subroutine pio_set_blocksize
-
-
-!>
-!! @public
-!! @brief Logical function returns true if the task is an IO task.
-!<
-  function pio_iam_iotask(iosystem) result(task)
-    use iso_c_binding
-    type(iosystem_desc_t), intent(in) :: iosystem
-    logical :: task
-    integer :: ierr
-    logical(C_BOOL) :: ctask
-    interface
-       integer(C_INT) function PIOc_iam_iotask(iosysid, iotask) &
-            bind(C,name="PIOc_iam_iotask")
-         use iso_c_binding
-         integer(C_INT), intent(in), value :: iosysid
-         logical(C_BOOL), intent(out) :: iotask
-       end function PIOc_iam_iotask
-    end interface
-    
-    ierr = PIOc_iam_iotask(iosystem%iosysid, ctask)
-    task = ctask
-  end function pio_iam_iotask
-  
-!>
-!! @public
-!! @brief Integer function returns rank of IO task.
-!<
-  function pio_iotask_rank(iosystem) result(rank)
-    type(iosystem_desc_t), intent(in) :: iosystem
-    integer :: rank, ierr
-    interface
-       integer(C_INT) function PIOc_iotask_rank(iosysid, rank) &
-            bind(C,name="PIOc_iotask_rank")
-         use iso_c_binding
-         integer(C_INT), intent(in), value :: iosysid
-         integer(C_INT), intent(out) :: rank
-       end function PIOc_iotask_rank
-    end interface
-    
-    ierr = PIOc_iotask_rank(iosystem%iosysid, rank)
-  end function pio_iotask_rank
-
-!>
-!! @public
-!! @brief Sets active to true if IO system is active.
-!<
-  subroutine pio_iosystem_is_active(iosystem, active)
-    use iso_c_binding
-    type(iosystem_desc_t), intent(in) :: iosystem
-    logical, intent(out) :: active
-    logical(C_BOOL) :: lactive
-    integer :: ierr
-    interface
-       integer(C_INT) function PIOc_iosystem_is_active(iosysid, active) &
-            bind(C,name="PIOc_iosystem_is_active")
-         use iso_c_binding
-         integer(C_INT), intent(in), value :: iosysid
-         logical(C_BOOL), intent(out) :: active
-       end function PIOc_iosystem_is_active
-    end interface
-
-    ierr = PIOc_iosystem_is_active(iosystem%iosysid, lactive)
-    active = lactive
-  end subroutine pio_iosystem_is_active
-
 
 end module pio
 
