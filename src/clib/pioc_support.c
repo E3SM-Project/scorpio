@@ -3739,7 +3739,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     if (retry)
     {
         /* Broadcast IO type (might be switched on IO tasks) to all tasks. */
-        if ((mpierr = MPI_Bcast(&file->iotype, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast_Wrapper(&file->iotype, 1, MPI_INT, ios->ioroot, ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
