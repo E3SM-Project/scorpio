@@ -4954,19 +4954,13 @@ int __wrap_ADIOI_Type_create_hindexed_x(int count,
 
 int MPI_Bcast_Wrapper(void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm)
 {
-    int rank = -1;
-    int size = -1;
     static long counter = 0;
-
     counter++;
 
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (rank == size - 1)
+    if (counter == 2000)
     {
-        printf("MPI_Bcast is called, counter = %ld\n", counter);
-        fflush(stdout);
+        MPI_Barrier(comm);
+        counter = 0;
     }
 
     return MPI_Bcast(buffer, count, datatype, root, comm);
