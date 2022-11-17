@@ -48,7 +48,7 @@ CONTAINS
   INTEGER FUNCTION pio_openfile(iosys, file, iotype, fname, mode) RESULT(ierr)
     TYPE(iosystem_desc_t), TARGET, INTENT(IN) :: iosys
     TYPE(file_desc_t), INTENT(OUT) :: file
-    INTEGER, INTENT(INOUT) :: iotype
+    INTEGER, INTENT(IN) :: iotype
     CHARACTER(LEN=*), INTENT(IN) :: fname
     INTEGER, OPTIONAL, INTENT(IN) :: mode
 
@@ -73,7 +73,12 @@ CONTAINS
                           trim(fname) // C_NULL_CHAR, cmode)
     ierr = INT(cerr)
 
-    iotype = INT(ciotype)
+    ! FIXME: A lot of E3SM code expects that the iotype passed in is not
+    ! modified, this is problematic when the C library retries opening
+    ! the file using a different I/O type. So we eventually need to
+    ! uncomment the line below and change the iotype arg to an INOUT arg
+    !iotype = INT(ciotype)
+
     file%iosystem => iosys
 
 #ifdef TIMING
@@ -102,7 +107,7 @@ CONTAINS
   INTEGER FUNCTION pio_createfile(iosys, file, iotype, fname, mode) RESULT(ierr)
     TYPE(iosystem_desc_t), TARGET, INTENT(IN) :: iosys
     TYPE(file_desc_t), INTENT(OUT) :: file
-    INTEGER, INTENT(INOUT) :: iotype
+    INTEGER, INTENT(IN) :: iotype
     CHARACTER(LEN=*), INTENT(IN) :: fname
     INTEGER, OPTIONAL, INTENT(IN) :: mode
 
@@ -127,7 +132,11 @@ CONTAINS
                           trim(fname) // C_NULL_CHAR, cmode)
     ierr = INT(cerr)
 
-    iotype = INT(ciotype)
+    ! FIXME: A lot of E3SM code expects that the iotype passed in is not
+    ! modified, this is problematic when the C library retries opening
+    ! the file using a different I/O type. So we eventually need to
+    ! uncomment the line below and change the iotype arg to an INOUT arg
+    !iotype = INT(ciotype)
     file%iosystem => iosys
 
 #ifdef TIMING
