@@ -111,13 +111,15 @@ MODULE spio_inq_dim
   INTERFACE pio_inquire_dimension
     !! FIXME: Since we cannot have polymorphic functions that are different only
     !! on optional args, we cannot have versions of the function for regular
-    !! integers (only for PIO_OFFSET_KINDs)
+    !! integers (and PIO_OFFSET_KINDs). So currently the version that accepts a
+    !! file accepts an INTEGER length arg while the version that accepts
+    !! the file id/handle accepts a PIO_OFFSET_KIND length arg
 
     !! pio_inquire_dimension_file_dimid version of the function accepts a file desc,
-    !! a dimension id/handle & a long (PIO_OFFSET_KIND) length as arguments 
-    MODULE PROCEDURE pio_inquire_dimension_file_offlen
+    !! a dimension id/handle & the length as arguments
+    MODULE PROCEDURE pio_inquire_dimension_file
     !! pio_inquire_dimension_fh_dimid version of the function accepts a file id/handle,
-    !! a dimension id/handle & a long (PIO_OFFSET_KIND) length as arguments 
+    !! a dimension id/handle & a long (PIO_OFFSET_KIND) length as arguments
     MODULE PROCEDURE pio_inquire_dimension_fh_offlen
   END INTERFACE
 
@@ -461,25 +463,26 @@ CONTAINS
 !! @param[in] file The file handle. @copydoc file_desc_t
 !! @param[in] dimid The id of the dimension
 !! @param[out] name (Optional) The dimension name
-!! @param[out] len (Optional) The length (KIND=PIO_OFFSET_KIND) of the dimension
+!! @param[out] len (Optional) The length of the dimension
 !! @retval ierr @copydoc error_return
 !!
-  INTEGER FUNCTION pio_inquire_dimension_file_offlen(file, dimid, name, len) RESULT(ierr)
+  INTEGER FUNCTION pio_inquire_dimension_file(file, dimid, name, len) RESULT(ierr)
     TYPE(file_desc_t), INTENT(IN) :: file
     INTEGER, INTENT(IN) :: dimid
     CHARACTER(LEN=*), OPTIONAL, INTENT(OUT) :: name
-    INTEGER(PIO_OFFSET_KIND), OPTIONAL, INTENT(OUT) :: len
+    INTEGER, OPTIONAL, INTENT(OUT) :: len
 
     CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND) :: offlen
 
 #ifdef TIMING
-    CALL t_startf("PIO:pio_inquire_dimension_file_offlen")
+    CALL t_startf("PIO:pio_inquire_dimension_file")
 #endif
 
     IF(dimid <= 0) THEN
       WRITE(log_msg, *) "Invalid dimension id (dimid = ", dimid,&
                         ") passed to pio_inquire_dimension() function,",&
-                        " pio_inquire_dimension_file_offlen(). file id = ", file%fh
+                        " pio_inquire_dimension_file(). file id = ", file%fh
       ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
       RETURN
     END IF
@@ -491,27 +494,28 @@ CONTAINS
       IF(ierr /= PIO_NOERR) THEN
         WRITE(log_msg, *) "Unable to query dimension name (dimid = ", dimid,&
                           ") in pio_inquire_dimension() function,",&
-                          " pio_inquire_dimension_file_offlen(). file id = ", file%fh
+                          " pio_inquire_dimension_file(). file id = ", file%fh
         ierr = pio_error(file%iosystem, ierr, __PIO_FILE__, __LINE__, TRIM(log_msg))
         RETURN
       END IF
     END IF
 
     IF(PRESENT(len)) THEN
-      ierr = pio_inq_dimlen(file, dimid, len)
+      ierr = pio_inq_dimlen(file, dimid, offlen)
       IF(ierr /= PIO_NOERR) THEN
         WRITE(log_msg, *) "Unable to query dimension length (dimid = ", dimid,&
                           ") in pio_inquire_dimension() function,",&
-                          " pio_inquire_dimension_file_offlen(). file id = ", file%fh
+                          " pio_inquire_dimension_file(). file id = ", file%fh
         ierr = pio_error(file%iosystem, ierr, __PIO_FILE__, __LINE__, TRIM(log_msg))
         RETURN
       END IF
+      len = INT(offlen)
     END IF
 
 #ifdef TIMING
-    CALL t_stopf("PIO:pio_inquire_dimension_file_offlen")
+    CALL t_stopf("PIO:pio_inquire_dimension_file")
 #endif
-  END FUNCTION pio_inquire_dimension_file_offlen
+  END FUNCTION pio_inquire_dimension_file
 
 !>
 !! @public
@@ -549,8 +553,30 @@ CONTAINS
       RETURN
     END IF
 
-    !ierr = pio_inquire_dimension(file, dimid, name, len)
-    ierr = pio_inquire_dimension_file_offlen(file, dimid, name, len)
+    ierr = PIO_NOERR
+
+    IF(PRESENT(name)) THEN
+      ierr = pio_inq_dimname(file, dimid, name)
+      IF(ierr /= PIO_NOERR) THEN
+        WRITE(log_msg, *) "Unable to query dimension name (dimid = ", dimid,&
+                          ") in pio_inquire_dimension() function,",&
+                          " pio_inquire_dimension_fh_offlen(). file id = ", file%fh
+        ierr = pio_error(file%iosystem, ierr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+        RETURN
+      END IF
+    END IF
+
+    IF(PRESENT(len)) THEN
+      ierr = pio_inq_dimlen(file, dimid, len)
+      IF(ierr /= PIO_NOERR) THEN
+        WRITE(log_msg, *) "Unable to query dimension length (dimid = ", dimid,&
+                          ") in pio_inquire_dimension() function,",&
+                          " pio_inquire_dimension_fh_offlen(). file id = ", file%fh
+        ierr = pio_error(file%iosystem, ierr, __PIO_FILE__, __LINE__, TRIM(log_msg))
+        RETURN
+      END IF
+    END IF
+
 
 #ifdef TIMING
     CALL t_stopf("PIO:pio_inquire_dimension_fh_offlen")
