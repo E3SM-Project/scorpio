@@ -3713,7 +3713,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     if(ios->async)
     {
         int len = strlen(filename) + 1;
-        PIO_SEND_ASYNC_MSG(ios, PIO_MSG_OPEN_FILE, &ierr, len, filename, file->iotype, file->mode);
+        PIO_SEND_ASYNC_MSG(ios, PIO_MSG_OPEN_FILE, &ierr, len, filename, file->iotype, file->mode, retry);
         if(ierr != PIO_NOERR)
         {
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
