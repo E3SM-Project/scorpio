@@ -86,8 +86,8 @@ int init_async_msgs_sign(void )
      * B => byte array, needs to be prefixed by L/M
      */
     strncpy(pio_async_msg_sign[PIO_MSG_INVALID], "", PIO_MAX_ASYNC_MSG_ARGS);
-    /* PIO_MSG_OPEN_FILE message sends 1 int/len + 1 string + 1 int + 1 int */
-    strncpy(pio_async_msg_sign[PIO_MSG_OPEN_FILE], "scii", PIO_MAX_ASYNC_MSG_ARGS);
+    /* PIO_MSG_OPEN_FILE message sends 1 int/len + 1 string + 1 int + 1 int + 1 int */
+    strncpy(pio_async_msg_sign[PIO_MSG_OPEN_FILE], "sciii", PIO_MAX_ASYNC_MSG_ARGS);
     /* PIO_MSG_CREATE_FILE message sends 1 int/len + 1 string + 1 int + 1 int */
     strncpy(pio_async_msg_sign[PIO_MSG_CREATE_FILE], "scii", PIO_MAX_ASYNC_MSG_ARGS);
     /* PIO_MSG_INQ_ATT message sends 
@@ -3036,6 +3036,7 @@ int open_file_handler(iosystem_desc_t *ios)
     int len;
     int iotype;
     int mode;
+    int retry;
     int ret = PIO_NOERR;
 
     LOG((1, "open_file_handler comproot = %d", ios->comproot));
@@ -3044,7 +3045,7 @@ int open_file_handler(iosystem_desc_t *ios)
     /* Get the parameters for this function that the he comp master
      * task is broadcasting. */
     char filename[PIO_MAX_NAME+1];
-    PIO_RECV_ASYNC_MSG(ios, PIO_MSG_OPEN_FILE, &ret, &len, filename, &iotype, &mode);
+    PIO_RECV_ASYNC_MSG(ios, PIO_MSG_OPEN_FILE, &ret, &len, filename, &iotype, &mode, &retry);
     if(ret != PIO_NOERR)
     {
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
@@ -3055,7 +3056,7 @@ int open_file_handler(iosystem_desc_t *ios)
          len, filename, iotype, mode));
 
     /* Call the open file function */
-    ret = PIOc_openfile_retry(ios->iosysid, &ncid, &iotype, filename, mode, 0);
+    ret = PIOc_openfile_retry(ios->iosysid, &ncid, &iotype, filename, mode, retry);
     if (ret != PIO_NOERR)
     {
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
