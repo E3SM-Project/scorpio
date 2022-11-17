@@ -528,6 +528,30 @@ int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
                             "Inquiring type information on file %s (ncid=%d) failed. Unable to send asynchronous message, PIO_MSG_INQ_TYPE on iosystem (iosysid=%d)", pio_get_fname_from_file(file), ncid, ios->iosysid);
         }
     }
+    else
+    {
+#ifdef _PNETCDF
+        /* For PnetCDF IO type, if async is not in use, we do not need any
+         * communication across processes. All tasks can directly call the
+         * internal helper function pioc_pnetcdf_inq_type to get the name
+         * and size of a type. */
+        if (file->iotype == PIO_IOTYPE_PNETCDF)
+        {
+            ierr = pioc_pnetcdf_inq_type(ncid, xtype, name, sizep);
+            if (ierr != PIO_NOERR)
+            {
+                LOG((1, "pioc_pnetcdf_inq_type failed, ierr = %d", ierr));
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return ierr;
+            }
+
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return PIO_NOERR;
+        }
+#endif
+    }
 
     /* ADIOS: assume all procs are also IO tasks */
 #ifdef _ADIOS2
