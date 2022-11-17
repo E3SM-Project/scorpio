@@ -98,7 +98,7 @@ CONTAINS
     END IF
 
 #if {DIMS} == 0
-    clen = LEN_TRIM(attval)
+    clen = LEN_TRIM(attval) + 1
     nstrs = 1
 #else
     clen = LEN(attval)
