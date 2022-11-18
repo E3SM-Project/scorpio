@@ -3713,7 +3713,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     if(ios->async)
     {
         int len = strlen(filename) + 1;
-        PIO_SEND_ASYNC_MSG(ios, PIO_MSG_OPEN_FILE, &ierr, len, filename, file->iotype, file->mode);
+        PIO_SEND_ASYNC_MSG(ios, PIO_MSG_OPEN_FILE, &ierr, len, filename, file->iotype, file->mode, retry);
         if(ierr != PIO_NOERR)
         {
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -3821,9 +3821,11 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             }
             if ((ierr != NC_NOERR) && (file->iotype != PIO_IOTYPE_NETCDF))
             {
-                /* reset file markers for NETCDF on all tasks */
+                /* reset file markers for NETCDF on all IO tasks */
                 file->iotype = PIO_IOTYPE_NETCDF;
 
+                /* FIXME: The changes below to modify the user-specified
+                 * iotype needs to be propogated to all tasks. */
                 /* modify the user-specified iotype on all tasks */
                 /* Modifying the user-specified iotype unfortunately
                  * causes some E3SM model components to reset the iotype
@@ -3873,6 +3875,21 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         free(file->io_fstats);
         free(file);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+    }
+
+    if (retry)
+    {
+        /* Broadcast IO type (might be switched on IO tasks) to all tasks. */
+        if ((mpierr = MPI_Bcast(&file->iotype, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        {
+            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            free(file->io_fstats);
+            free(file);
+            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        }
     }
 
     ierr = check_netcdf(ios, file, ierr, __FILE__, __LINE__);
