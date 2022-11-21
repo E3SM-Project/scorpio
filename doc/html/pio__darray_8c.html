@@ -23,7 +23,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">SCORPIO
-   &#160;<span id="projectnumber">1.3.2</span>
+   &#160;<span id="projectnumber">1.4.1</span>
    </div>
   </td>
  </tr>
@@ -86,7 +86,7 @@ Include dependency graph for pio_darray.c:</div>
 <div class="dyncontent">
 <div class="center"><img src="pio__darray_8c__incl.png" border="0" usemap="#pio__darray_8c" alt=""/></div>
 <map name="pio__darray_8c" id="pio__darray_8c">
-<area shape="rect" id="node3" href="pio_8h.html" title="Public headers for the PIO C interface. " alt="" coords="222,87,274,114"/>
+<area shape="rect" id="node3" href="pio_8h.html" title="Public headers for the PIO C interface. " alt="" coords="214,87,265,114"/>
 </map>
 </div>
 </div><table class="memberdecls">
@@ -104,15 +104,15 @@ Functions</h2></td></tr>
 <tr class="memitem:a391b1ef1811260306b599b5bcc680a52"><td class="memItemLeft" align="right" valign="top">PIO_Offset&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="pio__darray_8c.html#a391b1ef1811260306b599b5bcc680a52">PIOc_set_buffer_size_limit</a> (PIO_Offset limit)</td></tr>
 <tr class="memdesc:a391b1ef1811260306b599b5bcc680a52"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set the PIO IO node data buffer size limit.  <a href="#a391b1ef1811260306b599b5bcc680a52">More...</a><br /></td></tr>
 <tr class="separator:a391b1ef1811260306b599b5bcc680a52"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ga8e6611243431101939c4dd4c991a7e0b"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__write__darray.html#ga8e6611243431101939c4dd4c991a7e0b">PIOc_write_darray_multi</a> (int ncid, const int *varids, int ioid, int nvars, PIO_Offset arraylen, void *array, const int *frame, void **fillvalue, bool flushtodisk)</td></tr>
-<tr class="memdesc:ga8e6611243431101939c4dd4c991a7e0b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write one or more arrays with the same IO decomposition to the file.  <a href="group___p_i_o__write__darray.html#ga8e6611243431101939c4dd4c991a7e0b">More...</a><br /></td></tr>
-<tr class="separator:ga8e6611243431101939c4dd4c991a7e0b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ga2e3989fbf67984ffbace9eb849635c07"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__write__darray.html#ga2e3989fbf67984ffbace9eb849635c07">PIOc_write_darray_multi</a> (int ncid, const int *varids, int ioid, int nvars, PIO_Offset arraylen, const void *array, const int *frame, const void **fillvalue, bool flushtodisk)</td></tr>
+<tr class="memdesc:ga2e3989fbf67984ffbace9eb849635c07"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write one or more arrays with the same IO decomposition to the file.  <a href="group___p_i_o__write__darray.html#ga2e3989fbf67984ffbace9eb849635c07">More...</a><br /></td></tr>
+<tr class="separator:ga2e3989fbf67984ffbace9eb849635c07"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:gab3e7daa32e4bcbd54a1afa2508ed5f4f"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__write__darray.html#gab3e7daa32e4bcbd54a1afa2508ed5f4f">find_var_fillvalue</a> (<a class="el" href="structfile__desc__t.html">file_desc_t</a> *file, int varid, <a class="el" href="structvar__desc__t.html">var_desc_t</a> *vdesc)</td></tr>
 <tr class="memdesc:gab3e7daa32e4bcbd54a1afa2508ed5f4f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Find the fillvalue that should be used for a variable.  <a href="group___p_i_o__write__darray.html#gab3e7daa32e4bcbd54a1afa2508ed5f4f">More...</a><br /></td></tr>
 <tr class="separator:gab3e7daa32e4bcbd54a1afa2508ed5f4f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:gaa40fae759a2a5e39cb7af9b6f024db8f"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__write__darray.html#gaa40fae759a2a5e39cb7af9b6f024db8f">PIOc_write_darray</a> (int ncid, int varid, int ioid, PIO_Offset arraylen, void *array, void *fillvalue)</td></tr>
-<tr class="memdesc:gaa40fae759a2a5e39cb7af9b6f024db8f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write a distributed array to the output file.  <a href="group___p_i_o__write__darray.html#gaa40fae759a2a5e39cb7af9b6f024db8f">More...</a><br /></td></tr>
-<tr class="separator:gaa40fae759a2a5e39cb7af9b6f024db8f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ga4dced32349b44a2fcbc22355ba6636c4"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__write__darray.html#ga4dced32349b44a2fcbc22355ba6636c4">PIOc_write_darray</a> (int ncid, int varid, int ioid, PIO_Offset arraylen, const void *array, const void *fillvalue)</td></tr>
+<tr class="memdesc:ga4dced32349b44a2fcbc22355ba6636c4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write a distributed array to the output file.  <a href="group___p_i_o__write__darray.html#ga4dced32349b44a2fcbc22355ba6636c4">More...</a><br /></td></tr>
+<tr class="separator:ga4dced32349b44a2fcbc22355ba6636c4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:gaa4eb9375a17ec358a88c8e7e388880db"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__read__darray.html#gaa4eb9375a17ec358a88c8e7e388880db">PIOc_read_darray</a> (int ncid, int varid, int ioid, PIO_Offset arraylen, void *array)</td></tr>
 <tr class="memdesc:gaa4eb9375a17ec358a88c8e7e388880db"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read a field from a file to the IO library.  <a href="group___p_i_o__read__darray.html#gaa4eb9375a17ec358a88c8e7e388880db">More...</a><br /></td></tr>
 <tr class="separator:gaa4eb9375a17ec358a88c8e7e388880db"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -162,7 +162,7 @@ PIO_Offset&#160;</td><td class="memItemRight" valign="bottom"><b>maxusage</b> = 
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Apr 1 2022 12:34:02 for SCORPIO by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Fri Dec 2 2022 15:00:14 for SCORPIO by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.13
 </small></address>
