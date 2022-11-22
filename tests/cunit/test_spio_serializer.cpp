@@ -6,11 +6,9 @@
 #include <cassert>
 #include <cctype>
 
-extern "C"{
 #include "pio_config.h"
 #include "pio.h"
 #include "pio_tests.h"
-}
 #include "spio_serializer.hpp"
 
 #define LOG_RANK0(rank, ...)                     \

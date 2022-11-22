@@ -66,6 +66,10 @@
         return e;                                                       \
     } while (0)
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* Function prototypes. */
 int pio_test_init(int argc, char **argv, int *my_rank, int *ntasks, int target_ntasks, MPI_Comm *test_comm);
 int pio_test_init2(int argc, char **argv, int *my_rank, int *ntasks, int min_ntasks,
@@ -94,4 +98,9 @@ int run_test_main(int argc, char **argv, int min_ntasks, int max_ntasks,
 /* Create a 2D decomposition used in some tests. */
 int create_decomposition_2d(int ntasks, int my_rank, int iosysid, int *dim_len_2d, int *ioid,
                             int pio_type);
+
+#if defined(__cplusplus)
+}
+#endif
+
 #endif /* _PIO_TESTS_H */

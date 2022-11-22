@@ -5,11 +5,9 @@
 #include <algorithm>
 #include <cassert>
 
-extern "C"{
 #include "pio_config.h"
 #include "pio.h"
 #include "pio_tests.h"
-}
 #include "spio_tree.hpp"
 
 #define LOG_RANK0(rank, ...)                     \
