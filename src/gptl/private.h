@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <sys/time.h>
+#include <stdbool.h>
 
 #ifndef NO_COMM_F2C
 #ifndef HAVE_COMM_F2C
@@ -42,10 +43,6 @@
 ** all available options.
 */
 #define MAX_AUX 9
-
-#ifndef __cplusplus
-typedef enum {false = 0, true = 1} bool;  /* mimic C++ */
-#endif
 
 typedef struct {
   long last_utime;          /* saved usr time from "start" */
