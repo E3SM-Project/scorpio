@@ -158,7 +158,7 @@ SUBROUTINE shr_sys_flush(unit)
 !-------------------------------------------------------------------------------
 
 #if (defined IRIX64 || defined CRAY || defined OSF1 || defined SUNOS || defined LINUX || defined NEC_SX || defined UNICOSMP)
-#ifdef CPRNAG
+#if (defined CPRNAG || defined CPRIBM)
    flush(unit)
 #else
    call flush(unit)
