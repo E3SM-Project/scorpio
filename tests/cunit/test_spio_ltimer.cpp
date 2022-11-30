@@ -5,12 +5,10 @@
 #include <algorithm>
 #include <cassert>
 
-extern "C"{
 #include "pio_config.h"
 #include "pio.h"
 #include "pio_tests.h"
 #include "spio_ltimer.h"
-}
 #include "spio_ltimer.hpp"
 
 #define LOG_RANK0(rank, ...)                     \

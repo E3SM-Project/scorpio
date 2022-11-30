@@ -4,10 +4,8 @@
 #include <string>
 #include <vector>
 
-extern "C"{
 #include "pio_config.h"
 #include "pio.h"
-} // extern "C"
 
 namespace spio_tool_utils{
   namespace spio_lib_info{

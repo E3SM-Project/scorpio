@@ -52,6 +52,18 @@ endif ()
 target_compile_definitions (gptl
   PUBLIC ${CMAKE_Fortran_COMPILER_DIRECTIVE})
 
+# Compiler-specific compiler options
+string (TOUPPER "${CMAKE_C_COMPILER_ID}" CMAKE_C_COMPILER_NAME)
+if (CMAKE_C_COMPILER_NAME STREQUAL "CRAY")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -h std=c99")
+elseif (CMAKE_C_COMPILER_NAME STREQUAL "PGI")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -c99")
+elseif (CMAKE_C_COMPILER_NAME STREQUAL "NVHPC")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -c99")
+else ()
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
+endif ()
+
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "NAG")
   set ( CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -mismatch_all" )
   #    target_compile_options (gptl

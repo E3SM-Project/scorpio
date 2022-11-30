@@ -5,9 +5,7 @@
 #include <cassert>
 
 #include "pio_sdecomps_regex.hpp"
-extern "C"{
-#include <pio_tests.h>
-}
+#include "pio_tests.h"
 
 #define LOG_RANK0(rank, ...)                     \
             do{                                   \

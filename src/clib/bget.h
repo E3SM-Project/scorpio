@@ -12,6 +12,11 @@
 //#endif
 
 typedef long bufsize;
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 void    bpool(void *buffer, bufsize len);
 void   *bget(bufsize size);
 void   *bgetz(bufsize size);
@@ -28,5 +33,9 @@ void    bufdump(void *buf);
 void    bpoold(void *pool, int dumpalloc, int dumpfree);
 int     bpoolv(void *pool);
 void bfreespace(bufsize *maxfree, bufsize *totfree);
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif

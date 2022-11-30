@@ -14,10 +14,8 @@
 
 #include <adios2.h>
 
-extern "C" {
 #include "pio.h"
 #include "pio_internal.h"
-}
 
 #include "adios2pio-nm-lib.h"
 #include "adios2pio-nm-lib-c.h"

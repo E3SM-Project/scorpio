@@ -4,12 +4,10 @@
 #include <cassert>
 #include <cstring>
 
-extern "C"{
 #include "pio_config.h"
 #include "pio.h"
 #include "pio_tests.h"
 #include "spio_file_mvcache.h"
-}
 #include "spio_file_mvcache.hpp"
 
 #define LOG_RANK0(rank, ...)                     \

@@ -8,12 +8,10 @@
 #include <algorithm>
 #include <stack>
 
-extern "C"{
 #include "pio_config.h"
 #include "pio.h"
 #include "pio_internal.h"
 #include "pio_sdecomps_regex.h"
-}
 #include "pio_sdecomps_regex.hpp"
 
 namespace PIO_Util{

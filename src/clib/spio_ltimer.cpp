@@ -3,12 +3,10 @@
 #include <map>
 #include <cassert>
 
-extern "C"{
 #include "pio_config.h"
 #include "pio.h"
 #include "pio_internal.h"
 #include "spio_ltimer.h"
-}
 #include "spio_ltimer.hpp"
 
 /* Global timer cache */

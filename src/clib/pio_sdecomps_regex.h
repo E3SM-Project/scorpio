@@ -1,6 +1,10 @@
 #ifndef __PIO_SDECOMPS_REGEX_H___
 #define __PIO_SDECOMPS_REGEX_H___
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* The C API that matches user specified regular expression to save
  * I/O decomposition with the ioid, file and variables names provided
  * @param ioid : The I/O decomposition ID to match
@@ -10,5 +14,9 @@
  * previously specified regular expression, false otherwise
  */
 bool pio_save_decomps_regex_match(int ioid, const char *fname, const char *vname);
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif /* __PIO_SDECOMPS_REGEX_H__ */

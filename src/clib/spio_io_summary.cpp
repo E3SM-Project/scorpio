@@ -10,12 +10,10 @@
 #include <cstdlib>
 #include <unistd.h>
 
-extern "C"{
 #include "pio_config.h"
 #include "pio.h"
 #include "pio_internal.h"
 #include "spio_io_summary.h"
-}
 
 #include "spio_io_summary.hpp"
 #include "spio_serializer.hpp"
