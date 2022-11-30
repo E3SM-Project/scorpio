@@ -1,4 +1,14 @@
+
+#ifdef MPI_SERIAL
+extern "C" {
+#endif
+
 #include "mpi.h"
+
+#ifdef MPI_SERIAL
+}
+#endif
+
 #include <iostream>
 #include <string>
 #include <vector>

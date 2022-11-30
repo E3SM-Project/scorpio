@@ -13,7 +13,20 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h> /* memcpy */
+
+#ifdef MPI_SERIAL
+#if defined(__cplusplus)
+extern "C" {
+#endif
+#endif
+
 #include <mpi.h>
+
+#ifdef MPI_SERIAL
+#if defined(__cplusplus)
+}
+#endif
+#endif
 
 #include "pio_config.h"
 #if PIO_USE_PNETCDF

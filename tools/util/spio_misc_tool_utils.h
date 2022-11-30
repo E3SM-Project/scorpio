@@ -5,7 +5,6 @@
 
 #include "pio_config.h"
 #include "pio.h"
-#include "mpi.h"
 
 namespace spio_tool_utils{
   
