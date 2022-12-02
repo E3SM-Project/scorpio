@@ -23,7 +23,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">SCORPIO
-   &#160;<span id="projectnumber">1.3.2</span>
+   &#160;<span id="projectnumber">1.4.1</span>
    </div>
   </td>
  </tr>
@@ -82,7 +82,7 @@ Include dependency graph for pio_nc.c:</div>
 <div class="dyncontent">
 <div class="center"><img src="pio__nc_8c__incl.png" border="0" usemap="#pio__nc_8c" alt=""/></div>
 <map name="pio__nc_8c" id="pio__nc_8c">
-<area shape="rect" id="node3" href="pio_8h.html" title="Public headers for the PIO C interface. " alt="" coords="222,80,274,107"/>
+<area shape="rect" id="node3" href="pio_8h.html" title="Public headers for the PIO C interface. " alt="" coords="214,80,265,107"/>
 </map>
 </div>
 </div><table class="memberdecls">
@@ -329,10 +329,10 @@ Functions</h2></td></tr>
 <p>This routine is called collectively by all tasks in the communicator ios.union_comm.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">incid</td><td>the ncid of the input file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaed31e065901c964d4224b3db61a30d5e" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
+    <tr><td class="paramname">incid</td><td>the ncid of the input file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaa481a8333f620329dce4be12e1dd6a11" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
     <tr><td class="paramname">ivarid</td><td>the ID of the variable with the attribute in the input file. </td></tr>
     <tr><td class="paramname">name</td><td>the name of the attribute to be copied </td></tr>
-    <tr><td class="paramname">oncid</td><td>the ncid of the output file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaed31e065901c964d4224b3db61a30d5e" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
+    <tr><td class="paramname">oncid</td><td>the ncid of the output file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaa481a8333f620329dce4be12e1dd6a11" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
     <tr><td class="paramname">ovarid</td><td>the ID of the variable to copy the attribute to in the output file. </td></tr>
   </table>
   </dd>
@@ -378,7 +378,7 @@ Functions</h2></td></tr>
 <p>This routine is called collectively by all tasks in the communicator ios.union_comm. For more information on the underlying NetCDF commmand please read about this function in the NetCDF documentation at: <a href="http://www.unidata.ucar.edu/software/netcdf/docs/group__attributes.html">http://www.unidata.ucar.edu/software/netcdf/docs/group__attributes.html</a></p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaed31e065901c964d4224b3db61a30d5e" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
+    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaa481a8333f620329dce4be12e1dd6a11" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
     <tr><td class="paramname">varid</td><td>the variable ID. </td></tr>
     <tr><td class="paramname">name</td><td>of the attribute to delete. </td></tr>
   </table>
@@ -437,7 +437,7 @@ Functions</h2></td></tr>
 <p>This routine is called collectively by all tasks in the communicator ios.union_comm. For more information on the underlying NetCDF commmand please read about this function in the NetCDF documentation at: <a href="http://www.unidata.ucar.edu/software/netcdf/docs/group__datasets.html">http://www.unidata.ucar.edu/software/netcdf/docs/group__datasets.html</a></p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaed31e065901c964d4224b3db61a30d5e" title="Create a new file using pio. ">PIOc_createfile()</a>.</td></tr>
+    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaa481a8333f620329dce4be12e1dd6a11" title="Create a new file using pio. ">PIOc_createfile()</a>.</td></tr>
   </table>
   </dd>
 </dl>
@@ -488,7 +488,7 @@ Functions</h2></td></tr>
 <p>This routine is called collectively by all tasks in the communicator ios.union_comm. For more information on the underlying NetCDF commmand please read about this function in the NetCDF documentation at: <a href="http://www.unidata.ucar.edu/software/netcdf/docs/group__attributes.html">http://www.unidata.ucar.edu/software/netcdf/docs/group__attributes.html</a></p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaed31e065901c964d4224b3db61a30d5e" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
+    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaa481a8333f620329dce4be12e1dd6a11" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
     <tr><td class="paramname">varid</td><td>the variable ID. </td></tr>
     <tr><td class="paramname">idp</td><td>a pointer that will get the id of the variable or attribute. </td></tr>
   </table>
@@ -594,7 +594,7 @@ Functions</h2></td></tr>
 <p>This routine is called collectively by all tasks in the communicator ios.union_comm. For more information on the underlying NetCDF commmand please read about this function in the NetCDF documentation at: <a href="http://www.unidata.ucar.edu/software/netcdf/docs/group__dimensions.html">http://www.unidata.ucar.edu/software/netcdf/docs/group__dimensions.html</a></p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaed31e065901c964d4224b3db61a30d5e" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
+    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaa481a8333f620329dce4be12e1dd6a11" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
     <tr><td class="paramname">lenp</td><td>a pointer that will get the number of values </td></tr>
   </table>
   </dd>
@@ -762,7 +762,7 @@ Functions</h2></td></tr>
 <p>This routine is called collectively by all tasks in the communicator ios.union_comm. For more information on the underlying NetCDF commmand please read about this function in the NetCDF documentation at: <a href="http://www.unidata.ucar.edu/software/netcdf/docs/group__variables.html">http://www.unidata.ucar.edu/software/netcdf/docs/group__variables.html</a></p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaed31e065901c964d4224b3db61a30d5e" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
+    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaa481a8333f620329dce4be12e1dd6a11" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
     <tr><td class="paramname">varid</td><td>the variable ID. </td></tr>
     <tr><td class="paramname">xtypep</td><td>a pointer that will get the type of the attribute. </td></tr>
     <tr><td class="paramname">nattsp</td><td>a pointer that will get the number of attributes </td></tr>
@@ -816,7 +816,7 @@ Functions</h2></td></tr>
 <p>This routine is called collectively by all tasks in the communicator ios.union_comm. For more information on the underlying NetCDF commmand please read about this function in the NetCDF documentation at: <a href="http://www.unidata.ucar.edu/software/netcdf/docs/group__variables.html">http://www.unidata.ucar.edu/software/netcdf/docs/group__variables.html</a></p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaed31e065901c964d4224b3db61a30d5e" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
+    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaa481a8333f620329dce4be12e1dd6a11" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
     <tr><td class="paramname">varid</td><td>the variable ID. </td></tr>
     <tr><td class="paramname">no_fill</td><td>a pointer to int that will get the fill mode. Ignored if NULL (except with pnetcdf, which seg-faults with NULL.) </td></tr>
     <tr><td class="paramname">fill_valuep</td><td>pointer to space that gets the fill value for this variable. Ignored if NULL. </td></tr>
@@ -870,7 +870,7 @@ Functions</h2></td></tr>
 <p>This routine is called collectively by all tasks in the communicator ios.union_comm. For more information on the underlying NetCDF commmand please read about this function in the NetCDF documentation at: <a href="http://www.unidata.ucar.edu/software/netcdf/docs/group__attributes.html">http://www.unidata.ucar.edu/software/netcdf/docs/group__attributes.html</a></p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaed31e065901c964d4224b3db61a30d5e" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
+    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaa481a8333f620329dce4be12e1dd6a11" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
     <tr><td class="paramname">varid</td><td>the variable ID. </td></tr>
   </table>
   </dd>
@@ -916,7 +916,7 @@ Functions</h2></td></tr>
 <p>This routine is called collectively by all tasks in the communicator ios.union_comm. For more information on the underlying NetCDF commmand please read about this function in the NetCDF documentation at: <a href="http://www.unidata.ucar.edu/software/netcdf/docs/group__dimensions.html">http://www.unidata.ucar.edu/software/netcdf/docs/group__dimensions.html</a></p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaed31e065901c964d4224b3db61a30d5e" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
+    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaa481a8333f620329dce4be12e1dd6a11" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
   </table>
   </dd>
 </dl>
@@ -961,7 +961,7 @@ Functions</h2></td></tr>
 <p>This routine is called collectively by all tasks in the communicator ios.union_comm. For more information on the underlying NetCDF commmand please read about this function in the NetCDF documentation at: <a href="http://www.unidata.ucar.edu/software/netcdf/docs/group__variables.html">http://www.unidata.ucar.edu/software/netcdf/docs/group__variables.html</a></p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaed31e065901c964d4224b3db61a30d5e" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
+    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaa481a8333f620329dce4be12e1dd6a11" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
     <tr><td class="paramname">varid</td><td>the variable ID. </td></tr>
   </table>
   </dd>
@@ -1007,7 +1007,7 @@ Functions</h2></td></tr>
 <p>This routine is called collectively by all tasks in the communicator ios.union_comm. For more information on the underlying NetCDF commmand please read about this function in the NetCDF documentation at: <a href="http://www.unidata.ucar.edu/software/netcdf/docs/group__datasets.html">http://www.unidata.ucar.edu/software/netcdf/docs/group__datasets.html</a></p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaed31e065901c964d4224b3db61a30d5e" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
+    <tr><td class="paramname">ncid</td><td>the ncid of the open file, obtained from <a class="el" href="group___p_i_o__openfile.html#gae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library. ">PIOc_openfile()</a> or <a class="el" href="group___p_i_o__createfile.html#gaa481a8333f620329dce4be12e1dd6a11" title="Create a new file using pio. ">PIOc_createfile()</a>. </td></tr>
     <tr><td class="paramname">fillmode</td><td>either NC_FILL or NC_NOFILL. </td></tr>
     <tr><td class="paramname">old_modep</td><td>a pointer to an int that gets the old setting. </td></tr>
   </table>
@@ -1021,7 +1021,7 @@ Functions</h2></td></tr>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Apr 1 2022 12:34:02 for SCORPIO by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Fri Dec 2 2022 15:00:14 for SCORPIO by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.13
 </small></address>

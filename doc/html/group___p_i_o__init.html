@@ -23,7 +23,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">SCORPIO
-   &#160;<span id="projectnumber">1.3.2</span>
+   &#160;<span id="projectnumber">1.4.1</span>
    </div>
   </td>
  </tr>
@@ -84,9 +84,9 @@ Functions/Subroutines</h2></td></tr>
 <tr class="memitem:ga479a1d9fe2edfc7ca321a1b482fe0211"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__init.html#ga479a1d9fe2edfc7ca321a1b482fe0211">PIOc_Init_Intracomm</a> (MPI_Comm comp_comm, int num_iotasks, int stride, int base, int rearr, int *iosysidp)</td></tr>
 <tr class="memdesc:ga479a1d9fe2edfc7ca321a1b482fe0211"><td class="mdescLeft">&#160;</td><td class="mdescRight">Library initialization used when IO tasks are a subset of compute tasks.  <a href="#ga479a1d9fe2edfc7ca321a1b482fe0211">More...</a><br /></td></tr>
 <tr class="separator:ga479a1d9fe2edfc7ca321a1b482fe0211"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ga017725f65a38a40963ac6936bbe7b5e9"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__init.html#ga017725f65a38a40963ac6936bbe7b5e9">PIOc_init_async</a> (MPI_Comm world, int num_io_procs, int *io_proc_list, int component_count, int *num_procs_per_comp, int **proc_list, MPI_Comm *user_io_comm, MPI_Comm *user_comp_comm, int rearranger, int *iosysidp)</td></tr>
-<tr class="memdesc:ga017725f65a38a40963ac6936bbe7b5e9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Library initialization used when IO tasks are distinct from compute tasks.  <a href="#ga017725f65a38a40963ac6936bbe7b5e9">More...</a><br /></td></tr>
-<tr class="separator:ga017725f65a38a40963ac6936bbe7b5e9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:gaaf64b6f1d6cd18454a05526819a1cde9"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__init.html#gaaf64b6f1d6cd18454a05526819a1cde9">PIOc_init_async</a> (MPI_Comm world, int num_io_procs, const int *io_proc_list, int component_count, const int *num_procs_per_comp, const int **proc_list, MPI_Comm *user_io_comm, MPI_Comm *user_comp_comm, int rearranger, int *iosysidp)</td></tr>
+<tr class="memdesc:gaaf64b6f1d6cd18454a05526819a1cde9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Library initialization used when IO tasks are distinct from compute tasks.  <a href="#gaaf64b6f1d6cd18454a05526819a1cde9">More...</a><br /></td></tr>
+<tr class="separator:gaaf64b6f1d6cd18454a05526819a1cde9"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <p>initializes the pio subsystem </p>
@@ -311,8 +311,8 @@ Functions/Subroutines</h2></td></tr>
 
 </div>
 </div>
-<a id="ga017725f65a38a40963ac6936bbe7b5e9"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ga017725f65a38a40963ac6936bbe7b5e9">&#9670;&nbsp;</a></span>PIOc_init_async()</h2>
+<a id="gaaf64b6f1d6cd18454a05526819a1cde9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#gaaf64b6f1d6cd18454a05526819a1cde9">&#9670;&nbsp;</a></span>PIOc_init_async()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -332,7 +332,7 @@ Functions/Subroutines</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">int *&#160;</td>
+          <td class="paramtype">const int *&#160;</td>
           <td class="paramname"><em>io_proc_list</em>, </td>
         </tr>
         <tr>
@@ -344,13 +344,13 @@ Functions/Subroutines</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">int *&#160;</td>
+          <td class="paramtype">const int *&#160;</td>
           <td class="paramname"><em>num_procs_per_comp</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">int **&#160;</td>
+          <td class="paramtype">const int **&#160;</td>
           <td class="paramname"><em>proc_list</em>, </td>
         </tr>
         <tr>
@@ -510,7 +510,7 @@ Initialize the bget buffer, unless PIO_USE_MALLOC was used. </li>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Apr 1 2022 12:34:02 for SCORPIO by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Fri Dec 2 2022 15:00:14 for SCORPIO by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.13
 </small></address>
