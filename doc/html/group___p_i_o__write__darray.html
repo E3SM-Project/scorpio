@@ -23,7 +23,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">SCORPIO
-   &#160;<span id="projectnumber">1.3.2</span>
+   &#160;<span id="projectnumber">1.4.1</span>
    </div>
   </td>
  </tr>
@@ -135,15 +135,15 @@ Functions/Subroutines</h2></td></tr>
 <tr class="memitem:gae2eda505e927211b0ce67c6af2fe6a18"><td class="memItemLeft" align="right" valign="top">subroutine&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__write__darray.html#gae2eda505e927211b0ce67c6af2fe6a18">piodarray::write_darray_7d_double</a> (File, varDesc, ioDesc, array, iostat, fillval)</td></tr>
 <tr class="memdesc:gae2eda505e927211b0ce67c6af2fe6a18"><td class="mdescLeft">&#160;</td><td class="mdescRight">Writes a 7D array of type double.  <a href="group___p_i_o__write__darray.html#gae2eda505e927211b0ce67c6af2fe6a18">More...</a><br /></td></tr>
 <tr class="separator:gae2eda505e927211b0ce67c6af2fe6a18"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ga8e6611243431101939c4dd4c991a7e0b"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__write__darray.html#ga8e6611243431101939c4dd4c991a7e0b">PIOc_write_darray_multi</a> (int ncid, const int *varids, int ioid, int nvars, PIO_Offset arraylen, void *array, const int *frame, void **fillvalue, bool flushtodisk)</td></tr>
-<tr class="memdesc:ga8e6611243431101939c4dd4c991a7e0b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write one or more arrays with the same IO decomposition to the file.  <a href="#ga8e6611243431101939c4dd4c991a7e0b">More...</a><br /></td></tr>
-<tr class="separator:ga8e6611243431101939c4dd4c991a7e0b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ga2e3989fbf67984ffbace9eb849635c07"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__write__darray.html#ga2e3989fbf67984ffbace9eb849635c07">PIOc_write_darray_multi</a> (int ncid, const int *varids, int ioid, int nvars, PIO_Offset arraylen, const void *array, const int *frame, const void **fillvalue, bool flushtodisk)</td></tr>
+<tr class="memdesc:ga2e3989fbf67984ffbace9eb849635c07"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write one or more arrays with the same IO decomposition to the file.  <a href="#ga2e3989fbf67984ffbace9eb849635c07">More...</a><br /></td></tr>
+<tr class="separator:ga2e3989fbf67984ffbace9eb849635c07"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:gab3e7daa32e4bcbd54a1afa2508ed5f4f"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__write__darray.html#gab3e7daa32e4bcbd54a1afa2508ed5f4f">find_var_fillvalue</a> (<a class="el" href="structfile__desc__t.html">file_desc_t</a> *file, int varid, <a class="el" href="structvar__desc__t.html">var_desc_t</a> *vdesc)</td></tr>
 <tr class="memdesc:gab3e7daa32e4bcbd54a1afa2508ed5f4f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Find the fillvalue that should be used for a variable.  <a href="#gab3e7daa32e4bcbd54a1afa2508ed5f4f">More...</a><br /></td></tr>
 <tr class="separator:gab3e7daa32e4bcbd54a1afa2508ed5f4f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:gaa40fae759a2a5e39cb7af9b6f024db8f"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__write__darray.html#gaa40fae759a2a5e39cb7af9b6f024db8f">PIOc_write_darray</a> (int ncid, int varid, int ioid, PIO_Offset arraylen, void *array, void *fillvalue)</td></tr>
-<tr class="memdesc:gaa40fae759a2a5e39cb7af9b6f024db8f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write a distributed array to the output file.  <a href="#gaa40fae759a2a5e39cb7af9b6f024db8f">More...</a><br /></td></tr>
-<tr class="separator:gaa40fae759a2a5e39cb7af9b6f024db8f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ga4dced32349b44a2fcbc22355ba6636c4"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__write__darray.html#ga4dced32349b44a2fcbc22355ba6636c4">PIOc_write_darray</a> (int ncid, int varid, int ioid, PIO_Offset arraylen, const void *array, const void *fillvalue)</td></tr>
+<tr class="memdesc:ga4dced32349b44a2fcbc22355ba6636c4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write a distributed array to the output file.  <a href="#ga4dced32349b44a2fcbc22355ba6636c4">More...</a><br /></td></tr>
+<tr class="separator:ga4dced32349b44a2fcbc22355ba6636c4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <p>The overloaded PIO_write_darray writes a distributed array to disk. </p>
@@ -194,8 +194,8 @@ Functions/Subroutines</h2></td></tr>
 
 </div>
 </div>
-<a id="gaa40fae759a2a5e39cb7af9b6f024db8f"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#gaa40fae759a2a5e39cb7af9b6f024db8f">&#9670;&nbsp;</a></span>PIOc_write_darray()</h2>
+<a id="ga4dced32349b44a2fcbc22355ba6636c4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ga4dced32349b44a2fcbc22355ba6636c4">&#9670;&nbsp;</a></span>PIOc_write_darray()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -227,13 +227,13 @@ Functions/Subroutines</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">void *&#160;</td>
+          <td class="paramtype">const void *&#160;</td>
           <td class="paramname"><em>array</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">void *&#160;</td>
+          <td class="paramtype">const void *&#160;</td>
           <td class="paramname"><em>fillvalue</em>&#160;</td>
         </tr>
         <tr>
@@ -279,8 +279,8 @@ Remember the frame value (i.e. record number) of this data if there is one. </li
 
 </div>
 </div>
-<a id="ga8e6611243431101939c4dd4c991a7e0b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ga8e6611243431101939c4dd4c991a7e0b">&#9670;&nbsp;</a></span>PIOc_write_darray_multi()</h2>
+<a id="ga2e3989fbf67984ffbace9eb849635c07"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ga2e3989fbf67984ffbace9eb849635c07">&#9670;&nbsp;</a></span>PIOc_write_darray_multi()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -318,7 +318,7 @@ Remember the frame value (i.e. record number) of this data if there is one. </li
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">void *&#160;</td>
+          <td class="paramtype">const void *&#160;</td>
           <td class="paramname"><em>array</em>, </td>
         </tr>
         <tr>
@@ -330,7 +330,7 @@ Remember the frame value (i.e. record number) of this data if there is one. </li
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">void **&#160;</td>
+          <td class="paramtype">const void **&#160;</td>
           <td class="paramname"><em>fillvalue</em>, </td>
         </tr>
         <tr>
@@ -348,8 +348,8 @@ Remember the frame value (i.e. record number) of this data if there is one. </li
 </div><div class="memdoc">
 
 <p>Write one or more arrays with the same IO decomposition to the file. </p>
-<p>This funciton is similar to <a class="el" href="group___p_i_o__write__darray.html#gaa40fae759a2a5e39cb7af9b6f024db8f" title="Write a distributed array to the output file. ">PIOc_write_darray()</a>, but allows the caller to use their own data buffering (instead of using the buffering implemented in <a class="el" href="group___p_i_o__write__darray.html#gaa40fae759a2a5e39cb7af9b6f024db8f" title="Write a distributed array to the output file. ">PIOc_write_darray()</a>).</p>
-<p>When the user calls <a class="el" href="group___p_i_o__write__darray.html#gaa40fae759a2a5e39cb7af9b6f024db8f" title="Write a distributed array to the output file. ">PIOc_write_darray()</a> one or more times, then PIO_write_darray_multi() will be called when the buffer is flushed.</p>
+<p>This funciton is similar to <a class="el" href="group___p_i_o__write__darray.html#ga4dced32349b44a2fcbc22355ba6636c4" title="Write a distributed array to the output file. ">PIOc_write_darray()</a>, but allows the caller to use their own data buffering (instead of using the buffering implemented in <a class="el" href="group___p_i_o__write__darray.html#ga4dced32349b44a2fcbc22355ba6636c4" title="Write a distributed array to the output file. ">PIOc_write_darray()</a>).</p>
+<p>When the user calls <a class="el" href="group___p_i_o__write__darray.html#ga4dced32349b44a2fcbc22355ba6636c4" title="Write a distributed array to the output file. ">PIOc_write_darray()</a> one or more times, then PIO_write_darray_multi() will be called when the buffer is flushed.</p>
 <p>Internally, this function will: </p><ul>
 <li>
 Find info about file, decomposition, and variable. </li>
@@ -1791,7 +1791,7 @@ Special buffer flush for pnetcdf. </li>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Apr 1 2022 12:34:02 for SCORPIO by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Fri Dec 2 2022 15:00:15 for SCORPIO by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.13
 </small></address>
