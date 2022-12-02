@@ -7,8 +7,6 @@
 #include "pio_config.h"
 #include "pio.h"
 
-#include "mpi.h"
-
 /* Fwd decl reqd for create_spio_finfo() */
 class spio_finfo;
 

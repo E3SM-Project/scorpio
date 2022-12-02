@@ -3,7 +3,21 @@
 
 #include "pio_config.h"
 #include <stdbool.h>
+
+#ifdef MPI_SERIAL
+#if defined(__cplusplus)
+extern "C" {
+#endif
+#endif
+
 #include "mpi.h"
+
+#ifdef MPI_SERIAL
+#if defined(__cplusplus)
+}
+#endif
+#endif
+
 #include "pio_internal.h"
 
 /* Timer states */

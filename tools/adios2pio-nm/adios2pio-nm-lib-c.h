@@ -1,7 +1,19 @@
 #ifndef _ADIOS2PIO_NM_LIB_C_H_
 #define _ADIOS2PIO_NM_LIB_C_H_
 
+#ifdef MPI_SERIAL
+#if defined(__cplusplus)
+extern "C" {
+#endif
+#endif
+
 #include <mpi.h>
+
+#ifdef MPI_SERIAL
+#if defined(__cplusplus)
+}
+#endif
+#endif
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,5 +1,4 @@
 #include "pio_config.h"
-#include "mpi.h"
 #include "pio_timer.h"
 #include "pio_internal.h"
 

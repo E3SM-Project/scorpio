@@ -2,7 +2,16 @@
 #define _ADIOS2PIO_NM_LIB_H_ 
 
 #include <string>
+
+#ifdef MPI_SERIAL
+extern "C" {
+#endif
+
 #include <mpi.h>
+
+#ifdef MPI_SERIAL
+}
+#endif
 
 using namespace std;
 
