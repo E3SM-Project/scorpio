@@ -3109,6 +3109,16 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
             file->mode = file->mode |  NC_MPIIO | NC_NETCDF4;
+#ifdef NC_NODIMSCALE_ATTACH
+            /* If NC_NODIMSCALE_ATTACH flag is available (introduced by NetCDF 4.9.0), apply it
+               when creating HDF5-based NetCDF4 files to skip attaching dimscale to variables.
+
+               This workaround is required to bypass possible HDF5 errors (reproducible with
+               NetCDF 4.8.1 or 4.9.0) caused by the High-level DS API H5DSattach_scale called
+               multiple times inside a loop in the NetCDF library.
+             */
+            file->mode |= NC_NODIMSCALE_ATTACH;
+#endif
             LOG((2, "Calling nc_create_par io_comm = %d mode = %d fh = %d",
                  ios->io_comm, file->mode, file->fh));
             ierr = nc_create_par(filename, file->mode, ios->io_comm, ios->info, &file->fh);
