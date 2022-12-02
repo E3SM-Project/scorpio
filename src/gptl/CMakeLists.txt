@@ -73,6 +73,9 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     set ( CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fallow-argument-mismatch" )
   endif ()
 endif ()
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "XL")
+  set ( CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -qextname=flush" )
+endif ()
 
 #==============================================================================
 #  DEFINE THE INSTALL
