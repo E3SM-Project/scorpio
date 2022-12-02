@@ -3,12 +3,10 @@
 #include <stdexcept>
 #include <cassert>
 
-extern "C"{
 #include "pio_config.h"
 #include "pio.h"
 #include "pio_internal.h"
 #include "spio_file_mvcache.h"
-}
 
 #include "spio_file_mvcache.hpp"
 

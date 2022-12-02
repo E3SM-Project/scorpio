@@ -4,12 +4,8 @@
 #include <string>
 #include <vector>
 
-extern "C"{
 #include "pio_config.h"
 #include "pio.h"
-} // extern "C"
-
-#include "mpi.h"
 
 /* Fwd decl reqd for create_spio_finfo() */
 class spio_finfo;

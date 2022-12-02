@@ -4,10 +4,8 @@
 #include <string>
 #include <vector>
 
-extern "C"{
 #include "pio_config.h"
 #include "pio.h"
-} // extern "C"
 
 #include "spio_finfo.h"
 

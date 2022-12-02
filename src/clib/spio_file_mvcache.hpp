@@ -3,12 +3,10 @@
 
 #include <map>
 
-extern "C"{
 #include "pio_config.h"
 #include "pio.h"
 #include "pio_internal.h"
 #include "spio_file_mvcache.h"
-}
 
 namespace SPIO_Util{
   namespace File_Util{

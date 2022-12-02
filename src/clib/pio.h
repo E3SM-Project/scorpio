@@ -13,7 +13,20 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h> /* memcpy */
+
+#ifdef MPI_SERIAL
+#if defined(__cplusplus)
+extern "C" {
+#endif
+#endif
+
 #include <mpi.h>
+
+#ifdef MPI_SERIAL
+#if defined(__cplusplus)
+}
+#endif
+#endif
 
 #include "pio_config.h"
 #if PIO_USE_PNETCDF
@@ -61,8 +74,6 @@
 #define BLOCK_COUNT_THRESHOLD ((unsigned long)(1024 * 1024 * 1024 * 1.9))
 #define BLOCK_METADATA_SIZE 70 /* Size of adios block metadata */
 
-adios2_adios *get_adios2_adios();
-unsigned long get_adios2_io_cnt();
 #endif
 #ifdef _HDF5
 #include <hdf5.h>
@@ -1608,9 +1619,11 @@ extern "C" {
                            const PIO_Offset *stride, const PIO_Offset *imap, long *buf);
 
 #ifdef _ADIOS2
+    /* FIXME: Shouldn't these ADIOS functions be moved to pio_internal.h ? */
     adios2_type PIOc_get_adios_type(nc_type xtype);
     int get_adios2_type_size(adios2_type type, const void *var);
     const char *convert_adios2_error_to_string(adios2_error error);
+    adios2_adios *get_adios2_adios();
     unsigned long get_adios2_io_cnt();
     int begin_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
     int end_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
@@ -1619,6 +1632,7 @@ extern "C" {
 #endif
 #endif
 
+    /* FIXME: Shouldn't these HDF5 functions be moved to pio_internal.h ? */
 #ifdef _HDF5
     hid_t nc_type_to_hdf5_type(nc_type xtype);
     PIO_Offset hdf5_get_nc_type_size(nc_type xtype);

@@ -5,6 +5,10 @@
 #include "pio.h"
 #include "pio_internal.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* C interface for accessing the Multi-Variable Cache */
 
 /* Initialize the MVCache. The MVCache needs to init before using it */
@@ -21,4 +25,9 @@ void spio_file_mvcache_free(file_desc_t *file, int ioid);
 void spio_file_mvcache_clear(file_desc_t *file);
 /* Finalize the MVCache */
 void spio_file_mvcache_finalize(file_desc_t *file);
+
+#if defined(__cplusplus)
+}
+#endif
+
 #endif // __SPIO_FILE_MVCACHE_H__

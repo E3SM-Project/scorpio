@@ -10,12 +10,10 @@
 #include <cctype>
 #include <algorithm>
 #include <stack>
-extern "C"{
 #include "pio_config.h"
 #include "pio.h"
 #include "pio_internal.h"
 #include "pio_sdecomps_regex.h"
-}
 
 namespace PIO_Util{
   /* Internal util classes and functions used for parsing and evaluating

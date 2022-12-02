@@ -269,7 +269,7 @@ endif ()
 # The MPI library detection was done in the top level
 if (MPISERIAL_C_FOUND)
   target_compile_definitions (pioc
-    PRIVATE MPI_SERIAL)
+    PUBLIC MPI_SERIAL)
   target_include_directories (pioc
     PUBLIC ${MPISERIAL_C_INCLUDE_DIRS})
   target_link_libraries (pioc

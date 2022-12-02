@@ -32,34 +32,34 @@
 #include <assert.h>
 #include "spio_ltimer.h"
 
-#if PIO_ENABLE_LOGGING
-void pio_log(int severity, const char *fmt, ...);
-#define LOG(e) pio_log e
-#else
-#define LOG(e)
-#endif /* PIO_ENABLE_LOGGING */
-
-#define max(a,b)                                \
-    ({ __typeof__ (a) _a = (a);                 \
-        __typeof__ (b) _b = (b);                \
-        _a > _b ? _a : _b; })
-
-#define min(a,b)                                \
-    ({ __typeof__ (a) _a = (a);                 \
-        __typeof__ (b) _b = (b);                \
-        _a < _b ? _a : _b; })
-
-#define MAX_GATHER_BLOCK_SIZE 0
-#define PIO_REQUEST_ALLOC_CHUNK 16
-
-/** This is needed to handle _long() functions. It may not be used as
- * a data type when creating attributes or varaibles, it is only used
- * internally. */
-#define PIO_LONG_INTERNAL 13
-
 #if defined(__cplusplus)
 extern "C" {
 #endif
+
+#if PIO_ENABLE_LOGGING
+    void pio_log(int severity, const char *fmt, ...);
+    #define LOG(e) pio_log e
+#else
+    #define LOG(e)
+#endif /* PIO_ENABLE_LOGGING */
+
+    #define max(a,b)                                \
+        ({ __typeof__ (a) _a = (a);                 \
+            __typeof__ (b) _b = (b);                \
+            _a > _b ? _a : _b; })
+
+    #define min(a,b)                                \
+        ({ __typeof__ (a) _a = (a);                 \
+            __typeof__ (b) _b = (b);                \
+            _a < _b ? _a : _b; })
+
+    #define MAX_GATHER_BLOCK_SIZE 0
+    #define PIO_REQUEST_ALLOC_CHUNK 16
+
+    /** This is needed to handle _long() functions. It may not be used as
+     * a data type when creating attributes or varaibles, it is only used
+     * internally. */
+    #define PIO_LONG_INTERNAL 13
 
     extern PIO_Offset pio_buffer_size_limit;
 
@@ -397,10 +397,6 @@ extern "C" {
           int **preq_block_ranges,
           int *nreq_blocks);
 
-#if defined(__cplusplus)
-}
-#endif
-
 /* Asynchronous I/O services start with the following seq num */
 static const int PIO_MSG_START_SEQ_NUM = 1024;
 /** These are the messages that can be sent over the intercomm when
@@ -674,5 +670,10 @@ const char *pio_get_vnames_from_file_id(int pio_file_id,
               int *varids, int varids_sz, char *buf, size_t buf_sz);
 const char *pio_async_msg_to_string(int msg);
 #define PIO_IS_NULL(p) ((p) ? "not NULL" : "NULL")
+
+#if defined(__cplusplus)
+}
+#endif
+
 
 #endif /* __PIO_INTERNAL__ */

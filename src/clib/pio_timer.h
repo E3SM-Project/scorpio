@@ -3,7 +3,21 @@
 
 #include "pio_config.h"
 #include <stdbool.h>
+
+#ifdef MPI_SERIAL
+#if defined(__cplusplus)
+extern "C" {
+#endif
+#endif
+
 #include "mpi.h"
+
+#ifdef MPI_SERIAL
+#if defined(__cplusplus)
+}
+#endif
+#endif
+
 #include "pio_internal.h"
 
 /* Timer states */
@@ -47,6 +61,10 @@ typedef enum mtimer_type {
     PIO_MICRO_NUM_TIMERS
 } mtimer_type_t;
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* FIXME: Do we need to return error codes here - or just have asserts */
 /* Init timer framework - needs to be called once before using timers */
 int mtimer_init(mtimer_type_t type);
@@ -76,4 +94,9 @@ int mtimer_async_event_in_progress(mtimer_t mt, bool is_async_event_in_progress)
  * returns false otherwise
  */
 bool mtimer_has_async_event_in_progress(mtimer_t mt);
+
+#if defined(__cplusplus)
+}
+#endif
+
 #endif
