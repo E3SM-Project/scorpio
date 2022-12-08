@@ -872,7 +872,7 @@ CONTAINS
 
     ALLOCATE(cvdimids(vndims))
     ierr = PIOc_inq_vardimid(file%fh, varid - 1, cvdimids)
-    IF(ierr /= PIO_NOERR) THEN
+    IF(ierr == PIO_NOERR) THEN
       DO i = 1,vndims
         ! FIXME: Do we need to follow the convention of having the Fortran dimension ids
         ! start from 1 instead of 0 (the C convention)
