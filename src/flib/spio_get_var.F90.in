@@ -148,7 +148,7 @@ CONTAINS
 
     ALLOCATE(cstart(ndims))
     DO i=1,ndims
-      cstart(i) = INT(start(ndims - i + 1), PIO_OFFSET_F2C_TYPE_KIND)
+      cstart(i) = INT(start(ndims - i + 1) - 1, PIO_OFFSET_F2C_TYPE_KIND)
     END DO
 
     ! NetCDF only supports character arrays, read using character arrays
@@ -253,7 +253,7 @@ CONTAINS
 !! @retval ierr @copydoc error_return
 !!
   INTEGER FUNCTION pio_get_var1_vdesc_{TYPE} (file, vdesc, start, val) RESULT(ierr)
-    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(file_desc_t), INTENT(IN) :: file
     TYPE(var_desc_t), INTENT(IN) :: vdesc
     INTEGER, INTENT(IN) :: start(:)
     {VTYPE}, INTENT(OUT) :: val
@@ -295,7 +295,7 @@ CONTAINS
 !!                  read from the variable
 !! @returns PIO_NOERR on success, an error code otherwise
   INTEGER FUNCTION pio_get_vara_{DIMS}d_text (file, varid, start, cnt, val) RESULT(ierr)
-    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(file_desc_t), INTENT(IN) :: file
     INTEGER, INTENT(IN) :: varid, start(:), cnt(:)
     CHARACTER(LEN=*), INTENT(OUT) :: val{DIMSTR}
 
@@ -439,7 +439,7 @@ CONTAINS
 !!                  values that are being read
 !! @returns PIO_NOERR on success, an error code otherwise
   INTEGER FUNCTION pio_get_vara_{DIMS}d_{TYPE} (file, varid, start, cnt, val) RESULT(ierr)
-    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(file_desc_t), INTENT(IN) :: file
     INTEGER, INTENT(IN) :: varid, start(:), cnt(:)
     {VTYPE}, TARGET, INTENT(OUT) :: val{DIMSTR}
 
@@ -529,7 +529,7 @@ CONTAINS
 !!                  values that are being read
 !! @returns PIO_NOERR on success, an error code otherwise
   INTEGER FUNCTION pio_get_vara_vdesc_{DIMS}d_{TYPE} (file, vdesc, start, cnt, val) RESULT(ierr)
-    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(file_desc_t), INTENT(IN) :: file
     TYPE(var_desc_t), INTENT(IN) :: vdesc
     INTEGER, INTENT(IN) ::  start(:), cnt(:)
     {VTYPE}, INTENT(OUT) :: val{DIMSTR}
@@ -559,7 +559,7 @@ CONTAINS
 !!                  of each individual string)
 !! @returns PIO_NOERR on success, an error code otherwise
   INTEGER FUNCTION pio_get_var_{DIMS}d_text (file, varid, val) RESULT(ierr)
-    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(file_desc_t), INTENT(IN) :: file
     INTEGER, INTENT(IN) :: varid
     CHARACTER(LEN=*), INTENT(OUT) :: val{DIMSTR}
 
@@ -640,7 +640,7 @@ CONTAINS
 !! @param[out] val The value is read into this argument/variable.
 !! @returns PIO_NOERR on success, an error code otherwise
   INTEGER FUNCTION pio_get_var_0d_{TYPE} (file, varid, val) RESULT(ierr)
-    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(file_desc_t), INTENT(IN) :: file
     INTEGER, INTENT(IN) :: varid
     {VTYPE}, INTENT(OUT) :: val
 
@@ -672,7 +672,7 @@ CONTAINS
 !!                  by the variable dimensions.
 !! @returns PIO_NOERR on success, an error code otherwise
   INTEGER FUNCTION pio_get_var_{DIMS}d_{TYPE} (file, varid, val) RESULT(ierr)
-    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(file_desc_t), INTENT(IN) :: file
     INTEGER, INTENT(IN) :: varid
     {VTYPE}, INTENT(OUT) :: val{DIMSTR}
 
@@ -731,7 +731,7 @@ CONTAINS
 !!                  by the variable dimensions.
 !! @returns PIO_NOERR on success, an error code otherwise
   INTEGER FUNCTION pio_get_var_vdesc_{DIMS}d_{TYPE} (file, vdesc, val) RESULT(ierr)
-    TYPE(file_desc_t), INTENT(INOUT) :: file
+    TYPE(file_desc_t), INTENT(IN) :: file
     TYPE(var_desc_t), INTENT(IN) :: vdesc
     {VTYPE}, INTENT(OUT) :: val{DIMSTR}
 
