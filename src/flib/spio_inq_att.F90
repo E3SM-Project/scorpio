@@ -222,7 +222,7 @@ CONTAINS
 #ifdef TIMING
     CALL t_startf("PIO:pio_inq_attid_file_vid")
 #endif
-    IF(varid <= 0) THEN
+    IF(varid < 0) THEN
       WRITE(log_msg, *) "Invalid variable id (varid = ", varid, ")",&
                         " passed to pio_inq_attid() function,",&
                         " pio_inq_attid_file_vid. file id = ", file%fh
@@ -275,7 +275,7 @@ CONTAINS
     file%fh = fh
     file%iosystem => iosys
     
-    IF(varid <= 0) THEN
+    IF(varid < 0) THEN
       WRITE(log_msg, *) "Invalid variable id (varid = ", varid, ")",&
                         " passed to pio_inq_attid() function,",&
                         " pio_inq_attid_fh_vid. file id = ", file%fh
@@ -358,7 +358,7 @@ CONTAINS
 #ifdef TIMING
     CALL t_startf("PIO:pio_inq_attname_file_vid")
 #endif
-    IF(varid <= 0) THEN
+    IF(varid < 0) THEN
       WRITE(log_msg, *) "Invalid variable id (varid = ", varid,&
                         ") passed to pio_inq_attname() function,",&
                         " pio_inq_attname_file_vid(). file id = ", file%fh
@@ -421,7 +421,7 @@ CONTAINS
     file%fh = fh
     file%iosystem => iosys
     
-    IF((fh <= 0) .OR. (varid <= 0) .OR. (attid <= 0)) THEN
+    IF((fh <= 0) .OR. (varid < 0) .OR. (attid <= 0)) THEN
       WRITE(log_msg, *) "Invalid file handle/id (fh =", fh, ") "&
                         "or variable id (varid = ", varid,&
                         "or attribute id (attid = ", attid,&
@@ -473,7 +473,8 @@ CONTAINS
 !!
 !! @details
 !! @param[in] file The file handle. @copydoc file_desc_t
-!! @param[in] varid The id of the variable. Use PIO_GLOBAL for global attributes
+!! @param[in] varid The id of the variable associated with the attribute. Use
+!!                  PIO_GLOBAL as the variable id for global attributes
 !! @param[in] attid The id of the attribute
 !! @param[out] atttype The type of the attribute
 !! @retval ierr @copydoc error_return
@@ -491,7 +492,7 @@ CONTAINS
 #ifdef TIMING
     CALL t_startf("PIO:pio_inq_atttype_file_vid")
 #endif
-    IF((varid <= 0) .OR. (attid <= 0)) THEN
+    IF((varid < 0) .OR. (attid <= 0)) THEN
       WRITE(log_msg, *) "Invalid variable id (varid = ", varid,")",&
                         " or invalid attribute id (attid = ", attid, ")",&
                         " passed to pio_inq_atttype() function,",&
@@ -525,7 +526,8 @@ CONTAINS
 !!
 !! @details
 !! @param[in] fh The file id/handle
-!! @param[in] varid The id of the attribute. Use PIO_GLOBAL for global attributes
+!! @param[in] varid The id of the variable associated with the attribute. Use
+!!                  PIO_GLOBAL as the variable id for global attributes
 !! @param[in] attid The id of the attribute
 !! @param[out] atttype The type of the attribute
 !! @retval ierr @copydoc error_return
@@ -547,7 +549,7 @@ CONTAINS
     file%fh = fh
     file%iosystem => iosys
     
-    IF((varid <= 0) .OR. (attid <= 0)) THEN
+    IF((varid < 0) .OR. (attid <= 0)) THEN
       WRITE(log_msg, *) "Invalid variable id (varid = ", varid,")",&
                         " or invalid attribute id (attid = ", attid, ")",&
                         " passed to pio_inq_atttype() function,",&
@@ -627,7 +629,7 @@ CONTAINS
 #ifdef TIMING
     CALL t_startf("PIO:pio_inq_attlen_file_varid_attid_offlen")
 #endif
-    IF((varid <= 0) .OR. (attid <= 0)) THEN
+    IF((varid < 0) .OR. (attid <= 0)) THEN
       WRITE(log_msg, *) "Invalid variable id (varid = ", varid, ")",&
                         " or an invalid attribute id (attid = ", attid, ")",&
                         " passed to pio_inq_attlen() function,",&
@@ -680,7 +682,7 @@ CONTAINS
 #ifdef TIMING
     CALL t_startf("PIO:pio_inq_attlen_file_varid_attname_offlen")
 #endif
-    IF((varid <= 0) .OR. (LEN_TRIM(attname) == 0)) THEN
+    IF((varid < 0) .OR. (LEN_TRIM(attname) == 0)) THEN
       WRITE(log_msg, *) "Invalid variable id (varid = ", varid, ")",&
                         " or an invalid attribute name (empty string)",&
                         " passed to pio_inq_attlen() function,",&
@@ -738,7 +740,7 @@ CONTAINS
     file%fh = fh
     file%iosystem => iosys
     
-    IF((fh <= 0) .OR. (varid <= 0) .OR. (attid <= 0)) THEN
+    IF((fh <= 0) .OR. (varid < 0) .OR. (attid <= 0)) THEN
       WRITE(log_msg, *) "Invalid file handle/id (fh =", fh, ")",&
                         "or variable id (varid = ", varid,")",&
                         "or attribute id (attid = ", attid,")",&
@@ -786,7 +788,7 @@ CONTAINS
     file%fh = fh
     file%iosystem => iosys
 
-    IF((varid <= 0) .OR. (LEN_TRIM(attname) == 0)) THEN
+    IF((varid < 0) .OR. (LEN_TRIM(attname) == 0)) THEN
       WRITE(log_msg, *) "Invalid variable id (varid = ", varid, ")",&
                         " or an invalid attribute name (empty string)",&
                         " passed to pio_inq_attlen() function,",&
@@ -899,7 +901,8 @@ CONTAINS
 !!
 !! @details
 !! @param[in] file The file handle. @copydoc file_desc_t
-!! @param[in] varid The id of the attribute
+!! @param[in] varid The id of the variable with the attribute. Use PIO_GLOBAL
+!!                  as the variable id for global attributes
 !! @param[in] attname The name of the attribute
 !! @param[out] xtype (Optional) The type of the attribute
 !! @param[out] len (Optional) The length (KIND=PIO_OFFSET_KIND) of the attribute
@@ -919,8 +922,8 @@ CONTAINS
 #ifdef TIMING
     CALL t_startf("PIO:pio_inq_att_file_vid_offlen")
 #endif
-    IF(varid <= 0) THEN
-      WRITE(log_msg, *) "Invalid attribute id (varid = ", varid,&
+    IF(varid < 0) THEN
+      WRITE(log_msg, *) "Invalid variable id (varid = ", varid,&
                         ") passed to pio_inq_att() function,",&
                         " pio_inq_att_file_vid_offlen(). file id = ", file%fh
       ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
@@ -958,7 +961,8 @@ CONTAINS
 !!
 !! @details
 !! @param[in] fh The file id/handle
-!! @param[in] varid The id of the attribute
+!! @param[in] varid The id of the variable associated with the attribute. Use PIO_GLOBAL
+!!                  as the variable id for global attributes
 !! @param[in] attname The name of the attribute
 !! @param[out] xtype (Optional) The type of the attribute
 !! @param[out] len (Optional) The length (KIND=PIO_OFFSET_KIND) of the attribute
@@ -982,7 +986,7 @@ CONTAINS
     file%fh = fh
     file%iosystem => iosys
     
-    IF((fh <= 0) .OR. (varid <= 0)) THEN
+    IF((fh <= 0) .OR. (varid < 0)) THEN
       WRITE(log_msg, *) "Invalid file handle/id (fh =", fh, ") or variable id (varid = ", varid,&
                         ") passed to pio_inq_att() function, pio_inq_att_fh_vid()"
       ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
