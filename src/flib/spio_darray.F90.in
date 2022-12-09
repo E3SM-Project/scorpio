@@ -11,8 +11,9 @@
 
 MODULE spio_darray
   USE iso_c_binding
-  USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t
+  USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t, PIO_MAX_NAME
   USE pio_kinds, ONLY : i4, r4, r8, pio_offset_kind
+  USE spio_err, ONLY  : pio_error, pio_warn
   USE spio_darray_cint
 #ifdef TIMING
   use perf_mod, only : t_startf, t_stopf   !_EXTERNAL
@@ -72,11 +73,27 @@ CONTAINS
     {VTYPE}, OPTIONAL, INTENT(IN), TARGET :: fillval
 
     INTEGER(C_INT) :: cerr
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    {VTYPE}, ALLOCATABLE, TARGET :: tmp_array{DIMSTR}
     INTEGER(C_SIZE_T) :: array_sz
     TYPE(C_PTR) :: array_ptr, fillval_ptr
 
     array_sz = SIZE(array, KIND=C_SIZE_T)
-    array_ptr = C_LOC(array)
+    IF(IS_CONTIGUOUS(array)) THEN
+      array_ptr = C_LOC(array)
+    ELSE
+      ! Initialize a temp contiguous array/buffer to write the data using
+      ! the C APIs
+      WRITE(log_msg, *) "The user buffer used to write the distributed array",&
+                        " is not contiguous. A temporary contiguous buffer",&
+                        " will be used to copy+write the data, that can",&
+                        " negatively impact the I/O performance. varid = ",&
+                        vdesc%varid, ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      ALLOCATE(tmp_array, SOURCE= array)
+      array_ptr = C_LOC(tmp_array)
+    END IF
+
     IF(PRESENT(fillval)) THEN
       fillval_ptr = C_LOC(fillval)
     ELSE
@@ -93,6 +110,10 @@ CONTAINS
 #endif
     ierr = INT(cerr)
 
+    IF(.NOT. IS_CONTIGUOUS(array)) THEN
+      DEALLOCATE(tmp_array)
+    END IF
+
   END SUBROUTINE pio_write_darray_{DIMS}d_{TYPE}
 
 ! TYPE real,int,double
@@ -105,7 +126,7 @@ CONTAINS
 !! @param[in] vdesc The handle to the variable being read (@ref var_desc_t)
 !! @param[in] iodesc The handle to the I/O decomposition that describes how
 !! the data is decomposed across processes (@ref io_desc_t)
-!! @param[in] array The distributed array being read from the file. The data
+!! @param[out] array The distributed array being read from the file. The data
 !! in the local array is read from the file (for the variable @p vdesc)
 !! based on the I/O decomposition @p iodesc
 !! @param[out] ierr Set to PIO_NOERR on success, or an error code otherwise
@@ -118,15 +139,31 @@ CONTAINS
     TYPE(file_desc_t), INTENT(IN) :: file
     TYPE(var_desc_t), INTENT(IN) :: vdesc
     TYPE(io_desc_t), INTENT(IN) :: iodesc
-    {VTYPE}, INTENT(IN), TARGET :: array{DIMSTR}
+    {VTYPE}, INTENT(OUT), TARGET :: array{DIMSTR}
     INTEGER, INTENT(OUT) :: ierr
 
     INTEGER(C_INT) :: cerr
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    {VTYPE}, ALLOCATABLE, TARGET :: tmp_array{DIMSTR}
     INTEGER(C_SIZE_T) :: array_sz
     TYPE(C_PTR) :: array_ptr
 
     array_sz = SIZE(array, KIND=C_SIZE_T)
-    array_ptr = C_LOC(array)
+
+    IF(IS_CONTIGUOUS(array)) THEN
+      array_ptr = C_LOC(array)
+    ELSE
+      ! Initialize a temp contiguous array/buffer to read the data using
+      ! the C APIs
+      WRITE(log_msg, *) "The user buffer used to read the distributed array",&
+                        " is not contiguous. A temporary contiguous buffer",&
+                        " will be used to read the data, that can",&
+                        " negatively impact the I/O performance. varid = ",&
+                        vdesc%varid, ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      ALLOCATE(tmp_array, MOLD= array)
+      array_ptr = C_LOC(tmp_array)
+    END IF
 
 #ifdef TIMING
     call t_startf("PIO:read_darray_{DIMS}d_{TYPE}")
@@ -137,5 +174,11 @@ CONTAINS
     call t_stopf("PIO:read_darray_{DIMS}d_{TYPE}")
 #endif
     ierr = INT(cerr)
+
+    IF(.NOT. IS_CONTIGUOUS(array)) THEN
+      ! Copy the data read to the user buffer/array
+      array = tmp_array
+      DEALLOCATE(tmp_array)
+    END IF
   END SUBROUTINE pio_read_darray_{DIMS}d_{TYPE}
 END MODULE spio_darray
