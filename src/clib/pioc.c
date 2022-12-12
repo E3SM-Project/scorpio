@@ -1419,6 +1419,337 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
     LOG((2, "Init_Intracomm complete iosysid = %d", *iosysidp));
 
     GPTLstop("PIO:PIOc_Init_Intracomm");
+
+    /* DEBUG on crusher-gpu start */
+    static int counter = 0;
+    counter++;
+    if (ios->union_rank == 0)
+    {
+        printf("[DEBUG] PIOc_Init_Intracomm, counter = %d\n", counter);
+        fflush(stdout);
+    }
+    if (counter == 1)
+    {
+      int format = PIO_IOTYPE_PNETCDF;
+      int rearranger = PIO_REARR_SUBSET;
+      int iosysid = *iosysidp;
+      int ncid;
+
+      int ioid_525;
+      int ndims_525 = 0;
+      int *gdimlen_525 = NULL;
+      PIO_Offset fmaplen_525 = 0;
+      PIO_Offset *compmap_525 = NULL;
+      double buffer_525[27648];
+
+      int ioid_526;
+      int ndims_526 = 0;
+      int *gdimlen_526 = NULL;
+      PIO_Offset fmaplen_526 = 0;
+      PIO_Offset *compmap_526 = NULL;
+      double buffer_526[13824];
+
+      int ioid_527;
+      int ndims_527 = 0;
+      int *gdimlen_527 = NULL;
+      PIO_Offset fmaplen_527 = 0;
+      PIO_Offset *compmap_527 = NULL;
+      double buffer_527[14016];
+
+      int ioid_528;
+      int ndims_528 = 0;
+      int *gdimlen_528 = NULL;
+      PIO_Offset fmaplen_528 = 0;
+      PIO_Offset *compmap_528 = NULL;
+      double buffer_528[192];
+
+      int ioid_529;
+      int ndims_529 = 0;
+      int *gdimlen_529 = NULL;
+      PIO_Offset fmaplen_529 = 0;
+      PIO_Offset *compmap_529 = NULL;
+      double buffer_529[138240];
+
+      int ioid_530;
+      int ndims_530 = 0;
+      int *gdimlen_530 = NULL;
+      PIO_Offset fmaplen_530 = 0;
+      PIO_Offset *compmap_530 = NULL;
+      double buffer_530[9576];
+
+      int ioid_531;
+      int ndims_531 = 0;
+      int *gdimlen_531 = NULL;
+      PIO_Offset fmaplen_531 = 0;
+      PIO_Offset *compmap_531 = NULL;
+      double buffer_531[19152];
+
+      int ioid_532;
+      int ndims_532 = 0;
+      int *gdimlen_532 = NULL;
+      PIO_Offset fmaplen_532 = 0;
+      PIO_Offset *compmap_532 = NULL;
+      double buffer_532[133];
+
+      int ioid_533;
+      int ndims_533 = 0;
+      int *gdimlen_533 = NULL;
+      PIO_Offset fmaplen_533 = 0;
+      PIO_Offset *compmap_533 = NULL;
+      double buffer_533[95760];
+
+      int dimids[6];
+
+      int dimid_time;
+      int dimid_dim10;
+      int dimid_dim2;
+      int dimid_elem;
+      int dimid_gp;
+      int dimid_ilev;
+      int dimid_lev;
+      int dimid_ncol;
+
+      int varid_time;
+      int varid_v_dyn;
+      int varid_vtheta_dp_dyn;
+      int varid_dp3d_dyn;
+      int varid_phi_int_dyn;
+      int varid_ps_dyn;
+      int varid_Qdp_dyn;
+      int varid_w_int_dyn;
+      int varid_T_mid;
+      int varid_T_prev_micro_step;
+      int varid_cldfrac_liq;
+      int varid_eddy_diff_mom;
+      int varid_horiz_winds;
+      int varid_nc_nuceat_tend;
+      int varid_ni_activated;
+      int varid_o3_volume_mix_ratio;
+      int varid_phis;
+      int varid_precip_ice_surf_mass;
+      int varid_precip_liq_surf_mass;
+      int varid_ps;
+      int varid_qv;
+      int varid_qv_prev_micro_step;
+      int varid_sgs_buoy_flux;
+      int varid_tracers;
+
+      int *gdimlen = NULL;
+      PIO_Offset fmaplen = 0;
+      PIO_Offset *compmap = NULL;
+
+      PIOc_readmap("piodecomp_525.dat", &ndims_525, &gdimlen_525, &fmaplen_525, &compmap_525, MPI_COMM_WORLD);
+      PIOc_InitDecomp(iosysid, PIO_DOUBLE, 5, gdimlen_525, fmaplen_525, compmap_525, &ioid_525, &rearranger, NULL, NULL);
+
+      PIOc_readmap("piodecomp_526.dat", &ndims_526, &gdimlen_526, &fmaplen_526, &compmap_526, MPI_COMM_WORLD);
+      PIOc_InitDecomp(iosysid, PIO_DOUBLE, 4, gdimlen_526, fmaplen_526, compmap_526, &ioid_526, &rearranger, NULL, NULL);
+
+      PIOc_readmap("piodecomp_527.dat", &ndims_527, &gdimlen_527, &fmaplen_527, &compmap_527, MPI_COMM_WORLD);
+      PIOc_InitDecomp(iosysid, PIO_DOUBLE, 4, gdimlen_527, fmaplen_527, compmap_527, &ioid_527, &rearranger, NULL, NULL);
+
+      PIOc_readmap("piodecomp_528.dat", &ndims_528, &gdimlen_528, &fmaplen_528, &compmap_528, MPI_COMM_WORLD);
+      PIOc_InitDecomp(iosysid, PIO_DOUBLE, 3, gdimlen_528, fmaplen_528, compmap_528, &ioid_528, &rearranger, NULL, NULL);
+
+      PIOc_readmap("piodecomp_529.dat", &ndims_529, &gdimlen_529, &fmaplen_529, &compmap_529, MPI_COMM_WORLD);
+      PIOc_InitDecomp(iosysid, PIO_DOUBLE, 5, gdimlen_529, fmaplen_529, compmap_529, &ioid_529, &rearranger, NULL, NULL);
+
+      PIOc_readmap("piodecomp_530.dat", &ndims_530, &gdimlen_530, &fmaplen_530, &compmap_530, MPI_COMM_WORLD);
+      PIOc_InitDecomp(iosysid, PIO_DOUBLE, 2, gdimlen_530, fmaplen_530, compmap_530, &ioid_530, &rearranger, NULL, NULL);
+
+      PIOc_readmap("piodecomp_531.dat", &ndims_531, &gdimlen_531, &fmaplen_531, &compmap_531, MPI_COMM_WORLD);
+      PIOc_InitDecomp(iosysid, PIO_DOUBLE, 3, gdimlen_531, fmaplen_531, compmap_531, &ioid_531, &rearranger, NULL, NULL);
+
+      PIOc_readmap("piodecomp_532.dat", &ndims_532, &gdimlen_532, &fmaplen_532, &compmap_532, MPI_COMM_WORLD);
+      PIOc_InitDecomp(iosysid, PIO_DOUBLE, 1, gdimlen_532, fmaplen_532, compmap_532, &ioid_532, &rearranger, NULL, NULL);
+
+      PIOc_readmap("piodecomp_533.dat", &ndims_533, &gdimlen_533, &fmaplen_533, &compmap_533, MPI_COMM_WORLD);
+      PIOc_InitDecomp(iosysid, PIO_DOUBLE, 3, gdimlen_533, fmaplen_533, compmap_533, &ioid_533, &rearranger, NULL, NULL);
+
+      PIOc_createfile(iosysid, &ncid, &format, "PIOc_Init_Intracomm_scream.r.nc", PIO_CLOBBER);
+
+      PIOc_def_dim(ncid, "time", PIO_UNLIMITED, &dimid_time);
+      PIOc_def_dim(ncid, "dim10", 10, &dimid_dim10);
+      PIOc_def_dim(ncid, "dim2", 2, &dimid_dim2);
+      PIOc_def_dim(ncid, "elem", 96, &dimid_elem);
+      PIOc_def_dim(ncid, "gp", 4, &dimid_gp);
+      PIOc_def_dim(ncid, "ilev", 73, &dimid_ilev);
+      PIOc_def_dim(ncid, "lev", 72, &dimid_lev);
+      PIOc_def_dim(ncid, "ncol", 866, &dimid_ncol);
+
+      PIOc_def_var(ncid, "time", PIO_DOUBLE, 1, &dimid_time, &varid_time);
+
+      dimids[0] = dimid_time;
+      dimids[1] = dimid_elem;
+
+      dimids[2] = dimid_dim2;
+      dimids[3] = dimid_gp;
+      dimids[4] = dimid_gp;
+      dimids[5] = dimid_lev;
+      PIOc_def_var(ncid, "v_dyn", PIO_DOUBLE, 6, dimids, &varid_v_dyn);
+
+      dimids[2] = dimid_gp;
+      dimids[3] = dimid_gp;
+
+      dimids[4] = dimid_lev;
+      PIOc_def_var(ncid, "vtheta_dp_dyn", PIO_DOUBLE, 5, dimids, &varid_vtheta_dp_dyn);
+      PIOc_def_var(ncid, "dp3d_dyn", PIO_DOUBLE, 5, dimids, &varid_dp3d_dyn);
+
+      dimids[4] = dimid_ilev;
+      PIOc_def_var(ncid, "phi_int_dyn", PIO_DOUBLE, 5, dimids, &varid_phi_int_dyn);
+
+      PIOc_def_var(ncid, "ps_dyn", PIO_DOUBLE, 4, dimids, &varid_ps_dyn);
+
+      dimids[2] = dimid_dim10;
+      dimids[3] = dimid_gp;
+      dimids[4] = dimid_gp;
+      dimids[5] = dimid_lev;
+      PIOc_def_var(ncid, "Qdp_dyn", PIO_DOUBLE, 6, dimids, &varid_Qdp_dyn);
+
+      dimids[2] = dimid_gp;
+      dimids[3] = dimid_gp;
+      dimids[4] = dimid_ilev;
+      PIOc_def_var(ncid, "w_int_dyn", PIO_DOUBLE, 5, dimids, &varid_w_int_dyn);
+
+      dimids[1] = dimid_ncol;
+      dimids[2] = dimid_lev;
+      PIOc_def_var(ncid, "T_mid", PIO_DOUBLE, 3, dimids, &varid_T_mid);
+      PIOc_def_var(ncid, "T_prev_micro_step", PIO_DOUBLE, 3, dimids, &varid_T_prev_micro_step);
+      PIOc_def_var(ncid, "cldfrac_liq", PIO_DOUBLE, 3, dimids, &varid_cldfrac_liq);
+      PIOc_def_var(ncid, "eddy_diff_mom", PIO_DOUBLE, 3, dimids, &varid_eddy_diff_mom);
+
+      dimids[2] = dimid_dim2;
+      dimids[3] = dimid_lev;
+      PIOc_def_var(ncid, "horiz_winds", PIO_DOUBLE, 4, dimids, &varid_horiz_winds);
+
+      dimids[2] = dimid_lev;
+      PIOc_def_var(ncid, "nc_nuceat_tend", PIO_DOUBLE, 3, dimids, &varid_nc_nuceat_tend);
+      PIOc_def_var(ncid, "ni_activated", PIO_DOUBLE, 3, dimids, &varid_ni_activated);
+      PIOc_def_var(ncid, "o3_volume_mix_ratio", PIO_DOUBLE, 3, dimids, &varid_o3_volume_mix_ratio);
+
+      PIOc_def_var(ncid, "phis", PIO_DOUBLE, 2, dimids, &varid_phis);
+      PIOc_def_var(ncid, "precip_ice_surf_mass", PIO_DOUBLE, 2, dimids, &varid_precip_ice_surf_mass);
+      PIOc_def_var(ncid, "precip_liq_surf_mass", PIO_DOUBLE, 2, dimids, &varid_precip_liq_surf_mass);
+      PIOc_def_var(ncid, "ps", PIO_DOUBLE, 2, dimids, &varid_ps);
+
+      PIOc_def_var(ncid, "qv", PIO_DOUBLE, 3, dimids, &varid_qv);
+      PIOc_def_var(ncid, "qv_prev_micro_step", PIO_DOUBLE, 3, dimids, &varid_qv_prev_micro_step);
+      PIOc_def_var(ncid, "sgs_buoy_flux", PIO_DOUBLE, 3, dimids, &varid_sgs_buoy_flux);
+
+      dimids[2] = dimid_dim10;
+      dimids[3] = dimid_lev;
+      PIOc_def_var(ncid, "tracers", PIO_DOUBLE, 4, dimids, &varid_tracers);
+
+      PIOc_enddef(ncid);
+
+      PIOc_setframe(ncid, varid_v_dyn, 0);
+      PIOc_write_darray(ncid, varid_v_dyn, ioid_525, fmaplen_525, buffer_525, NULL);
+
+      PIOc_setframe(ncid, varid_vtheta_dp_dyn, 0);
+      PIOc_write_darray(ncid, varid_vtheta_dp_dyn, ioid_526, fmaplen_526, buffer_526, NULL);
+
+      PIOc_setframe(ncid, varid_dp3d_dyn, 0);
+      PIOc_write_darray(ncid, varid_dp3d_dyn, ioid_526, fmaplen_526, buffer_526, NULL);
+
+      PIOc_setframe(ncid, varid_phi_int_dyn, 0);
+      PIOc_write_darray(ncid, varid_phi_int_dyn, ioid_527, fmaplen_527, buffer_527, NULL);
+
+      PIOc_setframe(ncid, varid_ps_dyn, 0);
+      PIOc_write_darray(ncid, varid_ps_dyn, ioid_528, fmaplen_528, buffer_528, NULL);
+
+      PIOc_setframe(ncid, varid_Qdp_dyn, 0);
+      PIOc_write_darray(ncid, varid_Qdp_dyn, ioid_529, fmaplen_529, buffer_529, NULL);
+
+      PIOc_setframe(ncid, varid_w_int_dyn, 0);
+      PIOc_write_darray(ncid, varid_w_int_dyn, ioid_527, fmaplen_527, buffer_527, NULL);
+
+      PIOc_setframe(ncid, varid_T_mid, 0);
+      PIOc_write_darray(ncid, varid_T_mid, ioid_530, fmaplen_530, buffer_530, NULL);
+
+      PIOc_setframe(ncid, varid_T_prev_micro_step, 0);
+      PIOc_write_darray(ncid, varid_T_prev_micro_step, ioid_530, fmaplen_530, buffer_530, NULL);
+
+      PIOc_setframe(ncid, varid_cldfrac_liq, 0);
+      PIOc_write_darray(ncid, varid_cldfrac_liq, ioid_530, fmaplen_530, buffer_530, NULL);
+
+      PIOc_setframe(ncid, varid_eddy_diff_mom, 0);
+      PIOc_write_darray(ncid, varid_eddy_diff_mom, ioid_530, fmaplen_530, buffer_530, NULL);
+
+      PIOc_setframe(ncid, varid_horiz_winds, 0);
+      PIOc_write_darray(ncid, varid_horiz_winds, ioid_531, fmaplen_531, buffer_531, NULL);
+
+      PIOc_setframe(ncid, varid_nc_nuceat_tend, 0);
+      PIOc_write_darray(ncid, varid_nc_nuceat_tend, ioid_530, fmaplen_530, buffer_530, NULL);
+
+      PIOc_setframe(ncid, varid_ni_activated, 0);
+      PIOc_write_darray(ncid, varid_ni_activated, ioid_530, fmaplen_530, buffer_530, NULL);
+
+      PIOc_setframe(ncid, varid_o3_volume_mix_ratio, 0);
+      PIOc_write_darray(ncid, varid_o3_volume_mix_ratio, ioid_530, fmaplen_530, buffer_530, NULL);
+
+      PIOc_setframe(ncid, varid_phis, 0);
+      PIOc_write_darray(ncid, varid_phis, ioid_532, fmaplen_532, buffer_532, NULL);
+
+      PIOc_setframe(ncid, varid_precip_ice_surf_mass, 0);
+      PIOc_write_darray(ncid, varid_precip_ice_surf_mass, ioid_532, fmaplen_532, buffer_532, NULL);
+
+      PIOc_setframe(ncid, varid_precip_liq_surf_mass, 0);
+      PIOc_write_darray(ncid, varid_precip_liq_surf_mass, ioid_532, fmaplen_532, buffer_532, NULL);
+
+      PIOc_setframe(ncid, varid_ps, 0);
+      PIOc_write_darray(ncid, varid_ps, ioid_532, fmaplen_532, buffer_532, NULL);
+
+      PIOc_setframe(ncid, varid_qv, 0);
+      PIOc_write_darray(ncid, varid_qv, ioid_530, fmaplen_530, buffer_530, NULL);
+
+      PIOc_setframe(ncid, varid_qv_prev_micro_step, 0);
+      PIOc_write_darray(ncid, varid_qv_prev_micro_step, ioid_530, fmaplen_530, buffer_530, NULL);
+
+      PIOc_setframe(ncid, varid_sgs_buoy_flux, 0);
+      PIOc_write_darray(ncid, varid_sgs_buoy_flux, ioid_530, fmaplen_530, buffer_530, NULL);
+
+      PIOc_setframe(ncid, varid_tracers, 0);
+      PIOc_write_darray(ncid, varid_tracers, ioid_533, fmaplen_533, buffer_533, NULL);
+
+      PIOc_closefile(ncid);
+
+      free(compmap_525);
+      free(gdimlen_525);
+      PIOc_freedecomp(iosysid, ioid_525);
+
+      free(compmap_526);
+      free(gdimlen_526);
+      PIOc_freedecomp(iosysid, ioid_526);
+
+      free(compmap_527);
+      free(gdimlen_527);
+      PIOc_freedecomp(iosysid, ioid_527);
+
+      free(compmap_528);
+      free(gdimlen_528);
+      PIOc_freedecomp(iosysid, ioid_528);
+
+      free(compmap_529);
+      free(gdimlen_529);
+      PIOc_freedecomp(iosysid, ioid_529);
+
+      free(compmap_530);
+      free(gdimlen_530);
+      PIOc_freedecomp(iosysid, ioid_530);
+
+      free(compmap_531);
+      free(gdimlen_531);
+      PIOc_freedecomp(iosysid, ioid_531);
+
+      free(compmap_532);
+      free(gdimlen_532);
+      PIOc_freedecomp(iosysid, ioid_532);
+
+      free(compmap_533);
+      free(gdimlen_533);
+      PIOc_freedecomp(iosysid, ioid_533);
+    }
+    /* DEBUG on crusher-gpu end */
+
     return PIO_NOERR;
 }
 
