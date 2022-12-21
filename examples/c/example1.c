@@ -94,7 +94,28 @@ int my_rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sb
         }
     }
 
-    ret = MPI_Alltoallw(sbuf, sendcounts, sdispls, sendtypes, rbuf, recvcounts, rdispls, recvtypes, mycomm); ERR
+    /* Some MPI implementations (some vers of OpenMPI, MPICH 4.0 etc) do not
+     * allow passing MPI_DATATYPE_NULL to comm functions (MPI_Alltoallw) even
+     * though the send or recv length is 0, so using a dummy MPI type instead
+     * of MPI_DATATYPE_NULL
+     */
+    MPI_Datatype dummy_dt = MPI_CHAR;
+    MPI_Datatype sndtypes[ntasks], rcvtypes[ntasks];
+    for (int i = 0; i < ntasks; i++)
+    {
+        sndtypes[i] = sendtypes[i];
+        if (sndtypes[i] == MPI_DATATYPE_NULL)
+        {
+            sndtypes[i] = dummy_dt;
+        }
+        rcvtypes[i] = recvtypes[i];
+        if (rcvtypes[i] == MPI_DATATYPE_NULL)
+        {
+            rcvtypes[i] = dummy_dt;
+        }
+    }
+
+    ret = MPI_Alltoallw(sbuf, sendcounts, sdispls, sndtypes, rbuf, recvcounts, rdispls, rcvtypes, mycomm); ERR
 
     if (debug)
     {
