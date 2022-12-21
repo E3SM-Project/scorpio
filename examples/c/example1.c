@@ -1,435 +1,386 @@
-/**
- * @file 
- * @brief A simple C example for the ParallelIO Library.
- *
- * This example creates a netCDF output file with one dimension and
- * one variable. It first writes, then reads the sample file using the
- * ParallelIO library. 
- *
- * This example can be run in parallel for 1, 2, 4, 8, or 16
- * processors.
- */
-
-#include <getopt.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <mpi.h>
 #include <pio.h>
+#include <pio_internal.h>
 #ifdef TIMING
 #include <gptl.h>
 #endif
 
-/** The number of possible output netCDF output flavors available to
- * the ParallelIO library. */
-#define NUM_NETCDF_FLAVORS 5
+#define ERR { if (ret != PIO_NOERR) printf("Error at line = %d\n", __LINE__); }
 
-/** The number of dimensions in the example data. In this simple
-    example, we are using one-dimensional data. */
-#define NDIM 1
+/* Similar to rearrange_comp2io in src/clib/pio_rearrange.c */
+int my_rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf, void *rbuf, bool debug)
+{
+    MPI_Comm mycomm;
+    int ntasks;
+    int niotasks;
+    int ret;
 
-/** The length of our sample data. There will be a total of 16
- * integers in our data, and responsibilty for writing and reading
- * them will be spread between all the processors used to run this
- * example. */
-#define DIM_LEN 16
+    if (iodesc->rearranger == PIO_REARR_BOX)
+    {
+        mycomm = ios->union_comm;
+        niotasks = ios->num_iotasks;
+    }
+    else
+    {
+        mycomm = iodesc->subset_comm;
+        niotasks = 1;
+    }
 
-/** The name of the dimension in the netCDF output file. */
-#define DIM_NAME "x"
+    MPI_Comm_size(mycomm, &ntasks);
 
-/** The name of the variable in the netCDF output file. */
-#define VAR_NAME "foo"
+    ret = define_iodesc_datatypes(ios, iodesc); ERR
 
-/** Return code when netCDF output file does not match
- * expectations. */
-#define ERR_BAD 1001
+    int sendcounts[ntasks];
+    int recvcounts[ntasks];
+    int sdispls[ntasks];
+    int rdispls[ntasks];
+    MPI_Datatype sendtypes[ntasks];
+    MPI_Datatype recvtypes[ntasks];
 
-/** The meaning of life, the universe, and everything. */
-#define START_DATA_VAL 42
+    for (int i = 0; i < ntasks; i++)
+    {
+        sendcounts[i] = 0;
+        recvcounts[i] = 0;
+        sdispls[i] = 0;
+        rdispls[i] = 0;
+        sendtypes[i] = MPI_DATATYPE_NULL;
+        recvtypes[i] = MPI_DATATYPE_NULL;
+    }
 
-/** Handle MPI errors. This should only be used with MPI library
- * function calls. */
-#define MPIERR(e) do {                                                  \
-	MPI_Error_string(e, err_buffer, &resultlen);			\
-	printf("MPI error, line %d, file %s: %s\n", __LINE__, __FILE__, err_buffer); \
-	MPI_Finalize();							\
-	return 2;							\
-    } while (0) 
+    if (ios->ioproc)
+    {
+        for (int i = 0; i < iodesc->nrecvs; i++)
+        {
+            if (iodesc->rtype[i] != MPI_DATATYPE_NULL)
+            {
+                if (iodesc->rearranger == PIO_REARR_SUBSET)
+                {
+                    if (sbuf)
+                    {
+                        sendcounts[i] = 1;
+                        sendtypes[i] = iodesc->rtype[i];
+                    }
+                }
+                else
+                {
+                    sendcounts[iodesc->rfrom[i]] = 1;
+                    sendtypes[iodesc->rfrom[i]] = iodesc->rtype[i];
+                }
+            }
+        }
+    }
 
-/** Handle non-MPI errors by finalizing the MPI library and exiting
- * with an exit code. */
-#define ERR(e) do {				\
-	MPI_Finalize();				\
-	return e;				\
-    } while (0) 
+    for (int i = 0; i < niotasks; i++)
+    {
+        int io_comprank = ios->ioranks[i];
 
-/** Global err buffer for MPI. When there is an MPI error, this buffer
- * is used to store the error message that is associated with the MPI
- * error. */
-char err_buffer[MPI_MAX_ERROR_STRING];
+        if (iodesc->rearranger == PIO_REARR_SUBSET)
+            io_comprank = 0;
 
-/** This is the length of the most recent MPI error message, stored
- * int the global error string. */
-int resultlen;
+        if (iodesc->scount[i] > 0 && iodesc->stype[i] != MPI_DATATYPE_NULL)
+        {
+            recvcounts[io_comprank] = 1;
+            recvtypes[io_comprank] = iodesc->stype[i];
+        }
+    }
 
-/** @brief Check the output file.
- *
- *  Use netCDF to check that the output is as expected. 
- *
- * @param ntasks The number of processors running the example. 
- * @param filename The name of the example file to check. 
- *
- * @return 0 if example file is correct, non-zero otherwise. */
-int check_file(int ntasks, char *filename) {
-#ifdef _NETCDF
-    int ncid;         /**< File ID from netCDF. */
-    int ndims;        /**< Number of dimensions. */
-    int nvars;        /**< Number of variables. */
-    int ngatts;       /**< Number of global attributes. */
-    int unlimdimid;   /**< ID of unlimited dimension. */
-    size_t dimlen;    /**< Length of the dimension. */
-    int natts;        /**< Number of variable attributes. */
-    nc_type xtype;    /**< NetCDF data type of this variable. */
-    int ret;          /**< Return code for function calls. */
-    int dimids[NDIM]; /**< Dimension ids for this variable. */
-    char dim_name[PIO_MAX_NAME];   /**< Name of the dimension. */
-    char var_name[PIO_MAX_NAME];   /**< Name of the variable. */
-    size_t start[NDIM];           /**< Zero-based index to start read. */
-    size_t count[NDIM];           /**< Number of elements to read. */
-    int buffer[DIM_LEN];          /**< Buffer to read in data. */
-    int expected[DIM_LEN];        /**< Data values we expect to find. */
-    
-    /* Open the file. */
-    if ((ret = nc_open(filename, 0, &ncid)))
-	return ret;
+    if (debug)
+    {
+        if (ios->union_rank == 0)
+        {
+            printf("Before calling MPI_Alltoallw\n");
+            fflush(stdout);
+        }
+    }
 
-    /* Check the metadata. */
-    if ((ret = nc_inq(ncid, &ndims, &nvars, &ngatts, &unlimdimid)))
-	return ret;
-    if (ndims != NDIM || nvars != 1 || ngatts != 0 || unlimdimid != -1)
-	return ERR_BAD;
-    if ((ret = nc_inq_dim(ncid, 0, dim_name, &dimlen)))
-	return ret;
-    if (dimlen != DIM_LEN || strcmp(dim_name, DIM_NAME))
-	return ERR_BAD;
-    if ((ret = nc_inq_var(ncid, 0, var_name, &xtype, &ndims, dimids, &natts)))
-	return ret;
-    if (xtype != NC_INT || ndims != NDIM || dimids[0] != 0 || natts != 0)
-	return ERR_BAD;
+    /* Some MPI implementations (some vers of OpenMPI, MPICH 4.0 etc) do not
+     * allow passing MPI_DATATYPE_NULL to comm functions (MPI_Alltoallw) even
+     * though the send or recv length is 0, so using a dummy MPI type instead
+     * of MPI_DATATYPE_NULL
+     */
+    MPI_Datatype dummy_dt = MPI_CHAR;
+    MPI_Datatype sndtypes[ntasks], rcvtypes[ntasks];
+    for (int i = 0; i < ntasks; i++)
+    {
+        sndtypes[i] = sendtypes[i];
+        if (sndtypes[i] == MPI_DATATYPE_NULL)
+        {
+            sndtypes[i] = dummy_dt;
+        }
+        rcvtypes[i] = recvtypes[i];
+        if (rcvtypes[i] == MPI_DATATYPE_NULL)
+        {
+            rcvtypes[i] = dummy_dt;
+        }
+    }
 
-    /* Use the number of processors to figure out what the data in the
-     * file should look like. */
-    int div = DIM_LEN/ntasks;
-    for (int d = 0; d < DIM_LEN; d++)
-	expected[d] = START_DATA_VAL + d/div;
-    
-    /* Check the data. */
-    start[0] = 0;
-    count[0] = DIM_LEN;
-    if ((ret = nc_get_vara(ncid, 0, start, count, buffer)))
-	return ret;
-    for (int d = 0; d < DIM_LEN; d++)
-	if (buffer[d] != expected[d])
-	    return ERR_BAD;
+    ret = MPI_Alltoallw(sbuf, sendcounts, sdispls, sndtypes, rbuf, recvcounts, rdispls, rcvtypes, mycomm); ERR
 
-    /* Close the file. */
-    if ((ret = nc_close(ncid)))
-	return ret;
-#endif
+    if (debug)
+    {
+        if (ios->union_rank == 0)
+        {
+            printf("After calling MPI_Alltoallw\n");
+            fflush(stdout);
+        }
+    }
 
-    /* Everything looks good! */
-    return 0;
+    return PIO_NOERR;
 }
 
-/** @brief Main execution of code.
+int main(int argc, char* argv[])
+{
+#ifdef TIMING
+    GPTLinitialize();
+#endif
 
-    Executes the functions to:
-    - create a new examplePioClass instance
-    - initialize MPI and the ParallelIO libraries
-    - create the decomposition for this example
-    - create the netCDF output file
-    - define the variable in the file
-    - write data to the variable in the file using decomposition
-    - read the data back from the file using decomposition
-    - close the file
-    - clean up resources
+    MPI_Init(&argc, &argv);
 
-    The example can be run from the command line (on system that support it) like this:
-    <pre>
-    mpiexec -n 4 ./examplePio
-    </pre>
+    int my_rank;
+    int ntasks;
 
-    The sample file created by this program is a small netCDF file. It
-    has the following contents (as shown by ncdump) for a 4-processor
-    run:
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
 
-    <pre>
-    netcdf examplePio_c {
-    dimensions:
-    x = 16 ;
-    variables:
-    int foo(x) ;
-    data:
-
-    foo = 42, 42, 42, 42, 43, 43, 43, 43, 44, 44, 44, 44, 45, 45, 45, 45 ;
-    }
-    </pre>
-    
-    @param [in] argc argument count (should be zero)
-    @param [in] argv argument array (should be NULL)
-    @retval examplePioClass* Pointer to self.
-*/
-    int main(int argc, char* argv[])
+    if (ntasks == 48)
     {
-	/** Set to non-zero to get output to stdout. */
-	int verbose = 0;
+        const int ioproc_start = 0;
+        const int ioproc_stride = 1;
+        const int niotasks = 48;
 
-	/** Zero-based rank of processor. */
-	int my_rank;
+        double io_buffer[433];
+        double comp_buffer[220];
 
-	/** Number of processors involved in current execution. */
-	int ntasks;
+        int iosysid;
 
-	/** Different output flavors. The example file is written (and
-	 * then read) four times. The first two flavors,
-	 * parallel-netcdf, and netCDF serial, both produce a netCDF
-	 * classic format file (but with different libraries). The
-	 * last two produce netCDF4/HDF5 format files, written with
-	 * and without using netCDF-4 parallel I/O. */
-	int format[NUM_NETCDF_FLAVORS];
+        int ioid_515;
+        int ndims_515 = 0;
+        int *gdimlen_515 = NULL;
+        PIO_Offset fmaplen_515 = 0;
+        PIO_Offset *compmap_515 = NULL;
 
-	/** Number of processors that will do IO. In this example we
-	 * will do IO from all processors. */
-	int niotasks;
+        int ioid_516;
+        int ndims_516 = 0;
+        int *gdimlen_516 = NULL;
+        PIO_Offset fmaplen_516 = 0;
+        PIO_Offset *compmap_516 = NULL;
 
-	/** Stride in the mpi rank between io tasks. Always 1 in this
-	 * example. */
-	int ioproc_stride = 1;
+        int ioid_517;
+        int ndims_517 = 0;
+        int *gdimlen_517 = NULL;
+        PIO_Offset fmaplen_517 = 0;
+        PIO_Offset *compmap_517 = NULL;
 
-	/** Zero based rank of first processor to be used for I/O. */
-	int ioproc_start = 0;
+        int ioid_518;
+        int ndims_518 = 0;
+        int *gdimlen_518 = NULL;
+        PIO_Offset fmaplen_518 = 0;
+        PIO_Offset *compmap_518 = NULL;
 
-	/** The dimension ID. */
-	int dimid;
+        int ioid_519;
+        int ndims_519 = 0;
+        int *gdimlen_519 = NULL;
+        PIO_Offset fmaplen_519 = 0;
+        PIO_Offset *compmap_519 = NULL;
 
-	/** Array index per processing unit. This is the number of
-	 * elements of the data array that will be handled by each
-	 * processor. In this example there are 16 data elements. If the
-	 * example is run on 4 processors, then arrIdxPerPe will be 4. */
-	PIO_Offset elements_per_pe;
+        int ioid_520;
+        int ndims_520 = 0;
+        int *gdimlen_520 = NULL;
+        PIO_Offset fmaplen_520 = 0;
+        PIO_Offset *compmap_520 = NULL;
 
-	/* Length of the dimensions in the data. This simple example
-	 * uses one-dimensional data. The lenght along that dimension
-	 * is DIM_LEN (16). */
-	int dim_len[1] = {DIM_LEN};
+        int ioid_521;
+        int ndims_521 = 0;
+        int *gdimlen_521 = NULL;
+        PIO_Offset fmaplen_521 = 0;
+        PIO_Offset *compmap_521 = NULL;
 
-	/** The ID for the parallel I/O system. It is set by
-	 * PIOc_Init_Intracomm(). It references an internal structure
-	 * containing the general IO subsystem data and MPI
-	 * structure. It is passed to PIOc_finalize() to free
-	 * associated resources, after all I/O, but before
-	 * MPI_Finalize is called. */
-	int iosysid;
+        int ioid_522;
+        int ndims_522 = 0;
+        int *gdimlen_522 = NULL;
+        PIO_Offset fmaplen_522 = 0;
+        PIO_Offset *compmap_522 = NULL;
 
-	/** The ncid of the netCDF file created in this example. */
-	int ncid;
+        int ioid_523;
+        int ndims_523 = 0;
+        int *gdimlen_523 = NULL;
+        PIO_Offset fmaplen_523 = 0;
+        PIO_Offset *compmap_523 = NULL;
 
-	/** The ID of the netCDF varable in the example file. */
-	int varid;
+        int ioid_524;
+        int ndims_524 = 0;
+        int *gdimlen_524 = NULL;
+        PIO_Offset fmaplen_524 = 0;
+        PIO_Offset *compmap_524 = NULL;
 
-	/** The I/O description ID as passed back by PIOc_InitDecomp()
-	 * and freed in PIOc_freedecomp(). */
-	int ioid;
+        int ioid_525;
+        int ndims_525 = 0;
+        int *gdimlen_525 = NULL;
+        PIO_Offset fmaplen_525 = 0;
+        PIO_Offset *compmap_525 = NULL;
 
-	/** A buffer for sample data.  The size of this array will
-	 * vary depending on how many processors are involved in the
-	 * execution of the example code. It's length will be the same
-	 * as elements_per_pe.*/
-	int *buffer;
+        int ioid_526;
+        int ndims_526 = 0;
+        int *gdimlen_526 = NULL;
+        PIO_Offset fmaplen_526 = 0;
+        PIO_Offset *compmap_526 = NULL;
 
-	/** A 1-D array which holds the decomposition mapping for this
-	 * example. The size of this array will vary depending on how
-	 * many processors are involved in the execution of the
-	 * example code. It's length will be the same as
-	 * elements_per_pe. */
-	PIO_Offset *compdof;
+        PIOc_Init_Intracomm(MPI_COMM_WORLD, niotasks, ioproc_stride, ioproc_start, PIO_REARR_BOX, &iosysid);
+        iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
 
-        /** Test filename. */
-        char filename[PIO_MAX_NAME + 1];
+        /* 866 */
+        PIOc_readmap("piodecomp_515.dat", &ndims_515, &gdimlen_515, &fmaplen_515, &compmap_515, MPI_COMM_WORLD);
+        PIOc_InitDecomp(iosysid, PIO_DOUBLE, 1, gdimlen_515, fmaplen_515, compmap_515, &ioid_515, NULL, NULL, NULL);
 
-        /** The number of netCDF flavors available in this build. */
-        int num_flavors = 0;
-            
-	/** Used for command line processing. */
-	int c;
+        /* 11 x 866 */
+        PIOc_readmap("piodecomp_516.dat", &ndims_516, &gdimlen_516, &fmaplen_516, &compmap_516, MPI_COMM_WORLD);
+        PIOc_InitDecomp(iosysid, PIO_DOUBLE, 2, gdimlen_516, fmaplen_516, compmap_516, &ioid_516, NULL, NULL, NULL);
 
-	/** Return value. */
-	int ret;
+        /* 1 x 866 */
+        PIOc_readmap("piodecomp_517.dat", &ndims_517, &gdimlen_517, &fmaplen_517, &compmap_517, MPI_COMM_WORLD);
+        PIOc_InitDecomp(iosysid, PIO_DOUBLE, 2, gdimlen_517, fmaplen_517, compmap_517, &ioid_517, NULL, NULL, NULL);
 
-	/* Parse command line. */
-	while ((c = getopt(argc, argv, "v")) != -1)
-	    switch (c)
-	    {
-	    case 'v':
-		verbose++;
-		break;
-	    default:
-		break;
-	    }
+        /* 1 x 866 */
+        PIOc_readmap("piodecomp_518.dat", &ndims_518, &gdimlen_518, &fmaplen_518, &compmap_518, MPI_COMM_WORLD);
+        PIOc_InitDecomp(iosysid, PIO_DOUBLE, 2, gdimlen_518, fmaplen_518, compmap_518, &ioid_518, NULL, NULL, NULL);
 
-#ifdef TIMING    
-#ifndef TIMING_INTERNAL
-	/* Initialize the GPTL timing library. */
-	if ((ret = GPTLinitialize ()))
-	    return ret;
-#endif
-#endif    
-    
-	/* Initialize MPI. */
-	if ((ret = MPI_Init(&argc, &argv)))
-	    MPIERR(ret);
-        /*
-	if ((ret = MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN)))
-	    MPIERR(ret);
-        */
+        /* 3 x 866 */
+        PIOc_readmap("piodecomp_519.dat", &ndims_519, &gdimlen_519, &fmaplen_519, &compmap_519, MPI_COMM_WORLD);
+        PIOc_InitDecomp(iosysid, PIO_DOUBLE, 2, gdimlen_519, fmaplen_519, compmap_519, &ioid_519, NULL, NULL, NULL);
 
-	/* Learn my rank and the total number of processors. */
-	if ((ret = MPI_Comm_rank(MPI_COMM_WORLD, &my_rank)))
-	    MPIERR(ret);
-	if ((ret = MPI_Comm_size(MPI_COMM_WORLD, &ntasks)))
-	    MPIERR(ret);
+        /* 3 x 866 */
+        PIOc_readmap("piodecomp_520.dat", &ndims_520, &gdimlen_520, &fmaplen_520, &compmap_520, MPI_COMM_WORLD);
+        PIOc_InitDecomp(iosysid, PIO_DOUBLE, 2, gdimlen_520, fmaplen_520, compmap_520, &ioid_520, NULL, NULL, NULL);
 
-	/* Check that a valid number of processors was specified. */
-	if (!(ntasks == 1 || ntasks == 2 || ntasks == 4 ||
-	      ntasks == 8 || ntasks == 16))
-	    fprintf(stderr, "Number of processors must be 1, 2, 4, 8, or 16!\n");
-	if (verbose)
-	    printf("%d: ParallelIO Library example1 running on %d processors.\n",
-		   my_rank, ntasks);
+        /* 2 x 3 x 866 */
+        PIOc_readmap("piodecomp_521.dat", &ndims_521, &gdimlen_521, &fmaplen_521, &compmap_521, MPI_COMM_WORLD);
+        PIOc_InitDecomp(iosysid, PIO_DOUBLE, 3, gdimlen_521, fmaplen_521, compmap_521, &ioid_521, NULL, NULL, NULL);
 
-	/* keep things simple - 1 iotask per MPI process */    
-	niotasks = ntasks; 
+        /* 5 x 3 x 866 */
+        PIOc_readmap("piodecomp_522.dat", &ndims_522, &gdimlen_522, &fmaplen_522, &compmap_522, MPI_COMM_WORLD);
+        PIOc_InitDecomp(iosysid, PIO_DOUBLE, 3, gdimlen_522, fmaplen_522, compmap_522, &ioid_522, NULL, NULL, NULL);
 
-	/* Initialize the PIO IO system. This specifies how
-	 * many and which processors are involved in I/O. */
-	if ((ret = PIOc_Init_Intracomm(MPI_COMM_WORLD, niotasks, ioproc_stride,
-				       ioproc_start, PIO_REARR_SUBSET, &iosysid)))
-	    ERR(ret);
+        /* 866 */
+        PIOc_readmap("piodecomp_523.dat", &ndims_523, &gdimlen_523, &fmaplen_523, &compmap_523, MPI_COMM_WORLD);
+        PIOc_InitDecomp(iosysid, PIO_DOUBLE, 1, gdimlen_523, fmaplen_523, compmap_523, &ioid_523, NULL, NULL, NULL);
 
-	/* Describe the decomposition. This is a 1-based array, so add 1! */
-	elements_per_pe = DIM_LEN / ntasks;
-	if (!(compdof = malloc(elements_per_pe * sizeof(PIO_Offset))))
-	    return PIO_ENOMEM;
-	for (int i = 0; i < elements_per_pe; i++)
-	    compdof[i] = my_rank * elements_per_pe + i + 1;
-	
-	/* Create the PIO decomposition for this example. */
-	if (verbose)
-	    printf("rank: %d Creating decomposition...\n", my_rank);
-	if ((ret = PIOc_InitDecomp(iosysid, PIO_INT, NDIM, dim_len, (PIO_Offset)elements_per_pe,
-				   compdof, &ioid, NULL, NULL, NULL)))
-	    ERR(ret);
-	free(compdof);
+        /* 866 */
+        PIOc_readmap("piodecomp_524.dat", &ndims_524, &gdimlen_524, &fmaplen_524, &compmap_524, MPI_COMM_WORLD);
+        PIOc_InitDecomp(iosysid, PIO_DOUBLE, 1, gdimlen_524, fmaplen_524, compmap_524, &ioid_524, NULL, NULL, NULL);
 
-        /* The number of favors may change with the build parameters. */
-#ifdef _PNETCDF
-        format[num_flavors++] = PIO_IOTYPE_PNETCDF;
-#endif
-#ifdef _NETCDF
-        format[num_flavors++] = PIO_IOTYPE_NETCDF;
-#endif
-#ifdef _NETCDF4
-        format[num_flavors++] = PIO_IOTYPE_NETCDF4C;
-        format[num_flavors++] = PIO_IOTYPE_NETCDF4P;
-#endif
-#ifdef _ADIOS2
-        format[num_flavors++] = PIO_IOTYPE_ADIOS;
-#endif
-	
-	/* Use PIO to create the example file in each of the four
-	 * available ways. */
-	for (int fmt = 0; fmt < num_flavors; fmt++) 
-	{
-	    /* Create a filename. */
-	    sprintf(filename, "example1_%d.nc", fmt);
+        /* 17 x 866 */
+        PIOc_readmap("piodecomp_525.dat", &ndims_525, &gdimlen_525, &fmaplen_525, &compmap_525, MPI_COMM_WORLD);
+        PIOc_InitDecomp(iosysid, PIO_DOUBLE, 2, gdimlen_525, fmaplen_525, compmap_525, &ioid_525, NULL, NULL, NULL);
 
-	    /* Create the netCDF output file. */
-	    if (verbose)
-		printf("rank: %d Creating sample file %s with format %d...\n",
-		       my_rank, filename, format[fmt]);
-	    if ((ret = PIOc_createfile(iosysid, &ncid, &(format[fmt]), filename,
-				       PIO_CLOBBER)))
-		ERR(ret);
-	
-	    /* Define netCDF dimension and variable. */
-	    if (verbose)
-		printf("rank: %d Defining netCDF metadata...\n", my_rank);
-	    if ((ret = PIOc_def_dim(ncid, DIM_NAME, (PIO_Offset)dim_len[0], &dimid)))
-		ERR(ret);
-	    if ((ret = PIOc_def_var(ncid, VAR_NAME, PIO_INT, NDIM, &dimid, &varid)))
-		ERR(ret);
-	    if ((ret = PIOc_enddef(ncid)))
-		ERR(ret);
-	
-	    /* Prepare sample data. */
-	    if (!(buffer = malloc(elements_per_pe * sizeof(int))))
-	        return PIO_ENOMEM;
-	    for (int i = 0; i < elements_per_pe; i++)
-	        buffer[i] = START_DATA_VAL + my_rank;
+        /* 10 x 866 */
+        PIOc_readmap("piodecomp_526.dat", &ndims_526, &gdimlen_526, &fmaplen_526, &compmap_526, MPI_COMM_WORLD);
+        PIOc_InitDecomp(iosysid, PIO_DOUBLE, 2, gdimlen_526, fmaplen_526, compmap_526, &ioid_526, NULL, NULL, NULL);
 
-	    /* Write data to the file. */
-	    if (verbose)
-	        printf("rank: %d Writing sample data...\n", my_rank);
-	    if ((ret = PIOc_write_darray(ncid, varid, ioid, (PIO_Offset)elements_per_pe,
-	    			     buffer, NULL)))
-	        ERR(ret);
-	    if ((ret = PIOc_sync(ncid)))
-	        ERR(ret);
+        io_desc_t *iodesc_515 = pio_get_iodesc_from_id(ioid_515);
+        my_rearrange_io2comp(ios, iodesc_515, io_buffer, comp_buffer, false);
 
-	    /* Free buffer space used in this example. */
-	    free(buffer);
-	
-	    /* Close the netCDF file. */
-	    if (verbose)
-		printf("rank: %d Closing the sample data file...\n", my_rank);
-	    if ((ret = PIOc_closefile(ncid)))
-		ERR(ret);
-	}
-	
-	/* Free the PIO decomposition. */
-	if (verbose)
-	    printf("rank: %d Freeing PIO decomposition...\n", my_rank);
-	if ((ret = PIOc_freedecomp(iosysid, ioid)))
-	    ERR(ret);
-	
-	/* Finalize the IO system. */
-	if (verbose)
-	    printf("rank: %d Freeing PIO resources...\n", my_rank);
-	if ((ret = PIOc_finalize(iosysid)))
-	    ERR(ret);
+        io_desc_t *iodesc_516 = pio_get_iodesc_from_id(ioid_516);
+        my_rearrange_io2comp(ios, iodesc_516, io_buffer, comp_buffer, false);
 
-	/* Check the output file. */
-	if (!my_rank)
-	    for (int fmt = 0; fmt < num_flavors; fmt++)
-	    {
-	        sprintf(filename, "example1_%d.nc", fmt);
-	        if (format[fmt] != PIO_IOTYPE_ADIOS &&
-	            (ret = check_file(ntasks, filename)))
-	            ERR(ret);
-	    }
+        io_desc_t *iodesc_517 = pio_get_iodesc_from_id(ioid_517);
+        my_rearrange_io2comp(ios, iodesc_517, io_buffer, comp_buffer, false);
 
-	/* Finalize the MPI library. */
-	MPI_Finalize();
+        io_desc_t *iodesc_518 = pio_get_iodesc_from_id(ioid_518);
+        my_rearrange_io2comp(ios, iodesc_518, io_buffer, comp_buffer, false);
 
-#ifdef TIMING    
-#ifndef TIMING_INTERNAL
-	/* Finalize the GPTL timing library. */
-	if ((ret = GPTLfinalize ()))
-	    return ret;
-#endif
-#endif    
+        io_desc_t *iodesc_519 = pio_get_iodesc_from_id(ioid_519);
+        my_rearrange_io2comp(ios, iodesc_519, io_buffer, comp_buffer, false);
 
-	if (verbose)
-	    printf("rank: %d SUCCESS!\n", my_rank);
-	return 0;
+        io_desc_t *iodesc_520 = pio_get_iodesc_from_id(ioid_520);
+        my_rearrange_io2comp(ios, iodesc_520, io_buffer, comp_buffer, false);
+
+        io_desc_t *iodesc_521 = pio_get_iodesc_from_id(ioid_521);
+        my_rearrange_io2comp(ios, iodesc_521, io_buffer, comp_buffer, false);
+
+        io_desc_t *iodesc_522 = pio_get_iodesc_from_id(ioid_522);
+        my_rearrange_io2comp(ios, iodesc_522, io_buffer, comp_buffer, false);
+
+        io_desc_t *iodesc_523 = pio_get_iodesc_from_id(ioid_523);
+        my_rearrange_io2comp(ios, iodesc_523, io_buffer, comp_buffer, false);
+
+        io_desc_t *iodesc_524 = pio_get_iodesc_from_id(ioid_524);
+        my_rearrange_io2comp(ios, iodesc_524, io_buffer, comp_buffer, false);
+
+        io_desc_t *iodesc_525 = pio_get_iodesc_from_id(ioid_525);
+        my_rearrange_io2comp(ios, iodesc_525, io_buffer, comp_buffer, false);
+
+        if (my_rank == 0)
+        {
+            printf("Before calling rearrange_io2comp with ioid_526\n");
+            fflush(stdout);
+        }
+
+        io_desc_t *iodesc_526 = pio_get_iodesc_from_id(ioid_526);
+        my_rearrange_io2comp(ios, iodesc_526, io_buffer, comp_buffer, true);
+
+        if (my_rank == 0)
+        {
+            printf("After calling rearrange_io2comp with ioid_526\n");
+            fflush(stdout);
+        }
+
+        free(compmap_515);
+        free(gdimlen_515);
+        PIOc_freedecomp(iosysid, ioid_515);
+
+        free(compmap_516);
+        free(gdimlen_516);
+        PIOc_freedecomp(iosysid, ioid_516);
+
+        free(compmap_517);
+        free(gdimlen_517);
+        PIOc_freedecomp(iosysid, ioid_517);
+
+        free(compmap_518);
+        free(gdimlen_518);
+        PIOc_freedecomp(iosysid, ioid_518);
+
+        free(compmap_519);
+        free(gdimlen_519);
+        PIOc_freedecomp(iosysid, ioid_519);
+
+        free(compmap_520);
+        free(gdimlen_520);
+        PIOc_freedecomp(iosysid, ioid_520);
+
+        free(compmap_521);
+        free(gdimlen_521);
+        PIOc_freedecomp(iosysid, ioid_521);
+
+        free(compmap_522);
+        free(gdimlen_522);
+        PIOc_freedecomp(iosysid, ioid_522);
+
+        free(compmap_523);
+        free(gdimlen_523);
+        PIOc_freedecomp(iosysid, ioid_523);
+
+        free(compmap_524);
+        free(gdimlen_524);
+        PIOc_freedecomp(iosysid, ioid_524);
+
+        free(compmap_525);
+        free(gdimlen_525);
+        PIOc_freedecomp(iosysid, ioid_525);
+
+        free(compmap_526);
+        free(gdimlen_526);
+        PIOc_freedecomp(iosysid, ioid_526);
+
+        PIOc_finalize(iosysid);
     }
+
+    MPI_Finalize();
+
+#ifdef TIMING
+    GPTLfinalize();
+#endif
+
+    return 0;
+}
