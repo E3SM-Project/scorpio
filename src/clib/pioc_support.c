@@ -3587,11 +3587,20 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     int ierr = PIO_NOERR;      /* Return code from function calls. */
     int ierr2 = PIO_NOERR;      /* Return code from function calls. */
 
+    static int cnt = 0;
+    cnt++;
+
     /* Get the IO system info from the iosysid. */
     if (!(ios = pio_get_iosystem_from_id(iosysid)))
     {
         return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
                         "Opening file (%s) failed. Invalid iosystem id (%d) provided", (filename) ? filename : "UNKNOWN", iosysid);
+    }
+
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_openfile_retry start, file = %s\n", cnt, filename);
+         fflush(stdout);
     }
 
     /* User must provide valid input for these parameters. */
@@ -3975,6 +3984,12 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         spio_ltimer_start(file->io_fstats->rd_timer_name);
         spio_ltimer_start(file->io_fstats->tot_timer_name);
         LOG((3, "File has %d unlimited dimensions", file->num_unlim_dimids));
+    }
+
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_openfile_retry end, file = %s\n", cnt, filename);
+         fflush(stdout);
     }
 
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);

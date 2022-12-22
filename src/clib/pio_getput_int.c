@@ -40,6 +40,9 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function codes. */
     int ierr = PIO_NOERR;           /* Return code from function calls. */
 
+    static int cnt = 0;
+    cnt++;
+
     GPTLstart("PIO:PIOc_put_att_tc");
     GPTLstart("PIO:write_total");
     /* Find the info about this file. */
@@ -55,6 +58,12 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
     spio_ltimer_start(file->io_fstats->tot_timer_name);
     ios = file->iosystem;
     assert(ios);
+
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_put_att_tc start, file = %s, varid = %d, name = %s\n", cnt, file->fname, varid, name);
+         fflush(stdout);
+    }
 
     spio_ltimer_start(ios->io_fstats->wr_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
@@ -500,6 +509,12 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                         "Writing variable (%s, varid=%d) attribute (%s) to file (%s, ncid=%d) failed. Internal I/O library (%s) call failed", pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
     }
 
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_put_att_tc end, file = %s, varid = %d, name = %s\n", cnt, file->fname, varid, name);
+         fflush(stdout);
+    }
+
     GPTLstop("PIO:PIOc_put_att_tc");
     GPTLstop("PIO:write_total");
     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -538,6 +553,9 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function calls. */
     int ierr = PIO_NOERR;               /* Return code from function calls. */
 
+    static int cnt = 0;
+    cnt++;
+
     GPTLstart("PIO:PIOc_get_att_tc");
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -551,6 +569,12 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     spio_ltimer_start(file->io_fstats->tot_timer_name);
     ios = file->iosystem;
     assert(ios);
+
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_get_att_tc start, file = %s, varid = %d, name = %s\n", cnt, file->fname, varid, name);
+         fflush(stdout);
+    }
 
     spio_ltimer_start(ios->io_fstats->rd_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
@@ -798,6 +822,12 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
     }
 
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_get_att_tc end, file = %s, varid = %d, name = %s\n", cnt, file->fname, varid, name);
+         fflush(stdout);
+    }
+
     LOG((2, "get_att_tc data bcast complete"));
     GPTLstop("PIO:PIOc_get_att_tc");
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -857,6 +887,9 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function codes. */
     int ierr = PIO_NOERR;                           /* Return code. */
 
+    static int cnt = 0;
+    cnt++;
+
     GPTLstart("PIO:PIOc_get_vars_tc");
     LOG((1, "PIOc_get_vars_tc ncid = %d varid = %d xtype = %d start_present = %d "
          "count_present = %d stride_present = %d", ncid, varid, xtype, start_present,
@@ -874,6 +907,12 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     spio_ltimer_start(file->io_fstats->tot_timer_name);
     ios = file->iosystem;
     assert(ios);
+
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_get_vars_tc start, file = %s, varid = %d\n", cnt, file->fname, varid);
+         fflush(stdout);
+    }
 
     spio_ltimer_start(ios->io_fstats->rd_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
@@ -1277,6 +1316,12 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     ios->io_fstats->rb += num_elem * typelen;
     file->io_fstats->rb += num_elem * typelen;
 
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_get_vars_tc end, file = %s, varid = %d\n", cnt, file->fname, varid);
+         fflush(stdout);
+    }
+
     GPTLstop("PIO:PIOc_get_vars_tc");
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1468,6 +1513,9 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function codes. */
     int ierr = PIO_NOERR;          /* Return code from function calls. */
 
+    static int cnt = 0;
+    cnt++;
+
     GPTLstart("PIO:PIOc_put_vars_tc");
     GPTLstart("PIO:write_total");
     LOG((1, "PIOc_put_vars_tc ncid = %d varid = %d start_present = %d "
@@ -1487,6 +1535,12 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     spio_ltimer_start(file->io_fstats->tot_timer_name);
     ios = file->iosystem;
     assert(ios);
+
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_put_vars_tc start, file = %s, varid = %d\n", cnt, file->fname, varid);
+         fflush(stdout);
+    }
 
     spio_ltimer_start(ios->io_fstats->wr_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
@@ -2541,6 +2595,12 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     }
 
     LOG((2, "PIOc_put_vars_tc bcast netcdf return code %d complete", ierr));
+
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_put_vars_tc end, file = %s, varid = %d\n", cnt, file->fname, varid);
+         fflush(stdout);
+    }
 
     GPTLstop("PIO:PIOc_put_vars_tc");
     GPTLstop("PIO:write_total");

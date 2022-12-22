@@ -1994,6 +1994,9 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const 
     int mpierr = MPI_SUCCESS;  /* Return code from MPI functions. */
     int ierr = PIO_NOERR;  /* Return code. */
 
+    static int cnt = 0;
+    cnt++;
+
     GPTLstart("PIO:PIOc_write_darray");
     GPTLstart("PIO:write_total");
     LOG((1, "PIOc_write_darray ncid = %d varid = %d ioid = %d arraylen = %d",
@@ -2012,6 +2015,12 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const 
     spio_ltimer_start(file->io_fstats->tot_timer_name);
     ios = file->iosystem;
     assert(ios);
+
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_write_darray start, file = %s, varid = %d\n", cnt, file->fname, varid);
+         fflush(stdout);
+    }
 
     spio_ltimer_start(ios->io_fstats->wr_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
@@ -2539,6 +2548,13 @@ if (file->iotype != PIO_IOTYPE_HDF5)
 #ifdef PIO_MICRO_TIMING
     mtimer_stop(file->varlist[varid].wr_mtimer, get_var_desc_str(ncid, varid, NULL));
 #endif
+
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_write_darray end, file = %s, varid = %d\n", cnt, file->fname, varid);
+         fflush(stdout);
+    }
+
     GPTLstop("PIO:PIOc_write_darray");
     GPTLstop("PIO:write_total");
     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -2577,6 +2593,9 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
     int ierr = PIO_NOERR, mpierr = MPI_SUCCESS;           /* Return code. */
     int fndims = 0;
 
+    static int cnt = 0;
+    cnt++;
+
     GPTLstart("PIO:PIOc_read_darray");
     /* Get the file info. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -2590,6 +2609,12 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
     spio_ltimer_start(file->io_fstats->tot_timer_name);
     ios = file->iosystem;
     assert(ios);
+
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_read_darray start, file = %s, varid = %d\n", cnt, file->fname, varid);
+         fflush(stdout);
+    }
 
     spio_ltimer_start(ios->io_fstats->rd_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
@@ -2865,6 +2890,13 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
 #ifdef PIO_MICRO_TIMING
     mtimer_stop(file->varlist[varid].rd_mtimer, get_var_desc_str(ncid, varid, NULL));
 #endif
+
+    if (ios->union_rank == 0)
+    {
+         printf("[DEBUG] cnt = %d, PIOc_read_darray end, file = %s, varid = %d\n", cnt, file->fname, varid);
+         fflush(stdout);
+    }
+
     GPTLstop("PIO:PIOc_read_darray");
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
