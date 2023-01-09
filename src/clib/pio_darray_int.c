@@ -334,6 +334,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                         countlist[rrcnt][i] = count[i];
                         LOG((3, "startlist[%d][%d] = %d countlist[%d][%d] = %d", rrcnt, i,
                              startlist[rrcnt][i], rrcnt, i, countlist[rrcnt][i]));
+                        printf("[DEBUG] IO rank = %d, startlist[%d][%d] = %ld countlist[%d][%d] = %ld\n", ios->io_rank, rrcnt, i, startlist[rrcnt][i], rrcnt, i, countlist[rrcnt][i]);
                     }
                     rrcnt++;
                 }
