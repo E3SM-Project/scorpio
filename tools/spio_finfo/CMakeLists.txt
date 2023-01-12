@@ -92,10 +92,15 @@ target_include_directories(spio_finfo.exe PRIVATE
   ${PnetCDF_C_INCLUDE_DIRS} 
   ${PIO_C_EXTRA_INCLUDE_DIRS})
 
+# Skip MPI C++ headers/bindings for MPICH lib
 target_compile_definitions (spio_finfo.exe
   PUBLIC MPICH_SKIP_MPICXX)
+# Skip MPI C++ headers/bindings for OpenMPI lib
 target_compile_definitions (spio_finfo.exe
   PUBLIC OMPI_SKIP_MPICXX)
+# Skip MPI C++ headers/bindings for SGI MPT lib
+target_compile_definitions (spio_finfo.exe
+  PUBLIC MPI_NO_CPPBIND)
 
 # Add external lib compile/link flags
 if (NetCDF_C_FOUND)
