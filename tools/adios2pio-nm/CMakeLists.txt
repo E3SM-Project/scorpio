@@ -103,10 +103,15 @@ target_compile_definitions (adios2pio-nm-lib
   PRIVATE ${CMAKE_SYSTEM_DIRECTIVE})
 target_compile_definitions (adios2pio-nm-lib
   PUBLIC ${CMAKE_C_COMPILER_DIRECTIVE})
+# Skip MPI C++ headers/bindings for MPICH lib
 target_compile_definitions (adios2pio-nm-lib
   PUBLIC MPICH_SKIP_MPICXX)
+# Skip MPI C++ headers/bindings for OpenMPI lib
 target_compile_definitions (adios2pio-nm-lib
   PUBLIC OMPI_SKIP_MPICXX)
+# Skip MPI C++ headers/bindings for SGI MPT lib
+target_compile_definitions (adios2pio-nm-lib
+  PUBLIC MPI_NO_CPPBIND)
 
 # Set external lib compiler/link flags
 if (PnetCDF_C_FOUND)
