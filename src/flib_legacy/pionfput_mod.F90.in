@@ -1,0 +1,601 @@
+#define __PIO_FILE__ "pionfput_mod.F90"
+!>
+!! @file
+!! @brief Write routines for non-decomposed NetCDF data.
+!<
+module pionfput_mod
+#ifdef TIMING
+  use perf_mod, only : t_startf, t_stopf      ! _EXTERNAL
+#endif
+  use iso_c_binding
+  use pio_kinds, only: i4,r4,r8,pio_offset_kind
+  use pio_types, only : file_desc_t, var_desc_t, pio_noerr
+  use pio_support, only : piodie, get_text_var_sz, get_var_dim_sz
+  use pio_support, only : Fstring2Cstring
+
+  implicit none
+  private
+
+!>
+!! @defgroup PIO_put_var PIO_put_var
+!! @brief Writes data to a netCDF file.
+!! @details The put_var interface is provided as a simplified interface to
+!!  write variables to a netcdf format file.
+!! @warning Although this is a collective call the variable is written from the
+!!  root IO task, no consistancy check is made with data passed on other tasks.
+!!
+!<
+  public :: put_var
+  interface put_var
+     !  DIMS 0,1,2,3,4,5
+     module procedure put_var_{DIMS}d_{TYPE}, put_var_vdesc_{DIMS}d_{TYPE}
+     !  DIMS 1,2,3,4,5
+     module procedure put_vara_{DIMS}d_{TYPE}
+     !  DIMS 1,2,3,4,5
+     module procedure put_vara_vdesc_{DIMS}d_{TYPE}
+     module procedure put_var1_{TYPE}, put_var1_vdesc_{TYPE}
+  end interface
+  interface
+     integer(C_INT) function PIOc_put_var_text(ncid, varid, op) &
+          bind(C,name="PIOc_put_var_text")
+       use iso_c_binding
+       integer(C_INT), intent(in), value :: ncid
+       integer(C_INT), intent(in), value :: varid
+       character(C_CHAR) :: op(*)
+     end function PIOc_put_var_text
+  end interface
+  interface
+     integer(C_INT) function PIOc_put_vara_text(ncid, varid, start, count, op) &
+          bind(C,name="PIOc_put_vara_text")
+       use iso_c_binding
+       integer(C_INT), intent(in), value :: ncid
+       integer(C_INT), intent(in), value :: varid
+       integer(C_SIZE_T), intent(in) :: start(*)
+       integer(C_SIZE_T), intent(in) :: count(*)
+       character(C_CHAR), intent(in) :: op(*)
+     end function PIOc_put_vara_text
+  end interface
+  interface
+     integer(C_INT) function PIOc_put_vara_int(ncid, varid, start, count, op) &
+          bind(C,name="PIOc_put_vara_int")
+       use iso_c_binding
+       integer(C_INT), intent(in), value :: ncid
+       integer(C_INT), intent(in), value :: varid
+       integer(C_SIZE_T), intent(in) :: start(*)
+       integer(C_SIZE_T), intent(in) :: count(*)
+       integer(C_INT)   , intent(in) :: op(*)
+     end function PIOc_put_vara_int
+  end interface
+  interface
+     integer(C_INT) function PIOc_put_vara_float(ncid, varid, start, count, op) &
+          bind(C,name="PIOc_put_vara_float")
+       use iso_c_binding
+       integer(C_INT), intent(in), value :: ncid
+       integer(C_INT), intent(in), value :: varid
+       integer(C_SIZE_T), intent(in) :: start(*)
+       integer(C_SIZE_T), intent(in) :: count(*)
+       real(C_FLOAT)   , intent(in) :: op(*)
+     end function PIOc_put_vara_float
+  end interface
+  interface
+     integer(C_INT) function PIOc_put_vara_double(ncid, varid, start, count, op) &
+          bind(C,name="PIOc_put_vara_double")
+       use iso_c_binding
+       integer(C_INT), intent(in), value :: ncid
+       integer(C_INT), intent(in), value :: varid
+       integer(C_SIZE_T), intent(in) :: start(*)
+       integer(C_SIZE_T), intent(in) :: count(*)
+       real(C_DOUBLE)   , intent(in) :: op(*)
+     end function PIOc_put_vara_double
+  end interface
+
+
+
+
+contains
+
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Write one element of data to a netCDF variable.
+!! @details
+!! @param File @copydoc file_desc_t
+!! @param varid : The netcdf variable identifier
+!! @param index :
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @copydoc error_return
+!<
+  integer function put_var1_text (File,varid, index, ival) result(ierr)
+    type (File_desc_t), intent(inout) :: File
+    integer, intent(in) :: varid, index(:)
+    character(len=*), intent(in) :: ival
+    character, allocatable :: cval(:)
+    integer :: i
+    integer, allocatable :: count(:)
+    integer :: ndims, clen
+
+    if(len(ival) == 0) then
+      print *, "PIO: WARNING: Empty string passed to PIO_put_var,",&
+                " function put_var1_text, a collective C API call will",&
+                " be skipped on this process. ", __PIO_FILE__, __LINE__
+    end if
+
+    ierr = get_text_var_sz(File, varid, clen)
+    if(ierr /= PIO_NOERR) then
+      call piodie(__PIO_FILE__, __LINE__, "Getting text variable size failed")
+    end if
+
+    if(clen < len_trim(ival)) then
+      print *, "PIO: WARNING: The length of the string in the user buffer,",&
+                len_trim(ival),&
+                " chars, is greater than the size of the variable",&
+                " being written to, ", clen, " chars. The string",&
+                " may be truncated. ", __PIO_FILE__, __LINE__
+    end if
+
+    ndims = size(index)
+    allocate(count(ndims))
+    count = 1
+    ! Write the entire string starting from [index(1), clen]
+    count(1) = min(clen - index(1) + 1, len(ival))
+
+    ! Convert string to a 1d character array
+    allocate(cval(count(1) + 1))
+    cval = ''
+    do i=1,min(count(1),len_trim(ival))
+       cval(i) = ival(i:i)
+    end do
+    do i=min(count(1),len_trim(ival))+1,size(cval)
+      cval(i) = C_NULL_CHAR
+    end do
+
+    ierr = put_vara_1d_text(File,varid, index, count, cval)
+
+    deallocate(count, cval)
+  end function put_var1_text
+
+! TYPE int,real,double
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Write one element of data to a netCDF variable.
+!! @details
+!! @param File @copydoc file_desc_t
+!! @param varid : The netcdf variable identifier
+!! @param index :
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @copydoc error_return
+!<
+  integer function put_var1_{TYPE} (File,varid, index, ival) result(ierr)
+    type (File_desc_t), intent(inout) :: File
+    integer, intent(in) :: varid, index(:)
+    {VTYPE}, intent(in) :: ival
+    integer :: clen, i
+    integer(C_SIZE_T), allocatable :: cindex(:)
+    interface
+       integer(C_INT) function PIOc_put_var1_{NCTYPE}(ncid, varid, index, op) &
+            bind(C,name="PIOc_put_var1_{NCTYPE}")
+         use iso_c_binding
+         integer(C_INT), intent(in), value :: ncid
+         integer(C_INT), intent(in), value :: varid
+         integer(C_SIZE_T), intent(in) :: index(*)
+         {CTYPE} :: op
+       end function PIOc_put_var1_{NCTYPE}
+    end interface
+
+#ifdef TIMING
+    call t_startf("PIO:put_var1_{TYPE}")
+#endif
+    clen = size(index)
+    if (clen > 0) then
+        allocate(cindex(clen))
+        do i=1,clen
+            cindex(i) = index(clen-i+1)-1
+        enddo
+
+        ierr = PIOc_put_var1_{NCTYPE} (file%fh, varid-1, cindex, ival)
+        deallocate(cindex)
+    else
+        print *, "PIO: WARNING: Empty index array passed to PIO_put_var",&
+                  " function put_var1_{TYPE}, a collective C API call will",&
+                  " be skipped on this process. ", __PIO_FILE__, __LINE__
+    end if
+#ifdef TIMING
+    call t_stopf("PIO:put_var1_{TYPE}")
+#endif
+  end function put_var1_{TYPE}
+
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Write one element of data to a netCDF variable.
+!! @details
+!! @param File @copydoc file_desc_t
+!! @param vardesc @copydoc var_desc_t
+!! @param start :
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @copydoc error_return
+!<
+  integer function put_var1_vdesc_{TYPE} (File,vardesc, index, ival) result(ierr)
+    type (File_desc_t), intent(inout) :: File
+    type(var_desc_t), intent(in) :: vardesc
+    integer, intent(in) ::  index(:)
+    {VTYPE}, intent(in) :: ival
+
+    ierr = put_var1_{TYPE} (File, vardesc%varid, index, ival)
+  end function put_var1_vdesc_{TYPE}
+
+! DIMS 0,1,2,3,4,5
+! TYPE text
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Writes text data to netcdf variable.
+!! @details
+!! @param File @copydoc file_desc_t
+!! @param File : A file handle returne from \ref PIO_openfile or \ref PIO_createfile.
+!! @param varid : The netcdf variable identifier
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @copydoc error_return
+!<
+  integer function put_var_{DIMS}d_text (File,varid, ival) result(ierr)
+    type (File_desc_t), intent(inout) :: File
+    integer, intent(in) :: varid
+    character(len=*), intent(in) :: ival{DIMSTR}
+    character(C_CHAR), allocatable :: cval(:)
+    integer :: cval_sz, clen, nstrs
+
+#ifdef TIMING
+    call t_startf("PIO:put_var_{DIMS}d_text")
+#endif
+!   This manipulation is required to convert the fortran string to
+!   a c character array with all trailing space set to null
+!
+    ierr = PIO_NOERR
+    if(len(ival) == 0) then
+      print *, "PIO: WARNING: Empty {DIMS}d text data passed to PIO_put_var",&
+                " function put_var_{DIMS}d_text, a collective C API call will",&
+                " be skipped on this process. ", __PIO_FILE__, __LINE__
+    end if
+    ierr = get_text_var_sz(File, varid, clen, var_nstrs=nstrs)
+    if(ierr /= PIO_NOERR) then
+      call piodie(__PIO_FILE__, __LINE__, "Getting text variable size failed")
+    end if
+    if(clen < len(ival)) then
+      print *, "WARNING: The length of the string in the user buffer ,",&
+                len(ival),&
+                " chars, is greater than the size of the variable",&
+                " being written to, ", clen, " chars. The strings",&
+                " may be truncated"
+    end if
+    if(nstrs > 0) then
+      cval_sz = clen * nstrs
+    else
+      cval_sz = clen
+    end if
+    allocate(cval(cval_sz))
+    call Fstring2Cstring(ival, cval, cval_sz, clen, cstr_add_null = .false.)
+    ierr = PIOc_put_var_text(file%fh, varid-1,  cval)
+    deallocate(cval)
+
+#ifdef TIMING
+    call t_stopf("PIO:put_var_{DIMS}d_text")
+#endif
+  end function put_var_{DIMS}d_text
+
+! DIMS 1,2,3,4,5
+! TYPE int,real,double
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Writes {TYPE} data to a netCDF variable.
+!! @details
+!! @param File @copydoc file_desc_t
+!! @param File : A file handle returne from \ref PIO_openfile or \ref PIO_createfile.
+!! @param varid : The netcdf variable identifier
+!! @param ival : The data to write.
+!! @retval ierr @copydoc error_return
+!<
+  integer function put_var_internal_{TYPE} (ncid,varid, ival) result(ierr)
+    integer, intent(in) :: ncid
+    integer, intent(in) :: varid
+    {VTYPE}, intent(in) :: ival(*)
+
+    interface
+       integer(C_INT) function PIOc_put_var_{NCTYPE}(ncid, varid, op) &
+            bind(C,name="PIOc_put_var_{NCTYPE}")
+         use iso_c_binding
+         integer(C_INT), intent(in), value :: ncid
+         integer(C_INT), intent(in), value :: varid
+         {CTYPE}, intent(in) :: op(*)
+       end function PIOc_put_var_{NCTYPE}
+    end interface
+
+    ierr=PIOc_put_var_{NCTYPE} (ncid, varid-1, ival)
+
+
+  end function put_var_internal_{TYPE}
+
+! DIMS 1,2,3,4,5
+! TYPE int,real,double
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Write {TYPE} data to a netCDF varaible of {DIMS} dimension(s).
+!! @details
+!! @param File @copydoc file_desc_t
+!! @param File : A file handle returne from \ref PIO_openfile or \ref PIO_createfile.
+!! @param varid : The netcdf variable identifier
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @copydoc error_return
+!<
+  integer function put_var_{DIMS}d_{TYPE} (File,varid, ival) result(ierr)
+    type (File_desc_t), intent(inout) :: File
+    integer, intent(in) :: varid
+    {VTYPE}, intent(in) :: ival{DIMSTR}
+
+    {VTYPE}, allocatable :: cval(:), tmp_cval(:)
+    integer(PIO_OFFSET_KIND) :: var_sz
+    integer :: i, clen
+
+#ifdef TIMING
+    call t_startf("PIO:put_var_{DIMS}d_{TYPE}")
+#endif
+    clen = size(ival)
+    if (clen > 0) then
+        allocate(cval(clen))
+        cval = reshape(ival,(/clen/))
+
+        ierr = get_var_dim_sz(File, varid, var_sz)
+        if(ierr /= PIO_NOERR) then
+            print *, "WARNING: Getting variable dimensions failed (varid = ", varid, ")"
+            ! Instead of aborting here let the internal/C APIs handle
+            ! the error using the error handler chosen by the user
+            var_sz = INT(clen, PIO_OFFSET_KIND)
+        end if
+
+        if(INT(clen, PIO_OFFSET_KIND) >= var_sz) then
+            ierr = put_var_internal_{TYPE} (File%fh, varid, cval)
+        else
+            print *,  "PIO: WARNING: The user buffer passed to PIO_put_var ",&
+                      "is smaller (total size of user buffer = ", size(ival),&
+                      " elements) than the size of the variable (total size ",&
+                      "of the variable = ", var_sz, " elements). Only part ",&
+                      "of the variable will be written out"
+            allocate(tmp_cval(var_sz))
+            tmp_cval = 0
+            do i=1,clen
+                tmp_cval(i) = cval(i)
+            end do
+            ierr = put_var_internal_{TYPE} (File%fh, varid, tmp_cval)
+            deallocate(tmp_cval)
+        end if
+
+        deallocate(cval)
+    else
+        print *, "PIO: WARNING: Empty {DIMS}d {TYPE} data passed to PIO_put_var",&
+                  " function put_var_{DIMS}d_{TYPE}, a collective C API call will",&
+                  " be skipped on this process. ", __PIO_FILE__, __LINE__
+    end if
+
+#ifdef TIMING
+    call t_stopf("PIO:put_var_{DIMS}d_{TYPE}")
+#endif
+  end function put_var_{DIMS}d_{TYPE}
+
+! TYPE int,real,double
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Writes {TYPE} data to a netCDF scalar variable.
+!! @details
+!! @param File @copydoc file_desc_t
+!! @param File : A file handle returne from \ref PIO_openfile or \ref PIO_createfile.
+!! @param varid : The netcdf variable identifier
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @copydoc error_return
+!<
+  integer function put_var_0d_{TYPE} (File,varid, ival) result(ierr)
+    type (File_desc_t), intent(inout) :: File
+    integer, intent(in) :: varid
+    {VTYPE}, intent(in) :: ival
+    ierr=PIO_NOERR
+#ifdef TIMING
+    call t_startf("PIO:put_var_0d_{TYPE}")
+#endif
+
+    ierr = put_var_internal_{TYPE} (File%fh, varid, (/ival/))
+
+#ifdef TIMING
+    call t_stopf("PIO:put_var_0d_{TYPE}")
+#endif
+  end function put_var_0d_{TYPE}
+
+
+  integer function put_vara_internal_{TYPE} (ncid,varid,start,count, ival) result(ierr)
+    integer, intent(in) :: ncid
+    integer, intent(in) :: varid
+    integer, intent(in) :: start(:)
+    integer, intent(in) :: count(:)
+    {VTYPE}, target, intent(in) :: ival(*)
+    integer(C_SIZE_T), allocatable :: cstart(:), ccount(:)
+    integer :: i, ndims
+
+    ndims = 0
+    do i=1,size(count)
+       if(count(i)<=0) then
+          ndims=i-1
+          exit
+       else
+          ndims=i
+       endif
+    enddo
+    allocate(ccount(ndims), cstart(ndims))
+
+    do i=1,ndims
+       cstart(i) = start(ndims-i+1)-1
+       ccount(i) = count(ndims-i+1)
+    enddo
+    ierr=PIOc_put_vara_{NCTYPE} (ncid, varid-1, cstart, ccount, ival)
+    deallocate(cstart,ccount)
+
+  end function put_vara_internal_{TYPE}
+
+! DIMS 0,1,2,3,4,5
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Write {TYPE} data to a netcdf variable of {DIMS} dimension(s).
+!! @details
+!! @param File @copydoc file_desc_t
+!! @param vardesc @copydoc var_desc_t
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @copydoc error_return
+!<
+  integer function put_var_vdesc_{DIMS}d_{TYPE} (File, vardesc, ival) result(ierr)
+    type (File_desc_t), intent(inout) :: File
+    type(var_desc_t) , intent(in) :: vardesc
+    {VTYPE}, intent(in) :: ival{DIMSTR}
+
+    ierr = put_var_{DIMS}d_{TYPE} (File, vardesc%varid, ival)
+
+  end function put_var_vdesc_{DIMS}d_{TYPE}
+
+! DIMS 1,2,3,4,5
+! TYPE text
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Write {TYPE} data to a netcdf variable of {DIMS} dimension(s).
+!! @details
+!! @param File @copydoc file_desc_t
+!! @param varid : The netcdf variable identifier
+!! @param start :
+!! @param count :
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @copydoc error_return
+!<
+  integer function put_vara_{DIMS}d_text (File,varid, start, count, ival) result(ierr)
+    type (File_desc_t), intent(inout) :: File
+    integer, intent(in) :: varid, start(:), count(:)
+    character(len=*), intent(in) :: ival{DIMSTR}
+    character, allocatable :: cval(:)
+    integer :: cval_sz, clen,  sd
+    integer(C_SIZE_T), allocatable :: cstart(:), ccount(:)
+    integer :: i
+    integer :: ndims
+#ifdef TIMING
+    call t_startf("PIO:put_vara_{DIMS}d_text")
+#endif
+
+    ndims = 0
+    do i=1,size(count)
+       if(count(i)<=0) then
+          ndims=i-1
+          exit
+       else
+          ndims=i
+       endif
+    enddo
+    if(ndims == 0) then
+      call piodie(__PIO_FILE__, __LINE__, "Invalid count array passed to put_vara_*d_text")
+    end if
+    allocate(cstart(ndims),ccount(ndims))
+
+    do i=1,ndims
+       cstart(i) = start(ndims-i+1)-1
+       ccount(i) = count(ndims-i+1)
+    enddo
+
+!   This manipulation is required to convert the fortran string to
+!   a c character array with all trailing space set to null
+!
+    clen = len(ival)
+    sd = size(ival)
+    cval_sz = clen * sd
+    if (cval_sz > 0) then
+        allocate(cval(cval_sz))
+        ! Reshape the fortran array of strings to a contiguous 1d character array.
+        ! The 1d character array does not include string delimiters between the
+        ! different strings in the fortran array. The way the characters in the
+        ! C string is written out is determined by the shape specified in the
+        ! start/count arrays provided by the user.
+        ! character(len=3) :: ival[2] = [ "abc",
+        !                                 "def" ]
+        ! is converted to a single 1d character array
+        ! cval[6] = [   'a',
+        !               'b',
+        !               'c',
+        !               'd',
+        !               'e',
+        !               'f' ]
+        call Fstring2Cstring(ival, cval, cval_sz, clen, cstr_add_null = .false.)
+
+        ierr = PIOc_put_vara_text(file%fh, varid-1,  cstart, ccount, cval)
+        deallocate(cval)
+    else
+        print *, "PIO: WARNING: Empty {DIMS}d text data passed to PIO_put_var",&
+                  " function put_vara_{DIMS}d_text, a collective C API call will",&
+                  " be skipped on this process. ", __PIO_FILE__, __LINE__
+    end if
+    deallocate(cstart, ccount)
+
+#ifdef TIMING
+    call t_stopf("PIO:put_vara_{DIMS}d_text")
+#endif
+  end function put_vara_{DIMS}d_text
+
+! TYPE int,real,double
+! DIMS 1,2,3,4,5
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Write {TYPE} data to a netcdf variable of {DIMS} dimension(s).
+!! @details
+!! @param File @copydoc file_desc_t
+!! @param varid : The netcdf variable identifier
+!! @param start :
+!! @param count :
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @copydoc error_return
+!<
+  integer function put_vara_{DIMS}d_{TYPE} (File,varid, start, count, ival) result(ierr)
+    type (File_desc_t), intent(inout) :: File
+    integer, intent(in) :: varid, start(:), count(:)
+
+    {VTYPE}, intent(in) :: ival{DIMSTR}
+#ifdef TIMING
+    call t_startf("PIO:put_vara_{DIMS}d_{TYPE}")
+#endif
+
+    ierr = put_vara_internal_{TYPE} (File%fh, varid, start, count, ival)
+
+#ifdef TIMING
+    call t_stopf("PIO:put_vara_{DIMS}d_{TYPE}")
+#endif
+  end function put_vara_{DIMS}d_{TYPE}
+
+! DIMS 1,2,3,4,5
+!>
+!! @public
+!! @ingroup PIO_put_var
+!! @brief Write {TYPE} data to a netcdf variable of {DIMS} dimension(s).
+!! @details
+!! @param File @copydoc file_desc_t
+!! @param vardesc @copydoc var_desc_t
+!! @param start :
+!! @param count :
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @copydoc error_return
+!<
+  integer function put_vara_vdesc_{DIMS}d_{TYPE} (File,vardesc, start, count, ival) result(ierr)
+    type (File_desc_t), intent(inout) :: File
+    type(var_desc_t), intent(in) :: vardesc
+    integer, intent(in) ::  start(:), count(:)
+    {VTYPE}, intent(in) :: ival{DIMSTR}
+
+    ierr = put_vara_{DIMS}d_{TYPE} (File, vardesc%varid, start, count, ival)
+
+
+  end function put_vara_vdesc_{DIMS}d_{TYPE}
+end module pionfput_mod

@@ -1,0 +1,773 @@
+#define __PIO_FILE__ "pionfget_mod.F90"
+!>
+!! @file
+!! @brief Read Routines for non-decomposed NetCDF data.
+!<
+module pionfget_mod
+  use iso_c_binding
+#ifdef TIMING
+  use perf_mod, only : t_startf, t_stopf      ! _EXTERNAL
+#endif
+  use pio_kinds, only: i4,r4,r8,pio_offset_kind
+  use pio_types, only : file_desc_t, var_desc_t, pio_noerr
+  use pio_support, only : replace_c_null, get_text_var_sz, get_var_dim_sz, piodie
+  implicit none
+  private
+!>
+!! @defgroup PIO_get_var PIO_get_var
+!! @brief Reads non-decomposed data from a NetCDF file
+!! @details The get_var interface is provided as a simplified interface to
+!!  read variables from a NetCDF format file.   The variable is read on the
+!!  root IO task and broadcast in its entirety to all tasks.
+!<
+  public :: get_var
+  interface get_var
+     module procedure get_var_{DIMS}d_{TYPE}, get_var_vdesc_{DIMS}d_{TYPE}
+     !  DIMS 1,2,3,4,5
+     module procedure get_vara_{DIMS}d_{TYPE}, get_vara_vdesc_{DIMS}d_{TYPE}
+     module procedure get_var1_{TYPE}, get_var1_vdesc_{TYPE}
+  end interface
+
+ character(len=*), parameter :: modName='pionfget_mod'
+
+ interface
+    integer(C_INT) function PIOc_get_var_text (ncid, varid, ival) &
+         bind(C,name="PIOc_get_var_text")
+      use iso_c_binding
+      integer(C_INT), value :: ncid
+      integer(C_INT), value :: varid
+      character(C_CHAR) :: ival(*)
+    end function PIOc_get_var_text
+ end interface
+ interface
+    integer(C_INT) function PIOc_get_var_int (ncid, varid, ival) &
+         bind(C,name="PIOc_get_var_int")
+      use iso_c_binding
+      integer(C_INT), value :: ncid
+      integer(C_INT), value :: varid
+      integer(C_INT) :: ival(*)
+    end function PIOc_get_var_int
+ end interface
+ interface
+    integer(C_INT) function PIOc_get_var_float (ncid, varid, ival) &
+         bind(C,name="PIOc_get_var_float")
+      use iso_c_binding
+      integer(C_INT), value :: ncid
+      integer(C_INT), value :: varid
+      real(C_float) :: ival(*)
+    end function PIOc_get_var_float
+ end interface
+ interface
+    integer(C_INT) function PIOc_get_var_double (ncid, varid, ival) &
+         bind(C,name="PIOc_get_var_double")
+      use iso_c_binding
+      integer(C_INT), value :: ncid
+      integer(C_INT), value :: varid
+      real(C_DOUBLE) :: ival(*)
+    end function PIOc_get_var_double
+ end interface
+
+ interface
+    integer(C_INT) function PIOc_get_vara_int (ncid, varid, start, count, ival) &
+         bind(C,name="PIOc_get_vara_int")
+      use iso_c_binding
+      integer(C_INT), value :: ncid
+      integer(C_INT), value :: varid
+      integer(C_SIZE_T)  :: start(*)
+      integer(C_SIZE_T)  :: count(*)
+      integer(C_INT)  :: ival(*)
+    end function PIOc_get_vara_int
+ end interface
+ interface
+    integer(C_INT) function PIOc_get_vara_float (ncid, varid, start, count, ival) &
+         bind(C,name="PIOc_get_vara_float")
+      use iso_c_binding
+      integer(C_INT), value :: ncid
+      integer(C_INT), value :: varid
+      integer(C_SIZE_T)  :: start(*)
+      integer(C_SIZE_T)  :: count(*)
+      real(C_FLOAT)  :: ival(*)
+    end function PIOc_get_vara_float
+ end interface
+ interface
+    integer(C_INT) function PIOc_get_vara_double (ncid, varid, start, count, ival) &
+         bind(C,name="PIOc_get_vara_double")
+      use iso_c_binding
+      integer(C_INT), value :: ncid
+      integer(C_INT), value :: varid
+      integer(C_SIZE_T)  :: start(*)
+      integer(C_SIZE_T)  :: count(*)
+      real(C_DOUBLE)  :: ival(*)
+    end function PIOc_get_vara_double
+ end interface
+ interface
+    integer(C_INT) function PIOc_get_vara_text (ncid, varid, start, count, ival) &
+         bind(C,name="PIOc_get_vara_text")
+      use iso_c_binding
+      integer(C_INT), value :: ncid
+      integer(C_INT), value :: varid
+      integer(C_SIZE_T)  :: start(*)
+      integer(C_SIZE_T)  :: count(*)
+      character(C_CHAR)  :: ival(*)
+    end function PIOc_get_vara_text
+ end interface
+CONTAINS
+
+!>
+!! @public
+!! @ingroup PIO_get_var
+!! @brief Reads non-decomposed fields from a NetCDF file
+!! @details
+!! @param File @ref file_desc_t
+!! @param varid : The netcdf variable identifier
+!! @param index :  a multidimensional index that specifies which value to get
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @ref error_return
+!<
+  integer function get_var1_{TYPE} (File,varid, index, ival) result(ierr)
+    type (File_desc_t), intent(in) :: File
+    integer, intent(in) :: varid, index(:)
+    {VTYPE}, intent(out) :: ival
+
+
+    ierr = get_var1_id_{TYPE} (file%fh, varid, index, ival)
+
+  end function get_var1_{TYPE}
+! TYPE int,real,double
+  integer function get_var1_id_{TYPE} (ncid,varid, index, ival) result(ierr)
+    integer, intent(in) :: ncid
+    integer, intent(in) :: varid, index(:)
+    {VTYPE}, intent(out) :: ival
+    integer(C_SIZE_T), allocatable :: cindex(:)
+    integer :: i, clen
+    interface
+       integer(C_INT) function PIOc_get_var1_{NCTYPE} (ncid, varid, index, ival) &
+            bind(C,name="PIOc_get_var1_{NCTYPE}")
+         use iso_c_binding
+         integer(C_INT), value :: ncid
+         integer(C_INT), value :: varid
+         integer(C_SIZE_T) :: index(*)
+         {CTYPE} :: ival
+       end function PIOc_get_var1_{NCTYPE}
+    end interface
+
+#ifdef TIMING
+    call t_startf("PIO:get_var1_{TYPE}")
+#endif
+    clen = size(index)
+    allocate(cindex(clen))
+    do i=1,clen
+       cindex(i)=index(clen-i+1)-1
+    end do
+
+    ierr = PIOc_get_var1_{NCTYPE} (ncid, varid-1, cindex, ival)
+    deallocate(cindex)
+#ifdef TIMING
+    call t_stopf("PIO:get_var1_{TYPE}")
+#endif
+  end function get_var1_id_{TYPE}
+
+
+
+  integer function get_var1_id_text_internal(ncid,varid, index, vlen, ival) result(ierr)
+    integer, intent(in) :: ncid
+    integer, intent(in) :: varid, index(:)
+    integer,intent(in) :: vlen
+    character, intent(out) :: ival(vlen)
+
+    integer(C_SIZE_T), allocatable :: cindex(:)
+    integer(C_SIZE_T), allocatable :: count(:)
+    integer :: i, clen
+!!$    interface
+!!$       integer(C_INT) function PIOc_get_var1_text (ncid, varid, index, ival) &
+!!$            bind(C,name="PIOc_get_var1_text")
+!!$         use iso_c_binding
+!!$         integer(C_INT), value :: ncid
+!!$         integer(C_INT), value :: varid
+!!$         integer(C_SIZE_T) :: index(*)
+!!$         character :: ival(*)
+!!$       end function PIOc_get_var1_text
+!!$    end interface
+
+    clen = size(index)
+    allocate(cindex(clen))
+    do i=1,clen
+       cindex(i)=index(clen-i+1)-1
+    end do
+    allocate(count(clen))
+    count=1
+    count(clen) = vlen
+    ierr = PIOc_get_vara_text (ncid, varid-1, cindex, count, ival)
+    deallocate(cindex)
+    deallocate(count)
+  end function get_var1_id_text_internal
+
+  integer function get_var1_id_text (ncid,varid, index, ival) result(ierr)
+    integer, intent(in) :: ncid
+    integer, intent(in) :: varid, index(:)
+    character(len=*), intent(out) :: ival
+    character, allocatable :: cval(:)
+    integer :: clen, i
+
+#ifdef TIMING
+    call t_startf("PIO:get_var1_id_text")
+#endif
+    clen = len(ival)
+    allocate(cval(clen))
+    cval=C_NULL_CHAR
+    ival=''
+    ierr = get_var1_id_text_internal(ncid,varid,index,clen,cval)
+    i=1
+    do while(i<=clen )
+       if(cval(i) == C_NULL_CHAR ) exit
+       ival(i:i) = cval(i)
+       i=i+1
+    enddo
+   deallocate(cval)
+!   print *,__FILE__,__LINE__,trim(ival)
+
+#ifdef TIMING
+    call t_stopf("PIO:get_var1_id_text")
+#endif
+
+  end function get_var1_id_text
+
+
+
+!>
+!! @public
+!! @ingroup PIO_get_var
+!! @brief Writes an netcdf attribute to a file
+!! @details
+!! @param File @ref file_desc_t
+!! @param vardesc @ref var_desc_t
+!! @param index :  a multidimensional index that specifies which value to get
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @ref error_return
+!<
+  integer function get_var1_vdesc_{TYPE} (File,vardesc, index, ival) result(ierr)
+    type (File_desc_t), intent(in) :: File
+    type(var_desc_t), intent(in) :: vardesc
+    integer, intent(in) :: index(:)
+    {VTYPE}, intent(out) :: ival
+
+    character(len=*), parameter :: subName=modName//'::get_var1_vdesc_{TYPE}'
+
+    ierr = get_var1_{TYPE} (File, vardesc%varid, index, ival)
+
+  end function get_var1_vdesc_{TYPE}
+
+
+! TYPE int,real,double
+! DIMS 1,2,3,4,5
+!>
+!! @public
+!! @ingroup PIO_get_var
+!! @brief Writes an netcdf attribute to a file
+!! @details
+!! @param File @ref file_desc_t
+!! @param varid : The netcdf variable identifier
+!! @param start : A vector of size_t integers specifying the index in
+!!   the variable where the first of the data values will be read. The
+!!   indices are relative to 0, so for example, the first data value of
+!!   a variable would have index (0, 0, ... , 0). The length of start
+!!   must be the same as the number of dimensions of the specified
+!!   variable. The elements of start correspond, in order, to the
+!!   variable's dimensions. Hence, if the variable is a record variable,
+!!   the first index would correspond to the starting record number for
+!!   reading the data values.
+!! @param count : A vector of size_t integers specifying the edge
+!!   lengths along each dimension of the block of data values to be
+!!   read. To read a single value, for example, specify count as (1, 1,
+!!   ... , 1). The length of count is the number of dimensions of the
+!!   specified variable. The elements of count correspond, in order, to
+!!   the variable's dimensions. Hence, if the variable is a record
+!!   variable, the first element of count corresponds to a count of the
+!!   number of records to read.
+!! Note: setting any element of the count array to zero causes the function to exit without error, and without doing anything.
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @ref error_return
+!<
+  integer function get_vara_{DIMS}d_{TYPE} (File,varid, start, count, ival) result(ierr)
+    type (File_desc_t), intent(in) :: File
+    integer, intent(in) :: varid, start(:), count(:)
+    {VTYPE}, intent(out) :: ival{DIMSTR}
+
+#ifdef TIMING
+    call t_startf("PIO:get_vara_{DIMS}d_{TYPE}")
+#endif
+    ierr = get_vara_{TYPE}_internal (File%fh, varid, start, count, ival)
+#ifdef TIMING
+    call t_stopf("PIO:get_vara_{DIMS}d_{TYPE}")
+#endif
+
+  end function get_vara_{DIMS}d_{TYPE}
+
+! DIMS 1,2,3,4,5
+  integer function get_vara_{DIMS}d_text (File,varid, start, count, ival) result(ierr)
+    type (File_desc_t), intent(in) :: File
+    integer, intent(in) :: varid, start(:), count(:)
+    character(len=*), intent(out) :: ival{DIMSTR}
+
+    character(C_CHAR), allocatable :: cval(:)
+    integer :: cval_sz, clen
+
+#ifdef TIMING
+    call t_startf("PIO:get_vara_{DIMS}d_text")
+#endif
+    ival = ' '
+    ierr = get_text_var_sz(File, varid, clen)
+    if(ierr /= PIO_NOERR) then
+      call piodie(__PIO_FILE__, __LINE__, "Unable to query text var size")
+    end if
+    cval_sz = size(ival) * clen
+    allocate(cval(cval_sz))
+    ierr = get_vara_text_internal (File%fh, varid, start, count, size(cval), cval)
+
+    call Cstring2Fstring_{DIMS}d (cval, cval_sz, clen, ival)
+    deallocate(cval)
+
+#ifdef TIMING
+    call t_stopf("PIO:get_vara_{DIMS}d_text")
+#endif
+  end function get_vara_{DIMS}d_text
+
+! DIMS 1,2,3,4,5
+!>
+!! @public
+!! @ingroup PIO_get_var
+!! @brief Writes an netcdf attribute to a file
+!! @details
+!! @param File @ref file_desc_t
+!! @param vardesc @ref var_desc_t
+!! @param start : A vector of size_t integers specifying the index in
+!!   the variable where the first of the data values will be read. The
+!!   indices are relative to 0, so for example, the first data value of
+!!   a variable would have index (0, 0, ... , 0). The length of start
+!!   must be the same as the number of dimensions of the specified
+!!   variable. The elements of start correspond, in order, to the
+!!   variable's dimensions. Hence, if the variable is a record variable,
+!!   the first index would correspond to the starting record number for
+!!   reading the data values.
+!! @param count : A vector of size_t integers specifying the edge
+!!   lengths along each dimension of the block of data values to be
+!!   read. To read a single value, for example, specify count as (1, 1,
+!!   ... , 1). The length of count is the number of dimensions of the
+!!   specified variable. The elements of count correspond, in order, to
+!!   the variable's dimensions. Hence, if the variable is a record
+!!   variable, the first element of count corresponds to a count of the
+!!   number of records to read.
+!! Note: setting any element of the count array to zero causes the function to exit without error, and without doing anything.
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @ref error_return
+!<
+  integer function get_vara_vdesc_{DIMS}d_{TYPE} (File,vardesc, start, count, ival) result(ierr)
+    type (File_desc_t), intent(in) :: File
+    type(var_desc_t), intent(in) :: vardesc
+    integer, intent(in) :: start(:), count(:)
+    {VTYPE}, intent(out) :: ival{DIMSTR}
+
+    character(len=*), parameter :: subName=modName//'::get_vara_vdesc_{DIMS}d_{TYPE}'
+
+    ierr = get_vara_{DIMS}d_{TYPE} (File, vardesc%varid, start, count, ival)
+
+  end function get_vara_vdesc_{DIMS}d_{TYPE}
+
+! TYPE int,real,double
+! DIMS 0
+  integer function get_var_0d_{TYPE} (File,varid, ival) result(ierr)
+    use iso_c_binding
+    type (File_desc_t), intent(in) :: File
+    integer, intent(in) :: varid
+    {VTYPE}, intent(out) :: ival
+    {VTYPE}  :: aival(1)
+
+#ifdef TIMING
+    call t_startf("PIO:get_var_0d_{TYPE}")
+#endif
+
+    ierr = PIOc_get_var_{NCTYPE} (File%fh, varid-1, aival)
+    ival = aival(1)
+
+#ifdef TIMING
+    call t_stopf("PIO:get_var_0d_{TYPE}")
+#endif
+  end function Get_var_0d_{TYPE}
+
+! DIMS 0,1,2,3,4,5
+  integer function get_var_{DIMS}d_text (File,varid, ival) result(ierr)
+    type (File_desc_t), intent(in) :: File
+    integer, intent(in) :: varid
+    character(len=*), intent(out) :: ival{DIMSTR}
+
+    character(C_CHAR), allocatable :: cval(:)
+    integer :: cval_sz, clen, nstrs
+
+#ifdef TIMING
+    call t_startf("PIO:get_var_{DIMS}d_text")
+#endif
+    ival = ' '
+    ierr = get_text_var_sz(File, varid, clen, var_nstrs=nstrs)
+    if(ierr /= PIO_NOERR) then
+      call piodie(__PIO_FILE__, __LINE__, "Unable to query the text variable size")
+    end if
+
+    if(nstrs > 0) then
+      cval_sz = clen * nstrs
+    else
+      cval_sz = clen
+    end if
+
+    allocate(cval(cval_sz))
+    ierr = PIOc_get_var_text(File%fh, varid-1, cval)
+    call Cstring2Fstring_{DIMS}d (cval, cval_sz, clen, ival)
+    deallocate(cval)
+
+#ifdef TIMING
+    call t_stopf("PIO:get_var_{DIMS}d_text")
+#endif
+  end function get_var_{DIMS}d_text
+
+! TYPE int,real,double
+  integer function get_var_{TYPE}_internal  (ncid,varid, ival) result(ierr)
+    integer, intent(in) :: ncid
+    integer, intent(in) :: varid
+    {VTYPE}, intent(out), target :: ival(*)
+
+    ierr = PIOc_get_var_{NCTYPE} (ncid, varid-1, ival)
+
+  end function get_var_{TYPE}_internal
+
+! TYPE int,real,double
+  integer function get_vara_{TYPE}_internal  (ncid,varid, start, count, ival) result(ierr)
+    use pio_nf, only : pio_inq_varndims
+    integer, intent(in) :: ncid
+    integer, intent(in) :: varid
+    integer, intent(in) :: start(:)
+    integer, intent(in) :: count(:)
+    {VTYPE}, target, intent(out) :: ival(*)
+    integer(C_SIZE_T), allocatable :: cstart(:), ccount(:)
+    integer :: i, ndims
+
+    ierr = pio_inq_varndims(ncid,varid, ndims)
+    allocate(cstart(ndims),ccount(ndims))
+    do i=1,ndims
+       cstart(i) = start(ndims-i+1)-1
+       ccount(i) = count(ndims-i+1)
+    enddo
+
+    ierr = PIOc_get_vara_{NCTYPE} (ncid, varid-1, cstart, ccount, ival)
+    deallocate(cstart, ccount)
+
+  end function get_vara_{TYPE}_internal
+
+  integer function get_vara_text_internal  (ncid,varid, start, count, nstrs, cval) result(ierr)
+    use pio_nf, only : pio_inq_varndims
+    integer, intent(in) :: ncid
+    integer, intent(in) :: varid
+    integer, intent(in) :: start(:)
+    integer, intent(in) :: count(:)
+    integer, intent(in) :: nstrs
+    character(C_CHAR), intent(out) :: cval(:)
+    integer :: j
+    integer(C_SIZE_T), allocatable :: cstart(:), ccount(:)
+    integer :: i, ndims
+
+    ierr = pio_inq_varndims(ncid,varid, ndims)
+    allocate(cstart(ndims),ccount(ndims))
+    do i=1,ndims
+       cstart(i) = start(ndims-i+1)-1
+       ccount(i) = count(ndims-i+1)
+    enddo
+
+    ierr = PIOc_get_vara_text (ncid, varid-1, cstart, ccount, cval)
+    deallocate(ccount, cstart)
+  end function get_vara_text_internal
+
+! TYPE int,real,double
+! DIMS 1,2,3,4,5
+  integer function get_var_{DIMS}d_{TYPE} (File,varid, ival) result(ierr)
+    type (File_desc_t), intent(in) :: File
+    integer, intent(in) :: varid
+    {VTYPE}, intent(out) :: ival{DIMSTR}
+    integer(PIO_OFFSET_KIND) :: var_sz
+
+#ifdef TIMING
+    call t_startf("PIO:get_var_{DIMS}d_{TYPE}")
+#endif
+    ierr = get_var_dim_sz(File, varid, var_sz)
+    if(ierr /= PIO_NOERR) then
+      print *, "WARNING: Getting variable dimensions failed, (varid = ", varid, ")"
+      ! Instead of aborting here let the internal/C APIs handle the error
+      ! based on the error handler chosen by the user
+      var_sz = INT(SIZE(ival), PIO_OFFSET_KIND)
+    end if
+
+    if(INT(SIZE(ival), PIO_OFFSET_KIND) < var_sz) then
+      print *, "ERROR: The size of the user buffer (", SIZE(ival), " elements) ",&
+                "is smaller than the size of the variable (", var_sz, " elements)"
+      call piodie(__PIO_FILE__, __LINE__, "Insufficient user buffer size")
+    end if
+
+    ierr = get_var_{TYPE}_internal(File%fh, varid, ival)
+
+#ifdef TIMING
+    call t_stopf("PIO:get_var_{DIMS}d_{TYPE}")
+#endif
+  end function get_var_{DIMS}d_{TYPE}
+
+
+!>
+!! @public
+!! @ingroup PIO_get_var
+!! @brief Writes an netcdf attribute to a file
+!! @details
+!! @param File @ref file_desc_t
+!! @param vardesc @ref var_desc_t
+!! @param ival : The value for the netcdf metadata
+!! @retval ierr @ref error_return
+!<
+  integer function get_var_vdesc_{DIMS}d_{TYPE} (File,vardesc, ival) result(ierr)
+    type (File_desc_t), intent(in) :: File
+    type(var_desc_t), intent(in) :: vardesc
+    {VTYPE}, intent(out) :: ival{DIMSTR}
+
+    ierr = get_var_{DIMS}d_{TYPE} (File, vardesc%varid, ival)
+
+  end function get_var_vdesc_{DIMS}d_{TYPE}
+
+! DIMS 0,1,2,3,4,5
+  subroutine Cstring2Fstring_{DIMS}d(cstr, cstr_sz, max_clen, fstr)
+    character(C_CHAR), intent(in) :: cstr(:)
+    ! The total size of cstr, the total number of chars in cstr
+    integer, intent(in) :: cstr_sz
+    ! The length of each string in cstr
+    integer, intent(in) :: max_clen
+    character(len=*), intent(out) :: fstr{DIMSTR}
+
+#if {DIMS} != 0
+    integer :: fstr_dim_sz({DIMS})
+#endif
+    integer :: max_nstrs, max_flen
+    integer :: cstr_idx
+    logical :: cstr_copied
+    integer :: i, j, k, m, n, q
+
+    character, parameter :: F_SPACE_CHAR = ' '
+
+    max_nstrs = cstr_sz / max_clen
+#if {DIMS} != 0
+    if(max_nstrs > size(fstr)) then
+      print *, "ERROR: The provided user buffer",&
+                  " does not have space for copying ", max_nstrs, "strings",&
+                  " (space available to copy only ", size(fstr), " strings)"
+      call piodie(__PIO_FILE__, __LINE__, "Insufficient user buffer space")
+    end if
+
+    do i=1,{DIMS}
+      fstr_dim_sz(i) = size(fstr,i)
+    enddo
+#else
+    if(max_nstrs > 1) then
+      print *, "ERROR: The provided user buffer",&
+                  " does not have space for copying ", max_nstrs, "strings",&
+                  " (space available to copy only 1 string)"
+      call piodie(__PIO_FILE__, __LINE__, "Insufficient user buffer space")
+    end if
+#endif
+    fstr = F_SPACE_CHAR
+    cstr_idx = 0
+#if {DIMS} == 0
+    max_flen= len(fstr)
+    cstr_copied = .false.
+    do i=1,min(max_clen, max_flen)
+      fstr(i:i) = cstr(i)
+      if(fstr(i:i) == C_NULL_CHAR) then
+        fstr(i:i) = F_SPACE_CHAR
+        cstr_copied = .true.
+        exit
+      end if
+    end do
+    if((.not. cstr_copied) .and. (max_flen < max_clen)) then
+      ! We have exhausted the Fortran write buffer
+      ! Warn the user of the truncation
+      print *, "WARNING: The user buffer provided had insufficient space (",&
+                max_flen, " chars to read string with ", max_clen, " chars).",&
+                "The contents will be truncated to : ", trim(fstr)
+      fstr(max_flen:max_flen) = F_SPACE_CHAR
+    end if
+#endif
+#if {DIMS} == 1
+    max_flen= len(fstr(1))
+    do j=1,fstr_dim_sz(1)
+      cstr_copied = .false.
+      if(cstr_idx * max_clen + min(max_clen, max_flen) > cstr_sz) then
+        print *, "WARNING: The number of strings read (", cstr_idx, ") ",&
+                  "is less than the number of expected strings in the ",&
+                  "Fortran array (", fstr_dim_sz(1), " strings) "
+        exit
+      end if
+      do i=1,min(max_clen, max_flen)
+        fstr(j)(i:i) = cstr(cstr_idx * max_clen + i)
+        if(fstr(j)(i:i) == C_NULL_CHAR) then
+          fstr(j)(i:i) = F_SPACE_CHAR
+          cstr_copied = .true.
+          exit
+        end if
+      end do
+      if((.not. cstr_copied) .and. (max_flen < max_clen)) then
+        ! We have exhausted the Fortran write buffer
+        ! Warn the user of the truncation
+        print *, "WARNING: The user buffer provided had insufficient space (",&
+                  max_flen, " chars to read strings with ", max_clen, " chars).",&
+                  "The contents will be truncated to : ", trim(fstr(j))
+        fstr(j)(max_flen:max_flen) = F_SPACE_CHAR
+      end if
+      cstr_idx = cstr_idx + 1
+    enddo
+#endif
+#if {DIMS} == 2
+    max_flen= len(fstr(1,1))
+    do k=1,fstr_dim_sz(2)
+      do j=1,fstr_dim_sz(1)
+        cstr_copied = .false.
+        if(cstr_idx * max_clen + min(max_clen, max_flen) > cstr_sz) then
+          print *, "WARNING: The number of strings read (", cstr_idx, ") ",&
+                    "is less than the number of expected strings in the ",&
+                    "Fortran array (", fstr_dim_sz(1) * fstr_dim_sz(2), " strings) "
+          exit
+        end if
+        do i=1,min(max_clen, max_flen)
+          fstr(j,k)(i:i) = cstr(cstr_idx * max_clen + i)
+          if(fstr(j,k)(i:i) == C_NULL_CHAR) then
+            fstr(j,k)(i:i) = F_SPACE_CHAR
+            cstr_copied = .true.
+            exit
+          end if
+        end do
+        if((.not. cstr_copied) .and. (max_flen < max_clen)) then
+          ! We have exhausted the Fortran write buffer
+          ! Warn the user of the truncation
+          print *, "WARNING: The user buffer provided had insufficient space (",&
+                    max_flen, " chars to read strings with ", max_clen, " chars).",&
+                    "The contents will be truncated to : ", trim(fstr(j,k))
+          fstr(j,k)(max_flen:max_flen) = F_SPACE_CHAR
+        end if
+        cstr_idx = cstr_idx + 1
+      enddo ! do j=1,fstr_dim_sz(1)
+    enddo ! do k=1,fstr_dim_sz(2)
+#endif
+#if {DIMS} == 3
+    max_flen= len(fstr(1,1,1))
+    do m=1,fstr_dim_sz(3)
+      do k=1,fstr_dim_sz(2)
+        do j=1,fstr_dim_sz(1)
+          cstr_copied = .false.
+          if(cstr_idx * max_clen + min(max_clen, max_flen) > cstr_sz) then
+            print *, "WARNING: The number of strings read (", cstr_idx, ") ",&
+                      "is less than the number of expected strings in the ",&
+                      "Fortran array (",&
+                      fstr_dim_sz(1) * fstr_dim_sz(2) * fstr_dim_sz(3), " strings) "
+            exit
+          end if
+          do i=1,min(max_clen, max_flen)
+            fstr(j,k,m)(i:i) = cstr(cstr_idx * max_clen + i)
+            if(fstr(j,k,m)(i:i) == C_NULL_CHAR) then
+              fstr(j,k,m)(i:i) = F_SPACE_CHAR
+              cstr_copied = .true.
+              exit
+            end if
+          end do
+          if((.not. cstr_copied) .and. (max_flen < max_clen)) then
+            ! We have exhausted the Fortran write buffer
+            ! Warn the user of the truncation
+            print *, "WARNING: The user buffer provided had insufficient space (",&
+                      max_flen, " chars to read strings with ", max_clen, " chars).",&
+                      "The contents will be truncated to : ", trim(fstr(j,k,m))
+            fstr(j,k,m)(max_flen:max_flen) = F_SPACE_CHAR
+          end if
+          cstr_idx = cstr_idx + 1
+        enddo ! do j=1,fstr_dim_sz(1)
+      enddo ! do k=1,fstr_dim_sz(2)
+    enddo ! do m=1,fstr_dim_sz(3)
+#endif
+#if {DIMS} == 4
+    max_flen= len(fstr(1,1,1,1))
+    do n=1,fstr_dim_sz(4)
+      do m=1,fstr_dim_sz(3)
+        do k=1,fstr_dim_sz(2)
+          do j=1,fstr_dim_sz(1)
+            cstr_copied = .false.
+            if(cstr_idx * max_clen + min(max_clen, max_flen) > cstr_sz) then
+              print *, "WARNING: The number of strings read (", cstr_idx, ") ",&
+                        "is less than the number of expected strings in the ",&
+                        "Fortran array (",&
+                        fstr_dim_sz(1) * fstr_dim_sz(2) * fstr_dim_sz(3) * fstr_dim_sz(4),&
+                        " strings) "
+              exit
+            end if
+            do i=1,min(max_clen, max_flen)
+              fstr(j,k,m,n)(i:i) = cstr(cstr_idx * max_clen + i)
+              if(fstr(j,k,m,n)(i:i) == C_NULL_CHAR) then
+                fstr(j,k,m,n)(i:i) = F_SPACE_CHAR
+                cstr_copied = .true.
+                exit
+              end if
+            end do
+            if((.not. cstr_copied) .and. (max_flen < max_clen)) then
+              ! We have exhausted the Fortran write buffer
+              ! Warn the user of the truncation
+              print *, "WARNING: The user buffer provided had insufficient space (",&
+                        max_flen, " chars to read strings with ", max_clen, " chars).",&
+                        "The contents will be truncated to : ", trim(fstr(j,k,m,n))
+              fstr(j,k,m,n)(max_flen:max_flen) = F_SPACE_CHAR
+            end if
+            cstr_idx = cstr_idx + 1
+          enddo ! do j=1,fstr_dim_sz(1)
+        enddo ! do k=1,fstr_dim_sz(2)
+      enddo ! do m=1,fstr_dim_sz(3)
+    enddo ! do n=1,fstr_dim_sz(4)
+#endif
+#if {DIMS} == 5
+    max_flen= len(fstr(1,1,1,1,1))
+    do q=1,fstr_dim_sz(5)
+      do n=1,fstr_dim_sz(4)
+        do m=1,fstr_dim_sz(3)
+          do k=1,fstr_dim_sz(2)
+            do j=1,fstr_dim_sz(1)
+              cstr_copied = .false.
+              if(cstr_idx * max_clen + min(max_clen, max_flen) > cstr_sz) then
+                print *, "WARNING: The number of strings read (", cstr_idx, ") ",&
+                          "is less than the number of expected strings in the ",&
+                          "Fortran array (",&
+                          fstr_dim_sz(1) * fstr_dim_sz(2) * fstr_dim_sz(3) * fstr_dim_sz(4) * fstr_dim_sz(5),&
+                          " strings) "
+                exit
+              end if
+              do i=1,min(max_clen, max_flen)
+                fstr(j,k,m,n,q)(i:i) = cstr(cstr_idx * max_clen + i)
+                if(fstr(j,k,m,n,q)(i:i) == C_NULL_CHAR) then
+                  fstr(j,k,m,n,q)(i:i) = F_SPACE_CHAR
+                  cstr_copied = .true.
+                  exit
+                end if
+              end do
+              if((.not. cstr_copied) .and. (max_flen < max_clen)) then
+                ! We have exhausted the Fortran write buffer
+                ! Warn the user of the truncation
+                print *, "WARNING: The user buffer provided had insufficient space (",&
+                          max_flen, " chars to read strings with ", max_clen, " chars).",&
+                          "The contents will be truncated to : ", trim(fstr(j,k,m,n,q))
+                fstr(j,k,m,n,q)(max_flen:max_flen) = F_SPACE_CHAR
+              end if
+              cstr_idx = cstr_idx + 1
+            enddo ! do j=1,fstr_dim_sz(1)
+          enddo ! do k=1,fstr_dim_sz(2)
+        enddo ! do m=1,fstr_dim_sz(3)
+      enddo ! do n=1,fstr_dim_sz(4)
+    enddo ! do q=1,fstr_dim_sz(5)
+#endif
+
+  end subroutine Cstring2Fstring_{DIMS}d
+
+end module pionfget_mod
