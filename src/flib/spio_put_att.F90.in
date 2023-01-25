@@ -98,7 +98,7 @@ CONTAINS
     END IF
 
 #if {DIMS} == 0
-    clen = LEN_TRIM(attval) + 1
+    clen = LEN_TRIM(attval)
     nstrs = 1
 #else
     clen = LEN(attval)
@@ -110,7 +110,7 @@ CONTAINS
     ! Convert string to a 1d CHARACTER array & adding a C NULL character
     ! at the end of the string (since we are using C APIs to write the
     ! string to the variable)
-    ALLOCATE(cval(cval_sz))
+    ALLOCATE(cval(cval_sz + 1))
     cval = C_NULL_CHAR
 
     !ierr = f2cstring(file%iosystem, attval, cval, cval_sz, clen, cstr_add_null=.true.)
