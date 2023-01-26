@@ -104,6 +104,15 @@ CONTAINS
     clen = LEN(attval)
     nstrs = SIZE(attval)
 #endif
+
+    IF(clen == 0) THEN
+      ! Since some E3SM components write empty attribute strings we do not error out here
+      WRITE(log_msg, *) "Empty attribute value (empty string) passed to pio_put_att() function,",&
+                        " pio_put_att_fh_vid_{DIMS}d_text(). attribute name = ", TRIM(attname),&
+                        " , varid = ", varid, ", file id = ", file%fh
+      CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
+    END IF
+
     cval_sz = clen * nstrs
 
     ! NetCDF only supports character arrays

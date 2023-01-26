@@ -107,6 +107,11 @@ CONTAINS
       add_c_null = cstr_add_null
     END IF
 
+    IF(max_clen <= 0) THEN
+      ! Some codes write out empty strings, nothing to convert here
+      RETURN
+    END IF
+
     max_nstrs = cstr_sz / max_clen
     IF(max_nstrs < 1) THEN
       WRITE(log_msg, *) "ERROR: The provided user buffer",&
