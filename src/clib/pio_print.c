@@ -86,6 +86,24 @@ const char *pio_get_vname_from_file_id(int pio_file_id, int varid)
   }
 }
 
+void pio_print_vinfo(int iosysid, int fileid, int varid)
+{
+  iosystem_desc_t *ios = NULL;
+
+  ios = pio_get_iosystem_from_id(iosysid);
+  assert(ios);
+
+  if(ios->union_rank == 0){
+    printf("============ Variable info ============= \n", varid);
+    printf("Variable id : %d\n", varid);
+    printf("Variable name : %s\n", pio_get_vname_from_file_id(fileid, varid));
+    printf("File id : %d\n", fileid);
+    printf("File name : %s\n", pio_get_fname_from_file_id(fileid));
+    printf("======================================== \n"); fflush(stdout);
+    assert(0);
+  }
+}
+
 const char *pio_get_vnames_from_file(file_desc_t *file,
               int *varids, int varids_sz, char *buf, size_t buf_sz)
 {

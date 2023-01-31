@@ -111,6 +111,15 @@ module pionfget_mod
       character(C_CHAR)  :: ival(*)
     end function PIOc_get_vara_text
  end interface
+ interface
+    subroutine pio_print_vinfo (iosysid, ncid, varid) &
+         bind(C,name="pio_print_vinfo")
+      use iso_c_binding
+      integer(C_INT), value :: iosysid
+      integer(C_INT), value :: ncid
+      integer(C_INT), value :: varid
+    end subroutine pio_print_vinfo
+ end interface
 CONTAINS
 
 !>
@@ -506,6 +515,7 @@ CONTAINS
     if(INT(SIZE(ival), PIO_OFFSET_KIND) < var_sz) then
       print *, "ERROR: The size of the user buffer (", SIZE(ival), " elements) ",&
                 "is smaller than the size of the variable (", var_sz, " elements)"
+      call pio_print_vinfo(File%iosystem%iosysid, File%fh, varid - 1)
       call piodie(__PIO_FILE__, __LINE__, "Insufficient user buffer size")
     end if
 
