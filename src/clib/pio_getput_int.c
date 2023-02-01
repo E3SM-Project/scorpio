@@ -326,7 +326,8 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                 /* String type */
                 space_id = H5Screate(H5S_SCALAR);
                 h5_xtype = H5Tcopy(H5T_C_S1);
-                H5Tset_size(h5_xtype, asize);
+                /* For empty strings, asize is 0, while H5Tset_size() requires that size must be positive */
+                H5Tset_size(h5_xtype, asize + 1);
                 H5Tset_strpad(h5_xtype, H5T_STR_NULLTERM);
                 H5Tset_cset(h5_xtype, H5T_CSET_ASCII);
             }
