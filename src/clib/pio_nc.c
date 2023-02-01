@@ -154,6 +154,38 @@ int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
      }
 #endif
 
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        if (ndimsp)
+            *ndimsp = file->hdf5_num_dims;
+
+        if (nvarsp)
+            *nvarsp = file->hdf5_num_vars;
+
+        if (ngattsp)
+            *ngattsp = file->hdf5_num_gattrs;
+
+        if (unlimdimidp)
+        {
+            *unlimdimidp = -1;
+            for (int i = 0; i < file->hdf5_num_dims; i++)
+            {
+                if (file->hdf5_dims[i].len == PIO_UNLIMITED)
+                {
+                    *unlimdimidp = i;
+                    break;
+                }
+            }
+        }
+
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+        return PIO_NOERR;
+    }
+#endif
+
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
     {
@@ -1075,6 +1107,35 @@ int PIOc_inq_dimid(int ncid, const char *name, int *idp)
         return PIO_NOERR;
     }
 #endif
+
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        ierr = PIO_EBADDIM;
+        *idp = -1;
+        for (int i = 0; i < file->hdf5_num_dims; i++)
+        {
+            if (!strcmp(name, file->hdf5_dims[i].name))
+            {
+                *idp = i;
+                ierr = PIO_NOERR;
+                break;
+            }
+        }
+
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+        /* A failure to inquire is not fatal */
+        if (ierr != PIO_NOERR)
+        {
+            LOG((1, "PIOc_inq_dimid with HDF5 type failed, ierr = %d", ierr));
+            return ierr;
+        }
+
+        return PIO_NOERR;
+    }
+#endif
  
     /* IO tasks call the netCDF functions. */
     if (ios->ioproc)
@@ -1674,6 +1735,34 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
     }
 #endif
 
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        ierr = PIO_ENOTVAR;
+        for (int i = 0; i < file->hdf5_num_vars; i++)
+        {
+            if (!strcmp(name, file->hdf5_vars[i].name))
+            {
+                *varidp = i;
+                ierr = PIO_NOERR;
+                break;
+            }
+        }
+
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+        /* A failure to inquire is not fatal */
+        if (ierr != PIO_NOERR)
+        {
+            LOG((1, "PIOc_inq_varid with HDF5 type failed, ierr = %d", ierr));
+            return ierr;
+        }
+
+        return PIO_NOERR;
+    }
+#endif
+
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
     {
@@ -1862,6 +1951,37 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
         if (ierr != PIO_NOERR)
         {
             LOG((1, "PIOc_inq_att with ADIOS type failed, ierr = %d", ierr));
+            return ierr;
+        }
+
+        return PIO_NOERR;
+    }
+#endif
+
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        ierr = PIO_ENOTATT;
+        for (int i = 0; i < file->hdf5_num_attrs; i++)
+        {
+            if (!strcmp(name, file->hdf5_attrs[i].att_name) &&
+                file->hdf5_attrs[i].att_varid == varid &&
+                file->hdf5_attrs[i].att_ncid == ncid)
+            {
+                ierr = PIO_NOERR;
+                *xtypep = (nc_type) (file->hdf5_attrs[i].att_type);
+                *lenp = (PIO_Offset) (file->hdf5_attrs[i].att_len);
+                break;
+            }
+        }
+
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+        /* A failure to inquire is not fatal */
+        if (ierr != PIO_NOERR)
+        {
+            LOG((1, "PIOc_inq_att with HDF5 type failed, ierr = %d", ierr));
             return ierr;
         }
 

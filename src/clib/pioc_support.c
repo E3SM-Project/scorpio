@@ -2795,6 +2795,8 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #ifdef _HDF5
     file->hdf5_num_dims = 0;
     file->hdf5_num_vars = 0;
+    file->hdf5_num_attrs = 0;
+    file->hdf5_num_gattrs = 0;
 #endif
     /*
     file->num_unlim_dimids = 0;
