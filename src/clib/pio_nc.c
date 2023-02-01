@@ -3490,7 +3490,11 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
                 dims[i] = mdims[i] = file->hdf5_dims[dimidsp[i]].len;
 
             dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
-            H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED);
+
+            /* H5DSattach_scale calls (even with MPI_Barrier) might fail or hang if attribute creation
+             * order is tracked or indexed. Before we have a better workaround, temporarily disable
+             * tracking and indexing of attribute creation order. */
+            /* H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED); */
 
             if (xtype == NC_CHAR)
             {

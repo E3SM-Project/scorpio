@@ -3342,7 +3342,10 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
             hid_t fcpl_id = H5Pcreate(H5P_FILE_CREATE);
 
             H5Pset_link_creation_order(fcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED);
-            H5Pset_attr_creation_order(fcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED);
+            /* H5DSattach_scale calls (even with MPI_Barrier) might fail or hang if attribute creation
+             * order is tracked or indexed. Before we have a better workaround, temporarily disable
+             * tracking and indexing of attribute creation order. */
+            /* H5Pset_attr_creation_order(fcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED); */
 
             hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
             H5Pset_fapl_mpio(fapl_id, ios->io_comm, ios->info);
@@ -4236,7 +4239,10 @@ int pioc_change_def(int ncid, int is_enddef)
                         hsize_t dims[1], max_dims[1], chunk_dims[1] = {1};
 
                         dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
-                        H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED);
+                        /* H5DSattach_scale calls (even with MPI_Barrier) might fail or hang if attribute creation
+                         * order is tracked or indexed. Before we have a better workaround, temporarily disable
+                         * tracking and indexing of attribute creation order. */
+                        /* H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED); */
 
                         /* Set size of dataset to size of dimension. */
                         max_dims[0] = dims[0] = file->hdf5_dims[i].len;
@@ -4341,6 +4347,13 @@ int pioc_change_def(int ncid, int is_enddef)
                             for (int j = 0; j < ndims; j++)
                             {
                                 H5DSattach_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_dims[dimids[j]].hdf5_dataset_id, j);
+
+                                /* According to HDF5 developers, the H5DS routines are not parallel, so all the ranks are going to be
+                                 * doing the same operations. At some point, with enough iterations of the loop, HDF5 might get out of
+                                 * step between the ranks.
+                                 * Workaround: place a barrier to sync H5DSattach_scale calls.
+                                 */
+                                MPI_Barrier(ios->io_comm);
                             }
                         }
                     }
