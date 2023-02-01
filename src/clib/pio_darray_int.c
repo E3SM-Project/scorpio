@@ -468,30 +468,43 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                     /* For each variable to be written. */
                     for (int nv = 0; nv < nvars; nv++)
                     {
-                        /* Get the var info. */
-                        vdesc = file->varlist + varids[nv];
-
-                        /* If this is a record (or quasi-record) var, set the start for
-                         * the record dimension. */
-                        if (vdesc->record >= 0 && fndims > 1)
-                            for (int rc = 0; rc < rrcnt; rc++)
-                                startlist[rc][0] = frame[nv];
-
                         hid_t file_space_id = H5Dget_space(file->hdf5_vars[varids[nv]].hdf5_dataset_id);
+                        hid_t mem_space_id;
 
-                        H5S_seloper_t op = H5S_SELECT_SET;
-
-                        for (int i = 0; i < rrcnt; i++)
+                        if (dsize_all > 0)
                         {
-                            /* Union hyperslabs of all regions */
-                            H5Sselect_hyperslab(file_space_id, op, (hsize_t*)startlist[i], NULL, (hsize_t*)countlist[i], NULL);
-                            op = H5S_SELECT_OR;
+                            /* Get the var info. */
+                            vdesc = file->varlist + varids[nv];
+
+                            /* If this is a record (or quasi-record) var, set the start for
+                             * the record dimension. */
+                            if (vdesc->record >= 0 && fndims > 1)
+                                for (int rc = 0; rc < rrcnt; rc++)
+                                    startlist[rc][0] = frame[nv];
+
+                            H5S_seloper_t op = H5S_SELECT_SET;
+
+                            for (int i = 0; i < rrcnt; i++)
+                            {
+                                /* Union hyperslabs of all regions */
+                                H5Sselect_hyperslab(file_space_id, op, (hsize_t*)startlist[i], NULL, (hsize_t*)countlist[i], NULL);
+                                op = H5S_SELECT_OR;
+                            }
+
+                            mem_space_id = H5Screate_simple(1, &dsize_all, NULL);
+
+                            /* Get a pointer to the data. */
+                            bufptr = (void *)((char *)iobuf + nv * iodesc->mpitype_size * llen);
                         }
+                        else
+                        {
+                            /* No data to write on this IO task. */
+                            H5Sselect_none(file_space_id);
 
-                        hid_t mem_space_id = H5Screate_simple(1, &dsize_all, NULL);
+                            mem_space_id = H5Screate(H5S_NULL);
 
-                        /* Get a pointer to the data. */
-                        bufptr = (void *)((char *)iobuf + nv * iodesc->mpitype_size * llen);
+                            bufptr = NULL;
+                        }
 
                         /* Collective write */
                         hid_t mem_type_id = nc_type_to_hdf5_type(iodesc->piotype);
