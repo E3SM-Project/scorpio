@@ -3678,18 +3678,39 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 #endif
 
 #ifdef _HDF5
-    /* Use NETCDF4 type to read HDF5 type files so far */
     if (file->iotype == PIO_IOTYPE_HDF5)
     {
+        if (H5Fis_hdf5(filename) > 0)
+        {
 #ifdef _NETCDF4
+            /* Use NETCDF4 IO type to read files generated with HDF5 IO type so far */
 #ifdef _MPISERIAL
-        file->iotype = PIO_IOTYPE_NETCDF4C;
+            file->iotype = PIO_IOTYPE_NETCDF4C;
 #else
-        file->iotype = PIO_IOTYPE_NETCDF4P;
+            file->iotype = PIO_IOTYPE_NETCDF4P;
+#endif
+#else
+            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                            "Opening file (%s) with PIO_IOTYPE_HDF5 failed. HDF5 IO type currently requires NETCDF4 (not configured for SCORPIO) to support read operations", filename);
+#endif
+        }
+        else
+        {
+#ifdef _PNETCDF
+            file->iotype = PIO_IOTYPE_PNETCDF;
+#else
+#ifdef _NETCDF
+            file->iotype = PIO_IOTYPE_NETCDF;
 #endif
 #endif
+        }
     }
 #endif
+
     file->iosystem = ios;
     file->mode = mode;
     /*
