@@ -1023,6 +1023,18 @@ int PIOc_closefile(int ncid)
         }
 
         file->hdf5_num_vars = 0;
+
+        for (int i = 0; i < file->hdf5_num_attrs; i++)
+        {
+            if (file->hdf5_attrs[i].att_name != NULL)
+            {
+                free(file->hdf5_attrs[i].att_name);
+                file->hdf5_attrs[i].att_name = NULL;
+            }
+        }
+
+        file->hdf5_num_attrs = 0;
+        file->hdf5_num_gattrs = 0;
     }
 #endif
 

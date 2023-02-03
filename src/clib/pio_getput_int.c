@@ -307,6 +307,30 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 #ifdef _HDF5
     if (file->iotype == PIO_IOTYPE_HDF5)
     {
+        int num_attrs = file->hdf5_num_attrs;
+        if (num_attrs >= PIO_MAX_ATTRS)
+        {
+            fprintf(stderr, "ERROR: Num of attributes exceeds maximum (%d).\n", PIO_MAX_ATTRS);
+            GPTLstop("PIO:PIOc_put_att_tc");
+            GPTLstop("PIO:write_total");
+            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->wr_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(NULL, file, PIO_EMAXATTS, __FILE__, __LINE__,
+                           "num_attrs (%d) is larger than or equal to PIO_MAX_ATTRS (%d) for file (%s)",
+                           num_attrs, PIO_MAX_ATTRS, pio_get_fname_from_file(file));
+        }
+
+        file->hdf5_attrs[num_attrs].att_name = strdup(name);
+        file->hdf5_attrs[num_attrs].att_len = len;
+        file->hdf5_attrs[num_attrs].att_type = atttype;
+        file->hdf5_attrs[num_attrs].att_varid = varid;
+        file->hdf5_attrs[num_attrs].att_ncid = ncid;
+        file->hdf5_num_attrs++;
+        if (varid == PIO_GLOBAL)
+            file->hdf5_num_gattrs++;
+
         if (ios->ioproc)
         {
             hid_t attr_id;
@@ -326,7 +350,8 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                 /* String type */
                 space_id = H5Screate(H5S_SCALAR);
                 h5_xtype = H5Tcopy(H5T_C_S1);
-                H5Tset_size(h5_xtype, asize);
+                /* For empty strings, asize is 0, while H5Tset_size() requires that size must be positive */
+                H5Tset_size(h5_xtype, asize + 1);
                 H5Tset_strpad(h5_xtype, H5T_STR_NULLTERM);
                 H5Tset_cset(h5_xtype, H5T_CSET_ASCII);
             }

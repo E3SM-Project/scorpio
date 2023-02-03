@@ -930,6 +930,24 @@ typedef struct hdf5_var_desc_t
 
     hid_t hdf5_dataset_id;
 } hdf5_var_desc_t;
+
+typedef struct hdf5_att_desc_t
+{
+    /** Attribute name */
+    char *att_name;
+
+    /** NC type give at def_att time */
+    nc_type att_type;
+
+    /** length of attribute value */
+    PIO_Offset att_len;
+
+    /** ncid of the attribute */
+    int att_ncid;
+
+    /** attribute varid */
+    int att_varid;
+} hdf5_att_desc_t;
 #endif
 
 /**
@@ -1057,6 +1075,14 @@ typedef struct file_desc_t
 
     /** Number of vars defined */
     int hdf5_num_vars;
+
+    struct hdf5_att_desc_t hdf5_attrs[PIO_MAX_ATTRS];
+
+    /** Number of attrs defined */
+    int hdf5_num_attrs;
+
+    /** Number of global attrs defined */
+    int hdf5_num_gattrs;
 #endif /* _HDF5 */
 
     /* File name - cached */
