@@ -2795,6 +2795,8 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #ifdef _HDF5
     file->hdf5_num_dims = 0;
     file->hdf5_num_vars = 0;
+    file->hdf5_num_attrs = 0;
+    file->hdf5_num_gattrs = 0;
 #endif
     /*
     file->num_unlim_dimids = 0;
@@ -3340,7 +3342,10 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
             hid_t fcpl_id = H5Pcreate(H5P_FILE_CREATE);
 
             H5Pset_link_creation_order(fcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED);
-            H5Pset_attr_creation_order(fcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED);
+            /* H5DSattach_scale calls (even with MPI_Barrier) might fail or hang if attribute creation
+             * order is tracked or indexed. Before we have a better workaround, temporarily disable
+             * tracking and indexing of attribute creation order. */
+            /* H5Pset_attr_creation_order(fcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED); */
 
             hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
             H5Pset_fapl_mpio(fapl_id, ios->io_comm, ios->info);
@@ -3673,18 +3678,39 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 #endif
 
 #ifdef _HDF5
-    /* Use NETCDF4 type to read HDF5 type files so far */
     if (file->iotype == PIO_IOTYPE_HDF5)
     {
+        if (H5Fis_hdf5(filename) > 0)
+        {
 #ifdef _NETCDF4
+            /* Use NETCDF4 IO type to read files generated with HDF5 IO type so far */
 #ifdef _MPISERIAL
-        file->iotype = PIO_IOTYPE_NETCDF4C;
+            file->iotype = PIO_IOTYPE_NETCDF4C;
 #else
-        file->iotype = PIO_IOTYPE_NETCDF4P;
+            file->iotype = PIO_IOTYPE_NETCDF4P;
+#endif
+#else
+            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                            "Opening file (%s) with PIO_IOTYPE_HDF5 failed. HDF5 IO type currently requires NETCDF4 (not configured for SCORPIO) to support read operations", filename);
+#endif
+        }
+        else
+        {
+#ifdef _PNETCDF
+            file->iotype = PIO_IOTYPE_PNETCDF;
+#else
+#ifdef _NETCDF
+            file->iotype = PIO_IOTYPE_NETCDF;
 #endif
 #endif
+        }
     }
 #endif
+
     file->iosystem = ios;
     file->mode = mode;
     /*
@@ -4234,7 +4260,10 @@ int pioc_change_def(int ncid, int is_enddef)
                         hsize_t dims[1], max_dims[1], chunk_dims[1] = {1};
 
                         dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
-                        H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED);
+                        /* H5DSattach_scale calls (even with MPI_Barrier) might fail or hang if attribute creation
+                         * order is tracked or indexed. Before we have a better workaround, temporarily disable
+                         * tracking and indexing of attribute creation order. */
+                        /* H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED); */
 
                         /* Set size of dataset to size of dimension. */
                         max_dims[0] = dims[0] = file->hdf5_dims[i].len;
@@ -4339,6 +4368,13 @@ int pioc_change_def(int ncid, int is_enddef)
                             for (int j = 0; j < ndims; j++)
                             {
                                 H5DSattach_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_dims[dimids[j]].hdf5_dataset_id, j);
+
+                                /* According to HDF5 developers, the H5DS routines are not parallel, so all the ranks are going to be
+                                 * doing the same operations. At some point, with enough iterations of the loop, HDF5 might get out of
+                                 * step between the ranks.
+                                 * Workaround: place a barrier to sync H5DSattach_scale calls.
+                                 */
+                                MPI_Barrier(ios->io_comm);
                             }
                         }
                     }
