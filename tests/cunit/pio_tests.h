@@ -33,7 +33,7 @@
 #define NUM_REARRANGERS 2
 
 /* Number of sample files constructed for these tests. */
-#define NUM_SAMPLES 3
+#define NUM_SAMPLES 5
 
 /** Error code for when things go wrong. */
 #define ERR_CHECK 1109
@@ -82,6 +82,10 @@ int create_nc_sample_1(int iosysid, int format, char *filename, int my_rank, int
 int check_nc_sample_1(int iosysid, int format, char *filename, int my_rank, int *ncid);
 int create_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *ncid);
 int check_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *ncid);
+int create_nc_sample_64bit_offset(int iosysid, int format, char *filename, int my_rank, int *ncid);
+int check_nc_sample_64bit_offset(int iosysid, int format, char *filename, int my_rank, int *ncid);
+int create_nc_sample_64bit_data(int iosysid, int format, char *filename, int my_rank, int *ncid);
+int check_nc_sample_64bit_data(int iosysid, int format, char *filename, int my_rank, int *ncid);
 int get_iotypes(int *num_flavors, int *flavors);
 int get_iotype_name(int iotype, char *name);
 int pio_test_finalize(MPI_Comm *test_comm);
