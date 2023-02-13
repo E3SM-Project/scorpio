@@ -210,10 +210,7 @@ typedef PIO_OFFSET_C_TYPENAME PIO_Offset;
 #define PIO_MAX_VAR_DIMS NC_MAX_VAR_DIMS
 #endif
 #define PIO_64BIT_OFFSET NC_64BIT_OFFSET
-
-/** NC_64BIT_DATA This is a problem - need to define directly instead
- * of using include file. */
-#define PIO_64BIT_DATA 0x0010
+#define PIO_64BIT_DATA NC_64BIT_DATA
 
 /** Define the netCDF-based error codes. */
 #define PIO_NOERR  NC_NOERR
