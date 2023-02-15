@@ -249,10 +249,52 @@ test_inq_format(int ncid, int format)
         return ret;
 
     /* Check the result. */
-    if ((format == PIO_IOTYPE_PNETCDF || format == PIO_IOTYPE_NETCDF) && myformat != 1)
+    if ((format == PIO_IOTYPE_PNETCDF || format == PIO_IOTYPE_NETCDF) && myformat != NC_FORMAT_CLASSIC)
         return ERR_WRONG;
     else if ((format == PIO_IOTYPE_NETCDF4C || format == PIO_IOTYPE_NETCDF4P) &&
-             myformat != 3)
+             myformat != NC_FORMAT_NETCDF4)
+        return ERR_WRONG;
+
+    return PIO_NOERR;
+}
+
+/* Test the inq_format function (expect NC_FORMAT_64BIT_OFFSET). */
+int
+test_inq_format_64bit_offset(int ncid, int format)
+{
+    int myformat;
+    int ret;
+
+    /* Get the format of an open file. */
+    if ((ret = PIOc_inq_format(ncid, &myformat)))
+        return ret;
+
+    /* Check the result. */
+    if ((format == PIO_IOTYPE_PNETCDF || format == PIO_IOTYPE_NETCDF) && myformat != NC_FORMAT_64BIT_OFFSET)
+        return ERR_WRONG;
+    else if ((format == PIO_IOTYPE_NETCDF4C || format == PIO_IOTYPE_NETCDF4P) &&
+             myformat != NC_FORMAT_NETCDF4)
+        return ERR_WRONG;
+
+    return PIO_NOERR;
+}
+
+/* Test the inq_format function (expect NC_FORMAT_64BIT_DATA). */
+int
+test_inq_format_64bit_data(int ncid, int format)
+{
+    int myformat;
+    int ret;
+
+    /* Get the format of an open file. */
+    if ((ret = PIOc_inq_format(ncid, &myformat)))
+        return ret;
+
+    /* Check the result. */
+    if ((format == PIO_IOTYPE_PNETCDF || format == PIO_IOTYPE_NETCDF) && myformat != NC_FORMAT_64BIT_DATA)
+        return ERR_WRONG;
+    else if ((format == PIO_IOTYPE_NETCDF4C || format == PIO_IOTYPE_NETCDF4P) &&
+             myformat != NC_FORMAT_NETCDF4)
         return ERR_WRONG;
 
     return PIO_NOERR;
@@ -265,10 +307,10 @@ test_inq_type(int ncid, int format)
 #define NUM_TYPES 11
     char type_name[PIO_MAX_NAME + 1];
     PIO_Offset type_size;
-    nc_type xtype[NUM_TYPES] = {NC_CHAR, NC_BYTE, NC_SHORT, NC_INT, NC_FLOAT, NC_DOUBLE,
-                                NC_UBYTE, NC_USHORT, NC_UINT, NC_INT64, NC_UINT64};
+    nc_type xtype[NUM_TYPES] = {PIO_CHAR, PIO_BYTE, PIO_SHORT, PIO_INT, PIO_FLOAT, PIO_DOUBLE,
+                                PIO_UBYTE, PIO_USHORT, PIO_UINT, PIO_INT64, PIO_UINT64};
     int type_len[NUM_TYPES] = {1, 1, 2, 4, 4, 8, 1, 2, 4, 8, 8};
-    int max_type = format == PIO_IOTYPE_NETCDF ? NC_DOUBLE : NC_UINT64;
+    int max_type = format == PIO_IOTYPE_NETCDF ? PIO_DOUBLE : PIO_UINT64;
     int ret;
 
     /* Check each type size. */
@@ -298,6 +340,12 @@ create_nc_sample(int sample, int iosysid, int format, char *filename, int my_ran
     case 2:
         return create_nc_sample_2(iosysid, format, filename, my_rank, ncid);
         break;
+    case 3:
+        return create_nc_sample_64bit_offset(iosysid, format, filename, my_rank, ncid);
+        break;
+    case 4:
+        return create_nc_sample_64bit_data(iosysid, format, filename, my_rank, ncid);
+        break;
     }
     return PIO_EINVAL;
 }
@@ -317,6 +365,12 @@ check_nc_sample(int sample, int iosysid, int format, char *filename, int my_rank
     case 2:
         return check_nc_sample_2(iosysid, format, filename, my_rank, ncid);
         break;
+    case 3:
+        return check_nc_sample_64bit_offset(iosysid, format, filename, my_rank, ncid);
+        break;
+    case 4:
+        return check_nc_sample_64bit_data(iosysid, format, filename, my_rank, ncid);
+        break;
     }
     return PIO_EINVAL;
 }
@@ -329,7 +383,7 @@ create_nc_sample_0(int iosysid, int format, char *filename, int my_rank, int *nc
     int ret;
 
     /* Create the file. */
-    if ((ret = PIOc_createfile(iosysid, &ncid, &format, filename, NC_CLOBBER)))
+    if ((ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER)))
         return ret;
     printf("%d file created ncid = %d\n", my_rank, ncid);
 
@@ -371,7 +425,7 @@ check_nc_sample_0(int iosysid, int format, char *filename, int my_rank, int *nci
     /* Re-open the file to check it. */
     printf("%d opening file %s format %d\n", my_rank, filename, format);
     if ((ret = PIOc_openfile2(iosysid, &ncid, &format, filename,
-                             NC_NOWRITE)))
+                             PIO_NOWRITE)))
         return ret;
 
     /* Find the number of dimensions, variables, and global attributes.*/
@@ -435,7 +489,7 @@ create_nc_sample_1(int iosysid, int format, char *filename, int my_rank, int *nc
     int data[DIM_LEN_S1];
 
     /* Create the file. */
-    if ((ret = PIOc_createfile(iosysid, &ncid, &format, filename, NC_CLOBBER)))
+    if ((ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER)))
         return ret;
     printf("%d file created ncid = %d\n", my_rank, ncid);
 
@@ -453,7 +507,7 @@ create_nc_sample_1(int iosysid, int format, char *filename, int my_rank, int *nc
 
     /* Define a 1-D variable. */
     printf("%d defining variable %s\n", my_rank, VAR_NAME_S1);
-    if ((ret = PIOc_def_var(ncid, VAR_NAME_S1, NC_INT, NDIM_S1, &dimid, &varid)))
+    if ((ret = PIOc_def_var(ncid, VAR_NAME_S1, PIO_INT, NDIM_S1, &dimid, &varid)))
         return ret;
 
     /* End define mode. */
@@ -471,7 +525,7 @@ create_nc_sample_1(int iosysid, int format, char *filename, int my_rank, int *nc
     printf("%d writing data\n", my_rank);
     start[0] = 0;
     count[0] = DIM_LEN_S1;
-    if ((ret = PIOc_put_vars_tc(ncid, varid, start, count, NULL, NC_INT, data)))
+    if ((ret = PIOc_put_vars_tc(ncid, varid, start, count, NULL, PIO_INT, data)))
         return ret;
 
     /* Test inq_format. */
@@ -513,13 +567,13 @@ check_nc_sample_1(int iosysid, int format, char *filename, int my_rank, int *nci
     /* Re-open the file to check it. */
     printf("%d opening file %s format %d\n", my_rank, filename, format);
     if ((ret = PIOc_openfile2(iosysid, &ncid, &format, filename,
-                             NC_NOWRITE)))
+                             PIO_NOWRITE)))
         return ret;
 
     /* Try to read the data. */
     PIO_Offset start[NDIM_S1] = {0}, count[NDIM_S1] = {DIM_LEN_S1};
     int data_in[DIM_LEN_S1];
-    if ((ret = PIOc_get_vars_tc(ncid, 0, start, count, NULL, NC_INT, data_in)))
+    if ((ret = PIOc_get_vars_tc(ncid, 0, start, count, NULL, PIO_INT, data_in)))
         return ret;
     for (int i = 0; i < DIM_LEN_S1; i++)
     {
@@ -565,7 +619,7 @@ check_nc_sample_1(int iosysid, int format, char *filename, int my_rank, int *nci
     /* Check out the variable. */
     if ((ret = PIOc_inq_var(ncid, 0, varname, PIO_MAX_NAME + 1, &vartype, &varndims, &vardimids, &varnatts)))
         return ret;
-    if (strcmp(varname, VAR_NAME_S1) || vartype != NC_INT || varndims != NDIM_S1 ||
+    if (strcmp(varname, VAR_NAME_S1) || vartype != PIO_INT || varndims != NDIM_S1 ||
         vardimids != 0 || varnatts != 0)
         return ERR_WRONG;
 
@@ -594,7 +648,7 @@ create_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *nc
 
     /* Create a netCDF file with one dimension and one variable. */
     printf("%d creating file %s\n", my_rank, filename);
-    if ((ret = PIOc_createfile(iosysid, &ncid, &format, filename, NC_CLOBBER)))
+    if ((ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER)))
         return ret;
     printf("%d file created ncid = %d\n", my_rank, ncid);
 
@@ -619,7 +673,7 @@ create_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *nc
     /* Define a 1-D variable. */
     char varname2[PIO_MAX_NAME + 1];
     printf("%d defining variable %s\n", my_rank, VAR_NAME_S2);
-    if ((ret = PIOc_def_var(ncid, FIRST_VAR_NAME_S2, NC_INT, NDIM_S2, &dimid, &varid)))
+    if ((ret = PIOc_def_var(ncid, FIRST_VAR_NAME_S2, PIO_INT, NDIM_S2, &dimid, &varid)))
         return ret;
     if ((ret = PIOc_inq_varname(ncid, 0, varname2, PIO_MAX_NAME + 1)))
         return ret;
@@ -636,32 +690,32 @@ create_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *nc
     double double_att_data = ATT_VALUE_S2;
     char attname2[PIO_MAX_NAME + 1];
     /* Write an att and rename it. */
-    if ((ret = PIOc_put_att_int(ncid, NC_GLOBAL, FIRST_ATT_NAME_S2, NC_INT, 1, &att_data)))
+    if ((ret = PIOc_put_att_int(ncid, PIO_GLOBAL, FIRST_ATT_NAME_S2, PIO_INT, 1, &att_data)))
         return ret;
-    if ((ret = PIOc_inq_attname(ncid, NC_GLOBAL, 0, attname2)))
+    if ((ret = PIOc_inq_attname(ncid, PIO_GLOBAL, 0, attname2)))
         return ret;
     if (strcmp(attname2, FIRST_ATT_NAME_S2))
         return ERR_WRONG;
-    if ((ret = PIOc_rename_att(ncid, NC_GLOBAL, FIRST_ATT_NAME_S2, ATT_NAME_S2)))
+    if ((ret = PIOc_rename_att(ncid, PIO_GLOBAL, FIRST_ATT_NAME_S2, ATT_NAME_S2)))
         return ret;
 
     /* Write an att and delete it. */
-    if ((ret = PIOc_put_att_int(ncid, NC_GLOBAL, FIRST_ATT_NAME_S2, NC_INT, 1, &att_data)))
+    if ((ret = PIOc_put_att_int(ncid, PIO_GLOBAL, FIRST_ATT_NAME_S2, PIO_INT, 1, &att_data)))
         return ret;
-    if ((ret = PIOc_del_att(ncid, NC_GLOBAL, FIRST_ATT_NAME_S2)))
+    if ((ret = PIOc_del_att(ncid, PIO_GLOBAL, FIRST_ATT_NAME_S2)))
         return ret;
-    /* if ((ret = PIOc_inq_att(ncid, NC_GLOBAL, FIRST_ATT_NAME_S2, NULL, NULL)) != PIO_ENOTATT) */
+    /* if ((ret = PIOc_inq_att(ncid, PIO_GLOBAL, FIRST_ATT_NAME_S2, NULL, NULL)) != PIO_ENOTATT) */
     /* { */
     /*  printf("ret = %d\n", ret); */
     /*  return ERR_AWFUL; */
     /* } */
 
     /* Write some atts of different types. */
-    if ((ret = PIOc_put_att_short(ncid, NC_GLOBAL, SHORT_ATT_NAME_S2, NC_SHORT, 1, &short_att_data)))
+    if ((ret = PIOc_put_att_short(ncid, PIO_GLOBAL, SHORT_ATT_NAME_S2, PIO_SHORT, 1, &short_att_data)))
         return ret;
-    if ((ret = PIOc_put_att_float(ncid, NC_GLOBAL, FLOAT_ATT_NAME_S2, NC_FLOAT, 1, &float_att_data)))
+    if ((ret = PIOc_put_att_float(ncid, PIO_GLOBAL, FLOAT_ATT_NAME_S2, PIO_FLOAT, 1, &float_att_data)))
         return ret;
-    if ((ret = PIOc_put_att_double(ncid, NC_GLOBAL, DOUBLE_ATT_NAME_S2, NC_DOUBLE, 1, &double_att_data)))
+    if ((ret = PIOc_put_att_double(ncid, PIO_GLOBAL, DOUBLE_ATT_NAME_S2, PIO_DOUBLE, 1, &double_att_data)))
         return ret;
 
     /* End define mode. */
@@ -680,7 +734,7 @@ create_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *nc
     printf("%d writing data\n", my_rank);
     start[0] = 0;
     count[0] = DIM_LEN_S2;
-    if ((ret = PIOc_put_vars_tc(ncid, varid, start, count, NULL, NC_INT, data)))
+    if ((ret = PIOc_put_vars_tc(ncid, varid, start, count, NULL, PIO_INT, data)))
         return ret;
 
     /* Close the file if ncidp was not provided. */
@@ -734,11 +788,11 @@ check_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *nci
 
     /* Re-open the file to check it. */
     printf("%d opening file %s format %d\n", my_rank, filename, format);
-    if ((ret = PIOc_openfile2(iosysid, &ncid, &format, filename, NC_NOWRITE)))
+    if ((ret = PIOc_openfile2(iosysid, &ncid, &format, filename, PIO_NOWRITE)))
         return ERR_CHECK;
 
     /* Try to read the data. */
-    if ((ret = PIOc_get_vars_tc(ncid, 0, start, count, NULL, NC_INT, data_in)))
+    if ((ret = PIOc_get_vars_tc(ncid, 0, start, count, NULL, PIO_INT, data_in)))
         return ERR_CHECK;
     for (int i = 0; i < DIM_LEN_S2; i++)
     {
@@ -801,7 +855,7 @@ check_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *nci
     /* Check out the variable. */
     if ((ret = PIOc_inq_var(ncid, 0, varname, PIO_MAX_NAME + 1, &vartype, &varndims, &vardimids, &varnatts)))
         return ERR_CHECK;
-    if (strcmp(varname, VAR_NAME_S2) || vartype != NC_INT || varndims != NDIM_S2 ||
+    if (strcmp(varname, VAR_NAME_S2) || vartype != PIO_INT || varndims != NDIM_S2 ||
         vardimids != 0 || varnatts != 0)
         return ERR_WRONG;
 
@@ -812,7 +866,7 @@ check_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *nci
         return ERR_WRONG;
     if ((ret = PIOc_inq_vartype(ncid, 0, &vartype2)))
         return ERR_CHECK;
-    if (vartype2 != NC_INT)
+    if (vartype2 != PIO_INT)
         return ERR_WRONG;
     if ((ret = PIOc_inq_varndims(ncid, 0, &varndims2)))
         return ERR_CHECK;
@@ -832,40 +886,40 @@ check_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *nci
         return ERR_WRONG;
 
     /* Check out the global attributes. */
-    if ((ret = PIOc_inq_att(ncid, NC_GLOBAL, ATT_NAME_S2, &atttype, &attlen)))
+    if ((ret = PIOc_inq_att(ncid, PIO_GLOBAL, ATT_NAME_S2, &atttype, &attlen)))
         return ERR_CHECK;
-    if (atttype != NC_INT || attlen != 1)
+    if (atttype != PIO_INT || attlen != 1)
         return ERR_WRONG;
-    if ((ret = PIOc_inq_attlen(ncid, NC_GLOBAL, ATT_NAME_S2, &attlen)))
+    if ((ret = PIOc_inq_attlen(ncid, PIO_GLOBAL, ATT_NAME_S2, &attlen)))
         return ERR_CHECK;
     if (attlen != 1)
         return ERR_WRONG;
-    if ((ret = PIOc_inq_attname(ncid, NC_GLOBAL, 0, myattname)))
+    if ((ret = PIOc_inq_attname(ncid, PIO_GLOBAL, 0, myattname)))
         return ERR_CHECK;
     if (strcmp(ATT_NAME_S2, myattname))
         return ERR_WRONG;
-    if ((ret = PIOc_inq_attid(ncid, NC_GLOBAL, ATT_NAME_S2, &myid)))
+    if ((ret = PIOc_inq_attid(ncid, PIO_GLOBAL, ATT_NAME_S2, &myid)))
         return ERR_CHECK;
     if (myid != 0)
         return ERR_WRONG;
-    if ((ret = PIOc_get_att_int(ncid, NC_GLOBAL, ATT_NAME_S2, &att_data)))
+    if ((ret = PIOc_get_att_int(ncid, PIO_GLOBAL, ATT_NAME_S2, &att_data)))
         return ERR_CHECK;
     printf("%d att_data = %d\n", my_rank, att_data);
     if (att_data != ATT_VALUE_S2)
         return ERR_WRONG;
-    if ((ret = PIOc_inq_att(ncid, NC_GLOBAL, SHORT_ATT_NAME_S2, &atttype, &attlen)))
+    if ((ret = PIOc_inq_att(ncid, PIO_GLOBAL, SHORT_ATT_NAME_S2, &atttype, &attlen)))
         return ERR_CHECK;
-    if (atttype != NC_SHORT || attlen != 1)
+    if (atttype != PIO_SHORT || attlen != 1)
         return ERR_WRONG;
-    if ((ret = PIOc_get_att_short(ncid, NC_GLOBAL, SHORT_ATT_NAME_S2, &short_att_data)))
+    if ((ret = PIOc_get_att_short(ncid, PIO_GLOBAL, SHORT_ATT_NAME_S2, &short_att_data)))
         return ERR_CHECK;
     if (short_att_data != ATT_VALUE_S2)
         return ERR_WRONG;
-    if ((ret = PIOc_get_att_float(ncid, NC_GLOBAL, FLOAT_ATT_NAME_S2, &float_att_data)))
+    if ((ret = PIOc_get_att_float(ncid, PIO_GLOBAL, FLOAT_ATT_NAME_S2, &float_att_data)))
         return ERR_CHECK;
     if (float_att_data != ATT_VALUE_S2)
         return ERR_WRONG;
-    if ((ret = PIOc_get_att_double(ncid, NC_GLOBAL, DOUBLE_ATT_NAME_S2, &double_att_data)))
+    if ((ret = PIOc_get_att_double(ncid, PIO_GLOBAL, DOUBLE_ATT_NAME_S2, &double_att_data)))
         return ERR_CHECK;
     if (double_att_data != ATT_VALUE_S2)
         return ERR_WRONG;
@@ -881,6 +935,188 @@ check_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *nci
     }
 
     return 0;
+}
+
+/* Copied from create_nc_sample_1, but use 64-bit file offsets. */
+int
+create_nc_sample_64bit_offset(int iosysid, int format, char *filename, int my_rank, int *ncidp)
+{
+    /* The ncid of the netCDF file. */
+    int ncid;
+
+    /* The ID of the netCDF varable. */
+    int varid;
+
+    /* The ID of the netCDF dimension. */
+    int dimid;
+
+    /* Return code. */
+    int ret;
+
+    /* Start and count arrays for netCDF. */
+    PIO_Offset start[NDIM_S1], count[NDIM_S1] = {0};
+
+    /* The sample data. */
+    int data[DIM_LEN_S1];
+
+    /* Create the file. */
+    if ((ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER | PIO_64BIT_OFFSET)))
+        return ret;
+    printf("%d file created ncid = %d\n", my_rank, ncid);
+
+    /* /\* End define mode, then re-enter it. *\/ */
+    if ((ret = PIOc_enddef(ncid)))
+        return ret;
+    printf("%d calling redef\n", my_rank);
+    if ((ret = PIOc_redef(ncid)))
+        return ret;
+
+    /* Define a dimension. */
+    printf("%d defining dimension %s\n", my_rank, DIM_NAME_S1);
+    if ((ret = PIOc_def_dim(ncid, DIM_NAME_S1, DIM_LEN_S1, &dimid)))
+        return ret;
+
+    /* Define a 1-D variable. */
+    printf("%d defining variable %s\n", my_rank, VAR_NAME_S1);
+    if ((ret = PIOc_def_var(ncid, VAR_NAME_S1, PIO_INT, NDIM_S1, &dimid, &varid)))
+        return ret;
+
+    /* End define mode. */
+    printf("%d ending define mode ncid = %d\n", my_rank, ncid);
+    if ((ret = PIOc_enddef(ncid)))
+        return ret;
+    printf("%d define mode ended ncid = %d\n", my_rank, ncid);
+
+    /* Write some data. For the PIOc_put/get functions, all data must
+     * be on compmaster before the function is called. Only
+     * compmaster's arguments are passed to the async msg handler. All
+     * other computation tasks are ignored. */
+    for (int i = 0; i < DIM_LEN_S1; i++)
+        data[i] = i;
+    printf("%d writing data\n", my_rank);
+    start[0] = 0;
+    count[0] = DIM_LEN_S1;
+    if ((ret = PIOc_put_vars_tc(ncid, varid, start, count, NULL, PIO_INT, data)))
+        return ret;
+
+    /* Test inq_format. */
+    if ((ret = test_inq_format_64bit_offset(ncid, format)))
+        return ret;
+
+    /* Test inq_type. */
+    if ((ret = test_inq_type(ncid, format)))
+        return ret;
+
+    /* Close the file if ncidp was not provided. */
+    if (ncidp)
+        *ncidp = ncid;
+    else
+    {
+        printf("%d closing file ncid = %d\n", my_rank, ncid);
+        if ((ret = PIOc_closefile(ncid)))
+            return ret;
+        printf("%d closed file ncid = %d\n", my_rank, ncid);
+    }
+
+    return PIO_NOERR;
+}
+
+/* Check sample file 64bit_offset for correctness. */
+int
+check_nc_sample_64bit_offset(int iosysid, int format, char *filename, int my_rank, int *ncidp)
+{
+    return check_nc_sample_1(iosysid, format, filename, my_rank, ncidp);
+}
+
+/* Copied from create_nc_sample_1, but use 64 bit dimensions and sizes. */
+int
+create_nc_sample_64bit_data(int iosysid, int format, char *filename, int my_rank, int *ncidp)
+{
+    /* The ncid of the netCDF file. */
+    int ncid;
+
+    /* The ID of the netCDF varable. */
+    int varid;
+
+    /* The ID of the netCDF dimension. */
+    int dimid;
+
+    /* Return code. */
+    int ret;
+
+    /* Start and count arrays for netCDF. */
+    PIO_Offset start[NDIM_S1], count[NDIM_S1] = {0};
+
+    /* The sample data. */
+    int data[DIM_LEN_S1];
+
+    /* Create the file. */
+    if ((ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER | PIO_64BIT_DATA)))
+        return ret;
+    printf("%d file created ncid = %d\n", my_rank, ncid);
+
+    /* /\* End define mode, then re-enter it. *\/ */
+    if ((ret = PIOc_enddef(ncid)))
+        return ret;
+    printf("%d calling redef\n", my_rank);
+    if ((ret = PIOc_redef(ncid)))
+        return ret;
+
+    /* Define a dimension. */
+    printf("%d defining dimension %s\n", my_rank, DIM_NAME_S1);
+    if ((ret = PIOc_def_dim(ncid, DIM_NAME_S1, DIM_LEN_S1, &dimid)))
+        return ret;
+
+    /* Define a 1-D variable. */
+    printf("%d defining variable %s\n", my_rank, VAR_NAME_S1);
+    if ((ret = PIOc_def_var(ncid, VAR_NAME_S1, PIO_INT, NDIM_S1, &dimid, &varid)))
+        return ret;
+
+    /* End define mode. */
+    printf("%d ending define mode ncid = %d\n", my_rank, ncid);
+    if ((ret = PIOc_enddef(ncid)))
+        return ret;
+    printf("%d define mode ended ncid = %d\n", my_rank, ncid);
+
+    /* Write some data. For the PIOc_put/get functions, all data must
+     * be on compmaster before the function is called. Only
+     * compmaster's arguments are passed to the async msg handler. All
+     * other computation tasks are ignored. */
+    for (int i = 0; i < DIM_LEN_S1; i++)
+        data[i] = i;
+    printf("%d writing data\n", my_rank);
+    start[0] = 0;
+    count[0] = DIM_LEN_S1;
+    if ((ret = PIOc_put_vars_tc(ncid, varid, start, count, NULL, PIO_INT, data)))
+        return ret;
+
+    /* Test inq_format. */
+    if ((ret = test_inq_format_64bit_data(ncid, format)))
+        return ret;
+
+    /* Test inq_type. */
+    if ((ret = test_inq_type(ncid, format)))
+        return ret;
+
+    /* Close the file if ncidp was not provided. */
+    if (ncidp)
+        *ncidp = ncid;
+    else
+    {
+        printf("%d closing file ncid = %d\n", my_rank, ncid);
+        if ((ret = PIOc_closefile(ncid)))
+            return ret;
+        printf("%d closed file ncid = %d\n", my_rank, ncid);
+    }
+
+    return PIO_NOERR;
+}
+
+/* Check sample file 64bit_data for correctness. */
+int
+check_nc_sample_64bit_data(int iosysid, int format, char *filename, int my_rank, int *ncidp)
+{
+    return check_nc_sample_1(iosysid, format, filename, my_rank, ncidp);
 }
 
 /* Create the decomposition to divide the 3-dimensional sample data
