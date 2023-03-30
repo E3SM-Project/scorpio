@@ -285,7 +285,7 @@ endif ()
 # Hack to circumvent IBM XL (16.1.1-3) internal compiler error by
 # disabling optimization for pioc_support.c
 cmake_host_system_information (RESULT FQDN_SITENAME QUERY FQDN)
-if (FQDN_SITENAME MATCHES "^.*[.]olcf")
+if (FQDN_SITENAME MATCHES "^.*summit[.]olcf")
   if (CMAKE_C_COMPILER_NAME STREQUAL "XL")
     message(STATUS "Disabling compiler optimization for pioc_support.c (to prevent internal compiler error with the XL compiler)")
     set_source_files_properties(pioc_support.c PROPERTIES COMPILE_FLAGS "-qnoopt -qnosmp")
