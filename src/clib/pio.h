@@ -63,7 +63,6 @@
 #define BLOCK_METADATA_SIZE 70 /* Size of adios block metadata */
 
 adios2_adios *get_adios2_adios();
-unsigned long get_adios2_io_cnt();
 #endif
 #ifdef _HDF5
 #include <hdf5.h>
