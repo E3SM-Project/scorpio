@@ -520,20 +520,6 @@ int end_adios2_step(file_desc_t *file, iosystem_desc_t *ios)
 
     return PIO_NOERR;
 }
-
-#ifndef strdup
-char *strdup(const char *str)
-{
-    int n = strlen(str) + 1;
-    char *dup = (char*)malloc(n);
-    if (dup)
-    {
-        strcpy(dup, str);
-    }
-
-    return dup;
-}
-#endif
 #endif /* _ADIOS2 */
 
 #ifdef _HDF5
@@ -583,20 +569,6 @@ inline PIO_Offset hdf5_get_nc_type_size(nc_type xtype)
 
     return -1;
 }
-
-#ifndef strdup
-char *strdup(const char *str)
-{
-    int n = strlen(str) + 1;
-    char *dup = (char*)malloc(n);
-    if (dup)
-    {
-        strcpy(dup, str);
-    }
-
-    return dup;
-}
-#endif
 #endif
 
 /**
@@ -4951,3 +4923,15 @@ int __wrap_ADIOI_Type_create_hindexed_x(int count,
     return ret;
 }
 #endif
+
+char *spio_strdup(const char *str)
+{
+    size_t n = strlen(str) + 1;
+    char *dup = (char*)malloc(n);
+    if (dup)
+    {
+        strcpy(dup, str);
+    }
+
+    return dup;
+}

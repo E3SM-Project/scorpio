@@ -2987,7 +2987,7 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
         }
 
         assert(file->num_dim_vars < PIO_MAX_DIMS);
-        file->dim_names[file->num_dim_vars] = strdup(name);
+        file->dim_names[file->num_dim_vars] = spio_strdup(name);
         file->dim_values[file->num_dim_vars] = len;
         *idp = file->num_dim_vars;
         ++file->num_dim_vars;
@@ -3033,7 +3033,7 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
 #ifdef _HDF5
     if (file->iotype == PIO_IOTYPE_HDF5)
     {
-        file->hdf5_dims[file->hdf5_num_dims].name = strdup(name);
+        file->hdf5_dims[file->hdf5_num_dims].name = spio_strdup(name);
         file->hdf5_dims[file->hdf5_num_dims].len = len;
         file->hdf5_dims[file->hdf5_num_dims].has_coord_var = false;
         *idp = file->hdf5_num_dims;
@@ -3228,7 +3228,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
         }
 
         assert(file->num_vars < PIO_MAX_VARS);
-        file->adios_vars[file->num_vars].name = strdup(name);
+        file->adios_vars[file->num_vars].name = spio_strdup(name);
         file->adios_vars[file->num_vars].nc_type = xtype;
         file->adios_vars[file->num_vars].adios_type = PIOc_get_adios_type(xtype);
         file->adios_vars[file->num_vars].adios_type_size = (size_t)get_adios2_type_size(file->adios_vars[file->num_vars].adios_type, NULL);
@@ -3353,7 +3353,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
     if (file->iotype == PIO_IOTYPE_HDF5)
     {
         assert(file->hdf5_num_vars < PIO_MAX_VARS);
-        file->hdf5_vars[file->hdf5_num_vars].name = strdup(name);
+        file->hdf5_vars[file->hdf5_num_vars].name = spio_strdup(name);
         file->hdf5_vars[file->hdf5_num_vars].alt_name = NULL;
         file->hdf5_vars[file->hdf5_num_vars].nc_type = xtype;
         file->hdf5_vars[file->hdf5_num_vars].ndims = ndims;

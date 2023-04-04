@@ -46,6 +46,11 @@ if (WITH_NETCDF)
 find_package (NetCDF ${NETCDF_C_MIN_VER_REQD} COMPONENTS C)
 endif ()
 
+#===== HDF5-C =====
+if (WITH_HDF5)
+  find_package (HDF5 COMPONENTS C)
+endif ()
+
 #===== ADIOS-C =====
 if ((WITH_ADIOS2) AND (NOT ADIOS2_FOUND))
   # ADIOS 2.8.0 overwrites/resets CMAKE_MODULE_PATH, so cache and restore it after
@@ -96,6 +101,7 @@ target_include_directories(adios2pio-nm-lib PUBLIC
   ${SCORPIO_SOURCE_DIR}/tools/util
   ${PnetCDF_C_INCLUDE_DIRS}
   ${NETCDF_C_INCLUDE_DIRS}
+  ${HDF5_C_INCLUDE_DIRS}
   ${PIO_C_EXTRA_INCLUDE_DIRS})
 
 # System and compiler CPP directives

@@ -397,6 +397,14 @@ extern "C" {
           int **preq_block_ranges,
           int *nreq_blocks);
 
+    /* strdup is a function specified in the POSIX.1-2008 standard, which
+     * defines APIs for UNIX-like operating systems. It is not part of the
+     * ANSI C or ISO C99 standards.
+     * To ensure maximum portability of SCORPIO, define our own version of
+     * strdup using standard C library functions.
+     */
+    char *spio_strdup(const char *str);
+
 /* Asynchronous I/O services start with the following seq num */
 static const int PIO_MSG_START_SEQ_NUM = 1024;
 /** These are the messages that can be sent over the intercomm when
