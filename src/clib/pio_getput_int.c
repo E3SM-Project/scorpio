@@ -247,7 +247,7 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                            "num_attrs (%d) is larger than or equal to pio_max_vars (%d) for file (%s)",
                            num_attrs, PIO_MAX_VARS, pio_get_fname_from_file(file));
         }
-        file->adios_attrs[num_attrs].att_name = strdup(name);
+        file->adios_attrs[num_attrs].att_name = spio_strdup(name);
         file->adios_attrs[num_attrs].att_len = len;
         file->adios_attrs[num_attrs].att_type = atttype;
         file->adios_attrs[num_attrs].att_varid = varid;
@@ -322,7 +322,7 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                            num_attrs, PIO_MAX_ATTRS, pio_get_fname_from_file(file));
         }
 
-        file->hdf5_attrs[num_attrs].att_name = strdup(name);
+        file->hdf5_attrs[num_attrs].att_name = spio_strdup(name);
         file->hdf5_attrs[num_attrs].att_len = len;
         file->hdf5_attrs[num_attrs].att_type = atttype;
         file->hdf5_attrs[num_attrs].att_varid = varid;

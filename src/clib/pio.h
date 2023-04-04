@@ -1650,18 +1650,12 @@ extern "C" {
     unsigned long get_adios2_io_cnt();
     int begin_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
     int end_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
-#ifndef strdup
-    char *strdup(const char *str);
-#endif
 #endif
 
     /* FIXME: Shouldn't these HDF5 functions be moved to pio_internal.h ? */
 #ifdef _HDF5
     hid_t nc_type_to_hdf5_type(nc_type xtype);
     PIO_Offset hdf5_get_nc_type_size(nc_type xtype);
-#ifndef strdup
-    char *strdup(const char *str);
-#endif
 #endif
 
 #if defined(__cplusplus)
