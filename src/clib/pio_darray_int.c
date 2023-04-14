@@ -507,7 +507,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                         }
 
                         /* Collective write */
-                        hid_t mem_type_id = nc_type_to_hdf5_type(iodesc->piotype);
+                        hid_t mem_type_id = spio_nc_type_to_hdf5_type(iodesc->piotype);
                         H5Dwrite(file->hdf5_vars[varids[nv]].hdf5_dataset_id, mem_type_id, mem_space_id, file_space_id, file->dxplid_coll, bufptr);
 
                         H5Sclose(file_space_id);

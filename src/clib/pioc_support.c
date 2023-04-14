@@ -522,55 +522,6 @@ int end_adios2_step(file_desc_t *file, iosystem_desc_t *ios)
 }
 #endif /* _ADIOS2 */
 
-#ifdef _HDF5
-inline hid_t nc_type_to_hdf5_type(nc_type xtype)
-{
-    switch (xtype)
-    {
-        case NC_BYTE:   return H5T_NATIVE_UINT8;
-        case NC_UBYTE:  return H5T_NATIVE_UCHAR;
-        case NC_CHAR:   return H5T_NATIVE_CHAR;
-        case NC_SHORT:  return H5T_NATIVE_SHORT;
-        case NC_USHORT: return H5T_NATIVE_USHORT;
-        case NC_INT:    return H5T_NATIVE_INT;
-        case NC_UINT:   return H5T_NATIVE_UINT;
-        case NC_FLOAT : return H5T_NATIVE_FLOAT;
-        case NC_DOUBLE: return H5T_NATIVE_DOUBLE;
-        case NC_INT64:  return H5T_NATIVE_INT64;
-        case NC_UINT64: return H5T_NATIVE_UINT64;
-        default: return -1;
-    }
-
-    return -1;
-}
-
-inline PIO_Offset hdf5_get_nc_type_size(nc_type xtype)
-{
-    switch (xtype)
-    {
-    case NC_UBYTE:
-    case NC_BYTE:
-    case NC_CHAR:
-        return 1;
-    case NC_SHORT:
-    case NC_USHORT:
-        return 2;
-    case NC_UINT:
-    case NC_INT:
-    case NC_FLOAT:
-        return 4;
-    case NC_UINT64:
-    case NC_INT64:
-    case NC_DOUBLE:
-        return 8;
-    default:
-        return -1;
-    }
-
-    return -1;
-}
-#endif
-
 /**
  * Return a string description of an error code.
  *
@@ -3277,107 +3228,7 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
 #ifdef _HDF5
         case PIO_IOTYPE_HDF5:
-            if (file->mode & PIO_NOCLOBBER) /* Check whether HDF5 file exists */
-            {
-                struct stat sd;
-                if (0 == stat(filename, &sd))
-                {
-                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
-                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    return pio_err(ios, NULL, PIO_EEXIST, __FILE__, __LINE__,
-                                   "Creating file (%s) using HDF5 iotype and PIO_NOCLOBBER mode failed. HDF5 file already exists", filename);
-                }
-            }
-            else
-            {
-                /* Delete HDF5 file if it exists */
-                if (ios->io_rank == 0)
-                {
-                    struct stat sd;
-                    if (0 == stat(filename, &sd))
-                        unlink(filename);
-                }
-
-                /* Make sure that no task is trying to operate on the
-                 * HDF5 file while it is being deleted */
-                if ((mpierr = MPI_Barrier(ios->io_comm)))
-                {
-                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
-                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
-                }
-            }
-
-            if (ios->info == MPI_INFO_NULL)
-                MPI_Info_create(&ios->info);
-
-            hid_t fcpl_id = H5Pcreate(H5P_FILE_CREATE);
-
-            H5Pset_link_creation_order(fcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED);
-            /* H5DSattach_scale calls (even with MPI_Barrier) might fail or hang if attribute creation
-             * order is tracked or indexed. Before we have a better workaround, temporarily disable
-             * tracking and indexing of attribute creation order. */
-            /* H5Pset_attr_creation_order(fcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED); */
-
-            hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
-            H5Pset_fapl_mpio(fapl_id, ios->io_comm, ios->info);
-
-            file->hdf5_file_id = H5Fcreate(filename, H5F_ACC_TRUNC, fcpl_id, fapl_id);
-
-            H5Pclose(fcpl_id);
-            H5Pclose(fapl_id);
-
-            /* Set up collective dataset transfer property list */
-            file->dxplid_coll = H5Pcreate(H5P_DATASET_XFER);
-            H5Pset_dxpl_mpio(file->dxplid_coll, H5FD_MPIO_COLLECTIVE);
-
-            /* Set up independent dataset transfer property list */
-            file->dxplid_indep = H5Pcreate(H5P_DATASET_XFER);
-            H5Pset_dxpl_mpio(file->dxplid_indep, H5FD_MPIO_INDEPENDENT);
-
-            /* Writing _NCProperties attribute */
-            const char* attr_name = "_NCProperties";
-            char nc_properties[PIO_MAX_NAME];
-            unsigned int major, minor, release;
-            H5get_libversion(&major, &minor, &release);
-
-            snprintf(nc_properties, PIO_MAX_NAME,
-                     "version=2,scorpio=%d.%d.%d,hdf5=%1u.%1u.%1u",
-                     PIO_VERSION_MAJOR, PIO_VERSION_MINOR, PIO_VERSION_PATCH,
-                     major, minor, release);
-
-            hid_t attr_id;
-            hsize_t asize = strlen(nc_properties);
-            hid_t loc_id = file->hdf5_file_id;
-
-            hid_t space_id = H5Screate(H5S_SCALAR);
-            hid_t h5_string_type = H5Tcopy(H5T_C_S1);
-            H5Tset_size(h5_string_type, asize);
-            H5Tset_strpad(h5_string_type, H5T_STR_NULLTERM);
-            H5Tset_cset(h5_string_type, H5T_CSET_ASCII);
-
-            /* H5Aexists() returns zero (false), a positive (true) or a negative (failure) value */
-            htri_t att_exists = H5Aexists(loc_id, attr_name);
-            if (att_exists > 0)
-            {
-                attr_id = H5Aopen(loc_id, attr_name, H5P_DEFAULT);
-            }
-            else if (att_exists == 0)
-            {
-                attr_id = H5Acreate2(loc_id, attr_name, h5_string_type, space_id, H5P_DEFAULT, H5P_DEFAULT);
-            }
-            else
-            {
-                /* Error determining whether an attribute with a given name exists on an object */
-            }
-
-            H5Awrite(attr_id, h5_string_type, nc_properties);
-
-            H5Sclose(space_id);
-            H5Aclose(attr_id);
-
-            H5Tclose(h5_string_type);
-
+            ierr = spio_hdf5_create(ios, file, filename);
             break;
 #endif
         }
@@ -4224,133 +4075,7 @@ int pioc_change_def(int ncid, int is_enddef)
         {
             if (is_enddef)
             {
-                for (int i = 0; i < file->hdf5_num_dims; i++)
-                {
-                    if (!file->hdf5_dims[i].has_coord_var)
-                    {
-                        hid_t space_id, dcpl_id, dimscale_id;
-                        hsize_t dims[1], max_dims[1], chunk_dims[1] = {1};
-
-                        dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
-                        /* H5DSattach_scale calls (even with MPI_Barrier) might fail or hang if attribute creation
-                         * order is tracked or indexed. Before we have a better workaround, temporarily disable
-                         * tracking and indexing of attribute creation order. */
-                        /* H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED); */
-
-                        /* Set size of dataset to size of dimension. */
-                        max_dims[0] = dims[0] = file->hdf5_dims[i].len;
-
-                        /* If this dimension scale is unlimited, set up chunking with a chunksize of 1. */
-                        if (max_dims[0] == PIO_UNLIMITED)
-                        {
-                            max_dims[0] = H5S_UNLIMITED;
-                            H5Pset_chunk(dcpl_id, 1, chunk_dims);
-                        }
-
-                        space_id = H5Screate_simple(1, dims, max_dims);
-
-                        /* Create the dataset that will be the dimension scale. */
-                        dimscale_id = H5Dcreate2(file->hdf5_file_id, file->hdf5_dims[i].name, H5T_IEEE_F32BE,
-                                                 space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
-                        if (dimscale_id < 0)
-                        {
-                            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                            spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                                           "Changing the define mode for file %s using HDF5 iotype failed. H5Dcreate2() for dimension %s failed.",
-                                           pio_get_fname_from_file(file), file->hdf5_dims[i].name);
-                        }
-
-                        char dimscale_name[PIO_MAX_NAME];
-                        snprintf(dimscale_name, PIO_MAX_NAME, "%s%10d", "This is a netCDF dimension but not a netCDF variable.", dims[0]);
-                        H5DSset_scale(dimscale_id, dimscale_name);
-                        file->hdf5_dims[i].hdf5_dataset_id = dimscale_id;
-
-                        /* Write a special attribute for the netCDF-4 dimension ID. */
-                        hid_t dimid_att_id;
-                        htri_t attr_exists;
-
-                        hid_t dimid_space_id = H5Screate(H5S_SCALAR);
-
-                        /* H5Aexists() returns zero (false), a positive (true) or a negative (failure) value */
-                        attr_exists = H5Aexists(dimscale_id, "_Netcdf4Dimid");
-                        if (attr_exists > 0)
-                            dimid_att_id = H5Aopen(dimscale_id, "_Netcdf4Dimid", H5P_DEFAULT);
-                        else if (attr_exists == 0)
-                            dimid_att_id = H5Acreate2(dimscale_id, "_Netcdf4Dimid",
-                                                     H5T_NATIVE_INT, dimid_space_id, H5P_DEFAULT, H5P_DEFAULT);
-                        else
-                        {
-                            /* Error determining whether an attribute with a given name exists on an object */
-                        }
-
-                        H5Awrite(dimid_att_id, H5T_NATIVE_INT, &i);
-
-                        H5Sclose(dimid_space_id);
-                        H5Aclose(dimid_att_id);
-
-                        H5Sclose(space_id);
-                        H5Pclose(dcpl_id);
-                    }
-                }
-
-                for (int i = 0; i < file->hdf5_num_vars; i++)
-                {
-                    /* Upgrade dataset of a coordinate variable to a dimension scale */
-                    if (file->hdf5_vars[i].is_coord_var)
-                    {
-                        H5DSset_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_vars[i].name);
-                        assert(file->hdf5_vars[i].ndims > 0);
-                        int dimid = file->hdf5_vars[i].hdf5_dimids[0];
-                        file->hdf5_dims[dimid].hdf5_dataset_id = file->hdf5_vars[i].hdf5_dataset_id;
-
-                        /* Write a special attribute for the netCDF-4 dimension ID. */
-                        hid_t dimscale_id = file->hdf5_vars[i].hdf5_dataset_id;
-                        hid_t dimid_att_id;
-                        htri_t attr_exists;
-
-                        hid_t dimid_space_id = H5Screate(H5S_SCALAR);
-
-                        attr_exists = H5Aexists(dimscale_id, "_Netcdf4Dimid");
-                        if (attr_exists > 0)
-                            dimid_att_id = H5Aopen(dimscale_id, "_Netcdf4Dimid", H5P_DEFAULT);
-                        else if (attr_exists == 0)
-                            dimid_att_id = H5Acreate2(dimscale_id, "_Netcdf4Dimid",
-                                                     H5T_NATIVE_INT, dimid_space_id, H5P_DEFAULT, H5P_DEFAULT);
-                        else
-                        {
-                            /* Error determining whether an attribute with a given name exists on an object */
-                        }
-
-                        H5Awrite(dimid_att_id, H5T_NATIVE_INT, &dimid);
-
-                        H5Sclose(dimid_space_id);
-                        H5Aclose(dimid_att_id);
-                    }
-                }
-
-                for (int i = 0; i < file->hdf5_num_vars; i++)
-                {
-                    if (!file->hdf5_vars[i].is_coord_var)
-                    {
-                        int ndims = file->hdf5_vars[i].ndims;
-                        if (ndims > 0)
-                        {
-                            int* dimids = file->hdf5_vars[i].hdf5_dimids;
-                            for (int j = 0; j < ndims; j++)
-                            {
-                                H5DSattach_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_dims[dimids[j]].hdf5_dataset_id, j);
-
-                                /* According to HDF5 developers, the H5DS routines are not parallel, so all the ranks are going to be
-                                 * doing the same operations. At some point, with enough iterations of the loop, HDF5 might get out of
-                                 * step between the ranks.
-                                 * Workaround: place a barrier to sync H5DSattach_scale calls.
-                                 */
-                                MPI_Barrier(ios->io_comm);
-                            }
-                        }
-                    }
-                }
+                ierr = spio_hdf5_enddef(ios, file);
             }
         }
 #endif /* _HDF5 */
@@ -4935,3 +4660,580 @@ char *spio_strdup(const char *str)
 
     return dup;
 }
+
+inline PIO_Offset spio_get_nc_type_size(nc_type xtype)
+{
+    switch (xtype)
+    {
+    case NC_UBYTE:
+    case NC_BYTE:
+    case NC_CHAR:
+        return 1;
+    case NC_SHORT:
+    case NC_USHORT:
+        return 2;
+    case NC_UINT:
+    case NC_INT:
+    case NC_FLOAT:
+        return 4;
+    case NC_UINT64:
+    case NC_INT64:
+    case NC_DOUBLE:
+        return 8;
+    default:
+        return -1;
+    }
+
+    return -1;
+}
+
+#ifdef _HDF5
+inline hid_t spio_nc_type_to_hdf5_type(nc_type xtype)
+{
+    switch (xtype)
+    {
+        case NC_BYTE:   return H5T_NATIVE_UINT8;
+        case NC_UBYTE:  return H5T_NATIVE_UCHAR;
+        case NC_CHAR:   return H5T_NATIVE_CHAR;
+        case NC_SHORT:  return H5T_NATIVE_SHORT;
+        case NC_USHORT: return H5T_NATIVE_USHORT;
+        case NC_INT:    return H5T_NATIVE_INT;
+        case NC_UINT:   return H5T_NATIVE_UINT;
+        case NC_FLOAT : return H5T_NATIVE_FLOAT;
+        case NC_DOUBLE: return H5T_NATIVE_DOUBLE;
+        case NC_INT64:  return H5T_NATIVE_INT64;
+        case NC_UINT64: return H5T_NATIVE_UINT64;
+        default: return -1;
+    }
+
+    return -1;
+}
+
+int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filename)
+{
+    int mpierr = MPI_SUCCESS;
+
+    assert(ios && file && filename);
+    assert(file->iotype == PIO_IOTYPE_HDF5);
+    assert(ios->ioproc);
+
+    if (file->mode & PIO_NOCLOBBER) /* Check whether HDF5 file exists */
+    {
+        struct stat sd;
+        if (0 == stat(filename, &sd))
+        {
+            return pio_err(ios, NULL, PIO_EEXIST, __FILE__, __LINE__,
+                           "Creating file (%s) using HDF5 iotype and PIO_NOCLOBBER mode failed. HDF5 file already exists", filename);
+        }
+    }
+    else
+    {
+        /* Delete HDF5 file if it exists */
+        if (ios->io_rank == 0)
+        {
+            struct stat sd;
+            if (0 == stat(filename, &sd))
+                unlink(filename);
+        }
+
+        /* Make sure that no task is trying to operate on the
+         * HDF5 file while it is being deleted */
+        if ((mpierr = MPI_Barrier(ios->io_comm)))
+        {
+            return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
+        }
+    }
+
+    if (ios->info == MPI_INFO_NULL)
+    {
+        if ((mpierr = MPI_Info_create(&ios->info)))
+        {
+            return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
+        }
+    }
+
+    hid_t fcpl_id = H5Pcreate(H5P_FILE_CREATE);
+
+    H5Pset_link_creation_order(fcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED);
+    /* H5DSattach_scale calls (even with MPI_Barrier) might fail or hang if attribute creation
+     * order is tracked or indexed. Before we have a better workaround, temporarily disable
+     * tracking and indexing of attribute creation order. */
+    /* H5Pset_attr_creation_order(fcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED); */
+
+    hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
+    H5Pset_fapl_mpio(fapl_id, ios->io_comm, ios->info);
+
+    file->hdf5_file_id = H5Fcreate(filename, H5F_ACC_TRUNC, fcpl_id, fapl_id);
+
+    H5Pclose(fcpl_id);
+    H5Pclose(fapl_id);
+
+    /* Set up collective dataset transfer property list */
+    file->dxplid_coll = H5Pcreate(H5P_DATASET_XFER);
+    H5Pset_dxpl_mpio(file->dxplid_coll, H5FD_MPIO_COLLECTIVE);
+
+    /* Set up independent dataset transfer property list */
+    file->dxplid_indep = H5Pcreate(H5P_DATASET_XFER);
+    H5Pset_dxpl_mpio(file->dxplid_indep, H5FD_MPIO_INDEPENDENT);
+
+    /* Writing _NCProperties attribute */
+    const char* attr_name = "_NCProperties";
+    char nc_properties[PIO_MAX_NAME];
+    unsigned int major, minor, release;
+    H5get_libversion(&major, &minor, &release);
+
+    snprintf(nc_properties, PIO_MAX_NAME,
+             "version=2,scorpio=%d.%d.%d,hdf5=%1u.%1u.%1u",
+             PIO_VERSION_MAJOR, PIO_VERSION_MINOR, PIO_VERSION_PATCH,
+             major, minor, release);
+
+    hid_t attr_id;
+    hsize_t asize = strlen(nc_properties);
+    hid_t loc_id = file->hdf5_file_id;
+
+    hid_t space_id = H5Screate(H5S_SCALAR);
+    hid_t h5_string_type = H5Tcopy(H5T_C_S1);
+    H5Tset_size(h5_string_type, asize);
+    H5Tset_strpad(h5_string_type, H5T_STR_NULLTERM);
+    H5Tset_cset(h5_string_type, H5T_CSET_ASCII);
+
+    /* H5Aexists() returns zero (false), a positive (true) or a negative (failure) value */
+    htri_t att_exists = H5Aexists(loc_id, attr_name);
+    if (att_exists > 0)
+    {
+        attr_id = H5Aopen(loc_id, attr_name, H5P_DEFAULT);
+    }
+    else if (att_exists == 0)
+    {
+        attr_id = H5Acreate2(loc_id, attr_name, h5_string_type, space_id, H5P_DEFAULT, H5P_DEFAULT);
+    }
+    else
+    {
+        /* Error determining whether an attribute with a given name exists on an object */
+    }
+
+    H5Awrite(attr_id, h5_string_type, nc_properties);
+
+    H5Sclose(space_id);
+    H5Aclose(attr_id);
+
+    H5Tclose(h5_string_type);
+
+    return PIO_NOERR;
+}
+
+int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
+                      nc_type xtype, int ndims, const int *dimidsp, int varid)
+{
+    herr_t herr;
+    hid_t h5_xtype;
+    hid_t sid;
+    hid_t dcpl_id;
+    hsize_t cdim[H5S_MAX_RANK], dims[H5S_MAX_RANK], mdims[H5S_MAX_RANK];
+    int i;
+
+    assert(ios && file && name && ndims >= 0 && varid >= 0);
+    assert(file->iotype == PIO_IOTYPE_HDF5);
+    assert(ios->ioproc);
+
+    for (i = 0; i < ndims; i++)
+        dims[i] = mdims[i] = file->hdf5_dims[dimidsp[i]].len;
+
+    dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+
+    /* H5DSattach_scale calls (even with MPI_Barrier) might fail or hang if attribute creation
+     * order is tracked or indexed. Before we have a better workaround, temporarily disable
+     * tracking and indexing of attribute creation order. */
+    /* H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED); */
+
+    if (xtype == NC_CHAR)
+    {
+        /* String type */
+        h5_xtype = H5Tcopy(H5T_C_S1);
+        H5Tset_strpad(h5_xtype, H5T_STR_NULLTERM);
+        H5Tset_cset(h5_xtype, H5T_CSET_ASCII);
+    }
+    else
+        h5_xtype = spio_nc_type_to_hdf5_type(xtype);
+
+    file->hdf5_vars[varid].hdf5_type = h5_xtype;
+
+    if (ndims > 0 && dims[0] == PIO_UNLIMITED)
+    {
+        mdims[0] = H5S_UNLIMITED;
+
+        /* Chunk size along rec dim is always 1 */
+        cdim[0] = 1;
+        for (i = 1; i < ndims; i++)
+            cdim[i] = mdims[i];
+
+        herr = H5Pset_chunk(dcpl_id, ndims, cdim);
+    }
+
+    sid = H5Screate_simple(ndims, dims, mdims);
+    const char* dataset_name = (file->hdf5_vars[varid].alt_name == NULL)? name : file->hdf5_vars[varid].alt_name;
+    file->hdf5_vars[varid].hdf5_dataset_id = H5Dcreate2(file->hdf5_file_id, dataset_name, h5_xtype, sid, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+    if (file->hdf5_vars[varid].hdf5_dataset_id < 0)
+    {
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Creating HDF5 dataset for variable %s failed.", name);
+    }
+
+    H5Sclose(sid);
+    H5Pclose(dcpl_id);
+
+    /* Write the hidden coordinates attribute, which lists the dimids of this variable. */
+    if (ndims > 0)
+    {
+        hsize_t coords_len[1];
+        hid_t coords_space_id, coords_att_id;
+        htri_t attr_exists;
+
+        coords_len[0] = ndims;
+        coords_space_id = H5Screate_simple(1, coords_len, coords_len);
+
+        /* H5Aexists() returns zero (false), a positive (true) or a negative (failure) value */
+        attr_exists = H5Aexists(file->hdf5_vars[varid].hdf5_dataset_id, "_Netcdf4Coordinates");
+        if (attr_exists > 0)
+            coords_att_id = H5Aopen(file->hdf5_vars[varid].hdf5_dataset_id, "_Netcdf4Coordinates", H5P_DEFAULT);
+        else if (attr_exists == 0)
+            coords_att_id = H5Acreate2(file->hdf5_vars[varid].hdf5_dataset_id, "_Netcdf4Coordinates",
+                                      H5T_NATIVE_INT, coords_space_id, H5P_DEFAULT, H5P_DEFAULT);
+        else
+        {
+            /* Error determining whether an attribute with a given name exists on an object */
+        }
+
+        assert(dimidsp);
+        H5Awrite(coords_att_id, H5T_NATIVE_INT, dimidsp);
+
+        H5Sclose(coords_space_id);
+        H5Aclose(coords_att_id);
+    }
+
+    return PIO_NOERR;
+}
+
+int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
+{
+    int i;
+
+    assert(ios && file);
+    assert(file->iotype == PIO_IOTYPE_HDF5);
+    assert(ios->ioproc);
+
+    for (i = 0; i < file->hdf5_num_dims; i++)
+    {
+        if (!file->hdf5_dims[i].has_coord_var)
+        {
+            hid_t space_id, dcpl_id, dimscale_id;
+            hsize_t dims[1], max_dims[1], chunk_dims[1] = {1};
+
+            dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+            /* H5DSattach_scale calls (even with MPI_Barrier) might fail or hang if attribute creation
+             * order is tracked or indexed. Before we have a better workaround, temporarily disable
+             * tracking and indexing of attribute creation order. */
+            /* H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED); */
+
+            /* Set size of dataset to size of dimension. */
+            max_dims[0] = dims[0] = file->hdf5_dims[i].len;
+
+            /* If this dimension scale is unlimited, set up chunking with a chunksize of 1. */
+            if (max_dims[0] == PIO_UNLIMITED)
+            {
+                max_dims[0] = H5S_UNLIMITED;
+                H5Pset_chunk(dcpl_id, 1, chunk_dims);
+            }
+
+            space_id = H5Screate_simple(1, dims, max_dims);
+
+            /* Create the dataset that will be the dimension scale. */
+            dimscale_id = H5Dcreate2(file->hdf5_file_id, file->hdf5_dims[i].name, H5T_IEEE_F32BE,
+                                     space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+            if (dimscale_id < 0)
+            {
+                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                               "Creating HDF5 dataset for dimension %s failed.", file->hdf5_dims[i].name);
+            }
+
+            char dimscale_name[PIO_MAX_NAME];
+            snprintf(dimscale_name, PIO_MAX_NAME, "%s%10d", "This is a netCDF dimension but not a netCDF variable.", (int)dims[0]);
+            H5DSset_scale(dimscale_id, dimscale_name);
+            file->hdf5_dims[i].hdf5_dataset_id = dimscale_id;
+
+            /* Write a special attribute for the netCDF-4 dimension ID. */
+            hid_t dimid_att_id;
+            htri_t attr_exists;
+
+            hid_t dimid_space_id = H5Screate(H5S_SCALAR);
+
+            /* H5Aexists() returns zero (false), a positive (true) or a negative (failure) value */
+            attr_exists = H5Aexists(dimscale_id, "_Netcdf4Dimid");
+            if (attr_exists > 0)
+                dimid_att_id = H5Aopen(dimscale_id, "_Netcdf4Dimid", H5P_DEFAULT);
+            else if (attr_exists == 0)
+                dimid_att_id = H5Acreate2(dimscale_id, "_Netcdf4Dimid",
+                                         H5T_NATIVE_INT, dimid_space_id, H5P_DEFAULT, H5P_DEFAULT);
+            else
+            {
+                /* Error determining whether an attribute with a given name exists on an object */
+            }
+
+            H5Awrite(dimid_att_id, H5T_NATIVE_INT, &i);
+
+            H5Sclose(dimid_space_id);
+            H5Aclose(dimid_att_id);
+
+            H5Sclose(space_id);
+            H5Pclose(dcpl_id);
+        }
+    }
+
+    for (i = 0; i < file->hdf5_num_vars; i++)
+    {
+        /* Upgrade dataset of a coordinate variable to a dimension scale */
+        if (file->hdf5_vars[i].is_coord_var)
+        {
+            H5DSset_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_vars[i].name);
+            assert(file->hdf5_vars[i].ndims > 0);
+            int dimid = file->hdf5_vars[i].hdf5_dimids[0];
+            file->hdf5_dims[dimid].hdf5_dataset_id = file->hdf5_vars[i].hdf5_dataset_id;
+
+            /* Write a special attribute for the netCDF-4 dimension ID. */
+            hid_t dimscale_id = file->hdf5_vars[i].hdf5_dataset_id;
+            hid_t dimid_att_id;
+            htri_t attr_exists;
+
+            hid_t dimid_space_id = H5Screate(H5S_SCALAR);
+
+            attr_exists = H5Aexists(dimscale_id, "_Netcdf4Dimid");
+            if (attr_exists > 0)
+                dimid_att_id = H5Aopen(dimscale_id, "_Netcdf4Dimid", H5P_DEFAULT);
+            else if (attr_exists == 0)
+                dimid_att_id = H5Acreate2(dimscale_id, "_Netcdf4Dimid",
+                                         H5T_NATIVE_INT, dimid_space_id, H5P_DEFAULT, H5P_DEFAULT);
+            else
+            {
+                /* Error determining whether an attribute with a given name exists on an object */
+            }
+
+            H5Awrite(dimid_att_id, H5T_NATIVE_INT, &dimid);
+
+            H5Sclose(dimid_space_id);
+            H5Aclose(dimid_att_id);
+        }
+    }
+
+    for (i = 0; i < file->hdf5_num_vars; i++)
+    {
+        if (!file->hdf5_vars[i].is_coord_var)
+        {
+            int ndims = file->hdf5_vars[i].ndims;
+            if (ndims > 0)
+            {
+                int* dimids = file->hdf5_vars[i].hdf5_dimids;
+                for (int j = 0; j < ndims; j++)
+                {
+                    H5DSattach_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_dims[dimids[j]].hdf5_dataset_id, j);
+
+                    /* According to HDF5 developers, the H5DS routines are not parallel, so all the ranks are going to be
+                     * doing the same operations. At some point, with enough iterations of the loop, HDF5 might get out of
+                     * step between the ranks.
+                     * Workaround: place a barrier to sync H5DSattach_scale calls.
+                     */
+                    MPI_Barrier(ios->io_comm);
+                }
+            }
+        }
+    }
+
+    return PIO_NOERR;
+}
+
+int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const char *name,
+                      nc_type atttype, PIO_Offset len, const void *op)
+{
+    hid_t attr_id;
+    hid_t space_id;
+    hsize_t asize = len;
+    htri_t att_exists;
+    hid_t loc_id;
+    hid_t h5_xtype;
+
+    assert(ios && file && name && op);
+    assert(file->iotype == PIO_IOTYPE_HDF5);
+    assert(ios->ioproc);
+
+    if (varid == PIO_GLOBAL)
+        loc_id = file->hdf5_file_id;
+    else
+        loc_id = file->hdf5_vars[varid].hdf5_dataset_id;
+
+    if (atttype == NC_CHAR)
+    {
+        /* String type */
+        space_id = H5Screate(H5S_SCALAR);
+        h5_xtype = H5Tcopy(H5T_C_S1);
+        /* For empty strings, asize is 0, while H5Tset_size() requires that size must be positive */
+        H5Tset_size(h5_xtype, asize + 1);
+        H5Tset_strpad(h5_xtype, H5T_STR_NULLTERM);
+        H5Tset_cset(h5_xtype, H5T_CSET_ASCII);
+    }
+    else
+    {
+        space_id = H5Screate_simple(1, &asize, &asize);
+        h5_xtype = spio_nc_type_to_hdf5_type(atttype);
+    }
+
+    /* H5Aexists() returns zero (false), a positive (true) or a negative (failure) value */
+    att_exists = H5Aexists(loc_id, name);
+    if (att_exists > 0)
+    {
+        attr_id = H5Aopen(loc_id, name, H5P_DEFAULT);
+    }
+    else if (att_exists == 0)
+    {
+        attr_id = H5Acreate2(loc_id, name, h5_xtype, space_id, H5P_DEFAULT, H5P_DEFAULT);
+    }
+    else
+    {
+        /* Error determining whether an attribute with a given name exists on an object */
+    }
+
+    H5Awrite(attr_id, h5_xtype, op);
+
+    H5Sclose(space_id);
+    H5Aclose(attr_id);
+
+    /* String attribute */
+    if (atttype == NC_CHAR)
+        H5Tclose(h5_xtype);
+
+    return PIO_NOERR;
+}
+
+int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
+                      const PIO_Offset *start, const PIO_Offset *count,
+                      const PIO_Offset *stride, nc_type xtype, const void *buf)
+{
+    hsize_t dims[H5S_MAX_RANK];
+    hsize_t mdims[H5S_MAX_RANK];
+
+    assert(ios && file && varid >= 0 && buf);
+    assert(file->iotype == PIO_IOTYPE_HDF5);
+    assert(ios->ioproc);
+
+    hid_t file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
+    H5Sget_simple_extent_dims(file_space_id, dims, mdims);
+
+    int ndims = file->hdf5_vars[varid].ndims;
+
+    /* Extend record dimension if needed */
+    if (ndims > 0 && start != NULL && count != NULL && mdims[0] == H5S_UNLIMITED && dims[0] < (hsize_t)(start[0] + count[0]))
+    {
+        dims[0] = (hsize_t) (start[0] + count[0]);
+        H5Sclose(file_space_id);
+        H5Dextend(file->hdf5_vars[varid].hdf5_dataset_id, dims);
+        file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
+    }
+
+    /* Only the IO master does the IO */
+    if (ios->iomaster == MPI_ROOT)
+    {
+        hsize_t hstart[H5S_MAX_RANK];
+        hsize_t hcount[H5S_MAX_RANK];
+        hsize_t hstride[H5S_MAX_RANK];
+
+        if (start)
+        {
+            for (int i = 0; i < ndims; i++)
+                hstart[i] = (hsize_t)start[i];
+        }
+        else
+        {
+            for (int i = 0; i < ndims; i++)
+                hstart[i] = 0;
+        }
+
+        if (count)
+        {
+            for (int i = 0; i < ndims; i++)
+                hcount[i] = (hsize_t)count[i];
+        }
+        else
+        {
+            for (int i = 0; i < ndims; i++)
+                hcount[i] = dims[i];
+        }
+
+        if (stride)
+        {
+            for (int i = 0; i < ndims; i++)
+                hstride[i] = (hsize_t)stride[i];
+        }
+        else
+        {
+            for (int i = 0; i < ndims; i++)
+                hstride[i] = 1;
+        }
+
+        hid_t mem_space_id = H5Screate_simple(ndims, hcount, hcount);
+
+        if (ndims > 0)
+            H5Sselect_hyperslab(file_space_id, H5S_SELECT_SET, hstart, hstride, hcount, NULL);
+
+        hid_t mem_type_id;
+        if (xtype == NC_CHAR)
+        {
+            /* String type */
+            mem_type_id = H5Tcopy(H5T_C_S1);
+            H5Tset_strpad(mem_type_id, H5T_STR_NULLTERM);
+            H5Tset_cset(mem_type_id, H5T_CSET_ASCII);
+        }
+        else
+            mem_type_id = spio_nc_type_to_hdf5_type(xtype);
+
+        /* Independent write */
+        H5Dwrite(file->hdf5_vars[varid].hdf5_dataset_id, mem_type_id, mem_space_id, file_space_id, file->dxplid_indep, buf);
+
+        H5Sclose(mem_space_id);
+
+        if (xtype == NC_CHAR)
+            H5Tclose(mem_type_id);
+    }
+
+    H5Sclose(file_space_id);
+
+    return PIO_NOERR;
+}
+
+int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file)
+{
+    int i;
+
+    assert(ios && file);
+    assert(file->iotype == PIO_IOTYPE_HDF5);
+    assert(ios->ioproc);
+
+    H5Pclose(file->dxplid_coll);
+    H5Pclose(file->dxplid_indep);
+
+    for (i = 0; i < file->hdf5_num_dims; i++)
+    {
+        if (!file->hdf5_dims[i].has_coord_var)
+            H5Dclose(file->hdf5_dims[i].hdf5_dataset_id);
+    }
+
+    for (i = 0; i < file->hdf5_num_vars; i++)
+    {
+        H5Dclose(file->hdf5_vars[i].hdf5_dataset_id);
+
+        if (file->hdf5_vars[i].nc_type == NC_CHAR)
+            H5Tclose(file->hdf5_vars[i].hdf5_type);
+    }
+
+    H5Fclose(file->hdf5_file_id);
+
+    return PIO_NOERR;
+}
+#endif

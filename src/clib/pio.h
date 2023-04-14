@@ -78,6 +78,7 @@ extern "C" {
 #ifdef _HDF5
 #include <hdf5.h>
 #include <hdf5_hl.h>
+#include <unistd.h>
 #endif
 
 /* PIO_OFFSET_C_TYPENAME is defined in pio_config.h */
@@ -1650,12 +1651,6 @@ extern "C" {
     unsigned long get_adios2_io_cnt();
     int begin_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
     int end_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
-#endif
-
-    /* FIXME: Shouldn't these HDF5 functions be moved to pio_internal.h ? */
-#ifdef _HDF5
-    hid_t nc_type_to_hdf5_type(nc_type xtype);
-    PIO_Offset hdf5_get_nc_type_size(nc_type xtype);
 #endif
 
 #if defined(__cplusplus)
