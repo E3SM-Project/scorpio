@@ -40,7 +40,6 @@ set (PIO_GenF90_SRCS
   spio_put_var_cint.F90
   spio_get_var.F90
   spio_get_var_cint.F90
-  pio_support.F90
   spio_darray.F90
   spio_darray_cint.F90
   spio_decomp.F90
@@ -97,7 +96,6 @@ set (PIO_Fortran_SRCS
   spio_misc_api_cint.F90
   spio_misc_api.F90
   spio_netcdf_types.F90
-  pio_nf.F90
   pio.F90
   pio_types.F90
   pio_nf_utils.F90)
@@ -305,16 +303,9 @@ endforeach ()
 #  INSTALL
 #==============================================================================
 set (PIO_Fortran_MODS ${CMAKE_CURRENT_BINARY_DIR}/pio.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/pio_nf.mod
   ${CMAKE_CURRENT_BINARY_DIR}/pio_types.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/piolib_mod.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/pionfget_mod.mod
   ${CMAKE_CURRENT_BINARY_DIR}/pio_kinds.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/pio_support.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/spio_darray.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/piodarray.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/pionfatt_mod.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/spio_put_var.mod)
+  ${CMAKE_CURRENT_BINARY_DIR}/pio_nf_utils.mod)
 
 # Install libpiof.a
 install (TARGETS piof DESTINATION lib)
