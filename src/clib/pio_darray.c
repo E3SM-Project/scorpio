@@ -3339,7 +3339,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
         }
 
         size_t read_type_size = get_adios2_type_size(read_type, NULL);
-        adios2_type out_type = PIOc_get_adios_type(iodesc->piotype);
+        adios2_type out_type = spio_get_adios_type(iodesc->piotype);
         int out_type_size = get_adios2_type_size(out_type, NULL);
 
         /* Check that frame_id is not a special case of -1 */
@@ -3547,7 +3547,7 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
         {
 #ifdef _ADIOS2
             assert(vdesc_adios2->nc_type != PIO_NAT);
-            vdesc_adios2->adios_type = PIOc_get_adios_type(vdesc_adios2->nc_type);
+            vdesc_adios2->adios_type = spio_get_adios_type(vdesc_adios2->nc_type);
             assert(vdesc_adios2->adios_type != adios2_type_unknown);
 #endif
         }

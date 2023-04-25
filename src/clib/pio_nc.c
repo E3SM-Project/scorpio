@@ -565,14 +565,14 @@ int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
 #ifdef _PNETCDF
         /* For PnetCDF IO type, if async is not in use, we do not need any
          * communication across processes. All tasks can directly call the
-         * internal helper function pioc_pnetcdf_inq_type to get the name
+         * internal helper function spio_pnetcdf_inq_type to get the name
          * and size of a type. */
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
-            ierr = pioc_pnetcdf_inq_type(ncid, xtype, name, sizep);
+            ierr = spio_pnetcdf_inq_type(ncid, xtype, name, sizep);
             if (ierr != PIO_NOERR)
             {
-                LOG((1, "pioc_pnetcdf_inq_type failed, ierr = %d", ierr));
+                LOG((1, "spio_pnetcdf_inq_type failed, ierr = %d", ierr));
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
                 return ierr;
@@ -591,7 +591,7 @@ int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
     {
         if (sizep)
         {
-            adios2_type atype = PIOc_get_adios_type(xtype);
+            adios2_type atype = spio_get_adios_type(xtype);
             int asize = get_adios2_type_size(atype, NULL);
             *sizep = (PIO_Offset) asize;
         }
@@ -619,7 +619,7 @@ int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
-            ierr = pioc_pnetcdf_inq_type(ncid, xtype, name, sizep);
+            ierr = spio_pnetcdf_inq_type(ncid, xtype, name, sizep);
 #endif /* _PNETCDF */
 
 #ifdef _NETCDF
@@ -2984,7 +2984,7 @@ int PIOc_set_fill(int ncid, int fillmode, int *old_modep)
  */
 int PIOc_enddef(int ncid)
 {
-    return pioc_change_def(ncid, 1);
+    return spio_change_def(ncid, 1);
 }
 
 /**
@@ -3003,7 +3003,7 @@ int PIOc_enddef(int ncid)
  */
 int PIOc_redef(int ncid)
 {
-    return pioc_change_def(ncid, 0);
+    return spio_change_def(ncid, 0);
 }
 
 /**
@@ -3389,7 +3389,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
         }
 
         file->adios_vars[file->num_vars].nc_type = xtype;
-        file->adios_vars[file->num_vars].adios_type = PIOc_get_adios_type(xtype);
+        file->adios_vars[file->num_vars].adios_type = spio_get_adios_type(xtype);
         file->adios_vars[file->num_vars].adios_type_size = (size_t)get_adios2_type_size(file->adios_vars[file->num_vars].adios_type, NULL);
         file->adios_vars[file->num_vars].nattrs = 0;
         file->adios_vars[file->num_vars].ndims = ndims;
@@ -4196,7 +4196,7 @@ int PIOc_get_att(int ncid, int varid, const char *name, void *ip)
     }
     LOG((2, "atttype = %d", atttype));
 
-    return PIOc_get_att_tc(ncid, varid, name, atttype, ip);
+    return spio_get_att_tc(ncid, varid, name, atttype, ip);
 }
 
 /**
@@ -4219,7 +4219,7 @@ int PIOc_get_att(int ncid, int varid, const char *name, void *ip)
 int PIOc_put_att(int ncid, int varid, const char *name, nc_type xtype,
                  PIO_Offset len, const void *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, xtype, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, xtype, op);
 }
 
 /**
@@ -4239,7 +4239,7 @@ int PIOc_put_att(int ncid, int varid, const char *name, nc_type xtype,
  */
 int PIOc_get_att_double(int ncid, int varid, const char *name, double *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_DOUBLE, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_DOUBLE, (void *)ip);
 }
 
 /**
@@ -4259,7 +4259,7 @@ int PIOc_get_att_double(int ncid, int varid, const char *name, double *ip)
  */
 int PIOc_get_att_uchar(int ncid, int varid, const char *name, unsigned char *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_UBYTE, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_UBYTE, (void *)ip);
 }
 
 /**
@@ -4279,7 +4279,7 @@ int PIOc_get_att_uchar(int ncid, int varid, const char *name, unsigned char *ip)
  */
 int PIOc_get_att_ushort(int ncid, int varid, const char *name, unsigned short *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_USHORT, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_USHORT, (void *)ip);
 }
 
 /**
@@ -4299,7 +4299,7 @@ int PIOc_get_att_ushort(int ncid, int varid, const char *name, unsigned short *i
  */
 int PIOc_get_att_uint(int ncid, int varid, const char *name, unsigned int *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_UINT, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_UINT, (void *)ip);
 }
 
 /**
@@ -4319,7 +4319,7 @@ int PIOc_get_att_uint(int ncid, int varid, const char *name, unsigned int *ip)
  */
 int PIOc_get_att_long(int ncid, int varid, const char *name, long *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_LONG_INTERNAL, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_LONG_INTERNAL, (void *)ip);
 }
 
 /**
@@ -4341,7 +4341,7 @@ int PIOc_get_att_long(int ncid, int varid, const char *name, long *ip)
  */
 int PIOc_get_att_text(int ncid, int varid, const char *name, char *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_CHAR, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_CHAR, (void *)ip);
 }
 
 /**
@@ -4361,7 +4361,7 @@ int PIOc_get_att_text(int ncid, int varid, const char *name, char *ip)
  */
 int PIOc_get_att_schar(int ncid, int varid, const char *name, signed char *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_BYTE, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_BYTE, (void *)ip);
 }
 
 /**
@@ -4381,7 +4381,7 @@ int PIOc_get_att_schar(int ncid, int varid, const char *name, signed char *ip)
  */
 int PIOc_get_att_ulonglong(int ncid, int varid, const char *name, unsigned long long *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_UINT64, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_UINT64, (void *)ip);
 }
 
 /**
@@ -4401,7 +4401,7 @@ int PIOc_get_att_ulonglong(int ncid, int varid, const char *name, unsigned long 
  */
 int PIOc_get_att_short(int ncid, int varid, const char *name, short *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_SHORT, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_SHORT, (void *)ip);
 }
 
 /**
@@ -4421,7 +4421,7 @@ int PIOc_get_att_short(int ncid, int varid, const char *name, short *ip)
  */
 int PIOc_get_att_int(int ncid, int varid, const char *name, int *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_INT, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_INT, (void *)ip);
 }
 
 /**
@@ -4441,7 +4441,7 @@ int PIOc_get_att_int(int ncid, int varid, const char *name, int *ip)
  */
 int PIOc_get_att_longlong(int ncid, int varid, const char *name, long long *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_INT64, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_INT64, (void *)ip);
 }
 
 /**
@@ -4461,7 +4461,7 @@ int PIOc_get_att_longlong(int ncid, int varid, const char *name, long long *ip)
  */
 int PIOc_get_att_float(int ncid, int varid, const char *name, float *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_FLOAT, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_FLOAT, (void *)ip);
 }
 
 /**
@@ -4484,7 +4484,7 @@ int PIOc_get_att_float(int ncid, int varid, const char *name, float *ip)
 int PIOc_put_att_schar(int ncid, int varid, const char *name, nc_type xtype,
                        PIO_Offset len, const signed char *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_BYTE, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_BYTE, op);
 }
 
 /**
@@ -4507,7 +4507,7 @@ int PIOc_put_att_schar(int ncid, int varid, const char *name, nc_type xtype,
 int PIOc_put_att_long(int ncid, int varid, const char *name, nc_type xtype,
                       PIO_Offset len, const long *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_LONG_INTERNAL, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_LONG_INTERNAL, op);
 }
 
 /**
@@ -4530,7 +4530,7 @@ int PIOc_put_att_long(int ncid, int varid, const char *name, nc_type xtype,
 int PIOc_put_att_int(int ncid, int varid, const char *name, nc_type xtype,
                      PIO_Offset len, const int *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_INT, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_INT, op);
 }
 
 /**
@@ -4553,7 +4553,7 @@ int PIOc_put_att_int(int ncid, int varid, const char *name, nc_type xtype,
 int PIOc_put_att_uchar(int ncid, int varid, const char *name, nc_type xtype,
                        PIO_Offset len, const unsigned char *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_UBYTE, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_UBYTE, op);
 }
 
 /**
@@ -4576,7 +4576,7 @@ int PIOc_put_att_uchar(int ncid, int varid, const char *name, nc_type xtype,
 int PIOc_put_att_longlong(int ncid, int varid, const char *name, nc_type xtype,
                           PIO_Offset len, const long long *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_INT64, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_INT64, op);
 }
 
 /**
@@ -4599,7 +4599,7 @@ int PIOc_put_att_longlong(int ncid, int varid, const char *name, nc_type xtype,
 int PIOc_put_att_uint(int ncid, int varid, const char *name, nc_type xtype,
                       PIO_Offset len, const unsigned int *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_UINT, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_UINT, op);
 }
 
 /**
@@ -4622,7 +4622,7 @@ int PIOc_put_att_uint(int ncid, int varid, const char *name, nc_type xtype,
 int PIOc_put_att_float(int ncid, int varid, const char *name, nc_type xtype,
                        PIO_Offset len, const float *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_FLOAT, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_FLOAT, op);
 }
 
 /**
@@ -4645,7 +4645,7 @@ int PIOc_put_att_float(int ncid, int varid, const char *name, nc_type xtype,
 int PIOc_put_att_ulonglong(int ncid, int varid, const char *name, nc_type xtype,
                            PIO_Offset len, const unsigned long long *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_UINT64, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_UINT64, op);
 }
 
 /**
@@ -4668,7 +4668,7 @@ int PIOc_put_att_ulonglong(int ncid, int varid, const char *name, nc_type xtype,
 int PIOc_put_att_ushort(int ncid, int varid, const char *name, nc_type xtype,
                         PIO_Offset len, const unsigned short *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_USHORT, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_USHORT, op);
 }
 
 /**
@@ -4691,7 +4691,7 @@ int PIOc_put_att_ushort(int ncid, int varid, const char *name, nc_type xtype,
 int PIOc_put_att_text(int ncid, int varid, const char *name,
                       PIO_Offset len, const char *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, NC_CHAR, len, NC_CHAR, op);
+    return spio_put_att_tc(ncid, varid, name, NC_CHAR, len, NC_CHAR, op);
 }
 
 /**
@@ -4714,7 +4714,7 @@ int PIOc_put_att_text(int ncid, int varid, const char *name,
 int PIOc_put_att_short(int ncid, int varid, const char *name, nc_type xtype,
                        PIO_Offset len, const short *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_SHORT, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_SHORT, op);
 }
 
 /**
@@ -4737,7 +4737,7 @@ int PIOc_put_att_short(int ncid, int varid, const char *name, nc_type xtype,
 int PIOc_put_att_double(int ncid, int varid, const char *name, nc_type xtype,
                         PIO_Offset len, const double *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_DOUBLE, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_DOUBLE, op);
 }
 
 /**

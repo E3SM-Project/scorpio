@@ -416,7 +416,7 @@ static int initialize_adios2_variables(iosystem_desc_t *ios, file_desc_t *file)
     return PIO_NOERR;
 }
 
-adios2_type PIOc_get_adios_type(nc_type xtype)
+adios2_type spio_get_adios_type(nc_type xtype)
 {
     adios2_type t;
     switch (xtype)
@@ -1394,7 +1394,7 @@ int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims,
     }
 
     /* What is the size of the pio type? */
-    if ((ret = pioc_pnetcdf_inq_type(0, piotype, NULL, &type_size)))
+    if ((ret = spio_pnetcdf_inq_type(0, piotype, NULL, &type_size)))
     {
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Internal error while allocating memory for iodesc. Finding the size of PIO type (%d) failed", piotype);
@@ -1852,7 +1852,7 @@ int PIOc_write_nc_decomp(int iosysid, const char *filename, int cmode, int ioid,
             LOG((3, "full_map[%d][%d] = %d", p, e, full_map[p][e]));
 
     /* Write the netCDF decomp file. */
-    if ((ret = pioc_write_nc_decomp_int(ios, filename, cmode, iodesc->ndims, iodesc->dimlen,
+    if ((ret = spio_write_nc_decomp_int(ios, filename, cmode, iodesc->ndims, iodesc->dimlen,
                                         ios->num_comptasks, task_maplen, (int *)full_map, title,
                                         history, fortran_order)))
     {
@@ -1926,7 +1926,7 @@ int PIOc_read_nc_decomp(int iosysid, const char *filename, int *ioidp, MPI_Comm 
 
     /* Read the file. This allocates three arrays that we have to
      * free. */
-    if ((ret = pioc_read_nc_decomp_int(iosysid, filename, &ndims, &global_dimlen, &num_tasks_decomp,
+    if ((ret = spio_read_nc_decomp_int(iosysid, filename, &ndims, &global_dimlen, &num_tasks_decomp,
                                        &task_maplen, &max_maplen, &full_map, title, history,
                                        source_in, version_in, fortran_order)))
     {
@@ -1992,7 +1992,7 @@ int PIOc_read_nc_decomp(int iosysid, const char *filename, int *ioidp, MPI_Comm 
  * ordering, 0 for C array ordering.
  * @returns 0 for success, error code otherwise.
  */
-int pioc_write_nc_decomp_int(iosystem_desc_t *ios, const char *filename, int cmode, int ndims,
+int spio_write_nc_decomp_int(iosystem_desc_t *ios, const char *filename, int cmode, int ndims,
                              const int *global_dimlen, int num_tasks, const int *task_maplen, const int *map,
                              const char *title, const char *history, int fortran_order)
 {
@@ -2006,7 +2006,7 @@ int pioc_write_nc_decomp_int(iosystem_desc_t *ios, const char *filename, int cmo
               (!history || strlen(history) <= PIO_MAX_NAME), "invalid input",
               __FILE__, __LINE__);
 
-    LOG((2, "pioc_write_nc_decomp_int filename = %s ndims = %d num_tasks = %d", filename,
+    LOG((2, "spio_write_nc_decomp_int filename = %s ndims = %d num_tasks = %d", filename,
          ndims, num_tasks));
 
     /* Find the maximum maplen. */
@@ -2247,7 +2247,7 @@ int pioc_write_nc_decomp_int(iosystem_desc_t *ios, const char *filename, int cmo
  * array ordering.
  * @returns 0 for success, error code otherwise.
  */
-int pioc_read_nc_decomp_int(int iosysid, const char *filename, int *ndims, int **global_dimlen,
+int spio_read_nc_decomp_int(int iosysid, const char *filename, int *ndims, int **global_dimlen,
                             int *num_tasks, int **task_maplen, int *max_maplen, int **map, char *title,
                             char *history, char *source, char *version, int *fortran_order)
 {
@@ -2269,7 +2269,7 @@ int pioc_read_nc_decomp_int(int iosysid, const char *filename, int *ndims, int *
                         "Reading I/O decomposition from NetCDF file failed. Invalid filename (NULL) provided");
     }
 
-    LOG((1, "pioc_read_nc_decomp_int iosysid = %d filename = %s", iosysid, filename));
+    LOG((1, "spio_read_nc_decomp_int iosysid = %d filename = %s", iosysid, filename));
 
     /* Open the netCDF decomp file. */
     if ((ret = PIOc_open(iosysid, filename, NC_WRITE, &ncid)))
@@ -2725,7 +2725,7 @@ int PIO_get_avail_iotypes(char *buf, size_t sz)
  * @returns 0 for success, error code otherwise.
  * @ingroup PIO_createfile
  */
-int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *filename,
+int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *filename,
                         int mode)
 {
     char tname[SPIO_TIMER_MAX_NAME];
@@ -5126,7 +5126,7 @@ int openfile_int(int iosysid, int *ncidp, int *iotype, const char *filename,
  * @param sizep pointer that gets size of type. Ignored if NULL.
  * @returns 0 on success, error code otherwise.
  */
-int pioc_pnetcdf_inq_type(int ncid, nc_type xtype, char *name,
+int spio_pnetcdf_inq_type(int ncid, nc_type xtype, char *name,
                           PIO_Offset *sizep)
 {
     int typelen;
@@ -5172,13 +5172,13 @@ int pioc_pnetcdf_inq_type(int ncid, nc_type xtype, char *name,
  * @param ncid the ncid of the file to enddef or redef
  * @param is_enddef set to non-zero for enddef, 0 for redef.
  * @returns PIO_NOERR on success, error code on failure. */
-int pioc_change_def(int ncid, int is_enddef)
+int spio_change_def(int ncid, int is_enddef)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     int ierr = PIO_NOERR;  /* Return code from function calls. */
 
-    LOG((2, "pioc_change_def ncid = %d is_enddef = %d", ncid, is_enddef));
+    LOG((2, "spio_change_def ncid = %d is_enddef = %d", ncid, is_enddef));
 
     /* Find the info about this file. When I check the return code
      * here, some tests fail. ???*/
@@ -5210,10 +5210,10 @@ int pioc_change_def(int ncid, int is_enddef)
     }
 
     /* If this is an IO task, then call the netCDF function. */
-    LOG((3, "pioc_change_def ios->ioproc = %d", ios->ioproc));
+    LOG((3, "spio_change_def ios->ioproc = %d", ios->ioproc));
     if (ios->ioproc)
     {
-        LOG((3, "pioc_change_def calling netcdf function file->fh = %d file->do_io = %d iotype = %d",
+        LOG((3, "spio_change_def calling netcdf function file->fh = %d file->do_io = %d iotype = %d",
              file->fh, file->do_io, file->iotype));
 
         /* NetCDF and PnetCDF by default do not reserve any extra space in
@@ -5287,7 +5287,7 @@ int pioc_change_def(int ncid, int is_enddef)
         {
             if (is_enddef)
             {
-                LOG((3, "pioc_change_def calling nc_enddef file->fh = %d", file->fh));
+                LOG((3, "spio_change_def calling nc_enddef file->fh = %d", file->fh));
                 if (file->iotype == PIO_IOTYPE_NETCDF)
                 {
 #ifdef NETCDF_C_NC__ENDDEF_EXISTS
@@ -5347,7 +5347,7 @@ int pioc_change_def(int ncid, int is_enddef)
       return pio_err(ios, file, ierr, __FILE__, __LINE__,
                       "Changing the define mode for file (%s) failed. Low-level I/O library API failed", pio_get_fname_from_file(file));
     }
-    LOG((3, "pioc_change_def succeeded"));
+    LOG((3, "spio_change_def succeeded"));
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->tot_timer_name);

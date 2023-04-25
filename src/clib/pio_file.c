@@ -159,7 +159,7 @@ int PIOc_createfile(int iosysid, int *ncidp, const int *iotype, const char *file
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
 
     /* Create the file. */
-    if ((ret = PIOc_createfile_int(iosysid, ncidp, iotype, filename, mode)))
+    if ((ret = spio_createfile_int(iosysid, ncidp, iotype, filename, mode)))
     {
         GPTLstop("PIO:PIOc_createfile");
         GPTLstop("PIO:write_total");
@@ -255,7 +255,7 @@ int PIOc_create(int iosysid, const char *filename, int cmode, int *ncidp)
 #endif
     }
 
-    return PIOc_createfile_int(iosysid, ncidp, &iotype, filename, cmode);
+    return spio_createfile_int(iosysid, ncidp, &iotype, filename, cmode);
 }
 
 /* Internal helper function to perform sync operations
