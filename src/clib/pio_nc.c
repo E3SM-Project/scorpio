@@ -3366,7 +3366,8 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                           "Defining variable %s in file %s (ncid=%d) using HDF5 iotype failed. Out of memory allocating %lld bytes for global dimensions",
+                           "Defining variable %s in file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "Out of memory allocating %lld bytes for global dimensions",
                            vname, pio_get_fname_from_file(file), ncid, (unsigned long long) (ndims * sizeof(int)));
         }
         memcpy(file->hdf5_vars[file->hdf5_num_vars].hdf5_dimids, dimidsp, ndims * sizeof(int));
@@ -3398,7 +3399,8 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                         spio_ltimer_stop(file->io_fstats->tot_timer_name);
                         return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                                       "Defining variable %s in file %s (ncid=%d) using HDF5 iotype failed. Out of memory allocating %lld bytes for alternative variable name",
+                                       "Defining variable %s in file (%s, ncid=%d) using HDF5 iotype failed. "
+                                       "Out of memory allocating %lld bytes for alternative variable name",
                                        vname, pio_get_fname_from_file(file), ncid, (unsigned long long)alt_name_len);
                     }
 
@@ -3480,6 +3482,13 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
         if (file->iotype == PIO_IOTYPE_HDF5)
         {
              ierr = spio_hdf5_def_var(ios, file, name, xtype, ndims, dimidsp, *varidp);
+             if (ierr != PIO_NOERR)
+             {
+                 char errmsg[PIO_MAX_NAME];
+                 ierr2 = PIOc_strerror(ierr, errmsg, PIO_MAX_NAME);
+                 ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                 "Defining variable %s (ndims = %d) in file %s (ncid=%d, iotype=%s) failed. %s", name, ndims, pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype), ((ierr2 == PIO_NOERR) ? errmsg : ""));
+             }
         }
 #endif /* _HDF5 */
     }

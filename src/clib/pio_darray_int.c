@@ -441,13 +441,17 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                     if (!(startlist[rrcnt] = calloc(fndims, sizeof(PIO_Offset))))
                     {
                         ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                                          "Writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5 iotype failed. Out of memory allocating buffer (%lld bytes) for array to store starts of I/O regions written out to file", nvars, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (fndims * sizeof(PIO_Offset)));
+                                       "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                       "Out of memory allocating buffer (%lld bytes) for array to store starts of I/O regions written out to file",
+                                       nvars, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (fndims * sizeof(PIO_Offset)));
                         break;
                     }
                     if (!(countlist[rrcnt] = calloc(fndims, sizeof(PIO_Offset))))
                     {
                         ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                                          "Writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5 iotype failed. Out of memory allocating buffer (%lld bytes) for array to store counts of I/O regions written out to file", nvars, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (fndims * sizeof(PIO_Offset)));
+                                       "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                       "Out of memory allocating buffer (%lld bytes) for array to store counts of I/O regions written out to file",
+                                       nvars, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (fndims * sizeof(PIO_Offset)));
                         break;
                     }
 
@@ -469,7 +473,15 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                     for (int nv = 0; nv < nvars; nv++)
                     {
                         hid_t file_space_id = H5Dget_space(file->hdf5_vars[varids[nv]].hdf5_dataset_id);
-                        hid_t mem_space_id;
+                        if (file_space_id == H5I_INVALID_HID)
+                        {
+                            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                           "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                           "The low level (HDF5) I/O library call failed to make a copy of the dataspace of the dataset associated with variable (%s, varid=%d)",
+                                           nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                        }
+
+                        hid_t mem_space_id = H5I_INVALID_HID;
 
                         if (dsize_all > 0)
                         {
@@ -487,11 +499,25 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                             for (int i = 0; i < rrcnt; i++)
                             {
                                 /* Union hyperslabs of all regions */
-                                H5Sselect_hyperslab(file_space_id, op, (hsize_t*)startlist[i], NULL, (hsize_t*)countlist[i], NULL);
+                                if (H5Sselect_hyperslab(file_space_id, op, (hsize_t*)startlist[i], NULL, (hsize_t*)countlist[i], NULL) < 0)
+                                {
+                                    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                                   "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                                   "The low level (HDF5) I/O library call failed to select a hyperslab region for a dataspace copied from the dataset associated with variable (%s, varid=%d)",
+                                                   nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                                }
+
                                 op = H5S_SELECT_OR;
                             }
 
                             mem_space_id = H5Screate_simple(1, &dsize_all, NULL);
+                            if (mem_space_id == H5I_INVALID_HID)
+                            {
+                                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                               "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                               "The low level (HDF5) I/O library call failed to create a new simple dataspace for variable (%s, varid=%d)",
+                                               nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                            }
 
                             /* Get a pointer to the data. */
                             bufptr = (void *)((char *)iobuf + nv * iodesc->mpitype_size * llen);
@@ -499,19 +525,60 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                         else
                         {
                             /* No data to write on this IO task. */
-                            H5Sselect_none(file_space_id);
+                            if (H5Sselect_none(file_space_id) < 0)
+                            {
+                                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                               "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                               "The low level (HDF5) I/O library call failed to reset the selection region for a dataspace copied from the dataset associated with variable (%s, varid=%d)",
+                                               nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                            }
 
                             mem_space_id = H5Screate(H5S_NULL);
+                            if (mem_space_id == H5I_INVALID_HID)
+                            {
+                                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                               "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                               "The low level (HDF5) I/O library call failed to create a new NULL dataspace for variable (%s, varid=%d)",
+                                               nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                            }
 
                             bufptr = NULL;
                         }
 
                         /* Collective write */
                         hid_t mem_type_id = spio_nc_type_to_hdf5_type(iodesc->piotype);
-                        H5Dwrite(file->hdf5_vars[varids[nv]].hdf5_dataset_id, mem_type_id, mem_space_id, file_space_id, file->dxplid_coll, bufptr);
+                        if (mem_type_id == H5I_INVALID_HID)
+                        {
+                            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                           "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                           "Unsupported memory type (type=%x) for variable (%s, varid=%d)",
+                                           nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                        }
 
-                        H5Sclose(file_space_id);
-                        H5Sclose(mem_space_id);
+                        if (H5Dwrite(file->hdf5_vars[varids[nv]].hdf5_dataset_id, mem_type_id, mem_space_id, file_space_id,
+                                     file->dxplid_coll, bufptr) < 0)
+                        {
+                            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                           "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                           "The low level (HDF5) I/O library call failed to write the dataset associated with variable (%s, varid=%d)",
+                                           nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                        }
+
+                        if (H5Sclose(file_space_id) < 0)
+                        {
+                            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                           "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                           "The low level (HDF5) I/O library call failed to release a dataspace copied from the dataset associated with variable (%s, varid=%d)",
+                                           nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                        }
+
+                        if (H5Sclose(mem_space_id) < 0)
+                        {
+                            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                           "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                           "The low level (HDF5) I/O library call failed to release a simple (or NULL) dataspace for variable (%s, varid=%d)",
+                                           nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                        }
                     }
 
                     /* Free resources. */
