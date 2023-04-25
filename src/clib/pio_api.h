@@ -112,6 +112,8 @@ int PIOc_createfile(int iosysid, int *ncidp, const int *iotype, const char *fnam
 int PIOc_create(int iosysid, const char *path, int cmode, int *ncidp);
 int PIOc_openfile(int iosysid, int *ncidp, int *iotype, const char *fname, int mode);
 int PIOc_openfile2(int iosysid, int *ncidp, int *iotype, const char *fname, int mode);
+int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype,
+                        const char *filename, int mode, int retry);
 int PIOc_open(int iosysid, const char *path, int mode, int *ncidp);
 int PIOc_closefile(int ncid);
 int PIOc_File_is_Open(int ncid);

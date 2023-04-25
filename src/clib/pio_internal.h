@@ -129,16 +129,11 @@ extern "C" {
     void pio_push_request(file_desc_t *file, int request);
 
     /* Create a file (internal function). */
-    int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *filename, int mode);
+    int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *filename, int mode);
 
     /* Open a file and learn about metadata. */
     int openfile_int(int iosysid, int *ncidp, int *iotype, const char *filename,
                      int mode, int retry);
-
-    /* Open a file with optional retry as netCDF-classic if first
-     * iotype does not work. */
-    int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype,
-                            const char *filename, int mode, int retry);
 
     iosystem_desc_t *pio_get_iosystem_from_id(int iosysid);
     int pio_add_to_iosystem_list(iosystem_desc_t *ios, MPI_Comm comm);
@@ -336,34 +331,34 @@ extern "C" {
 #endif
 
     /* Read atts with type conversion. */
-    int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void *ip);
+    int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void *ip);
 
     /* Write atts with type conversion. */
-    int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
+    int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                         PIO_Offset len, nc_type memtype, const void *op);
 
     /* Generalized get functions. */
-    int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
+    int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                          const PIO_Offset *stride, nc_type xtype, void *buf);
-    int PIOc_get_var1_tc(int ncid, int varid, const PIO_Offset *index, nc_type xtype,
+    int spio_get_var1_tc(int ncid, int varid, const PIO_Offset *index, nc_type xtype,
                          void *buf);
-    int PIOc_get_var_tc(int ncid, int varid, nc_type xtype, void *buf);
+    int spio_get_var_tc(int ncid, int varid, nc_type xtype, void *buf);
     
 
     /* Generalized put functions. */
-    int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
+    int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                          const PIO_Offset *stride, nc_type xtype, const void *buf);
-    int PIOc_put_var1_tc(int ncid, int varid, const PIO_Offset *index, nc_type xtype,
+    int spio_put_var1_tc(int ncid, int varid, const PIO_Offset *index, nc_type xtype,
                          const void *op);
-    int PIOc_put_var_tc(int ncid, int varid, nc_type xtype, const void *op);
+    int spio_put_var_tc(int ncid, int varid, nc_type xtype, const void *op);
     
     /* An internal replacement for a function pnetcdf does not
      * have. */
-    int pioc_pnetcdf_inq_type(int ncid, nc_type xtype, char *name,
+    int spio_pnetcdf_inq_type(int ncid, nc_type xtype, char *name,
                               PIO_Offset *sizep);
 
     /* Handle end and re-defs. */
-    int pioc_change_def(int ncid, int is_enddef);
+    int spio_change_def(int ncid, int is_enddef);
 
 #ifdef _ADIOS2
     /* Remove a directory in the filesystem */
@@ -384,12 +379,12 @@ extern "C" {
     double mpi_mtimer_get_wtime(void );
 
     /* Write a netCDF decomp file. */
-    int pioc_write_nc_decomp_int(iosystem_desc_t *ios, const char *filename, int cmode, int ndims,
+    int spio_write_nc_decomp_int(iosystem_desc_t *ios, const char *filename, int cmode, int ndims,
                                  const int *global_dimlen, int num_tasks, const int *task_maplen, const int *map,
                                  const char *title, const char *history, int fortran_order);
 
     /* Read a netCDF decomp file. */
-    int pioc_read_nc_decomp_int(int iosysid, const char *filename, int *ndims, int **global_dimlen,
+    int spio_read_nc_decomp_int(int iosysid, const char *filename, int *ndims, int **global_dimlen,
                                 int *num_tasks, int **task_maplen, int *max_maplen, int **map, char *title,
                                 char *history, char *source, char *version, int *fortran_order);
 
@@ -418,7 +413,7 @@ extern "C" {
     PIO_Offset spio_get_nc_type_size(nc_type xtype);
 
 #ifdef _ADIOS2
-    adios2_type PIOc_get_adios_type(nc_type xtype);
+    adios2_type spio_get_adios_type(nc_type xtype);
     int get_adios2_type_size(adios2_type type, const void *var);
     const char *convert_adios2_error_to_string(adios2_error error);
     adios2_adios *get_adios2_adios();

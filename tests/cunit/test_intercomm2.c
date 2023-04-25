@@ -93,7 +93,7 @@ int check_file(int iosysid, int format, char *filename, int my_rank)
     {
         start[0] = start_index;
         count[0] = DIM_LEN - start_index;
-        if ((ret = PIOc_get_vars_tc(ncid, 0, start, count, NULL, NC_INT, data_in)))
+        if ((ret = spio_get_vars_tc(ncid, 0, start, count, NULL, NC_INT, data_in)))
             ERR(ret);
         for (int i = 0; i < count[0]; i++)
         {
@@ -519,7 +519,7 @@ int main(int argc, char **argv)
 		printf("%d test_intercomm2 writing data\n", my_rank);
                 start[0] = 0;
                 count[0] = DIM_LEN;
-                if ((ret = PIOc_put_vars_tc(ncid, varid, start, count, NULL, NC_INT, data)))
+                if ((ret = spio_put_vars_tc(ncid, varid, start, count, NULL, NC_INT, data)))
                     ERR(ret);
 
                 /* Close the file. */
