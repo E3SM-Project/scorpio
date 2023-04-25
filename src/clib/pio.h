@@ -1224,23 +1224,4 @@ enum PIO_ERROR_HANDLERS
 
 #include "pio_api.h"
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
-#ifdef _ADIOS2
-    /* FIXME: Shouldn't these ADIOS functions be moved to pio_internal.h ? */
-    adios2_type PIOc_get_adios_type(nc_type xtype);
-    int get_adios2_type_size(adios2_type type, const void *var);
-    const char *convert_adios2_error_to_string(adios2_error error);
-    adios2_adios *get_adios2_adios();
-    unsigned long get_adios2_io_cnt();
-    int begin_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
-    int end_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
-#endif
-
-#if defined(__cplusplus)
-}
-#endif
-
 #endif  // _PIO_H_

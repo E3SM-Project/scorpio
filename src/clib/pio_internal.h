@@ -417,6 +417,21 @@ extern "C" {
 
     PIO_Offset spio_get_nc_type_size(nc_type xtype);
 
+#ifdef _ADIOS2
+    adios2_type PIOc_get_adios_type(nc_type xtype);
+    int get_adios2_type_size(adios2_type type, const void *var);
+    const char *convert_adios2_error_to_string(adios2_error error);
+    adios2_adios *get_adios2_adios();
+    unsigned long get_adios2_io_cnt();
+    int begin_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
+    int end_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
+#endif
+
+#ifdef _HDF5
+    hid_t nc_type_to_hdf5_type(nc_type xtype);
+    PIO_Offset hdf5_get_nc_type_size(nc_type xtype);
+#endif
+
 /* Asynchronous I/O services start with the following seq num */
 static const int PIO_MSG_START_SEQ_NUM = 1024;
 /** These are the messages that can be sent over the intercomm when
