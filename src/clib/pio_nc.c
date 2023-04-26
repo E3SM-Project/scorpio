@@ -1075,7 +1075,7 @@ int PIOc_inq_dimid(int ncid, const char *name, int *idp)
         ierr = PIO_EBADDIM;
         for (int i = 0; i < file->num_dim_vars; i++)
         {
-            if (!strcmp(name, file->dim_names[i]))
+            if (!strncmp(name, file->dim_names[i], PIO_MAX_NAME))
             {
                 *idp = i;
                 ierr = PIO_NOERR;
@@ -1115,7 +1115,7 @@ int PIOc_inq_dimid(int ncid, const char *name, int *idp)
         *idp = -1;
         for (int i = 0; i < file->hdf5_num_dims; i++)
         {
-            if (!strcmp(name, file->hdf5_dims[i].name))
+            if (!strncmp(name, file->hdf5_dims[i].name, PIO_MAX_NAME))
             {
                 *idp = i;
                 ierr = PIO_NOERR;
@@ -1713,7 +1713,7 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
         ierr = PIO_ENOTVAR;
         for (int i = 0; i < file->num_vars; i++)
         {
-            if (!strcmp(name, file->adios_vars[i].name))
+            if (!strncmp(name, file->adios_vars[i].name, PIO_MAX_NAME))
             {
                 *varidp = i;
                 ierr = PIO_NOERR;
@@ -1741,7 +1741,7 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
         ierr = PIO_ENOTVAR;
         for (int i = 0; i < file->hdf5_num_vars; i++)
         {
-            if (!strcmp(name, file->hdf5_vars[i].name))
+            if (!strncmp(name, file->hdf5_vars[i].name, PIO_MAX_NAME))
             {
                 *varidp = i;
                 ierr = PIO_NOERR;
@@ -1933,7 +1933,7 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
         ierr = PIO_ENOTATT;
         for (int i = 0; i < file->num_attrs; i++)
         {
-            if (!strcmp(name, file->adios_attrs[i].att_name) &&
+            if (!strncmp(name, file->adios_attrs[i].att_name, PIO_MAX_NAME) &&
                 file->adios_attrs[i].att_varid == varid &&
                 file->adios_attrs[i].att_ncid == ncid)
             {
@@ -1964,7 +1964,7 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
         ierr = PIO_ENOTATT;
         for (int i = 0; i < file->hdf5_num_attrs; i++)
         {
-            if (!strcmp(name, file->hdf5_attrs[i].att_name) &&
+            if (!strncmp(name, file->hdf5_attrs[i].att_name, PIO_MAX_NAME) &&
                 file->hdf5_attrs[i].att_varid == varid &&
                 file->hdf5_attrs[i].att_ncid == ncid)
             {

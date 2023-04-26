@@ -71,7 +71,7 @@ static int remove_directory(const char *path)
             size_t len;
 
             /* Skip the names "." and ".." as we don't want to recurse on them. */
-            if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, ".."))
+            if (!strncmp(p->d_name, ".", 1) || !strncmp(p->d_name, "..", 2))
                 continue;
 
             len = path_len + strlen(p->d_name) + 2;
