@@ -247,7 +247,24 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                            "num_attrs (%d) is larger than or equal to pio_max_vars (%d) for file (%s)",
                            num_attrs, PIO_MAX_VARS, pio_get_fname_from_file(file));
         }
+
         file->adios_attrs[num_attrs].att_name = spio_strdup(name);
+        if (file->adios_attrs[num_attrs].att_name == NULL)
+        {
+            GPTLstop("PIO:PIOc_put_att_tc");
+            GPTLstop("PIO:write_total");
+            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->wr_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            GPTLstop("PIO:PIOc_put_att_tc_adios");
+            GPTLstop("PIO:write_total_adios");
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Writing variable (%s, varid=%d) attribute (%s) to file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "Out of memory duplicating attribute name",
+                           pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid);
+        }
+
         file->adios_attrs[num_attrs].att_len = len;
         file->adios_attrs[num_attrs].att_type = atttype;
         file->adios_attrs[num_attrs].att_varid = varid;
@@ -323,6 +340,20 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         }
 
         file->hdf5_attrs[num_attrs].att_name = spio_strdup(name);
+        if (file->hdf5_attrs[num_attrs].att_name == NULL)
+        {
+            GPTLstop("PIO:PIOc_put_att_tc");
+            GPTLstop("PIO:write_total");
+            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->wr_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Writing variable (%s, varid=%d) attribute (%s) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "Out of memory duplicating attribute name",
+                           pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid);
+        }
+
         file->hdf5_attrs[num_attrs].att_len = len;
         file->hdf5_attrs[num_attrs].att_type = atttype;
         file->hdf5_attrs[num_attrs].att_varid = varid;

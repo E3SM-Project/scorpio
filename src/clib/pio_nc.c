@@ -2988,6 +2988,16 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
 
         assert(file->num_dim_vars < PIO_MAX_DIMS);
         file->dim_names[file->num_dim_vars] = spio_strdup(name);
+        if (file->dim_names[file->num_dim_vars] == NULL)
+        {
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Defining dimension %s in file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "Out of memory duplicating dimension name",
+                           name, pio_get_fname_from_file(file), ncid);
+        }
+
         file->dim_values[file->num_dim_vars] = len;
         *idp = file->num_dim_vars;
         ++file->num_dim_vars;
@@ -3034,6 +3044,16 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
     if (file->iotype == PIO_IOTYPE_HDF5)
     {
         file->hdf5_dims[file->hdf5_num_dims].name = spio_strdup(name);
+        if (file->hdf5_dims[file->hdf5_num_dims].name == NULL)
+        {
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Defining dimension %s in file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "Out of memory duplicating dimension name",
+                           name, pio_get_fname_from_file(file), ncid);
+        }
+
         file->hdf5_dims[file->hdf5_num_dims].len = len;
         file->hdf5_dims[file->hdf5_num_dims].has_coord_var = false;
         *idp = file->hdf5_num_dims;
@@ -3229,6 +3249,16 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
 
         assert(file->num_vars < PIO_MAX_VARS);
         file->adios_vars[file->num_vars].name = spio_strdup(name);
+        if (file->adios_vars[file->num_vars].name == NULL)
+        {
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Defining variable %s in file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "Out of memory duplicating variable name",
+                           name, pio_get_fname_from_file(file), ncid);
+        }
+
         file->adios_vars[file->num_vars].nc_type = xtype;
         file->adios_vars[file->num_vars].adios_type = PIOc_get_adios_type(xtype);
         file->adios_vars[file->num_vars].adios_type_size = (size_t)get_adios2_type_size(file->adios_vars[file->num_vars].adios_type, NULL);
@@ -3354,6 +3384,16 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
     {
         assert(file->hdf5_num_vars < PIO_MAX_VARS);
         file->hdf5_vars[file->hdf5_num_vars].name = spio_strdup(name);
+        if (file->hdf5_vars[file->hdf5_num_vars].name == NULL)
+        {
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Defining variable %s in file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "Out of memory duplicating variable name",
+                           name, pio_get_fname_from_file(file), ncid);
+        }
+
         file->hdf5_vars[file->hdf5_num_vars].alt_name = NULL;
         file->hdf5_vars[file->hdf5_num_vars].nc_type = xtype;
         file->hdf5_vars[file->hdf5_num_vars].ndims = ndims;

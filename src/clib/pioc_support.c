@@ -4651,6 +4651,9 @@ int __wrap_ADIOI_Type_create_hindexed_x(int count,
 
 char *spio_strdup(const char *str)
 {
+    if (str == NULL)
+        return NULL;
+
     size_t n = strlen(str) + 1;
     char *dup = (char*)malloc(n);
     if (dup)
