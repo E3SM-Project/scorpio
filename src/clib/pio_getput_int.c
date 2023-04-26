@@ -234,7 +234,6 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         int num_attrs = file->num_attrs;
         if (num_attrs >= PIO_MAX_VARS)
         {
-            fprintf(stderr, "ERROR: Num of attributes exceeds maximum (%d).\n", PIO_MAX_VARS);
             GPTLstop("PIO:PIOc_put_att_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -327,7 +326,6 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         int num_attrs = file->hdf5_num_attrs;
         if (num_attrs >= PIO_MAX_ATTRS)
         {
-            fprintf(stderr, "ERROR: Num of attributes exceeds maximum (%d).\n", PIO_MAX_ATTRS);
             GPTLstop("PIO:PIOc_put_att_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
