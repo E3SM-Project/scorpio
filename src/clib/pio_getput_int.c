@@ -232,7 +232,7 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 
         /* Track attributes */
         int num_attrs = file->num_attrs;
-        if (num_attrs >= PIO_MAX_VARS)
+        if (num_attrs >= PIO_MAX_ATTRS)
         {
             GPTLstop("PIO:PIOc_put_att_tc");
             GPTLstop("PIO:write_total");
@@ -242,9 +242,10 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             GPTLstop("PIO:PIOc_put_att_tc_adios");
             GPTLstop("PIO:write_total_adios");
-            return pio_err(NULL, file, PIO_EMAXATTS, __FILE__, __LINE__,
-                           "num_attrs (%d) is larger than or equal to pio_max_vars (%d) for file (%s)",
-                           num_attrs, PIO_MAX_VARS, pio_get_fname_from_file(file));
+            return pio_err(ios, file, PIO_EMAXATTS, __FILE__, __LINE__,
+                           "Writing variable (%s, varid=%d) attribute (%s) to file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "Number of attributes (%d) is larger than or equal to PIO_MAX_ATTRS (%d)",
+                           pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid, num_attrs, PIO_MAX_ATTRS);
         }
 
         file->adios_attrs[num_attrs].att_name = spio_strdup(name);
@@ -332,9 +333,10 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->wr_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            return pio_err(NULL, file, PIO_EMAXATTS, __FILE__, __LINE__,
-                           "num_attrs (%d) is larger than or equal to PIO_MAX_ATTRS (%d) for file (%s)",
-                           num_attrs, PIO_MAX_ATTRS, pio_get_fname_from_file(file));
+            return pio_err(ios, file, PIO_EMAXATTS, __FILE__, __LINE__,
+                           "Writing variable (%s, varid=%d) attribute (%s) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "Number of attributes (%d) is larger than or equal to PIO_MAX_ATTRS (%d)",
+                           pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid, num_attrs, PIO_MAX_ATTRS);
         }
 
         file->hdf5_attrs[num_attrs].att_name = spio_strdup(name);
