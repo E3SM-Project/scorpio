@@ -473,7 +473,7 @@ CONTAINS
 !!
 !! @details
 !! @param[in] iosys The handle to the I/O system. @copydoc iosystem_desc_t
-!! @param[out] nioprocs The number of I/O processes is returned via this arg
+!! @param[out] niotasks The number of I/O processes is returned via this arg
 !! @param[out] ierr (Optional) @copydoc error_return
 !!
   SUBROUTINE pio_getnumiotasks_(iosys, niotasks, ierr)
