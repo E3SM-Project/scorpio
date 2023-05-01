@@ -149,7 +149,7 @@ INTERFACE
 !! @details
 !! @param[in] iosysid The handle to the I/O subsystem associated with
 !!                    the I/O decomposition.
-!! @param[out] ioid The I/O decomposition id for the decomposition to free
+!! @param[in] ioid The I/O decomposition id for the decomposition to free
 !! @returns PIO_NOERR on success, an error code otherwise
   INTEGER(C_INT) FUNCTION PIOc_freedecomp(iosysid, ioid)&
                           bind(C,name="PIOc_freedecomp")
@@ -165,7 +165,7 @@ INTERFACE
 !! @brief Get local array/data size for an I/O decomposition
 !!
 !! @details
-!! @param[out] ioid The I/O decomposition id/handle for the decomposition
+!! @param[in] ioid The I/O decomposition id/handle for the decomposition
 !! @returns The local array/data size for the I/O decomposition
   INTEGER(C_INT) FUNCTION PIOc_get_local_array_size(ioid)&
                           bind(C,name="PIOc_get_local_array_size")
