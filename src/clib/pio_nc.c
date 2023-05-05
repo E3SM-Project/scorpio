@@ -606,7 +606,7 @@ int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
     if (file->iotype == PIO_IOTYPE_HDF5)
     {
         if (sizep)
-            *sizep = hdf5_get_nc_type_size(xtype);
+            *sizep = spio_get_nc_type_size(xtype);
 
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1075,7 +1075,7 @@ int PIOc_inq_dimid(int ncid, const char *name, int *idp)
         ierr = PIO_EBADDIM;
         for (int i = 0; i < file->num_dim_vars; i++)
         {
-            if (!strcmp(name, file->dim_names[i]))
+            if (!strncmp(name, file->dim_names[i], PIO_MAX_NAME))
             {
                 *idp = i;
                 ierr = PIO_NOERR;
@@ -1115,7 +1115,7 @@ int PIOc_inq_dimid(int ncid, const char *name, int *idp)
         *idp = -1;
         for (int i = 0; i < file->hdf5_num_dims; i++)
         {
-            if (!strcmp(name, file->hdf5_dims[i].name))
+            if (!strncmp(name, file->hdf5_dims[i].name, PIO_MAX_NAME))
             {
                 *idp = i;
                 ierr = PIO_NOERR;
@@ -1713,7 +1713,7 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
         ierr = PIO_ENOTVAR;
         for (int i = 0; i < file->num_vars; i++)
         {
-            if (!strcmp(name, file->adios_vars[i].name))
+            if (!strncmp(name, file->adios_vars[i].name, PIO_MAX_NAME))
             {
                 *varidp = i;
                 ierr = PIO_NOERR;
@@ -1741,7 +1741,7 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
         ierr = PIO_ENOTVAR;
         for (int i = 0; i < file->hdf5_num_vars; i++)
         {
-            if (!strcmp(name, file->hdf5_vars[i].name))
+            if (!strncmp(name, file->hdf5_vars[i].name, PIO_MAX_NAME))
             {
                 *varidp = i;
                 ierr = PIO_NOERR;
@@ -1933,7 +1933,7 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
         ierr = PIO_ENOTATT;
         for (int i = 0; i < file->num_attrs; i++)
         {
-            if (!strcmp(name, file->adios_attrs[i].att_name) &&
+            if (!strncmp(name, file->adios_attrs[i].att_name, PIO_MAX_NAME) &&
                 file->adios_attrs[i].att_varid == varid &&
                 file->adios_attrs[i].att_ncid == ncid)
             {
@@ -1964,7 +1964,7 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
         ierr = PIO_ENOTATT;
         for (int i = 0; i < file->hdf5_num_attrs; i++)
         {
-            if (!strcmp(name, file->hdf5_attrs[i].att_name) &&
+            if (!strncmp(name, file->hdf5_attrs[i].att_name, PIO_MAX_NAME) &&
                 file->hdf5_attrs[i].att_varid == varid &&
                 file->hdf5_attrs[i].att_ncid == ncid)
             {
@@ -2988,6 +2988,16 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
 
         assert(file->num_dim_vars < PIO_MAX_DIMS);
         file->dim_names[file->num_dim_vars] = spio_strdup(name);
+        if (file->dim_names[file->num_dim_vars] == NULL)
+        {
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Defining dimension %s in file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "Out of memory duplicating dimension name",
+                           name, pio_get_fname_from_file(file), ncid);
+        }
+
         file->dim_values[file->num_dim_vars] = len;
         *idp = file->num_dim_vars;
         ++file->num_dim_vars;
@@ -3034,6 +3044,16 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
     if (file->iotype == PIO_IOTYPE_HDF5)
     {
         file->hdf5_dims[file->hdf5_num_dims].name = spio_strdup(name);
+        if (file->hdf5_dims[file->hdf5_num_dims].name == NULL)
+        {
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Defining dimension %s in file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "Out of memory duplicating dimension name",
+                           name, pio_get_fname_from_file(file), ncid);
+        }
+
         file->hdf5_dims[file->hdf5_num_dims].len = len;
         file->hdf5_dims[file->hdf5_num_dims].has_coord_var = false;
         *idp = file->hdf5_num_dims;
@@ -3229,6 +3249,16 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
 
         assert(file->num_vars < PIO_MAX_VARS);
         file->adios_vars[file->num_vars].name = spio_strdup(name);
+        if (file->adios_vars[file->num_vars].name == NULL)
+        {
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Defining variable %s in file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "Out of memory duplicating variable name",
+                           name, pio_get_fname_from_file(file), ncid);
+        }
+
         file->adios_vars[file->num_vars].nc_type = xtype;
         file->adios_vars[file->num_vars].adios_type = PIOc_get_adios_type(xtype);
         file->adios_vars[file->num_vars].adios_type_size = (size_t)get_adios2_type_size(file->adios_vars[file->num_vars].adios_type, NULL);
@@ -3354,6 +3384,16 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
     {
         assert(file->hdf5_num_vars < PIO_MAX_VARS);
         file->hdf5_vars[file->hdf5_num_vars].name = spio_strdup(name);
+        if (file->hdf5_vars[file->hdf5_num_vars].name == NULL)
+        {
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Defining variable %s in file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "Out of memory duplicating variable name",
+                           name, pio_get_fname_from_file(file), ncid);
+        }
+
         file->hdf5_vars[file->hdf5_num_vars].alt_name = NULL;
         file->hdf5_vars[file->hdf5_num_vars].nc_type = xtype;
         file->hdf5_vars[file->hdf5_num_vars].ndims = ndims;
@@ -3366,7 +3406,8 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                           "Defining variable %s in file %s (ncid=%d) using HDF5 iotype failed. Out of memory allocating %lld bytes for global dimensions",
+                           "Defining variable %s in file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "Out of memory allocating %lld bytes for global dimensions",
                            vname, pio_get_fname_from_file(file), ncid, (unsigned long long) (ndims * sizeof(int)));
         }
         memcpy(file->hdf5_vars[file->hdf5_num_vars].hdf5_dimids, dimidsp, ndims * sizeof(int));
@@ -3398,7 +3439,8 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                         spio_ltimer_stop(file->io_fstats->tot_timer_name);
                         return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                                       "Defining variable %s in file %s (ncid=%d) using HDF5 iotype failed. Out of memory allocating %lld bytes for alternative variable name",
+                                       "Defining variable %s in file (%s, ncid=%d) using HDF5 iotype failed. "
+                                       "Out of memory allocating %lld bytes for alternative variable name",
                                        vname, pio_get_fname_from_file(file), ncid, (unsigned long long)alt_name_len);
                     }
 
@@ -3479,90 +3521,14 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
 #ifdef _HDF5
         if (file->iotype == PIO_IOTYPE_HDF5)
         {
-            herr_t herr;
-            hid_t h5_xtype;
-            hid_t sid;
-            hid_t dcpl_id;
-            hsize_t cdim[H5S_MAX_RANK], dims[H5S_MAX_RANK], mdims[H5S_MAX_RANK];
-            int i;
-
-            for (i = 0; i < ndims; i++)
-                dims[i] = mdims[i] = file->hdf5_dims[dimidsp[i]].len;
-
-            dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
-
-            /* H5DSattach_scale calls (even with MPI_Barrier) might fail or hang if attribute creation
-             * order is tracked or indexed. Before we have a better workaround, temporarily disable
-             * tracking and indexing of attribute creation order. */
-            /* H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED); */
-
-            if (xtype == NC_CHAR)
-            {
-                /* String type */
-                h5_xtype = H5Tcopy(H5T_C_S1);
-                H5Tset_strpad(h5_xtype, H5T_STR_NULLTERM);
-                H5Tset_cset(h5_xtype, H5T_CSET_ASCII);
-            }
-            else
-                h5_xtype = nc_type_to_hdf5_type(xtype);
-
-            file->hdf5_vars[*varidp].hdf5_type = h5_xtype;
-
-            if (ndims > 0 && dims[0] == PIO_UNLIMITED)
-            {
-                mdims[0] = H5S_UNLIMITED;
-
-                /* Chunk size along rec dim is always 1 */
-                cdim[0] = 1;
-                for (i = 1; i < ndims; i++)
-                    cdim[i] = mdims[i];
-
-                herr = H5Pset_chunk(dcpl_id, ndims, cdim);
-            }
-
-            sid = H5Screate_simple(ndims, dims, mdims);
-            const char* dataset_name = (file->hdf5_vars[*varidp].alt_name == NULL)? name : file->hdf5_vars[*varidp].alt_name;
-            file->hdf5_vars[*varidp].hdf5_dataset_id = H5Dcreate2(file->hdf5_file_id, dataset_name, h5_xtype, sid, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
-            if (file->hdf5_vars[*varidp].hdf5_dataset_id < 0)
-            {
-                const char *vname = (name) ? name : "UNKNOWN";
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                               "Defining variable %s in file %s (ncid=%d) using HDF5 iotype failed. H5Dcreate2() for variable %s failed.",
-                               vname, pio_get_fname_from_file(file), ncid, dataset_name);
-            }
-
-            H5Sclose(sid);
-            H5Pclose(dcpl_id);
-
-            /* Write the hidden coordinates attribute, which lists the dimids of this variable. */
-            if (ndims > 0)
-            {
-                hsize_t coords_len[1];
-                hid_t coords_space_id, coords_att_id;
-                htri_t attr_exists;
-
-                coords_len[0] = ndims;
-                coords_space_id = H5Screate_simple(1, coords_len, coords_len);
-
-                /* H5Aexists() returns zero (false), a positive (true) or a negative (failure) value */
-                attr_exists = H5Aexists(file->hdf5_vars[*varidp].hdf5_dataset_id, "_Netcdf4Coordinates");
-                if (attr_exists > 0)
-                    coords_att_id = H5Aopen(file->hdf5_vars[*varidp].hdf5_dataset_id, "_Netcdf4Coordinates", H5P_DEFAULT);
-                else if (attr_exists == 0)
-                    coords_att_id = H5Acreate2(file->hdf5_vars[*varidp].hdf5_dataset_id, "_Netcdf4Coordinates",
-                                              H5T_NATIVE_INT, coords_space_id, H5P_DEFAULT, H5P_DEFAULT);
-                else
-                {
-                    /* Error determining whether an attribute with a given name exists on an object */
-                }
-
-                H5Awrite(coords_att_id, H5T_NATIVE_INT, dimidsp);
-
-                H5Sclose(coords_space_id);
-                H5Aclose(coords_att_id);
-            }
+             ierr = spio_hdf5_def_var(ios, file, name, xtype, ndims, dimidsp, *varidp);
+             if (ierr != PIO_NOERR)
+             {
+                 char errmsg[PIO_MAX_NAME];
+                 ierr2 = PIOc_strerror(ierr, errmsg, PIO_MAX_NAME);
+                 ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                 "Defining variable %s (ndims = %d) in file %s (ncid=%d, iotype=%s) failed. %s", name, ndims, pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype), ((ierr2 == PIO_NOERR) ? errmsg : ""));
+             }
         }
 #endif /* _HDF5 */
     }

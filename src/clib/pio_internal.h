@@ -405,6 +405,8 @@ extern "C" {
      */
     char *spio_strdup(const char *str);
 
+    PIO_Offset spio_get_nc_type_size(nc_type xtype);
+
 /* Asynchronous I/O services start with the following seq num */
 static const int PIO_MSG_START_SEQ_NUM = 1024;
 /** These are the messages that can be sent over the intercomm when
@@ -678,6 +680,27 @@ const char *pio_get_vnames_from_file_id(int pio_file_id,
               int *varids, int varids_sz, char *buf, size_t buf_sz);
 const char *pio_async_msg_to_string(int msg);
 #define PIO_IS_NULL(p) ((p) ? "not NULL" : "NULL")
+
+/* Some helper functions internally used by HDF5 IO type */
+#ifdef _HDF5
+hid_t spio_nc_type_to_hdf5_type(nc_type xtype);
+
+int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filename);
+
+int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
+                      nc_type xtype, int ndims, const int *dimidsp, int varid);
+
+int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file);
+
+int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const char *name,
+                      nc_type atttype, PIO_Offset len, const void *op);
+
+int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
+                      const PIO_Offset *start, const PIO_Offset *count,
+                      const PIO_Offset *stride, nc_type xtype, const void *buf);
+
+int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file);
+#endif
 
 #if defined(__cplusplus)
 }

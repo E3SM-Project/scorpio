@@ -943,27 +943,7 @@ int PIOc_closefile(int ncid)
 #endif
 #ifdef _HDF5
         case PIO_IOTYPE_HDF5:
-            ierr = PIO_NOERR;
-
-            H5Pclose(file->dxplid_coll);
-            H5Pclose(file->dxplid_indep);
-
-            for (int i = 0; i < file->hdf5_num_dims; i++)
-            {
-                if (!file->hdf5_dims[i].has_coord_var)
-                    H5Dclose(file->hdf5_dims[i].hdf5_dataset_id);
-            }
-
-            for (int i = 0; i < file->hdf5_num_vars; i++)
-            {
-                H5Dclose(file->hdf5_vars[i].hdf5_dataset_id);
-
-                if (file->hdf5_vars[i].nc_type == NC_CHAR)
-                    H5Tclose(file->hdf5_vars[i].hdf5_type);
-            }
-
-            H5Fclose(file->hdf5_file_id);
-
+            ierr = spio_hdf5_close(ios, file);
             break;
 #endif
         default:

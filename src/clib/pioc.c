@@ -314,16 +314,42 @@ int PIOc_setframe(int ncid, int varid, int frame)
 
                 /* Get current dimension size */
                 hid_t file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
+                if (file_space_id == H5I_INVALID_HID)
+                {
+                    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                   "Setting frame to variable (%s, varid=%d) in file (%s, ncid=%d) using HDF5 iotype failed. "
+                                   "The low level (HDF5) I/O library call failed to make a copy of the dataspace of the dataset associated with this variable",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                }
 
                 int ndim = H5Sget_simple_extent_dims(file_space_id, dims, mdims);
+                if (ndim < 0)
+                {
+                    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                   "Setting frame to variable (%s, varid=%d) in file (%s, ncid=%d) using HDF5 iotype failed. "
+                                   "The low level (HDF5) I/O library call failed to retrieve dimension size and maximum size of a dataspace copied from the dataset associated with this variable",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                }
 
-                H5Sclose(file_space_id);
+                if (H5Sclose(file_space_id) < 0)
+                {
+                    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                   "Setting frame to variable (%s, varid=%d) in file (%s, ncid=%d) using HDF5 iotype failed. "
+                                   "The low level (HDF5) I/O library call failed to release a dataspace copied from the dataset associated with this variable",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                }
 
                 /* Extend record dimension if needed */
                 if (ndim > 0 && mdims[0] == H5S_UNLIMITED && dims[0] < (hsize_t)(frame + 1))
                 {
                     dims[0] = frame + 1;
-                    H5Dextend(file->hdf5_vars[varid].hdf5_dataset_id, dims);
+                    if (H5Dextend(file->hdf5_vars[varid].hdf5_dataset_id, dims) < 0)
+                    {
+                        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                       "Setting frame to variable (%s, varid=%d) in file (%s, ncid=%d) using HDF5 iotype failed. "
+                                       "The low level (HDF5) I/O library call failed to extend the dataset associated with this variable",
+                                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                    }
                 }
             }
         }
