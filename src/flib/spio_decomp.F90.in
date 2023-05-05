@@ -175,11 +175,11 @@ CONTAINS
     cerr = PIOc_InitDecomp(iosys%iosysid, INT(dt, C_INT), INT(ndims, C_INT),&
                             C_LOC(cgdims), INT(mapsz, C_INT), C_LOC(cmap),&
                             C_LOC(cioid), prearr, pstart, pcnt)
+    IF(PRESENT(iostart) .AND. PRESENT(iocount))THEN
+      DEALLOCATE(cstart, ccnt)
+    ENDIF
+    DEALLOCATE(cmap)
     IF(cerr /= PIO_NOERR) THEN
-      IF(PRESENT(iostart) .AND. PRESENT(iocount))THEN
-        DEALLOCATE(cstart, ccnt)
-      ENDIF
-      DEALLOCATE(cmap)
       IF(PRESENT(ierr)) THEN
         ierr = INT(cerr)
       ELSE
@@ -190,10 +190,6 @@ CONTAINS
     ENDIF
 
     iodesc%ioid = INT(cioid, i4)
-    IF(PRESENT(iostart) .AND. PRESENT(iocount))THEN
-      DEALLOCATE(cstart, ccnt)
-    ENDIF
-    DEALLOCATE(cmap)
 
 #ifdef TIMING
     CALL t_stopf("PIO:initdecomp")
@@ -275,21 +271,19 @@ CONTAINS
     cerr = PIOc_InitDecomp_bc(iosys%iosysid, INT(dt, C_INT), INT(ndims, C_INT),&
                             C_LOC(cgdims), C_LOC(cstart), C_LOC(ccnt),&
                             C_LOC(cioid))
+    DEALLOCATE(cstart, ccnt)
     IF(cerr /= PIO_NOERR) THEN
-      DEALLOCATE(cstart, ccnt)
       IF(PRESENT(ierr)) THEN
         ierr = INT(cerr)
       ELSE
         WRITE(log_msg, *) "PIO_initdecomp (PIO_initdecomp_bc) failed, err =",&
                           cerr, ", iosysid =", iosys%iosysid, ", gdims = ", gdims
         ret = pio_error(iosys, INT(cerr), __FILE__, __LINE__, trim(log_msg))
-        DEALLOCATE(cstart, ccnt)
         RETURN
       ENDIF
     ENDIF
 
     iodesc%ioid = INT(cioid, i4)
-    DEALLOCATE(cstart, ccnt)
 
 #ifdef TIMING
     CALL t_stopf("PIO:initdecomp")
