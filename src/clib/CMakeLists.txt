@@ -8,9 +8,34 @@ message(STATUS "===== Configuring SCORPIO C library... =====")
 #==============================================================================
 #  DEFINE THE TARGET LIBRARY
 #==============================================================================
+# PIO API source
+set (pio_api_src
+  api/spio_ddata_api.cpp
+  api/spio_dim_api.cpp
+  api/spio_err_api.cpp
+  api/spio_file_api.cpp
+  api/spio_file_md_api.cpp
+  api/spio_get_att_api.cpp
+  api/spio_get_var1_api.cpp
+  api/spio_get_vara_api.cpp
+  api/spio_get_var_api.cpp
+  api/spio_get_varm_api.cpp
+  api/spio_get_vars_api.cpp
+  api/spio_io_decomp_api.cpp
+  api/spio_io_sys_api.cpp
+  api/spio_misc_att_api.cpp
+  api/spio_misc_var_api.cpp
+  api/spio_put_att_api.cpp
+  api/spio_put_var1_api.cpp
+  api/spio_put_vara_api.cpp
+  api/spio_put_var_api.cpp
+  api/spio_put_varm_api.cpp
+  api/spio_put_vars_api.cpp)
+
 
 # Add sources for libpioc.a
-add_library (pioc topology.c pio_mpi_timer.c pio_timer.c pio_file.c
+add_library (pioc ${pio_api_src}
+  topology.c pio_mpi_timer.c pio_timer.c pio_file.c
   pioc_support.c pio_lists.c pio_print.c
   pioc.c pioc_sc.c pio_spmd.c pio_rearrange.c pio_nc4.c bget.c
   pio_nc.c pio_put_nc.c pio_get_nc.c pio_getput_int.c pio_msg.c pio_varm.c

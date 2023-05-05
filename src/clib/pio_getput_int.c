@@ -96,7 +96,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        ierr = PIOc_inq_type(ncid, atttype, NULL, &atttype_len);
+        ierr = PIOc_inq_type_impl(ncid, atttype, NULL, &atttype_len);
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_type failed, ierr = %d", ierr));
             GPTLstop("PIO:spio_put_att_tc");
@@ -114,7 +114,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             memtype_len = sizeof(long int);
         else
         {
-            ierr = PIOc_inq_type(ncid, memtype, NULL, &memtype_len);
+            ierr = PIOc_inq_type_impl(ncid, memtype, NULL, &memtype_len);
             if(ierr != PIO_NOERR){
                 GPTLstop("PIO:spio_put_att_tc");
                 GPTLstop("PIO:write_total");
@@ -604,7 +604,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        ierr = PIOc_inq_att(ncid, varid, name, &atttype, &attlen);
+        ierr = PIOc_inq_att_impl(ncid, varid, name, &atttype, &attlen);
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_att failed, ierr = %d", ierr));
             GPTLstop("PIO:spio_get_att_tc");
@@ -613,7 +613,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         LOG((2, "atttype = %d attlen = %d", atttype, attlen));
 
         /* Get the length (in bytes) of the type of the attribute. */
-        ierr = PIOc_inq_type(ncid, atttype, NULL, &atttype_len);
+        ierr = PIOc_inq_type_impl(ncid, atttype, NULL, &atttype_len);
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_type failed, ierr=%d", ierr));
             GPTLstop("PIO:spio_get_att_tc");
@@ -626,7 +626,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             memtype_len = sizeof(long int);
         else
         {
-            ierr = PIOc_inq_type(ncid, memtype, NULL, &memtype_len);
+            ierr = PIOc_inq_type_impl(ncid, memtype, NULL, &memtype_len);
             if(ierr != PIO_NOERR){
                 LOG((1, "PIOc_inq_type failed, ierr = %d", ierr));
                 GPTLstop("PIO:spio_get_att_tc");
@@ -1052,7 +1052,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        ierr = PIOc_inq_vartype(ncid, varid, &vartype);
+        ierr = PIOc_inq_vartype_impl(ncid, varid, &vartype);
         if(ierr != PIO_NOERR){
             GPTLstop("PIO:spio_get_vars_tc");
             return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
@@ -1068,7 +1068,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             typelen = sizeof(long int);
         else
         {
-            ierr = PIOc_inq_type(ncid, xtype, NULL, &typelen);
+            ierr = PIOc_inq_type_impl(ncid, xtype, NULL, &typelen);
             if(ierr != PIO_NOERR){
                 GPTLstop("PIO:spio_get_vars_tc");
                 return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
@@ -1077,7 +1077,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
 
         /* Get the number of dims for this var. */
-        ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+        ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
         if(ierr != PIO_NOERR){
             GPTLstop("PIO:spio_get_vars_tc");
             return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
@@ -2285,7 +2285,7 @@ int spio_get_var1_tc(int ncid, int varid, const PIO_Offset *index, nc_type xtype
     ios = file->iosystem;
 
     /* Find the number of dimensions. */
-    if ((ierr = PIOc_inq_varndims(ncid, varid, &ndims)))
+    if ((ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims)))
     {
         return pio_err(ios, file, ierr, __FILE__, __LINE__,
                         "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Unable to inquire the number of dimensions in the variable", pio_get_vname_from_file(file, varid), varid, pio_get_vname_from_file(file, varid), file->pio_ncid);
@@ -2338,7 +2338,7 @@ int spio_get_var_tc(int ncid, int varid, nc_type xtype, void *buf)
     ios = file->iosystem;
 
     /* Find the number of dimensions. */
-    if ((ierr = PIOc_inq_varndims(ncid, varid, &ndims)))
+    if ((ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims)))
     {
         return pio_err(ios, file, ierr, __FILE__, __LINE__,
                         "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring number of dimensions in the variable failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
@@ -2350,7 +2350,7 @@ int spio_get_var_tc(int ncid, int varid, nc_type xtype, void *buf)
     {
         /* Find the dimension IDs. */
         int dimids[ndims];
-        if ((ierr = PIOc_inq_vardimid(ncid, varid, dimids)))
+        if ((ierr = PIOc_inq_vardimid_impl(ncid, varid, dimids)))
         {
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
                             "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable dimension ids failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
@@ -2358,7 +2358,7 @@ int spio_get_var_tc(int ncid, int varid, nc_type xtype, void *buf)
 
         /* Find the dimension lengths. */
         for (int d = 0; d < ndims; d++)
-            if ((ierr = PIOc_inq_dimlen(ncid, dimids[d], &dimlen[d])))
+            if ((ierr = PIOc_inq_dimlen_impl(ncid, dimids[d], &dimlen[d])))
             {
                 return pio_err(ios, file, ierr, __FILE__, __LINE__,
                                 "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable dimension length for dim %d (dimid = %d) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, d, dimids[d]);
@@ -2490,7 +2490,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        ierr = PIOc_inq_vartype(ncid, varid, &vartype);
+        ierr = PIOc_inq_vartype_impl(ncid, varid, &vartype);
         if(ierr != PIO_NOERR){
             GPTLstop("PIO:spio_put_vars_tc");
             GPTLstop("PIO:write_total");
@@ -2508,7 +2508,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             xtype = vartype;
 
         /* Get the number of dims for this var. */
-        ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+        ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
         if(ierr != PIO_NOERR){
             GPTLstop("PIO:spio_put_vars_tc");
             GPTLstop("PIO:write_total");
@@ -2526,7 +2526,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             typelen = sizeof(long int);
         else
         {
-            ierr = PIOc_inq_type(ncid, xtype, NULL, &typelen);
+            ierr = PIOc_inq_type_impl(ncid, xtype, NULL, &typelen);
             if(ierr != PIO_NOERR){
                 GPTLstop("PIO:spio_put_vars_tc");
                 GPTLstop("PIO:write_total");
@@ -3487,7 +3487,7 @@ int spio_put_var1_tc(int ncid, int varid, const PIO_Offset *index, nc_type xtype
     ios = file->iosystem;
 
     /* Find the number of dimensions. */
-    if ((ierr = PIOc_inq_varndims(ncid, varid, &ndims)))
+    if ((ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims)))
     {
         return pio_err(ios, file, ierr, __FILE__, __LINE__,
                         "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Finding the number of dimensions of the variable failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
@@ -3550,7 +3550,7 @@ int spio_put_var_tc(int ncid, int varid, nc_type xtype, const void *op)
     ios = file->iosystem;
 
     /* Find the number of dimensions. */
-    if ((ierr = PIOc_inq_varndims(ncid, varid, &ndims)))
+    if ((ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims)))
     {
         return pio_err(ios, file, ierr, __FILE__, __LINE__,
                         "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Finding the number of dimensions of the variable failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
@@ -3567,7 +3567,7 @@ int spio_put_var_tc(int ncid, int varid, nc_type xtype, const void *op)
             start[d] = 0;
 
         /* Get the dimids for this var. */
-        ierr = PIOc_inq_vardimid(ncid, varid, dimid);
+        ierr = PIOc_inq_vardimid_impl(ncid, varid, dimid);
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_vardimid failed, ierr = %d", ierr));
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -3576,7 +3576,7 @@ int spio_put_var_tc(int ncid, int varid, nc_type xtype, const void *op)
 
         /* Count array are the dimlens. */
         for (int d = 0; d < ndims; d++)
-            if ((ierr = PIOc_inq_dimlen(ncid, dimid[d], &count[d])))
+            if ((ierr = PIOc_inq_dimlen_impl(ncid, dimid[d], &count[d])))
             {
                 return pio_err(ios, file, ierr, __FILE__, __LINE__,
                                 "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Finding the dimension length of dim %d in the file failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, d);
