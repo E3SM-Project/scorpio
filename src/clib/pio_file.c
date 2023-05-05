@@ -29,7 +29,7 @@
  * @ingroup PIO_openfile
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_openfile(int iosysid, int *ncidp, int *iotype, const char *filename,
+int PIOc_openfile_impl(int iosysid, int *ncidp, int *iotype, const char *filename,
                   int mode)
 {
     return openfile_int(iosysid, ncidp, iotype, filename, mode, 1);
@@ -54,7 +54,7 @@ int PIOc_openfile(int iosysid, int *ncidp, int *iotype, const char *filename,
  * @ingroup PIO_openfile
  * @author Ed Hartnett
  */
-int PIOc_openfile2(int iosysid, int *ncidp, int *iotype, const char *filename,
+int PIOc_openfile2_impl(int iosysid, int *ncidp, int *iotype, const char *filename,
                    int mode)
 {
     return openfile_int(iosysid, ncidp, iotype, filename, mode, 0);
@@ -73,7 +73,7 @@ int PIOc_openfile2(int iosysid, int *ncidp, int *iotype, const char *filename,
  * @ingroup PIO_openfile
  * @author Ed Hartnett
  */
-int PIOc_open(int iosysid, const char *path, int mode, int *ncidp)
+int PIOc_open_impl(int iosysid, const char *path, int mode, int *ncidp)
 {
     int iotype;
 
@@ -106,7 +106,7 @@ int PIOc_open(int iosysid, const char *path, int mode, int *ncidp)
 
     /* Open the file. If the open fails, do not retry as serial
      * netCDF. Just return the error code. */
-    return PIOc_openfile_retry(iosysid, ncidp, &iotype, path, mode, 0);
+    return PIOc_openfile_retry_impl(iosysid, ncidp, &iotype, path, mode, 0);
 }
 
 /**
@@ -127,7 +127,7 @@ int PIOc_open(int iosysid, const char *path, int mode, int *ncidp)
  * @ingroup PIO_createfile
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_createfile(int iosysid, int *ncidp, const int *iotype, const char *filename,
+int PIOc_createfile_impl(int iosysid, int *ncidp, const int *iotype, const char *filename,
                     int mode)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
@@ -184,7 +184,7 @@ int PIOc_createfile(int iosysid, int *ncidp, const int *iotype, const char *file
         /* Set the fill mode to NOFILL. */
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        if ((ret = PIOc_set_fill(*ncidp, NC_NOFILL, NULL)))
+        if ((ret = PIOc_set_fill_impl(*ncidp, NC_NOFILL, NULL)))
         {
             GPTLstop("PIO:PIOc_createfile");
             GPTLstop("PIO:write_total");
@@ -226,7 +226,7 @@ int PIOc_createfile(int iosysid, int *ncidp, const int *iotype, const char *file
  * @ingroup PIO_create
  * @author Ed Hartnett
  */
-int PIOc_create(int iosysid, const char *filename, int cmode, int *ncidp)
+int PIOc_create_impl(int iosysid, const char *filename, int cmode, int *ncidp)
 {
     int iotype;            /* The PIO IO type. */
 
@@ -446,7 +446,7 @@ static int sync_file(int ncid)
  * @returns PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_closefile(int ncid)
+int PIOc_closefile_impl(int ncid)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file = NULL;     /* Pointer to file information. */
@@ -1114,7 +1114,7 @@ int PIOc_closefile(int ncid)
  * @returns PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_deletefile(int iosysid, const char *filename)
+int PIOc_deletefile_impl(int iosysid, const char *filename)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     int ierr = PIO_NOERR;  /* Return code from function calls. */
@@ -1219,7 +1219,7 @@ int PIOc_deletefile(int iosysid, const char *filename)
  * @returns PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_sync(int ncid)
+int PIOc_sync_impl(int ncid)
 {
     file_desc_t *file = NULL;     /* Pointer to file information. */
     int ierr = PIO_NOERR;  /* Return code from function calls. */

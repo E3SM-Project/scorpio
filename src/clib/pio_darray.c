@@ -44,7 +44,7 @@ PIO_Offset maxusage = 0;
  * @param limit the size of the buffer on the IO nodes
  * @return The previous limit setting.
  */
-PIO_Offset PIOc_set_buffer_size_limit(PIO_Offset limit)
+PIO_Offset PIOc_set_buffer_size_limit_impl(PIO_Offset limit)
 {
     PIO_Offset oldsize = pio_buffer_size_limit;
 
@@ -109,7 +109,7 @@ PIO_Offset PIOc_set_buffer_size_limit(PIO_Offset limit)
  * @ingroup PIO_write_darray
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
+int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvars,
                             PIO_Offset arraylen, const void *array, const int *frame,
                             const void **fillvalue, bool flushtodisk)
 {
@@ -204,7 +204,7 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        ierr = PIOc_inq_varndims(file->pio_ncid, varids[0], &fndims);
+        ierr = PIOc_inq_varndims_impl(file->pio_ncid, varids[0], &fndims);
         if(ierr != PIO_NOERR){
           GPTLstop("PIO:PIOc_write_darray_multi");
           return pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -717,7 +717,7 @@ int find_var_fillvalue(file_desc_t *file, int varid, var_desc_t *vdesc)
     }
 
     /* Get the fill value. */
-    if ((ierr = PIOc_inq_var_fill(file->pio_ncid, varid, &no_fill, vdesc->fillvalue)))
+    if ((ierr = PIOc_inq_var_fill_impl(file->pio_ncid, varid, &no_fill, vdesc->fillvalue)))
     {
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                         "Finding fillvalue for variable (%s, varid=%d) in file (%s, ncid=%d), failed. Inquiring variable fillvalue failed", vdesc->vname, varid, file->fname, file->pio_ncid); 
@@ -1976,7 +1976,7 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
  * @ingroup PIO_write_darray
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const void *array,
+int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, const void *array,
                       const void *fillvalue)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
@@ -2118,7 +2118,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const 
                             "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Saving I/O decomposition (ioid=%d) failed. Unable to create a unique file name for saving the I/O decomposition", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
         }
         LOG((2, "Saving decomp map (write) to %s", filename));
-        PIOc_writemap(filename, ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
+        PIOc_writemap_impl(filename, ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
         iodesc->is_saved = true;
     }
 #endif
@@ -2138,7 +2138,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const 
         /* Find out PIO data type of var. */
         if (vdesc->pio_type == PIO_NAT)
         {
-            if ((ierr = PIOc_inq_vartype(ncid, varid, &vdesc->pio_type)))
+            if ((ierr = PIOc_inq_vartype_impl(ncid, varid, &vdesc->pio_type)))
             {
                 GPTLstop("PIO:PIOc_write_darray");
                 GPTLstop("PIO:write_total");
@@ -2152,7 +2152,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const 
         /* Find out length of type. */
         if (vdesc->type_size == 0)
         {
-            if ((ierr = PIOc_inq_type(ncid, vdesc->pio_type, NULL, &vdesc->type_size)))
+            if ((ierr = PIOc_inq_type_impl(ncid, vdesc->pio_type, NULL, &vdesc->type_size)))
             {
                 GPTLstop("PIO:PIOc_write_darray");
                 GPTLstop("PIO:write_total");
@@ -3475,7 +3475,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
  * @ingroup PIO_read_darray
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
+int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
                      void *array)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
@@ -3555,7 +3555,7 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
         {
             if (vdesc->pio_type == PIO_NAT)
             {
-                if ((ierr = PIOc_inq_vartype(ncid, varid, &vdesc->pio_type)))
+                if ((ierr = PIOc_inq_vartype_impl(ncid, varid, &vdesc->pio_type)))
                 {
                     GPTLstop("PIO:PIOc_read_darray");
                     return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
@@ -3578,7 +3578,7 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
         {
             if (vdesc->type_size == 0)
             {
-                if ((ierr = PIOc_inq_type(ncid, vdesc->pio_type, NULL, &vdesc->type_size)))
+                if ((ierr = PIOc_inq_type_impl(ncid, vdesc->pio_type, NULL, &vdesc->type_size)))
                 {
                     GPTLstop("PIO:PIOc_read_darray");
                     return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
@@ -3622,7 +3622,7 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        ierr = PIOc_inq_varndims(file->pio_ncid, varid, &fndims);
+        ierr = PIOc_inq_varndims_impl(file->pio_ncid, varid, &fndims);
         if(ierr != PIO_NOERR){
             GPTLstop("PIO:PIOc_read_darray");
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -3731,7 +3731,7 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
                             "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Saving the I/O decomposition (ioid=%d) failed, unable to create a unique file name for saving the decomposition", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
         }
         LOG((2, "Saving decomp map (read) to %s", filename));
-        PIOc_writemap(filename, ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
+        PIOc_writemap_impl(filename, ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
         iodesc->is_saved = true;
     }
 #endif

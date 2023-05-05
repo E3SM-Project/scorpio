@@ -11,6 +11,7 @@
 #define __PIO_INTERNAL__
 
 #include <pio.h>
+#include "pio_api_impl.h"
 
 /* These are the sizes of types in netCDF files. Do not replace these
  * constants with sizeof() calls for C types. They are not the
