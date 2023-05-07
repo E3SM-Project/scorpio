@@ -168,7 +168,8 @@ int main(int argc, char* argv[])
         ret = PIOc_put_att(ncid, varid_lat, "long_name", PIO_CHAR, strlen("latitude"), "latitude"); ERR
         ret = PIOc_put_att(ncid, varid_lat, "units", PIO_CHAR, strlen("degrees_north"), "degrees_north"); ERR
         ret = PIOc_put_att(ncid, varid_P0, "long_name", PIO_CHAR, strlen("reference pressure"), "reference pressure"); ERR
-        ret = PIOc_put_att(ncid, varid_P0, "units", PIO_CHAR, strlen("Pa"), "Pa"); ERR
+        ret = PIOc_put_att(ncid, varid_P0, "units", PIO_CHAR, strlen("pA"), "pA"); ERR /* Wrong attribute value */
+        ret = PIOc_put_att(ncid, varid_P0, "units", PIO_CHAR, strlen("Pa"), "Pa"); ERR /* Correction: overwrite an existing attribute */
         const int mdims_val = 1;
         ret = PIOc_put_att(ncid, varid_U, "mdims", PIO_INT, 1, &mdims_val); ERR
         ret = PIOc_put_att(ncid, varid_U, "units", PIO_CHAR, strlen("m/s"), "m/s"); ERR
@@ -569,6 +570,9 @@ int main(int argc, char* argv[])
 
 #else
     printf("SCORPIO is not configured with HDF5 support.\n");
+
+    /* Make the test fail if HDF5 support is not enabled/available. */
+    return -1;
 #endif
 
     return 0;
