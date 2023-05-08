@@ -1279,7 +1279,7 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
 
     if (ios->adios_io_process == 1)
     {
-        ios->adiosH = adios2_init(ios->adios_comm, adios2_debug_mode_on);
+        ios->adiosH = adios2_init_mpi(ios->adios_comm);
         if (ios->adiosH == NULL)
         {
             GPTLstop("PIO:PIOc_Init_Intracomm");
