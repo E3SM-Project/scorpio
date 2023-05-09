@@ -2144,7 +2144,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
     nproc   = w_nproc;
 
     // Initialization of the class factory
-    adios2::ADIOS adios(w_comm, adios2::DebugON);
+    adios2::ADIOS adios(w_comm);
 
     double time_init = 0;
     double time_init_max = -1;
@@ -2230,7 +2230,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         adios.RemoveIO(bpIO[0].Name());
         bpReader[1].Close();
         adios.RemoveIO(bpIO[1].Name());
-        adios2::ADIOS adios_new(comm, adios2::DebugON);
+        adios2::ADIOS adios_new(comm);
         ierr = OpenAdiosFile(adios_new, bpIO, bpReader, file0, err_msg);
 
         if (io_proc == 0)
