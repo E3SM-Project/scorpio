@@ -443,9 +443,11 @@ CONTAINS
     INTEGER, INTENT(IN) :: varid, start(:), cnt(:)
     {VTYPE}, TARGET, INTENT(OUT) :: val{DIMSTR}
 
-    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
+    INTEGER, PARAMETER :: LOG_MSG_LEN = 2 * PIO_MAX_NAME
+    CHARACTER(LEN=LOG_MSG_LEN) :: log_msg
     INTEGER(PIO_OFFSET_F2C_TYPE_KIND), ALLOCATABLE :: cstart(:), ccount(:)
-    INTEGER :: i, ndims
+    INTEGER :: i, cnt_sz, ndims
+    INTEGER(PIO_OFFSET_KIND) :: var_sz
 
 #ifdef TIMING
     CALL t_startf("PIO:get_vara_{DIMS}d_{TYPE}")
@@ -470,19 +472,52 @@ CONTAINS
     ! metadata, not from user args
     ! The number of dimensions of the variable is assumed to be equal to the number
     ! of consequtive elements of the cnt array argument that are > 0 
-    ndims = SIZE(cnt)
+    cnt_sz = SIZE(cnt)
     DO i=1,SIZE(cnt)
       IF(cnt(i) <= 0) THEN
-        ndims = i-1
+        cnt_sz = i-1
         exit
       END IF
     END DO
-    IF(ndims == 0) THEN
+    IF(cnt_sz == 0) THEN
       WRITE(log_msg, *) "Invalid count array passed to PIO_get_var() function,",&
                         " pio_get_vara_{DIMS}d_{TYPE}(). The first element in the count",&
-                        " array is <= 0 (should be > 0). varid = ", varid, ", file id = ", file%fh 
+                        " array is <= 0 (should be > 0). varid = ", varid, ", file id = ", file%fh
       ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
       RETURN
+    END IF
+
+    ! Get the number of variable dimensions from the file
+    ! Note: Some E3SM components pass count/start arrays that are larger than the
+    ! number of dimensions of the variable. So for backwards compatibility with the
+    ! legacy Fortran interface we use number of dimensions from the file (rather than
+    ! use the size of the start/count array to guess the number of dimensions of the var)
+    ierr = get_var_dim_sz(file, varid, var_sz, var_ndims=ndims)
+    IF(ierr /= PIO_NOERR) THEN
+      WRITE(log_msg, *) "Unable to query number of dimensions of variable in PIO_get_var() function,",&
+                        " pio_get_vara_{DIMS}d_{TYPE}(). varid = ", varid, ", file id = ", file%fh
+      ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      RETURN
+    END IF
+
+    IF(cnt_sz /= ndims) THEN
+      IF(cnt_sz < ndims) THEN
+        WRITE(log_msg, *) "Invalid count array passed to PIO_get_var() function,",&
+                          " pio_get_vara_{DIMS}d_{TYPE}(). The size of count array",&
+                          " (", cnt_sz, " elements) is less than the number of dimensions",&
+                          " (", ndims, ") of the variable. varid = ", varid, ", file id = ", file%fh
+        ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
+        RETURN
+      ELSE
+        ! Size of start/count arrays > ndims
+        WRITE(log_msg, *) "Invalid count array passed to PIO_get_var() function,",&
+                          " pio_get_vara_{DIMS}d_{TYPE}(). The size of count array",&
+                          " (", cnt_sz, " elements) is greater than the number of dimensions",&
+                          " (", ndims, ") of the variable. The excess number of elements in",&
+                          " the start/count arrays will be ignored. varid = ", varid,&
+                          ", file id = ", file%fh
+        CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
+      END IF
     END IF
     ALLOCATE(cstart(ndims), ccount(ndims))
 
