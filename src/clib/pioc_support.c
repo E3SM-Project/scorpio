@@ -2664,7 +2664,7 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     if (!ncidp || !iotype || !filename || strlen(filename) > PIO_MAX_NAME)
     {
         return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
-                        "Creating file failed. Invalid arguments provided, ncidp is %s (expected not NULL), iotype is %s (expected not NULL), filename is %s (expected not NULL), filename length = %lld (expected <= %d)", PIO_IS_NULL(ncidp), PIO_IS_NULL(iotype), PIO_IS_NULL(filename), (filename) ? ((unsigned long long )strlen(filename)) : 0, (int )PIO_MAX_NAME);
+                        "Creating file (%s) failed. Invalid arguments provided, ncidp is %s (expected not NULL), iotype is %s (expected not NULL), filename is %s (expected not NULL), filename length = %lld (expected <= %d)", (filename) ? filename : "UNKNOWN", PIO_IS_NULL(ncidp), PIO_IS_NULL(iotype), PIO_IS_NULL(filename), (filename) ? ((unsigned long long )strlen(filename)) : 0, (int )PIO_MAX_NAME);
     }
 
     /* A valid iotype must be specified. */
@@ -3423,10 +3423,10 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     }
 
     /* User must provide valid input for these parameters. */
-    if (!ncidp || !iotype || !filename)
+    if (!ncidp || !iotype || !filename || strlen(filename) > PIO_MAX_NAME)
     {
         return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
-                        "Opening file (%s) failed. Invalid arguments provided. ncidp is %s (expected not NULL), iotype is %s (expected not NULL), filename is %s (expected not NULL)", (filename) ? filename : "UNKNOWN", PIO_IS_NULL(ncidp), PIO_IS_NULL(iotype), PIO_IS_NULL(filename));
+                        "Opening file (%s) failed. Invalid arguments provided. ncidp is %s (expected not NULL), iotype is %s (expected not NULL), filename is %s (expected not NULL), filename length = %lld (expected <= %d)", (filename) ? filename : "UNKNOWN", PIO_IS_NULL(ncidp), PIO_IS_NULL(iotype), PIO_IS_NULL(filename), (filename) ? ((unsigned long long )strlen(filename)) : 0, (int )PIO_MAX_NAME);
     }
 
     /* A valid iotype must be specified. */
