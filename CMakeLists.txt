@@ -381,3 +381,31 @@ if (PIO_ENABLE_DOC)
 else ()
   message(STATUS "Disabling SCORPIO Documentation... (default, use -DPIO_ENABLE_DOC:BOOL=ON to enable documentation)")
 endif ()
+
+##############################################
+###   Package scorpio as a CMake package   ###
+##############################################
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+configure_package_config_file(
+  cmake/ScorpioConfig.cmake.in
+  "${CLDERA_BINARY_DIR}/ScorpioConfig.cmake"
+  INSTALL_DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}/cmake)
+
+write_basic_package_version_file(
+  "${CLDERA_BINARY_DIR}/ScorpioConfigVersion.cmake"
+  VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.
+  COMPATIBILITY SameMajorVersion)
+
+
+# Install the ScorpioConfig*.cmake files
+install(FILES
+  "${CLDERA_BINARY_DIR}/ScorpioConfig.cmake"
+  "${CLDERA_BINARY_DIR}/ScorpioConfigVersion.cmake"
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/scorpio)
+
+# Install cmake targets
+install(EXPORT ScorpioTargets
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/scorpio)
