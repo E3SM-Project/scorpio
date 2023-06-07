@@ -65,10 +65,19 @@ add_dependencies (piof genf90)
 #==============================================================================
 #  SET THE COMPILER OPTIONS
 #==============================================================================
-# Include flib source and binary directories (for Fortran modules)
+
+# Beside source dir, include bin dir (for modules generated with genf90),
+# as well as the fortran module directory. If INSTALL_INTERFACE, simply include
+# the include dir
+
+set_target_properties (piof PROPERTIES
+  Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/modules)
 target_include_directories (piof
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-  PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/modules>
+  PUBLIC $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/piof>
+)
 
 # System and compiler CPP directives
 target_compile_definitions (piof
@@ -241,20 +250,15 @@ endif ()
 #==============================================================================
 #  INSTALL
 #==============================================================================
-set (PIO_Fortran_MODS ${CMAKE_CURRENT_BINARY_DIR}/pio.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/pio_nf.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/pio_types.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/piolib_mod.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/pionfget_mod.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/pio_kinds.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/pio_support.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/piodarray.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/pionfatt_mod.mod
-  ${CMAKE_CURRENT_BINARY_DIR}/pionfput_mod.mod)
 
-# Install libpiof.a
-install (TARGETS piof DESTINATION lib)
+# Install piof target as part of ScorpioTargets
+install (TARGETS piof
+  EXPORT ScorpioTargets
+  LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/piof)
 
-# Install the Fortran modules
-install (FILES ${PIO_Fortran_MODS} DESTINATION include)
-
+# Until CMake comes up with a better way to handle compiled Fortran modules,
+# we're stuck with installing modules by hand
+install (DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/modules/
+         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/piof)

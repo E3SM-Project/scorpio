@@ -27,9 +27,19 @@ set (GPTL_Fortran_MODS ${CMAKE_CURRENT_BINARY_DIR}/perf_mod.mod
 
 add_library (gptl ${GPTL_Fortran_SRCS} ${GPTL_C_SRCS})
 
+set_target_properties (gptl PROPERTIES
+  Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/modules)
+set_target_properties (gptl PROPERTIES
+  PUBLIC_HEADER
+    ${CMAKE_CURRENT_SOURCE_DIR}/gptl.h
+)
+
 target_include_directories (gptl
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-  PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/modules>
+  PUBLIC $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/gptl>
+)
 
 target_compile_definitions (gptl
   PUBLIC INCLUDE_CMAKE_FCI)
@@ -76,19 +86,6 @@ endif ()
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "XL")
   set ( CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -qextname=flush" )
 endif ()
-
-#==============================================================================
-#  DEFINE THE INSTALL
-#==============================================================================
-
-# Library
-install (TARGETS gptl DESTINATION lib)
-
-# Header/Include File
-install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/gptl.h DESTINATION include)
-
-# Fortran Modules
-install (FILES ${GPTL_Fortran_MODS} DESTINATION include)
 
 #==============================================================================
 #  DEFINE THE DEPENDENCIES
@@ -192,3 +189,19 @@ if (NOT DEFINED SYSTEM_HAS_GETTIMEOFDAY)
   set (SYSTEM_HAS_GETTIMEOFDAY ${GETTIMEOFDAY}
     CACHE INTERNAL "Whether the gettimeofday function could be found")
 endif ()
+
+#==============================================================================
+#  DEFINE THE INSTALL
+#==============================================================================
+
+# Install gptl target as part of ScorpioTargets
+install (TARGETS gptl
+  EXPORT ScorpioTargets
+  LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gptl)
+
+# Until CMake comes up with a better way to handle compiled Fortran modules,
+# we're stuck with installing modules by hand
+install (DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/modules/
+         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gptl)

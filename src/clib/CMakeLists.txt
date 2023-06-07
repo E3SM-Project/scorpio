@@ -199,16 +199,17 @@ SET(CMAKE_EXTRA_INCLUDE_FILES)
 #==============================================================================
 #  SET THE COMPILER OPTIONS
 #==============================================================================
-# set up include-directories
-include_directories(
-  "${PROJECT_SOURCE_DIR}"   # to find foo/foo.h
-  "${PROJECT_BINARY_DIR}")  # to find foo/config.h
+# # set up include-directories
+# include_directories(
+#   "${PROJECT_SOURCE_DIR}"   # to find foo/foo.h
+#   "${PROJECT_BINARY_DIR}")  # to find foo/config.h
 
 # Include the clib source and binary directory
 target_include_directories (pioc
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories (pioc
-  PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+  PUBLIC $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/pioc>
+)
 
 # System and compiler CPP directives
 target_compile_definitions (pioc
@@ -245,6 +246,12 @@ endif ()
 # MPI_Irsends
 target_compile_definitions (pioc
   PRIVATE USE_MPI_ISEND_FOR_FC)
+
+# Set public header property, so install can install headers
+set_target_properties (pioc PROPERTIES
+  PUBLIC_HEADER
+  "${CMAKE_CURRENT_SOURCE_DIR}/pio.h;${PROJECT_BINARY_DIR}/pio_config.h"
+)
 
 # Compiler-specific compiler options
 string (TOUPPER "${CMAKE_C_COMPILER_ID}" CMAKE_C_COMPILER_NAME)
@@ -302,22 +309,19 @@ else ()
   set(USE_MICRO_TIMING 0)
 endif ()
 
+# Generate pio_config.h
+configure_file (
+  "${PROJECT_SOURCE_DIR}/pio_config.h.in"
+  "${PROJECT_BINARY_DIR}/pio_config.h"
+)
+
 #==============================================================================
 #  INSTALL
 #==============================================================================
 
-# Install libpioc.a
-install (TARGETS pioc DESTINATION lib)
-
-# Install the header file
-install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/pio.h DESTINATION include)
-
-# Generate and install pio_config.h
-configure_file (
-  "${PROJECT_SOURCE_DIR}/pio_config.h.in"
-  "${PROJECT_BINARY_DIR}/pio_config.h"
-  )
-
-# Install PIO config Include/Header File
-install (FILES ${PROJECT_BINARY_DIR}/pio_config.h DESTINATION include)
-
+# Install pioc target as part of ScorpioTargets
+install (TARGETS pioc
+  EXPORT ScorpioTargets
+  LIBRARY       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE       DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/pioc)
