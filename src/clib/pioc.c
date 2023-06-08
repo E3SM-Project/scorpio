@@ -74,6 +74,29 @@ int PIOc_File_is_Open(int ncid)
         return 1;
 }
 
+/**
+ * Get the id of the I/O system associated (I/O system used to open/create
+ * the file) with the file
+ *
+ * @param ncid The file handle/id
+ * @returns The id of the I/O system associated with the file
+ */
+int PIOc_get_iosystem(int ncid)
+{
+  const int INVALID_IOSYSID = -1;
+  file_desc_t *file = NULL;
+  int ret;
+
+  ret = pio_get_file(ncid, &file);
+  if(ret != PIO_NOERR){
+    return INVALID_IOSYSID;
+  }
+
+  assert(file != NULL);
+
+  return ((file->iosystem) ? (file->iosystem->iosysid) : INVALID_IOSYSID);
+}
+
 static const char *PIO_error_handler_to_string(int eh)
 {
     if(eh == PIO_INTERNAL_ERROR){

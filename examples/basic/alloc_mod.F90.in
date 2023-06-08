@@ -9,7 +9,7 @@ module alloc_mod
 
   use pio_kinds
   use pio_types
-  use pio_support, only : piodie, CheckMPIreturn, debug
+  use utils_mod
   implicit none
   private
 
@@ -77,13 +77,11 @@ contains
 
     integer ierr, ierror, rank
 #ifdef ALLOC_DEBUG
-    if(alloc_debug) then
        if(present(msg)) then
           print *,__PIO_FILE__,__LINE__,msg,varlen
        else
           print *,__PIO_FILE__,__LINE__,varlen
        end if
-    end if
 #endif
 
     if(varlen==0) then
@@ -137,13 +135,11 @@ contains
     character(len=*), parameter :: subName=modName//'::dealloc_check_{DIMS}d_{TYPE}'
     integer ierr, ierror, rank
 #ifdef ALLOC_DEBUG
-    if(debug) then
        if(present(msg)) then
           print *,__PIO_FILE__,__LINE__,msg,size(data)
        else
           print *,__PIO_FILE__,__LINE__,size(data)
        end if
-    end if
 #endif
 
     deallocate(data,stat=ierr)

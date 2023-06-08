@@ -2,7 +2,7 @@ module gdecomp_mod
 
    use kinds_mod
 #if !defined(STANDALONE_TEST)
-   use pio_support, only : piodie  ! _EXTERNAL
+   use utils_mod
    use pio, only : pio_offset_kind   ! _EXTERNAL
 #endif
 

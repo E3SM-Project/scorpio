@@ -20,6 +20,8 @@ module pionfatt_mod
   public :: put_att
   interface put_att
      module procedure put_att_id_{TYPE}, put_att_desc_{TYPE}, put_att_vid_{TYPE}
+  end interface
+  interface put_att
      ! TYPE real,int,double
      module procedure put_att_1d_id_{TYPE}
      ! TYPE real,int,double
@@ -35,6 +37,8 @@ module pionfatt_mod
   public :: get_att
   interface get_att
      module procedure get_att_{TYPE}, get_att_desc_{TYPE}, get_att_id_{TYPE}
+  end interface
+  interface get_att
      ! TYPE real,int,double
      module procedure get_att_1d_{TYPE}, get_att_desc_1d_{TYPE}, get_att_1d_id_{TYPE}
   end interface

@@ -1,0 +1,63 @@
+!>
+!! @file
+!! @brief C Interfaces for APIs to read and write distributed arrays
+!!
+
+!> @internal
+!! @def __PIO_FILE__
+!! This macro is used to define the file name in user messages
+!!
+#define __PIO_FILE__ 'spio_darray_cint'
+
+MODULE spio_darray_cint
+  USE iso_c_binding
+  IMPLICIT NONE
+
+INTERFACE
+!> @private
+!! @brief Fortran interface to C function to write distributed arrays
+!!
+!! @param[in] fh The file handle for the file being written to
+!! @param[in] varid The variable id of the variable being written
+!! @param[in] ioid The I/O decomposition id for the data being written
+!! @param[in] arraylen The size/length of the array being written
+!! @param[in] array The array being written to the file
+!! @param[in] fillvalue The fillvalue to use for missing values (holes)
+!! in the data being written out
+!! @returns Returns PIO_NOERR on success, an error code otherwise
+  INTEGER(C_INT) FUNCTION PIOc_write_darray(fh, varid, ioid,&
+                            arraylen, array, fillvalue)&
+                          bind(C,name="PIOc_write_darray")
+    USE iso_c_binding
+    INTEGER(C_INT), VALUE :: fh
+    INTEGER(C_INT), VALUE :: varid
+    INTEGER(C_INT), VALUE :: ioid
+    INTEGER(C_SIZE_T), VALUE :: arraylen
+    TYPE(C_PTR), VALUE :: array
+    TYPE(C_PTR), VALUE :: fillvalue
+  END FUNCTION PIOc_write_darray
+END INTERFACE
+
+INTERFACE
+!> @private
+!! @brief Fortran interface to C function to read distributed arrays
+!!
+!! @param[in] fh The file handle for the file being read from
+!! @param[in] varid The variable id of the variable being read
+!! @param[in] ioid The I/O decomposition id for the data being read
+!! @param[in] arraylen The size/length of the array being read
+!! @param[in] array The array being read from the file
+!! @returns Returns PIO_NOERR on success, an error code otherwise
+  INTEGER(C_INT) FUNCTION PIOc_read_darray(fh, varid, ioid,&
+                            arraylen, array)&
+                          bind(C,name="PIOc_read_darray")
+    USE iso_c_binding
+    INTEGER(C_INT), VALUE :: fh
+    INTEGER(C_INT), VALUE :: varid
+    INTEGER(C_INT), VALUE :: ioid
+    INTEGER(C_SIZE_T), VALUE :: arraylen
+    TYPE(C_PTR), VALUE :: array
+  END FUNCTION PIOc_read_darray
+END INTERFACE
+
+END MODULE spio_darray_cint

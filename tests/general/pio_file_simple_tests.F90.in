@@ -1,6 +1,6 @@
 PIO_TF_TEST_SUB_BEGIN create_file_no_opts(iotype, filename)
   implicit none
-  integer,  intent(in)  :: iotype
+  integer,  intent(inout)  :: iotype
   character(len=PIO_TF_MAX_STR_LEN),  intent(in)  :: filename
 
   type(file_desc_t) :: pio_file
@@ -21,7 +21,7 @@ PIO_TF_TEST_SUB_END create_file_no_opts
 
 PIO_TF_TEST_SUB_BEGIN open_file_no_write(iotype, filename)
   implicit none
-  integer,  intent(in)  :: iotype
+  integer,  intent(inout)  :: iotype
   character(len=PIO_TF_MAX_STR_LEN),  intent(in)  :: filename
 
   type(file_desc_t) :: pio_file
