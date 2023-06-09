@@ -20,7 +20,7 @@ MODULE spio_netcdf_types
 !!  - PIO_COMPACT : Store data in the file header for compactness (variables < 64MB)
 !<
 
-#ifdef _NETCDF
+#ifdef _NETCDF4
 #include <netcdf.inc>
   integer, public, parameter :: PIO_CONTIGUOUS = NF_CONTIGUOUS
   integer, public, parameter :: PIO_CHUNKED = NF_CHUNKED
