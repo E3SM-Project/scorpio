@@ -1,0 +1,55 @@
+!>
+!! @file
+!! @brief C Interfaces for SCORPIO APIs to get/read variable attributes
+!! (scalars & arrays) associated with a variable from a file
+
+!> @internal
+!! @def __PIO_FILE__
+!! This macro is used to define the file name in user messages
+!!
+#define __PIO_FILE__ 'spio_get_att_cint'
+
+MODULE spio_get_att_cint
+  USE iso_c_binding
+  USE pio_types, ONLY : iosystem_desc_t, pio_rearr_opt_t
+  IMPLICIT NONE
+
+INTERFACE
+! TYPE text,int,real,double
+!> @private
+!! @brief C function to Read/Get a scalar attribute associated with a
+!! variable in a file (used by the Fortran interface)
+!!
+!! @details
+!! @param[in] fh The file handle/id to the file with the variable
+!! @param[in] varid The handle/id of the variable
+!! @param[in] attname The name of the attribute
+!! @param[out] attval  Pointer to the attribute value
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER(C_INT) FUNCTION PIOc_get_att_{NCTYPE}(fh, varid, attname, attval) &
+                            bind(C,name="PIOc_get_att_{NCTYPE}")
+    USE iso_c_binding
+    INTEGER(C_INT), INTENT(IN), VALUE :: fh
+    INTEGER(C_INT), INTENT(IN), VALUE :: varid
+    CHARACTER(C_CHAR), INTENT(IN) :: attname(*)
+    TYPE(C_PTR), INTENT(IN), VALUE :: attval
+  END FUNCTION PIOc_get_att_{NCTYPE}
+END INTERFACE
+
+INTERFACE
+!> @private
+!! @brief C function to get the id of the I/O system associated with file
+!! (used by the Fortran interface)
+!!
+!! @details
+!! @param[in] fh The file handle/id
+!! @returns The I/O system id (for the I/O system used to create/open the file) &
+!! -1 on error
+  INTEGER(C_INT) FUNCTION PIOc_get_iosystem(fh) &
+                            bind(C,name="PIOc_get_iosystem")
+    USE iso_c_binding
+    INTEGER(C_INT), INTENT(IN), VALUE :: fh
+  END FUNCTION PIOc_get_iosystem
+END INTERFACE
+
+END MODULE spio_get_att_cint

@@ -2,12 +2,45 @@ module utils_mod
 
   use pio   ! _EXTERNAL
   use kinds_mod
+#ifndef NO_MPIMOD
+  use mpi    ! _EXTERNAL
+#endif
   implicit none
+#ifdef NO_MPIMOD
+  include 'mpif.h'    ! _EXTERNAL
+#endif
   private
 
-  public :: WriteHeader, split_comm
+  public :: piodie, checkmpireturn, WriteHeader, split_comm
 
 contains
+
+subroutine piodie(fname, line, errmsg)
+  character(len=*), intent(in) :: fname
+  integer, intent(in) :: line
+  character(len=*), intent(in), optional :: errmsg
+
+  integer :: ierr
+
+  write(*, *) "ERROR: In ", trim(fname), ", line = ", line 
+  if(present(errmsg)) then
+    write(*, *) trim(errmsg)
+  end if
+  call mpi_abort(MPI_COMM_WORLD, 1, ierr)
+end subroutine
+
+subroutine checkmpireturn(errmsg, ierr, fname, line)
+  character(len=*), intent(in) :: errmsg
+  integer, intent(in) :: ierr
+  character(len=*), intent(in) :: fname
+  integer, intent(in) :: line
+
+  if(ierr /= mpi_success) then
+    write(*, *) "ERROR: In ", trim(fname), ", line = ", line,&
+                ": ", trim(errmsg), "(MPI errcode = ", ierr, ")" 
+    call mpi_abort(MPI_COMM_WORLD, 1, ierr)
+  end if
+end subroutine
 
 !>
 !! @private

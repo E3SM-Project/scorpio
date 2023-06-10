@@ -1,0 +1,85 @@
+!>
+!! @file
+!! @brief C Interfaces for SCORPIO APIs to put/write variable attributes
+!! (scalars & arrays) associated with a variable into a file
+
+!> @internal
+!! @def __PIO_FILE__
+!! This macro is used to define the file name in user messages
+!!
+#define __PIO_FILE__ 'spio_put_att_cint'
+
+MODULE spio_put_att_cint
+  USE iso_c_binding
+  USE pio_types, ONLY : iosystem_desc_t, pio_rearr_opt_t
+  USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
+  IMPLICIT NONE
+
+INTERFACE
+!> @private
+!! @brief C function to Write/Put a string attribute associated with a
+!! variable in a file (used by the Fortran interface)
+!!
+!! @details
+!! @param[in] fh The file handle/id to the file with the variable
+!! @param[in] varid The handle/id of the variable
+!! @param[in] attname The name of the attribute
+!! @param[in] attlen  The length/size of the attribute (length/size of @p attval)
+!! @param[in] attval  Pointer to the attribute value (C_CHAR array)
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER(C_INT) FUNCTION PIOc_put_att_text(fh, varid, attname, attlen, attval) &
+                            bind(C,name="PIOc_put_att_text")
+    USE iso_c_binding
+    USE pio_kinds, ONLY : PIO_OFFSET_F2C_TYPE_KIND
+    INTEGER(C_INT), INTENT(IN), VALUE :: fh
+    INTEGER(C_INT), INTENT(IN), VALUE :: varid
+    CHARACTER(C_CHAR), INTENT(IN) :: attname(*)
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), INTENT(IN), VALUE :: attlen
+    TYPE(C_PTR), INTENT(IN), VALUE :: attval
+  END FUNCTION PIOc_put_att_text
+END INTERFACE
+
+INTERFACE
+! TYPE int,real,double
+!> @private
+!! @brief C function to Write/Put a scalar attribute associated with a
+!! variable in a file (used by the Fortran interface)
+!!
+!! @details
+!! @param[in] fh The file handle/id to the file with the variable
+!! @param[in] varid The handle/id of the variable
+!! @param[in] attname The name of the attribute
+!! @param[in] atttype The type of the attribute. @copydoc PIO_kinds
+!! @param[in] attlen  The size of the attribute (length/size of @p attval)
+!! @param[in] attval  The pointer to the attribute value
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER(C_INT) FUNCTION PIOc_put_att_{NCTYPE}(fh, varid, attname, atttype, attlen, attval) &
+                            bind(C,name="PIOc_put_att_{NCTYPE}")
+    USE iso_c_binding
+    USE pio_kinds, ONLY : PIO_OFFSET_F2C_TYPE_KIND
+    INTEGER(C_INT), INTENT(IN), VALUE :: fh
+    INTEGER(C_INT), INTENT(IN), VALUE :: varid
+    CHARACTER(C_CHAR), INTENT(IN) :: attname(*)
+    INTEGER(C_INT), INTENT(IN), VALUE :: atttype
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), INTENT(IN), VALUE :: attlen
+    TYPE(C_PTR), INTENT(IN), VALUE :: attval
+  END FUNCTION PIOc_put_att_{NCTYPE}
+END INTERFACE
+
+INTERFACE
+!> @private
+!! @brief C function to get the id of the I/O system associated with file
+!! (used by the Fortran interface)
+!!
+!! @details
+!! @param[in] fh The file handle/id
+!! @returns The I/O system id (for the I/O system used to create/open the file) &
+!! -1 on error
+  INTEGER(C_INT) FUNCTION PIOc_get_iosystem(fh) &
+                            bind(C,name="PIOc_get_iosystem")
+    USE iso_c_binding
+    INTEGER(C_INT), INTENT(IN), VALUE :: fh
+  END FUNCTION PIOc_get_iosystem
+END INTERFACE
+
+END MODULE spio_put_att_cint

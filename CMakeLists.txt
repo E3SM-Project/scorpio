@@ -30,6 +30,7 @@ endif ()
 
 #===== Library Options =====
 option (PIO_ENABLE_FORTRAN   "Enable the Fortran library builds"            ON)
+option (PIO_USE_FORTRAN_LEGACY_LIB   "Use the legacy Fortran library"       OFF)
 option (PIO_ENABLE_TIMING    "Enable the use of the GPTL timing library"    ON)
 option (PIO_ENABLE_INTERNAL_TIMING    "Gather and print GPTL timing stats"  OFF)
 option (PIO_ENABLE_IO_STATS  "Gather and print I/O performance stats"       ON)

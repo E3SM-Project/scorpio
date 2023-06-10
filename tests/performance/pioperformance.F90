@@ -123,10 +123,23 @@ program pioperformance
   call MPI_Finalize(ierr)
 contains
 
+  subroutine piodie(fname, line, errmsg)
+    character(len=*), intent(in) :: fname
+    integer, intent(in) :: line
+    character(len=*), intent(in), optional :: errmsg
+
+    integer :: ierr
+
+    write(*, *) "ERROR: In ", trim(fname), ", line = ", line 
+    if(present(errmsg)) then
+      write(*, *) trim(errmsg)
+    end if
+    call mpi_abort(MPI_COMM_WORLD, 1, ierr)
+  end subroutine
+
   subroutine pioperformancetest(filename, piotypes, mype, npe_base, &
        rearrangers, niotasks,nframes, nvars, varsize, unlimdimindof)
     use pio
-    use pio_support, only : pio_readdof
     use perf_mod
     character(len=*), intent(in) :: filename
     integer, intent(in) :: mype, npe_base
@@ -517,7 +530,6 @@ contains
 
   subroutine init_ideal_dof(doftype, mype, npe, ndims, gdims, compmap, varsize)
     use pio
-    use pio_support, only : piodie
     character(len=*), intent(in) :: doftype
     integer, intent(in) :: mype
     integer, intent(in) :: npe

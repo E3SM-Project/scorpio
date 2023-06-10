@@ -90,7 +90,7 @@ SUBROUTINE create_file(comm, iosys, iotype, fname, attname, dimname, ret)
 
     integer, intent(in) :: comm
     type(iosystem_desc_t), intent(inout) :: iosys
-    integer, intent(in) :: iotype
+    integer, intent(inout) :: iotype
     character(len=*), intent(in) :: fname
     character(len=*), intent(in) :: attname
     character(len=*), intent(in) :: dimname
@@ -156,7 +156,7 @@ SUBROUTINE open_and_check_file(comm, iosys, iotype, pio_file, fname, &
 
     integer, intent(in) :: comm
     type(iosystem_desc_t), intent(inout) :: iosys
-    integer, intent(in) :: iotype
+    integer, intent(inout) :: iotype
     type(file_desc_t), intent(inout) :: pio_file
     character(len=*), intent(in) :: fname
     character(len=*), intent(in) :: attname

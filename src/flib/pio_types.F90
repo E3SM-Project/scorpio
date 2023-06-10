@@ -6,8 +6,10 @@
 module pio_types
     use pio_kinds
     use iso_c_binding
+    use spio_netcdf_types, only : PIO_CONTIGUOUS, PIO_CHUNKED, PIO_COMPACT
     implicit none
     private
+
     !-------------------------------------------
     !  data structure to describe decomposition
     !-------------------------------------------
@@ -18,6 +20,18 @@ module pio_types
         integer(i4) :: start
         integer(i4) :: length
     end type
+
+    !----------------------------------------
+    ! Some constants related to types below
+    !----------------------------------------
+    ! Invalid I/O system id
+    integer(kind=c_int), public, parameter :: PIO_IOSYSID_INVALID = -1
+    ! Invalid file handle
+    integer(kind=c_int), public, parameter :: PIO_FH_INVALID = -1
+    ! Invalid I/O decomposition id
+    integer(kind=c_int), public, parameter :: PIO_IOID_INVALID = -1
+    ! Invalid variable id
+    integer(kind=c_int), public, parameter :: PIO_VARID_INVALID = -1
 
     !------------------------------------
     !  a file descriptor data structure
@@ -94,10 +108,13 @@ module pio_types
 !>
 !! @defgroup PIO_iotype PIO_iotype
 !! @public
-!! @brief An integer parameter which controls the iotype
+!! @brief An integer parameter that controls the underlying I/O library and
+!! the I/O library-specific options (compression etc) used by the library.
+!! Note that since an iotype is associated with a file, two different files
+!! can potentially be associated with two different iotypes.
 !! @details
-!!   - PIO_iotype_pnetcdf : parallel read/write of pNetCDF files (netcdf3)
-!!   - PIO_iotype_netcdf : serial read/write of NetCDF files using 'base_node' (netcdf3)
+!!   - PIO_iotype_pnetcdf : parallel read/write using the PnetCDF library
+!!   - PIO_iotype_netcdf : serial (only the root I/O process) read/write using the NetCDF library
 !!   - PIO_iotype_netcdf4c : parallel read/serial write of NetCDF4 (HDF5) files with data compression
 !!   - PIO_iotype_netcdf4p : parallel read/write of NETCDF4 (HDF5) files
 !!   - PIO_iotype_adios : parallel write of ADIOS files with subset rearrangement only
@@ -157,8 +174,35 @@ module pio_types
 !>
 !! @public
 !! @defgroup error_return error return codes
-!! @brief : The error return code; ierr != PIO_noerr indicates
-!! an error. (see @ref PIO_seterrorhandling )
+!! @brief : The error return code. Set to PIO_NOERR on success,
+!! or an error code otherwise
+!! (See @ref PIO_seterrorhandling for more information on how
+!! to customize/set error handling)
+!>
+
+!>
+!! @public
+!! @defgroup open_file_modes Supported modes for opening a file
+!! @brief : The flags to specify the file access mode when
+!! opening a file
+!! PIO_WRITE : Using this flag an existing file is opened
+!! in "write" mode
+!! PIO_NOWRITE : Using this flag an existing file is opened
+!! in "read-only" mode
+!>
+
+!>
+!! @public
+!! @defgroup create_file_modes Supported modes for creating a file
+!! @brief : The flags to specify the file access mode when
+!! creating a file
+!! PIO_CLOBBER : The file, if it exists, is truncated
+!! (the old contents of the file are deleted/overwritten)
+!! PIO_NOCLOBBER : This flag is used to ensure that a file,
+!! if it exists, is not truncated (the current contents of
+!! the file are not deleted) during file creation. If a
+!! file exists and the user uses PIO_NOCLOBBER while trying
+!! to recreate the file the call (PIO_createfile) will fail
 !>
 
 !>
@@ -182,6 +226,7 @@ module pio_types
    integer, public, parameter :: PIO_MAX_VARS_UB = 8192
    integer, public, parameter :: PIO_MAX_NAME_UB = 1024
    integer, public, parameter :: PIO_MAX_VAR_DIMS_UB = 1024
+   integer, public, parameter :: PIO_FMODE_CLR = 0
 #ifdef _PNETCDF
 #include <pnetcdf.inc>   /* _EXTERNAL */
    integer, public, parameter :: PIO_global = nf_global
@@ -244,7 +289,7 @@ module pio_types
    integer, public, parameter :: PIO_MAX_DIMS = PIO_MAX_DIMS_UB
    integer, public, parameter :: PIO_MAX_ATTRS = PIO_MAX_ATTRS_UB
    integer, public, parameter :: PIO_MAX_VARS = PIO_MAX_VARS_UB
-   integer, public, parameter :: PIO_MAX_NAME = 25
+   integer, public, parameter :: PIO_MAX_NAME = PIO_MAX_NAME_UB
    integer, public, parameter :: PIO_MAX_VAR_DIMS = 6
    integer, public, parameter :: PIO_CLOBBER = 10
    integer, public, parameter :: PIO_NOCLOBBER = 11
@@ -258,13 +303,26 @@ module pio_types
    double precision, public, parameter :: PIO_FILL_DOUBLE = 9.9692099683868690e+36;
 #endif
 #endif
+
    integer, public, parameter :: PIO_num_OST =  16
+   ! Generic error code for internal errors in the library
+   integer, public, parameter :: PIO_EINTERNAL = -501
+
+   ! Export types from spio_netcdf_types
+   public :: PIO_CONTIGUOUS, PIO_CHUNKED, PIO_COMPACT
 
 !>
 !! @defgroup PIO_rearr_comm_t PIO_rearr_comm_t
 !! @public 
-!! @brief The two choices for rearranger communication
+!! @brief The data rearranger communication mode
 !! @details
+!! The data rearranger in the library rearranges data between the
+!! compute processes (all the MPI processes in the I/O subsystem) and
+!! I/O processes (a subset of the compute processes in the I/O subsystem or
+!! a disjoint set of MPI processes in the I/O subsystem) before flushing the
+!! data written out by the user to the filesystem. The data rearrangement
+!! among the MPI processes can be achieved using MPI point to point or
+!! collective communication.
 !!  - PIO_rearr_comm_p2p : Point to point
 !!  - PIO_rearr_comm_coll : Collective
 !>
@@ -276,12 +334,17 @@ module pio_types
 !>
 !! @defgroup PIO_rearr_comm_dir PIO_rearr_comm_dir
 !! @public 
-!! @brief The four choices for rearranger communication direction
+!! @brief The data rearrangment flow control direction
 !! @details
-!!  - PIO_rearr_comm_fc_2d_enable : COMM procs to IO procs and vice versa
-!!  - PIO_rearr_comm_fc_1d_comp2io: COMM procs to IO procs only
-!!  - PIO_rearr_comm_fc_1d_io2comp: IO procs to COMM procs only
-!!  - PIO_rearr_comm_fc_2d_disable: Disable flow control
+!! The data rearranger can use flow control when rearranging data among
+!! the MPI processes. The flow control can be enabled for data
+!! rearrangement from compute processes to I/O processes (e.g. during a
+!! write operation), from I/O processes to compute processes (e.g. during
+!! a read operation) or both.
+!!  - PIO_rearr_comm_fc_2d_enable : compute procs to I/O procs and vice versa
+!!  - PIO_rearr_comm_fc_1d_comp2io: compute procs to I/O procs only
+!!  - PIO_rearr_comm_fc_1d_io2comp: I/O procs to compute procs only
+!!  - PIO_rearr_comm_fc_2d_disable: disable flow control
 !>
     enum, bind(c)
       enumerator :: PIO_rearr_comm_fc_2d_enable = 0
@@ -292,12 +355,21 @@ module pio_types
 
 !>
 !! @defgroup PIO_rearr_comm_fc_options PIO_rearr_comm_fc_options
-!! @brief Type that defines the PIO rearranger options
+!! @brief The data rearranger flow control options
 !! @details
-!!  - enable_hs : Enable handshake (true/false) 
-!!  - enable_isend : Enable Isends (true/false)
-!!  - max_pend_req : Maximum pending requests (To indicated unlimited
-!!                    number of requests use PIO_REARR_COMM_UNLIMITED_PEND_REQ)
+!! The data rearranger supports flow control when rearranging data among
+!! the MPI processes.
+!!  - enable_hs : Enable handshake (logical). If this option is enabled
+!!                a "handshake" is sent between communicating processes
+!!                before data is sent
+!!  - enable_isend : Enable non-blocking sends (logical). If this option
+!!                    is enabled non-blocking sends (instead of blocking
+!!                    sends) are used to send data between MPI processes
+!!                    while rearranging data
+!!  - max_pend_req : The maximum pending requests allowed at a time when
+!!                    MPI processes communicate for rearranging data among
+!!                    themselves. (Use PIO_REARR_COMM_UNLIMITED_PEND_REQ
+!!                    for allowing unlimited number of pending requests)
 !>
    type, bind(c), public :: PIO_rearr_comm_fc_opt_t
       logical(c_bool) :: enable_hs            ! Enable handshake?
@@ -308,8 +380,12 @@ module pio_types
     integer, public, parameter :: PIO_REARR_COMM_UNLIMITED_PEND_REQ = -1
 !>
 !! @defgroup PIO_rearr_options PIO_rearr_options
-!! @brief Type that defines the PIO rearranger options
+!! @brief The data rearranger options
 !! @details
+!! The library includes support for a data rearranger that rearranges data
+!! among MPI processes to improve the I/O throughput of the application.
+!! The user can control the data rearrangement by passing the data
+!! rearranger options to the library.
 !!  - comm_type : @copydoc PIO_rearr_comm_t
 !!  - fcd : @copydoc PIO_rearr_comm_dir
 !!  - comm_fc_opts : @copydoc PIO_rearr_comm_fc_options

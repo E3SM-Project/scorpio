@@ -1294,6 +1294,7 @@ extern "C" {
     int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep);
     int PIOc_set_blocksize(int newblocksize);
     int PIOc_File_is_Open(int ncid);
+    int PIOc_get_iosystem(int ncid);
 
     /* Set the IO node data buffer size limit. */
     PIO_Offset PIOc_set_buffer_size_limit(PIO_Offset limit);

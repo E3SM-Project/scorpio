@@ -24,7 +24,6 @@ program testpio
 #ifdef TIMING
   use perf_mod        ! _EXTERNAL
 #endif
-  use pio_support, only : piodie , checkmpireturn, pio_writedof, pio_readdof !_EXTERNAL
   ! Modules from testpio suite that are used by this application
 
   use gdecomp_mod, only: gdecomp_type, gdecomp_DOF, gdecomp_read_nml, camlike_decomp_generator, mpas_decomp_generator

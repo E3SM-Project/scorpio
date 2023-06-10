@@ -1,0 +1,106 @@
+!>
+!! @file
+!! @brief C Interfaces for SCORPIO APIs to get/read non-distributed
+!! arrays into a file
+
+!> @internal
+!! @def __PIO_FILE__
+!! This macro is used to define the file name in user messages
+!!
+#define __PIO_FILE__ 'spio_get_var_cint'
+
+MODULE spio_get_var_cint
+  USE iso_c_binding
+  USE pio_types, ONLY : iosystem_desc_t, pio_rearr_opt_t
+  USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
+  IMPLICIT NONE
+
+INTERFACE
+! TYPE int,real,double
+!> @private
+!! @brief C function to read/get one element/datum (${TYPE}) from a
+!! variable in a file at a specified index (used by the Fortran interface)
+!!
+!! @details
+!! @param[in] fh The file handle/id to the file with the variable
+!! @param[in] varid The handle/id of the variable
+!! @param[in] cstart  The variable index at which to read the element/datum. This
+!!                    argument is an array and the size of the array needs to be equal
+!!                    to the number of dimensions for the variable. Each element in the
+!!                    array corresponds to the index for the variable dimension
+!!                    (subscripts referring to where the value is read)
+!!                    The indices start from 0.
+!! @param[out] val  The value/datum is read into this arg. The value is read
+!!                  from the variable at the index, @p idx, specified above.
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER(C_INT) FUNCTION PIOc_get_var1_{NCTYPE}(fh, varid, cstart, val) &
+                            bind(C,name="PIOc_get_var1_{NCTYPE}")
+    USE iso_c_binding
+    USE pio_kinds, ONLY : PIO_OFFSET_F2C_TYPE_KIND
+    INTEGER(C_INT), INTENT(IN), value :: fh
+    INTEGER(C_INT), INTENT(IN), value :: varid
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), INTENT(IN) :: cstart(*)
+    {CTYPE}, INTENT(OUT) :: val
+  END FUNCTION PIOc_get_var1_{NCTYPE}
+END INTERFACE
+
+INTERFACE
+! TYPE text,int,real,double
+!> @private
+!! @brief C function to read/get specified number of elements (${TYPE})
+!! from a variable in a file at a specified index (used by the Fortran interface)
+!!
+!! @details
+!! @param[in] fh The file handle/id to the file with the variable
+!! @param[in] varid The handle/id of the variable
+!! @param[in] cstart The variable index at which the first element/datum is read.
+!!                    The remaining elements (the number of elements is determined
+!!                    by the @p count array), if any, in @p val is read from
+!!                    subsequent elements in the variable. This argument is an array
+!!                    and the size of the array needs to be equal to the number of
+!!                    dimensions for the variable. Each element in the array corresponds
+!!                    to the starting index for the variable dimension
+!!                    (subscripts referring to where the first value is read)
+!!                    The indices start from 0.
+!! @param[in] ccount  The number (count) of elements read. This argument is an
+!!                    array and the size of the array needs to be equal to the number
+!!                    of dimensions of the variable. Each element in the array corresponds
+!!                    to the number of elements of that variable dimension being read
+!! @param[out] val  The values are read into this array. The values are read from
+!!                  the variable at the index, @p cstart, specified above. The array
+!!                  needs to contain at least SIZE(ccount) values that are being read
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER(C_INT) FUNCTION PIOc_get_vara_{NCTYPE}(fh, varid, cstart, ccount, val) &
+                            bind(C,name="PIOc_get_vara_{NCTYPE}")
+    USE iso_c_binding
+    USE pio_kinds, ONLY : PIO_OFFSET_F2C_TYPE_KIND
+    INTEGER(C_INT), INTENT(IN), value :: fh
+    INTEGER(C_INT), INTENT(IN), value :: varid
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), INTENT(IN) :: cstart(*)
+    INTEGER(PIO_OFFSET_F2C_TYPE_KIND), INTENT(IN) :: ccount(*)
+    {CTYPE}, INTENT(OUT) :: val(*)
+  END FUNCTION PIOc_get_vara_{NCTYPE}
+END INTERFACE
+
+INTERFACE
+! TYPE text,int,real,double
+!> @private
+!! @brief C function to read/get all elements (${TYPE}) from a variable
+!! in a file (used by the Fortran interface)
+!!
+!! @details
+!! @param[in] fh The file handle/id to the file with the variable
+!! @param[in] varid The handle/id of the variable
+!! @param[out] val  The array of values are read into this arg. The number of elements
+!!                  in the array needs to be equal to the dimensions of the variable
+!! @returns PIO_NOERR on success, an error code otherwise
+  INTEGER(C_INT) FUNCTION PIOc_get_var_{NCTYPE}(fh, varid, val) &
+                            bind(C,name="PIOc_get_var_{NCTYPE}")
+    USE iso_c_binding
+    INTEGER(C_INT), INTENT(IN), value :: fh
+    INTEGER(C_INT), INTENT(IN), value :: varid
+    {CTYPE}, INTENT(OUT) :: val(*)
+  END FUNCTION PIOc_get_var_{NCTYPE}
+END INTERFACE
+
+END MODULE spio_get_var_cint

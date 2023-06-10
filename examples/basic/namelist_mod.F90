@@ -10,8 +10,8 @@ module namelist_mod
 
 ! Modules from PIO package that are used by this application
 
-    use pio_support, only : piodie, CheckMPIReturn ! _EXTERNAL
     use pio, only : pio_offset_kind
+    use utils_mod
     implicit none    
     private
 

@@ -1,7 +1,7 @@
 integer function test_file_write(iotype, iotype_desc) result(ierr)
   use pio_tutil
   Implicit none
-  integer, intent(in) :: iotype
+  integer, intent(inout) :: iotype
   character(len=*), intent(in) :: iotype_desc
 
   integer, parameter :: VEC_LOCAL_SZ = 7
