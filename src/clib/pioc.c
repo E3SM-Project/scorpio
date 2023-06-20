@@ -973,7 +973,7 @@ int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, i
                      const PIO_Offset *compmap, int *ioidp, int rearranger,
                      const PIO_Offset *iostart, const PIO_Offset *iocount)
 {
-    PIO_Offset compmap_1_based[maplen];
+    PIO_Offset* compmap_1_based = (PIO_Offset*)malloc(maplen * sizeof(PIO_Offset));
     int *rearrangerp = NULL;
 
     LOG((1, "PIOc_init_decomp iosysid = %d pio_type = %d ndims = %d maplen = %d",
@@ -991,8 +991,11 @@ int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, i
     }
 
     /* Call the legacy version of the function. */
-    return PIOc_InitDecomp(iosysid, pio_type, ndims, gdimlen, maplen, compmap_1_based,
-                           ioidp, rearrangerp, iostart, iocount);
+    int ret = PIOc_InitDecomp(iosysid, pio_type, ndims, gdimlen, maplen, compmap_1_based,
+                              ioidp, rearrangerp, iostart, iocount);
+
+    free(compmap_1_based);
+    return ret;
 }
 
 /**
