@@ -1198,6 +1198,9 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 case NC_SHORT:
                     ierr = ncmpi_get_vars_short(file->fh, varid, start, count, stride, buf);
                     break;
+                case NC_INT64:
+                    ierr = ncmpi_get_vars_longlong(file->fh, varid, start, count, stride, buf);
+                    break;
                 case NC_INT:
                     ierr = ncmpi_get_vars_int(file->fh, varid, start, count, stride, buf);
                     break;
@@ -1271,6 +1274,9 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 break;
             case NC_INT:
                 ierr = ncmpi_get_vars_int_all(file->fh, varid, start, cnt, stride, buf);
+                break;
+            case NC_INT64:
+                ierr = ncmpi_get_vars_longlong_all(file->fh, varid, start, cnt, stride, buf);
                 break;
             case PIO_LONG_INTERNAL:
                 ierr = ncmpi_get_vars_long_all(file->fh, varid, start, cnt, stride, buf);
