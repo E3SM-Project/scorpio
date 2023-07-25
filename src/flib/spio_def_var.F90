@@ -569,6 +569,7 @@ CONTAINS
     INTEGER, INTENT(IN) :: storage
     INTEGER, DIMENSION(:), INTENT(IN) :: chunksizes
 
+    CHARACTER(LEN=PIO_MAX_NAME) :: log_msg
     INTEGER :: i, ndims
     INTEGER(C_INT), DIMENSION(:), ALLOCATABLE :: cchunksizes
 
@@ -582,6 +583,16 @@ CONTAINS
     DO i=1,ndims
       cchunksizes(i) = INT(chunksizes(ndims - i + 1), C_INT)
     END DO
+
+#ifndef HAVE_NC4_CHUNK_CONSTS
+    ! NetCDF4 support is available but the chunking constants (for storage option) is not
+    ! defined
+    WRITE(log_msg, *) "NetCDF4 support is available but the NetCDF4 chunking constants",&
+                      " were not defined. The chunking storage options specified by the",&
+                      " user might be ignored (pio_def_var_chunking_file_vdesc()).",&
+                      " fh = ", file%fh, ", varid = ", vdesc%varid
+    CALL pio_warn(file%iosystem, __PIO_FILE__, __LINE__, TRIM(log_msg))
+#endif
 
     ierr = PIOc_def_var_chunking(file%fh, INT(vdesc%varid, C_INT) - 1,&
                                   INT(storage, C_INT), cchunksizes)
