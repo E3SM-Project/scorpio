@@ -826,6 +826,7 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
     {
         if (0 <= dimid && dimid < file->num_dim_vars)
         {
+            /* FIXME: use strncpy instead of strcpy */
             if (name)
                 strcpy(name, file->dim_names[dimid]);
 
@@ -872,6 +873,7 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
     {
         if (0 <= dimid && dimid < file->hdf5_num_dims)
         {
+            /* FIXME: use strncpy instead of strcpy */
             if (name)
                 strcpy(name, file->hdf5_dims[dimid].name);
 
@@ -1253,6 +1255,7 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
     {
         if (varid < file->num_vars)
         {
+            /* FIXME: use strncpy instead of strcpy */
             if (name)
                 strcpy(name, file->adios_vars[varid].name);
 
@@ -1295,6 +1298,7 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
     {
         if (varid < file->hdf5_num_vars)
         {
+            /* FIXME: use strncpy instead of strcpy */
             if (name)
                 strcpy(name, file->hdf5_vars[varid].name);
 
@@ -1381,6 +1385,7 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
                 LOG((3, "my_name = %s my_xtype = %d my_ndims = %d my_natts = %d",  my_name, my_xtype, my_ndims, my_natts));
                 if (!ierr)
                 {
+                    /* FIXME: use strncpy instead of strcpy */
                     if (name)
                         strcpy(name, my_name);
                     if (xtypep)
@@ -2132,8 +2137,70 @@ int PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
-        LOG((2, "ADIOS missing %s:%s", __FILE__, __func__));
-        ierr = PIO_NOERR;
+        if (0 <= attnum && attnum < file->num_attrs &&
+            file->adios_attrs[attnum].att_varid == varid &&
+            file->adios_attrs[attnum].att_ncid == ncid)
+        {
+            /* FIXME: use strncpy instead of strcpy */
+            if (name)
+                strcpy(name, file->adios_attrs[attnum].att_name);
+
+            ierr = PIO_NOERR;
+        }
+        else
+        {
+            if (name)
+                name[0] = '\0';
+
+            ierr = PIO_EBADID;
+        }
+
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+        /* A failure to inquire is not fatal */
+        if (ierr != PIO_NOERR)
+        {
+            LOG((1, "PIOc_inq_attname with ADIOS type failed, ierr = %d", ierr));
+            return ierr;
+        }
+
+        return PIO_NOERR;
+    }
+#endif
+
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        if (0 <= attnum && attnum < file->hdf5_num_attrs &&
+            file->hdf5_attrs[attnum].att_varid == varid &&
+            file->hdf5_attrs[attnum].att_ncid == ncid)
+        {
+            /* FIXME: use strncpy instead of strcpy */
+            if (name)
+                strcpy(name, file->hdf5_attrs[attnum].att_name);
+
+            ierr = PIO_NOERR;
+        }
+        else
+        {
+            if (name)
+                name[0] = '\0';
+
+            ierr = PIO_EBADID;
+        }
+
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+        /* A failure to inquire is not fatal */
+        if (ierr != PIO_NOERR)
+        {
+            LOG((1, "PIOc_inq_attname with HDF5 type failed, ierr = %d", ierr));
+            return ierr;
+        }
+
+        return PIO_NOERR;
     }
 #endif
 
@@ -2256,8 +2323,60 @@ int PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
-        LOG((2, "ADIOS missing %s:%s", __FILE__, __func__));
-        ierr = PIO_NOERR;
+        ierr = PIO_ENOTATT;
+        for (int i = 0; i < file->num_attrs; i++)
+        {
+            if (!strncmp(name, file->adios_attrs[i].att_name, PIO_MAX_NAME) &&
+                file->adios_attrs[i].att_varid == varid &&
+                file->adios_attrs[i].att_ncid == ncid)
+            {
+                *idp = i;
+                ierr = PIO_NOERR;
+                break;
+            }
+        }
+
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+        /* A failure to inquire is not fatal */
+        if (ierr != PIO_NOERR)
+        {
+            LOG((1, "PIOc_inq_attid with ADIOS type failed, ierr = %d", ierr));
+            return ierr;
+        }
+
+        return PIO_NOERR;
+    }
+#endif
+
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        ierr = PIO_ENOTATT;
+        for (int i = 0; i < file->hdf5_num_attrs; i++)
+        {
+            if (!strncmp(name, file->hdf5_attrs[i].att_name, PIO_MAX_NAME) &&
+                file->hdf5_attrs[i].att_varid == varid &&
+                file->hdf5_attrs[i].att_ncid == ncid)
+            {
+                *idp = i;;
+                ierr = PIO_NOERR;
+                break;
+            }
+        }
+
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+        /* A failure to inquire is not fatal */
+        if (ierr != PIO_NOERR)
+        {
+            LOG((1, "PIOc_inq_attid with HDF5 type failed, ierr = %d", ierr));
+            return ierr;
+        }
+
+        return PIO_NOERR;
     }
 #endif
 
