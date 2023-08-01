@@ -1943,9 +1943,14 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
                 file->adios_attrs[i].att_ncid == ncid)
             {
                 ierr = PIO_NOERR;
-                *xtypep = (nc_type) (file->adios_attrs[i].att_type);
-                *lenp = (PIO_Offset) (file->adios_attrs[i].att_len);
-                i = file->num_attrs + 1;
+
+                if (xtypep)
+                    *xtypep = (nc_type) (file->adios_attrs[i].att_type);
+
+                if (lenp)
+                    *lenp = (PIO_Offset) (file->adios_attrs[i].att_len);
+
+                break;
             }
         }
 
@@ -1974,8 +1979,13 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
                 file->hdf5_attrs[i].att_ncid == ncid)
             {
                 ierr = PIO_NOERR;
-                *xtypep = (nc_type) (file->hdf5_attrs[i].att_type);
-                *lenp = (PIO_Offset) (file->hdf5_attrs[i].att_len);
+
+                if (xtypep)
+                    *xtypep = (nc_type) (file->hdf5_attrs[i].att_type);
+
+                if (lenp)
+                    *lenp = (PIO_Offset) (file->hdf5_attrs[i].att_len);
+
                 break;
             }
         }
