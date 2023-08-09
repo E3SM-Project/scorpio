@@ -299,6 +299,26 @@ static int initialize_adios2_for_block_merging(iosystem_desc_t *ios, file_desc_t
                            "Setting (ADIOS) parameter (InitialBufferSize) failed (adios2_error=%s) for file (%s)",
                            convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
         }
+
+		/* ADIOS AGGREGATION */
+        adiosErr = adios2_set_parameter(file->ioH, "AggregationType", "EveryoneWrites");
+        if (adiosErr != adios2_error_none)
+        {
+            GPTLstop("PIO:initialize_adios2_for_block_merging");
+            return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Setting (ADIOS) parameter (AggregationType) failed (adios2_error=%s) for file (%s)",
+                           convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+        }
+
+        adiosErr = adios2_set_parameter(file->ioH, "AggregatorRatio", "2");
+        if (adiosErr != adios2_error_none)
+        {
+            GPTLstop("PIO:initialize_adios2_for_block_merging");
+            return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Setting (ADIOS) parameter (AggregatorRatio) failed (adios2_error=%s) for file (%s)",
+                           convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+        }
+		/* ADIOS AGGREGATION */
         /* BP5 */
 
 #ifndef _ADIOS_BP2NC_TEST /* Initializing buffer to 1Gb takes about 1 sec. Don't do it for unit tests */
