@@ -598,43 +598,46 @@ int PIOc_closefile(int ncid)
                                "adios2_begin_step failed for file (%s)", pio_get_fname_from_file(file));
             }
 
-            adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, "/__pio__/fillmode");
-            if (attributeH == NULL)
-            {
-                attributeH = adios2_define_attribute(file->ioH, "/__pio__/fillmode", adios2_type_int32_t, &file->fillmode);
-                if (attributeH == NULL)
-                {
-                    if (file->iotype == PIO_IOTYPE_ADIOS)
-                    {
-                        GPTLstop("PIO:PIOc_closefile_adios");
-                        GPTLstop("PIO:write_total_adios");
+			if (file->adios_rank == 0)
+			{
+            	adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, "/__pio__/fillmode");
+            	if (attributeH == NULL)
+            	{
+                	attributeH = adios2_define_attribute(file->ioH, "/__pio__/fillmode", adios2_type_int32_t, &file->fillmode);
+                	if (attributeH == NULL)
+                	{
+                    	if (file->iotype == PIO_IOTYPE_ADIOS)
+                    	{
+                        	GPTLstop("PIO:PIOc_closefile_adios");
+                        	GPTLstop("PIO:write_total_adios");
 #ifndef _ADIOS_BP2NC_TEST
-                        GPTLstop("PIO:write_total");
-                        spio_ltimer_stop(ios->io_fstats->wr_timer_name);
-                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                        spio_ltimer_stop(file->io_fstats->wr_timer_name);
-                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        	GPTLstop("PIO:write_total");
+                        	spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                        	spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        	spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                        	spio_ltimer_stop(file->io_fstats->tot_timer_name);
 #endif
-                    }
-                    else
-                    {
-                        GPTLstop("PIO:PIOc_closefile");
+                    	}
+                    	else
+                    	{
+                        	GPTLstop("PIO:PIOc_closefile");
 
-                        if (file->mode & PIO_WRITE)
-                        {
-                            GPTLstop("PIO:PIOc_closefile_write_mode");
-                            GPTLstop("PIO:write_total");
-                            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
-                            spio_ltimer_stop(file->io_fstats->wr_timer_name);
-                        }
-                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    }
-                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Defining (ADIOS) attribute (name=/__pio__/fillmode) failed for file (%s, ncid=%d)",
-                                   pio_get_fname_from_file(file), file->pio_ncid);
-                }
-            }
+                        	if (file->mode & PIO_WRITE)
+                        	{
+                            	GPTLstop("PIO:PIOc_closefile_write_mode");
+                            	GPTLstop("PIO:write_total");
+                            	spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                            	spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                        	}
+                        	spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        	spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    	}
+                    	return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       	            "Defining (ADIOS) attribute (name=/__pio__/fillmode) failed for file (%s, ncid=%d)",
+                       	            pio_get_fname_from_file(file), file->pio_ncid);
+                	}
+            	}
+			}
 
             /* This is needed to write out the attribute /__pio__/fillmode */
             {

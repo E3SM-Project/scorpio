@@ -279,7 +279,7 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         }
 
         char att_name[PIO_MAX_NAME];
-        if (file->adios_io_process == 1)
+        if (file->adios_io_process == 1 && file->adios_rank == 0)
         {
             snprintf(att_name, PIO_MAX_NAME, "%s/%s", path, name);
             adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, att_name);
