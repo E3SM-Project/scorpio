@@ -26,7 +26,7 @@ int PIOc_inq_dimname(int ncid, int dimid, char *name)
 {
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_dimname");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("dimid", dimid).
-    add_arg("name", name).flush();
+    add_arg("name", static_cast<void *>(name)).flush();
   return PIOc_inq_dimname_impl(ncid, dimid, name);
 }
 
