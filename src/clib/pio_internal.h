@@ -44,6 +44,7 @@ extern "C" {
     #define LOG(e)
 #endif /* PIO_ENABLE_LOGGING */
 
+#if !defined(__cplusplus)
     #define max(a,b)                                \
         ({ __typeof__ (a) _a = (a);                 \
             __typeof__ (b) _b = (b);                \
@@ -53,6 +54,7 @@ extern "C" {
         ({ __typeof__ (a) _a = (a);                 \
             __typeof__ (b) _b = (b);                \
             _a < _b ? _a : _b; })
+#endif
 
     #define MAX_GATHER_BLOCK_SIZE 0
     #define PIO_REQUEST_ALLOC_CHUNK 16
