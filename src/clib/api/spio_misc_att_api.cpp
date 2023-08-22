@@ -65,7 +65,7 @@ int PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_attname");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
     add_arg("varid", varid).add_arg("attnum", attnum).
-    add_arg("*name", name).flush();
+    add_arg("*name", static_cast<void *>(name)).flush();
   return PIOc_inq_attname_impl(ncid, varid, attnum, name);
 }
 
