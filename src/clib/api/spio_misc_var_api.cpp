@@ -68,10 +68,11 @@ int PIOc_inq_varnatts(int ncid, int varid, int *nattsp)
 int PIOc_def_var(int ncid, const char *name, nc_type xtype,  int ndims,
                  const int *dimidsp, int *varidp)
 {
+  assert((ndims > 0) && dimidsp);
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_def_var");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("*name", name).
     add_arg("xtype", static_cast<long long int>(xtype)).
-    add_arg("ndims", ndims).add_arg("*dimidsp", dimidsp).
+    add_arg("ndims", ndims).add_arg("*dimidsp", dimidsp, ndims).
     add_arg("*varidp", varidp).flush();
   return PIOc_def_var_impl(ncid, name, xtype,  ndims, dimidsp, varidp);
 }
