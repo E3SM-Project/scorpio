@@ -165,6 +165,25 @@ int pio_delete_file_from_list(int ncid)
             free(cfile->io_fstats);
             spio_file_mvcache_finalize(cfile);
             /* Free the memory used for this file. */
+#ifdef _ADIOS2
+            if (cfile->cache_data_blocks != NULL)
+            {
+                /* This call also frees cfile->cache_data_blocks */
+                cfile->cache_data_blocks->free(cfile->cache_data_blocks);
+            }
+
+            if (cfile->cache_block_sizes != NULL)
+            {
+                /* This call also frees cfile->cache_block_sizes */
+                cfile->cache_block_sizes->free(cfile->cache_block_sizes);
+            }
+
+            if (cfile->cache_darray_info != NULL)
+            {
+                /* This call also frees cfile->cache_darray_info */
+                cfile->cache_darray_info->free(cfile->cache_darray_info);
+            }
+#endif
             free(cfile);
             
             return PIO_NOERR;

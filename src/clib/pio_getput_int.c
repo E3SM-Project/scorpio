@@ -676,6 +676,188 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     ios->io_fstats->rb += attlen * atttype_len;
     file->io_fstats->rb += attlen * atttype_len;
 
+#ifdef _ADIOS2
+    if (file->iotype == PIO_IOTYPE_ADIOS)
+    {
+        char *full_name = NULL;
+        int full_name_len = 0;
+        adios2_error adiosErr = adios2_error_none;
+
+        if (varid == NC_GLOBAL)
+        {
+            char prefix_att_name[] = "/__pio__/global/";
+            full_name_len = strlen(prefix_att_name) + strlen(name) + 1;
+            full_name = calloc(full_name_len, 1);
+            if (full_name == NULL)
+            {
+                GPTLstop("PIO:PIOc_get_att_tc");
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) attribute (%s) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                               "Out of memory allocating %lld bytes for full name of attribute",
+                               pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid, (long long int)full_name_len);
+            }
+
+            strncpy(full_name, prefix_att_name, full_name_len);
+            strcat(full_name, name);
+        }
+        else
+        {
+            char prefix_att_name[] = "/__pio__/var/";
+            full_name_len = strlen(prefix_att_name) + strlen(file->adios_vars[varid].name) + strlen("/") + strlen(name) + 1;
+            full_name = calloc(full_name_len, 1);
+            if (full_name == NULL)
+            {
+                GPTLstop("PIO:PIOc_get_att_tc");
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) attribute (%s) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                               "Out of memory allocating %lld bytes for full name of attribute",
+                               pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid, (long long int)full_name_len);
+            }
+
+            strncpy(full_name, prefix_att_name, full_name_len);
+            strcat(full_name, file->adios_vars[varid].name);
+            strcat(full_name, "/");
+            strcat(full_name, name);
+        }
+
+        int required_adios_step = 0;
+        size_t current_adios_step = 0;
+
+        switch (memtype)
+        {
+            case NC_DOUBLE:
+            {
+                adios2_attribute const *attr = adios2_inquire_attribute(file->ioH, full_name);
+                if (attr != NULL)
+                {
+                    size_t size_attr = 0;
+                    double attr_data = 0.0;
+                    adiosErr = adios2_attribute_data(&attr_data, &size_attr, attr);
+                    if (adiosErr != adios2_error_none)
+                    {
+                        GPTLstop("PIO:PIOc_get_att_tc");
+                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Reading variable (%s, varid=%d) attribute (%s) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                       "The low level (ADIOS) I/O library call failed to retrieve attribute data pointer (adios2_error=%s)",
+                                       pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+                    }
+
+                    memcpy(ip, &attr_data, size_attr * sizeof(double));
+                }
+                break;
+            }
+            case NC_FLOAT:
+            {
+                adios2_attribute const *attr = adios2_inquire_attribute(file->ioH, full_name);
+                if (attr != NULL)
+                {
+                    size_t size_attr = 0;
+                    float attr_data = 0.0;
+                    adiosErr = adios2_attribute_data(&attr_data, &size_attr, attr);
+                    if (adiosErr != adios2_error_none)
+                    {
+                        GPTLstop("PIO:PIOc_get_att_tc");
+                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Reading variable (%s, varid=%d) attribute (%s) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                       "The low level (ADIOS) I/O library call failed to retrieve attribute data pointer (adios2_error=%s)",
+                                       pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+                    }
+
+                    memcpy(ip, &attr_data, size_attr * sizeof(float));
+                }
+                break;
+            }
+            case NC_INT:
+            {
+                adios2_attribute const *attr = adios2_inquire_attribute(file->ioH, full_name);
+                if (attr != NULL)
+                {
+                    size_t size_attr = 0;
+                    int32_t attr_data = 0;
+                    adiosErr = adios2_attribute_data(&attr_data, &size_attr, attr);
+                    if (adiosErr != adios2_error_none)
+                    {
+                        GPTLstop("PIO:PIOc_get_att_tc");
+                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Reading variable (%s, varid=%d) attribute (%s) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                       "The low level (ADIOS) I/O library call failed to retrieve attribute data pointer (adios2_error=%s)",
+                                       pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+                    }
+
+                    memcpy(ip, &attr_data, size_attr * sizeof(int32_t));
+                }
+                break;
+            }
+            case NC_CHAR:
+            {
+                adios2_attribute const *attr = adios2_inquire_attribute(file->ioH, full_name);
+                if (attr != NULL)
+                {
+                    size_t size_attr = 0;
+                    adios2_attribute_size(&size_attr, attr);
+                    char attr_data[PIO_MAX_NAME] = {'\0'};
+                    adiosErr = adios2_attribute_data(&attr_data, &size_attr, attr);
+                    if (adiosErr != adios2_error_none)
+                    {
+                        GPTLstop("PIO:PIOc_get_att_tc");
+                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Reading variable (%s, varid=%d) attribute (%s) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                       "The low level (ADIOS) I/O library call failed to retrieve attribute data pointer (adios2_error=%s)",
+                                       pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+                    }
+
+                    memcpy((char *)ip, &attr_data, strlen(attr_data) * sizeof(char));
+                }
+                break;
+            }
+            default:
+                GPTLstop("PIO:PIOc_get_att_tc");
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) attribute (%s) from file (%s, ncid=%d) failed. "
+                               "Unsupported attribute memory type (%x)",
+                               pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid, memtype);
+        }
+
+        free(full_name);
+
+        GPTLstop("PIO:PIOc_get_att_tc");
+        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+        return PIO_NOERR;
+    }
+#endif
+
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
     {
@@ -718,7 +900,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
         {
             switch(memtype)
             {
@@ -1182,7 +1364,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             switch(xtype)
             {
 #ifdef _NETCDF
@@ -1252,6 +1434,791 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Unsupported variable type (type=%x)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, xtype);
             }
     }
+
+#ifdef _ADIOS2
+    if (file->iotype == PIO_IOTYPE_ADIOS)
+    {
+        if (varid < 0 || varid >= file->num_vars)
+        {
+            GPTLstop("PIO:PIOc_get_vars_tc");
+            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
+                           "Reading variable from file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "Invalid variable id %d (expected >=0 && < number of variables in file, %d) is provided",
+                           pio_get_fname_from_file(file), ncid, varid, file->num_vars);
+        }
+
+        /* Check put_var tag */
+        if (strncmp(file->adios_vars[varid].nc_op_tag, "put_var", 7) != 0)
+        {
+            GPTLstop("PIO:PIOc_get_vars_tc");
+            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "Expected tag: put_var, actual tag: %s ",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, file->adios_vars[varid].nc_op_tag);
+        }
+
+        /* Get frame_id */
+        int frame_id = file->varlist[varid].record;
+
+        /* Magically obtain the relevant adios step */
+        int required_adios_step = adios_reader_get_step(file, varid, frame_id);
+        assert(required_adios_step >= 0);
+
+        size_t current_adios_step = 0;
+        adios2_step_status status = adios2_step_status_ok;
+        adios2_error adiosErr = adios2_error_none;
+
+        if (file->engineH != NULL)
+        {
+            adiosErr = adios2_current_step(&current_adios_step, file->engineH);
+            if (adiosErr != adios2_error_none)
+            {
+                GPTLstop("PIO:PIOc_get_vars_tc");
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                               "The low level (ADIOS) I/O library call failed to inspect current logical step (adios2_error=%s)",
+                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+            }
+        }
+
+        if (current_adios_step > required_adios_step)
+        {
+            /* Close bp file and remove IO object */
+            if (file->begin_step_called == 1)
+            {
+                adiosErr = adios2_end_step(file->engineH);
+                if (adiosErr != adios2_error_none)
+                {
+                    GPTLstop("PIO:PIOc_get_vars_tc");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                   "The low level (ADIOS) I/O library call failed to terminate interaction with current step (adios2_error=%s)",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+                }
+            }
+
+            file->begin_step_called = 0;
+
+            adiosErr = adios2_close(file->engineH);
+            if (adiosErr != adios2_error_none)
+            {
+                GPTLstop("PIO:PIOc_get_vars_tc");
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                               "The low level (ADIOS) I/O library call failed to close all transports in adios2_Engine (adios2_error=%s)",
+                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+            }
+
+            file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+            if (file->engineH == NULL)
+            {
+                GPTLstop("PIO:PIOc_get_vars_tc");
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                               "The low level (ADIOS) I/O library call failed to open an engine to start heavy-weight input/output operations (adios2_error=%s)",
+                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+            }
+
+            int step = 0;
+            while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0, &status) == adios2_error_none)
+            {
+                file->begin_step_called = 1;
+
+                if (step == required_adios_step || status == adios2_step_status_end_of_stream)
+                    break;
+                else
+                {
+                    adiosErr = adios2_end_step(file->engineH);
+                    if (adiosErr != adios2_error_none)
+                    {
+                        GPTLstop("PIO:PIOc_get_vars_tc");
+                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                       "The low level (ADIOS) I/O library call failed to terminate interaction with current step (adios2_error=%s)",
+                                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+                    }
+
+                    file->begin_step_called = 0;
+                    step++;
+                    continue;
+                }
+            }
+        }
+        else if (current_adios_step < required_adios_step)
+        {
+            /* Traverse bp file until the required step */
+            for (int step = 0; step < required_adios_step - current_adios_step; step++)
+            {
+                adiosErr = adios2_end_step(file->engineH);
+                if (adiosErr != adios2_error_none)
+                {
+                    GPTLstop("PIO:PIOc_get_vars_tc");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                   "The low level (ADIOS) I/O library call failed to terminate interaction with current step (adios2_error=%s)",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+                }
+
+                file->begin_step_called = 0;
+
+                adiosErr = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.0, &status);
+                if (adiosErr != adios2_error_none)
+                {
+                    GPTLstop("PIO:PIOc_get_vars_tc");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                   "The low level (ADIOS) I/O library call failed to begin a logical adios2 step stream (adios2_error=%s)",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+                }
+
+                file->begin_step_called = 1;
+            }
+        }
+
+        /* First we need to define the variable now that we know it's decomposition */
+        adios_var_desc_t *av = &(file->adios_vars[varid]);
+
+        /* Read ADIOS with memory type since ADIOS does not do conversions.
+         * Add an attribute describing the target output type (defined type).
+         */
+        if (xtype == PIO_NAT)
+            xtype = vartype;
+
+        if (xtype == PIO_LONG_INTERNAL)
+        {
+            int typesize = sizeof(long int);
+            if (typesize == 4)
+                xtype = PIO_INT;
+            else
+                xtype = PIO_INT64;
+        }
+
+        /* No conversion to var type will be made. Use the in-memory type of the data buffer */
+        av->adios_type = PIOc_get_adios_type(xtype);
+        av->adios_type_size = get_adios2_type_size(av->adios_type, NULL);
+
+        char vname[PIO_MAX_NAME] = {'\0'};
+
+        /* Scalars have to be handled differently. */
+        /* ndims should be initialized in the Open function*/
+        if (av->ndims == 0)
+        {
+            /* Only the IO master does the IO, so we are not really
+             * getting parallel IO here. */
+            if (file->all_rank == 0)
+            {
+                if (start)
+                {
+                    /* Ignore if user specifies start[0] == 0 */
+                    if (start[0] != 0)
+                    {
+                        printf("PIO: WARNING: Ignoring user-specified start indices while reading the scalar variable (%s) from file (%s, ncid=%d). "
+                               "An invalid start index (start[0] = %lld) provided (%s:%d)\n",
+                               av->name, pio_get_fname_from_file(file), ncid, (long long int) start[0], __FILE__, __LINE__);
+                    }
+                }
+
+                if (count)
+                {
+                    /* Ignore if user specifies count[0] == 1 */
+                    if (count[0] != 1)
+                    {
+                        printf("PIO: WARNING: Ignoring user-specified counts while reading the scalar variable (%s) from file (%s, ncid=%d). "
+                               "An invalid count (count[0] = %lld) provided (%s:%d)\n",
+                               av->name, pio_get_fname_from_file(file), ncid, (long long int) count[0], __FILE__, __LINE__);
+                    }
+                }
+
+                if (stride)
+                {
+                    /* Ignore if user specifies stride[0] == 1 */
+                    if (stride[0] != 1)
+                    {
+                        printf("PIO: WARNING: Ignoring user-specified strides while reading the scalar variable (%s) from file (%s, ncid=%d). "
+                               "An invalid stride (stride[0] = %lld) provided (%s:%d)\n",
+                               av->name, pio_get_fname_from_file(file), ncid, (long long int) stride[0], __FILE__, __LINE__);
+                    }
+                }
+
+                assert((strlen("/__pio__/var/") + strlen(av->name)) < PIO_MAX_NAME);
+                snprintf(vname, PIO_MAX_NAME, "/__pio__/var/%s", av->name);
+                av->adios_varid = adios2_inquire_variable(file->ioH, vname);
+                if (av->adios_varid == NULL)
+                {
+                    GPTLstop("PIO:PIOc_get_vars_tc");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                   "The low level (ADIOS) I/O library call failed to retrieve a variable handler within current io handler",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
+
+                }
+                else
+                {
+                    if (file->all_rank == 0)
+                    {
+                        /* Single value, check cache */
+                        char varname[PIO_MAX_NAME] = {'\0'};
+                        snprintf(varname, PIO_MAX_NAME, "%d", varid);
+
+                        char *mem_buffer = file->cache_data_blocks->get(file->cache_data_blocks, varname);
+                        if (mem_buffer == NULL)
+                        {
+                            mem_buffer = calloc(av->adios_type_size, 1);
+                            if (mem_buffer == NULL)
+                            {
+                                GPTLstop("PIO:PIOc_get_vars_tc");
+                                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                                return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                               "Out of memory allocating %lld bytes for a temporary buffer",
+                                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, (long long int)(av->adios_type_size));
+                            }
+
+                            adiosErr = adios2_get(file->engineH, av->adios_varid, mem_buffer, adios2_mode_sync);
+                            if (adiosErr != adios2_error_none)
+                            {
+                                GPTLstop("PIO:PIOc_get_vars_tc");
+                                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                               "The low level (ADIOS) I/O library call failed to get data associated with a variable from an engine (adios2_error=%s)",
+                                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+                            }
+
+                            memcpy((char *)buf, mem_buffer, av->adios_type_size);
+
+                            /* mem_buffer will be deleted in the cache delete operation */
+                            file->cache_data_blocks->put(file->cache_data_blocks, varname, mem_buffer);
+                        }
+                        else
+                            memcpy((char *)buf, mem_buffer, av->adios_type_size);
+                    }
+                }
+            }
+        }
+        else
+        {
+            /* This is not a scalar var. */
+            if (stride_present)
+            {
+                GPTLstop("PIO:PIOc_get_vars_tc");
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                               "Striding not supported",
+                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
+            }
+
+            /* Only the IO master actually does these ADIOS calls. */
+            if (file->all_rank == 0)
+            {
+                /* Write start and count arrays to be able to reconstruct the variable during conversion. */
+                int64_t pio_var_start[PIO_MAX_DIMS];
+                int64_t pio_var_count[PIO_MAX_DIMS];
+                if (start)
+                {
+                    for (int d = 0; d < av->ndims; d++)
+                        pio_var_start[d] = (int64_t) start[d];
+                }
+                else
+                    pio_var_start[0] = -1; /* if start is NULL */
+
+                if (count)
+                {
+                    for (int d = 0; d < av->ndims; d++)
+                        pio_var_count[d] = (int64_t) count[d];
+                }
+                else
+                    pio_var_count[0] = -1; /* if count is NULL */
+
+                /* Create a one-dimensional byte array to combine start, count and buf */
+                size_t av_size = 2 * av->ndims * sizeof(int64_t); /* pio_var_start and pio_var_count */
+                size_t buf_size = 1;
+                if (count)
+                {
+                    for (int d = 0; d < av->ndims; d++)
+                    {
+                        if (file->dim_values[av->gdimids[d]] != PIO_UNLIMITED)
+                            buf_size *= (size_t) count[d];
+                    }
+                }
+                else
+                {
+                    for (int d = 0; d < av->ndims; d++)
+                    {
+                        if (file->dim_values[av->gdimids[d]] != PIO_UNLIMITED)
+                            buf_size *= (size_t) file->dim_values[av->gdimids[d]];
+                    }
+                }
+                buf_size *= av->adios_type_size;
+                av_size += buf_size;
+
+                /* PIOc_put_var may be called multiple times with different start/count values
+                 * for a variable. ADIOS should output data for each of those calls not just
+                 * when the variable is not defined */
+                assert((strlen("/__pio__/var/") + strlen(av->name)) < PIO_MAX_NAME);
+                snprintf(vname, PIO_MAX_NAME, "/__pio__/var/%s", av->name);
+                av->adios_varid = adios2_inquire_variable(file->ioH, vname);
+                if (av->adios_varid == NULL)
+                {
+                    GPTLstop("PIO:PIOc_get_vars_tc");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                   "The low level (ADIOS) I/O library call failed to retrieve a variable handler within current io handler",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
+                }
+                else
+                {
+                    if (file->all_rank == 0)
+                    {
+                        /* Reading adios block */
+                        adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, av->adios_varid, required_adios_step);
+                        if (data_blocks == NULL)
+                        {
+                            GPTLstop("PIO:PIOc_get_vars_tc");
+                            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                            return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                           "The low level (ADIOS) I/O library call failed to get the list of blocks for a variable in a given step (NULL pointer returned)",
+                                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
+                        }
+
+                        size_t number_of_data_blocks = data_blocks->nblocks;
+
+                        /* Free memory */
+                        for (size_t i = 0; i < data_blocks->nblocks; i++)
+                        {
+                            free(data_blocks->BlocksInfo[i].Start);
+                            free(data_blocks->BlocksInfo[i].Count);
+                        }
+
+                        free(data_blocks->BlocksInfo);
+                        free(data_blocks->Shape);
+                        free(data_blocks);
+
+                        adios2_type read_type;
+                        adiosErr = adios2_variable_type(&read_type, av->adios_varid);
+                        if (adiosErr != adios2_error_none)
+                        {
+                            GPTLstop("PIO:PIOc_get_vars_tc");
+                            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                            return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                           "The low level (ADIOS) I/O library call failed to retrieve variable type (adios2_error=%s)",
+                                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+                        }
+
+                        size_t var_size = 0;
+                        size_t header_size = 2 * (av->ndims * sizeof(int64_t));
+
+                        /* Blocks structure
+                         * single block
+                         * block1: |start | count | data| */
+                        /* 2D */
+                        /* |start[0], start[1] | count[0], count[1] | data| */
+                        for (size_t block_id = 0; block_id < number_of_data_blocks; block_id++)
+                        {
+                            /* Caching var_size */
+                            char varname_size[PIO_MAX_NAME] = {'\0'};
+                            snprintf(varname_size, PIO_MAX_NAME, "%d  %zu sel_size", varid, block_id);
+
+                            char *mem_buffer_size = mem_buffer_size = file->cache_block_sizes->get(file->cache_block_sizes, varname_size);
+                            if (mem_buffer_size == NULL)
+                            {
+                                mem_buffer_size = calloc(1, sizeof(size_t));
+                                if (mem_buffer_size == NULL)
+                                {
+                                    GPTLstop("PIO:PIOc_get_vars_tc");
+                                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                                    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                                   "Out of memory allocating %lld bytes for a temporary buffer",
+                                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, (long long int)(sizeof(size_t)));
+                                }
+
+                                adiosErr = adios2_set_block_selection(av->adios_varid, block_id);
+                                if (adiosErr != adios2_error_none)
+                                {
+                                    GPTLstop("PIO:PIOc_get_vars_tc");
+                                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                                   "The low level (ADIOS) I/O library call failed to set block selection (adios2_error=%s)",
+                                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+                                }
+
+                                adiosErr = adios2_selection_size(&var_size, av->adios_varid);
+                                if (adiosErr != adios2_error_none)
+                                {
+                                    GPTLstop("PIO:PIOc_get_vars_tc");
+                                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                                   "The low level (ADIOS) I/O library call failed to return the minimum required allocation for the current selection (adios2_error=%s)",
+                                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+                                }
+
+                                memcpy(mem_buffer_size, &var_size, sizeof(size_t));
+
+                                /* mem_buffer_size will be deleted in the cache delete operation */
+                                file->cache_block_sizes->put(file->cache_block_sizes, varname_size, mem_buffer_size);
+                            }
+                            else
+                                memcpy(&var_size, mem_buffer_size, sizeof(size_t));
+
+                            char varname[PIO_MAX_NAME] = {'\0'};
+                            snprintf(varname, PIO_MAX_NAME, "%d %zu", varid, block_id);
+
+                            char *mem_buffer = file->cache_data_blocks->get(file->cache_data_blocks, varname);
+                            if (mem_buffer == NULL)
+                            {
+                                mem_buffer = calloc(var_size, av->adios_type_size);
+                                if (mem_buffer == NULL)
+                                {
+                                    GPTLstop("PIO:PIOc_get_vars_tc");
+                                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                                    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                                   "Out of memory allocating %lld bytes for for a temporary buffer",
+                                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, (long long int)(var_size * av->adios_type_size));
+                                }
+
+                                adiosErr = adios2_get(file->engineH, av->adios_varid, mem_buffer, adios2_mode_sync);
+                                if (adiosErr != adios2_error_none)
+                                {
+                                    GPTLstop("PIO:PIOc_get_vars_tc");
+                                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                                   "The low level (ADIOS) I/O library call failed to get data associated with a variable from an engine (adios2_error=%s)",
+                                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
+                                }
+
+                                /* mem_buffer will be deleted in the cache delete operation */
+                                file->cache_data_blocks->put(file->cache_data_blocks, varname, mem_buffer);
+                            }
+
+                            /* Find out start and count */
+                            int64_t block_info_start[PIO_MAX_DIMS];
+                            int64_t block_info_count[PIO_MAX_DIMS];
+                            for (int cnt = 0; cnt < av->ndims; cnt++)
+                            {
+                                block_info_start[cnt] = *((int64_t *) (mem_buffer + cnt * sizeof(int64_t)));
+                                block_info_count[cnt] = *((int64_t *) (mem_buffer + (cnt + av->ndims) * sizeof(int64_t)));
+                            }
+
+                            if (av->ndims == 1)
+                            {
+                                /* Data layout */
+                                /* |adios data block 1 | adios data block2 | */
+                                /* |header|     data   | header|   data    | */
+                                /* 0000xxx00*/
+                                size_t read_type_size = av->adios_type_size;
+                                /* index in a block */
+                                int64_t start_in_block_idx = -1;
+                                int64_t end_in_block_idx = -1;
+
+                                /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
+                                /* Find beginning of the block */
+                                /* case |0000xxxxxx| */
+                                if (start[0] >= block_info_start[0] &&
+                                    start[0] < block_info_start[0] + block_info_count[0])
+                                {
+                                    start_in_block_idx = start[0] - block_info_start[0];
+                                    /* case |xxxxxxxxx| */
+                                }
+                                else if (start[0] < block_info_start[0])
+                                    start_in_block_idx = 0;
+
+                                /* Find end of the block */
+                                /* case |xxxxx0000| */
+                                if (start[0] + count[0] >= block_info_start[0] &&
+                                    start[0] + count[0] < block_info_start[0] + block_info_count[0])
+                                {
+                                    end_in_block_idx = start[0] + count[0] - block_info_start[0];
+                                    /* case |xxxxxxxxx| */
+                                }
+                                else if (block_info_start[0] + block_info_count[0] <= start[0] + count[0])
+                                    end_in_block_idx = block_info_count[0];
+
+                                if (start_in_block_idx != -1 && end_in_block_idx != -1)
+                                {
+                                    int64_t offset_buf = block_info_start[0] - start[0] + start_in_block_idx;
+                                    int64_t offset_mem_buf = start_in_block_idx;
+                                    memcpy((char *) (buf + offset_buf * read_type_size),
+                                           mem_buffer + header_size + offset_mem_buf * read_type_size,
+                                           (end_in_block_idx - start_in_block_idx) * read_type_size);
+                                }
+                            }
+                            else if (av->ndims == 2)
+                            {
+                                /* Data layout */
+                                /* |adios data block 1 | adios data block2 | */
+                                /* |header|     data   | header|   data    | */
+                                /* 0000xxx00 */
+                                size_t read_type_size = av->adios_type_size;
+                                /* Index in a block with respect tp the block beginning */
+                                int64_t start_in_block_idx_0 = -1;
+                                int64_t end_in_block_idx_0 = -1;
+                                int64_t start_in_block_idx_1 = -1;
+                                int64_t end_in_block_idx_1 = -1;
+
+                                /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
+                                /* Find beginning of the block */
+                                /* case |0000xxxxxx| */
+                                /* fast index */
+                                if (start[1] >= block_info_start[1] &&
+                                    start[1] < block_info_start[1] + block_info_count[1])
+                                {
+                                    start_in_block_idx_1 = start[1] - block_info_start[1];
+                                    /* case |xxxxxxxxx| */
+                                }
+                                else if (start[1] < block_info_start[1])
+                                    start_in_block_idx_1 = 0;
+
+                                /* Find end of the block */
+                                /* case |xxxxx0000| */
+                                if (start[1] + count[1] >= block_info_start[1] &&
+                                    start[1] + count[1] < block_info_start[1] + block_info_count[1])
+                                {
+                                    end_in_block_idx_1 = start[1] + count[1] - block_info_start[1];
+                                    /* case |xxxxxxxxx| */
+                                }
+                                else if (block_info_start[1] + block_info_count[1] <= start[1] + count[1])
+                                    end_in_block_idx_1 = block_info_count[1];
+
+                                /* Slow index */
+                                if (start[0] >= block_info_start[0] &&
+                                    start[0] < block_info_start[0] + block_info_count[0])
+                                {
+                                    start_in_block_idx_0 = start[0] - block_info_start[0];
+                                    /* case |xxxxxxxxx| */
+                                }
+                                else if (start[0] < block_info_start[0])
+                                    start_in_block_idx_0 = 0;
+
+                                /* Find end of the block */
+                                /* case |xxxxx0000| */
+                                if (start[0] + count[0] >= block_info_start[0] &&
+                                    start[0] + count[0] < block_info_start[0] + block_info_count[0])
+                                {
+                                    end_in_block_idx_0 = start[0] + count[0] - block_info_start[0];
+                                    /* case |xxxxxxxxx| */
+                                }
+                                else if (block_info_start[0] + block_info_count[0] <= start[0] + count[0])
+                                    end_in_block_idx_0 = block_info_count[0];
+
+                                if (start_in_block_idx_0 != -1 && end_in_block_idx_0 != -1 &&
+                                    start_in_block_idx_1 != -1 && end_in_block_idx_1 != -1)
+                                {
+                                    for (int64_t idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++)
+                                    {
+                                        int64_t offset_buf_1D = block_info_start[1] - start[1] + start_in_block_idx_1;
+                                        int64_t offset_mem_buf_1D = start_in_block_idx_1;
+                                        int64_t size_dim_1 = file->dim_values[av->gdimids[1]];
+                                        int64_t offset_buf = (idx_0 + block_info_start[0] - start[0]) * size_dim_1 + offset_buf_1D;
+                                        int64_t offset_mem_buf = idx_0 * size_dim_1 + offset_mem_buf_1D;
+                                        memcpy((char *) (buf + offset_buf * read_type_size),
+                                               mem_buffer + header_size + offset_mem_buf * read_type_size,
+                                               (end_in_block_idx_1 - start_in_block_idx_1) * read_type_size);
+                                    }
+                                }
+                            }
+                            else if (av->ndims == 3)
+                            {
+                                /* Data layout */
+                                /*  |adios data block 1 | adios data block2 | */
+                                /*  |header|     data   | header|   data    | */
+                                /* 0000xxx00 */
+                                size_t read_type_size = av->adios_type_size;
+                                /* Index in a block with respect to block beginning */
+                                /* The last index is the fastest */
+                                int64_t start_in_block_idx_0 = -1;
+                                int64_t end_in_block_idx_0 = -1;
+                                int64_t start_in_block_idx_1 = -1;
+                                int64_t end_in_block_idx_1 = -1;
+                                int64_t start_in_block_idx_2 = -1;
+                                int64_t end_in_block_idx_2 = -1;
+
+                                /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
+                                /* Find beginning of the block */
+                                /* case |0000xxxxxx| */
+                                if (start[2] >= block_info_start[2] &&
+                                    start[2] < block_info_start[2] + block_info_count[2])
+                                {
+                                    start_in_block_idx_2 = start[2] - block_info_start[2];
+                                    /* case |xxxxxxxxx| */
+                                }
+                                else if (start[2] < block_info_start[2])
+                                    start_in_block_idx_2 = 0;
+
+                                /* Find end of the block */
+                                /* case |xxxxx0000| */
+                                if (start[2] + count[2] >= block_info_start[2] &&
+                                    start[2] + count[2] < block_info_start[2] + block_info_count[2])
+                                {
+                                    end_in_block_idx_2 = start[2] + count[2] - block_info_start[2];
+                                    /* case |xxxxxxxxx| */
+                                }
+                                else if (block_info_start[2] + block_info_count[2] <= start[2] + count[2])
+                                    end_in_block_idx_2 = block_info_count[2];
+
+                                if (start[1] >= block_info_start[1] &&
+                                    start[1] < block_info_start[1] + block_info_count[1])
+                                {
+                                    start_in_block_idx_1 = start[1] - block_info_start[1];
+                                    /* case |xxxxxxxxx| */
+                                }
+                                else if (start[1] < block_info_start[1])
+                                    start_in_block_idx_1 = 0;
+
+                                /* Find end of the block */
+                                /* case |xxxxx0000| */
+                                if (start[1] + count[1] >= block_info_start[1] &&
+                                    start[1] + count[1] < block_info_start[1] + block_info_count[1])
+                                {
+                                    end_in_block_idx_1 = start[1] + count[1] - block_info_start[1];
+                                    /* case |xxxxxxxxx| */
+                                }
+                                else if (block_info_start[1] + block_info_count[1] <= start[1] + count[1])
+                                    end_in_block_idx_1 = block_info_count[1];
+
+                                /* Slow index */
+                                if (start[0] >= block_info_start[0] &&
+                                    start[0] < block_info_start[0] + block_info_count[0])
+                                {
+                                    start_in_block_idx_0 = start[0] - block_info_start[0];
+                                    /* case |xxxxxxxxx| */
+                                }
+                                else if (start[0] < block_info_start[0])
+                                    start_in_block_idx_0 = 0;
+
+                                /* Find end of the block */
+                                /* case |xxxxx0000| */
+                                if (start[0] + count[0] >= block_info_start[0] &&
+                                    start[0] + count[0] < block_info_start[0] + block_info_count[0])
+                                {
+                                    end_in_block_idx_0 = start[0] + count[0] - block_info_start[0];
+                                    /* case |xxxxxxxxx| */
+                                }
+                                else if (block_info_start[0] + block_info_count[0] <= start[0] + count[0])
+                                    end_in_block_idx_0 = block_info_count[0];
+
+                                if (start_in_block_idx_0 != -1 && end_in_block_idx_0 != -1 &&
+                                    start_in_block_idx_1 != -1 && end_in_block_idx_1 != -1)
+                                {
+                                    for (int64_t idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++)
+                                    {
+                                        for (int64_t idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++)
+                                        {
+                                            int64_t size_dim_1 = file->dim_values[av->gdimids[1]];
+                                            int64_t size_dim_2 = file->dim_values[av->gdimids[2]];
+                                            int64_t offset_buf_1D = block_info_start[2] - start[2] + start_in_block_idx_2;
+                                            int64_t offset_mem_buf_1D = start_in_block_idx_2;
+                                            int64_t offset_buf_2D = (idx_1 + block_info_start[1] - start[1]) * size_dim_2;
+                                            int64_t offset_mem_buf_2D = idx_1 * size_dim_2;
+                                            int64_t offset_mem_buf = offset_mem_buf_1D + offset_mem_buf_2D + idx_0 * block_info_count[1] * block_info_count[2];
+                                            int64_t offset_buf = offset_buf_1D + offset_buf_2D + (idx_0 + block_info_start[0] - start[0]) * size_dim_1 * size_dim_2;
+                                            memcpy((char *) (buf + offset_buf * read_type_size),
+                                                   mem_buffer + header_size + offset_mem_buf * read_type_size,
+                                                   (end_in_block_idx_2 - start_in_block_idx_2) * read_type_size);
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                GPTLstop("PIO:PIOc_get_vars_tc");
+                                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                               "Unsupported number of dimensions (%d)",
+                                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, av->ndims);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+#endif
 
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
     if(ierr != PIO_NOERR){

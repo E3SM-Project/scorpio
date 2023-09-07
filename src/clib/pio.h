@@ -68,6 +68,8 @@ extern "C" {
 #include <limits.h>
 #include <adios2_c.h>
 
+#include "qhashtbl.h" /* qhashtbl implementation for ADIOS read */
+
 #define MAX_ADIOS_BUFFER_COUNT (PIO_MAX_CACHED_STEPS_FOR_ADIOS + 16) /* Maximum buffer size for aggregating decomp_id, frame_id, and fillval_id values */
 #define BLOCK_MAX_BUFFER ((unsigned long)INT_MAX) /* 2GB limit of MPI_Gatherv */
 /* adios end step is called if the number of blocks written out exceeds BLOCK_COUNT_THRESHOLD */
@@ -758,8 +760,9 @@ typedef struct iosystem_desc_t
     rearr_opt_t rearr_opts;
 
 #ifdef _ADIOS2
-    /* ADIOS handle */
-    adios2_adios *adiosH;
+    /* ADIOS handles */
+    adios2_adios *adiosH; /* Handle for ADIOS write */
+    adios2_adios *adios_readerH; /* Handle for ADIOS read */
     int adios_io_process;
     MPI_Comm adios_comm;
     int adios_rank, num_adiostasks;
@@ -815,6 +818,16 @@ typedef struct wmulti_buffer
 } wmulti_buffer;
 
 #ifdef _ADIOS2
+/* Interval map for ADIOS read */
+typedef struct adios_interval_map_t
+{
+    int n_adios_steps;
+    short **map;
+} adios_interval_map_t;
+
+/* Maximum char array length to store "darray" or "put_var", for ADIOS read */
+#define NC_OP_TAG_MAX_LEN 8
+
 /** Variable definition information saved at pioc_def_var,
  * so that ADIOS can define the variable at write time when
  * local dimensions and offsets are known.
@@ -863,6 +876,13 @@ typedef struct adios_var_desc_t
     int32_t *num_wb_buffer;
     int32_t decomp_cnt, frame_cnt, fillval_cnt, num_wb_cnt;
     int32_t max_buffer_cnt;
+
+    /* Simplified version of an interval map implementation
+     * index is a frame_id and the value is the adios_step */
+    adios_interval_map_t* interval_map; /* For ADIOS read */
+
+    /* Is this variable written with put_var or darray? */
+    char nc_op_tag[NC_OP_TAG_MAX_LEN]; /* For ADIOS read */
 } adios_var_desc_t;
 
 /* Track attributes */
@@ -1053,6 +1073,13 @@ typedef struct file_desc_t
 
     /** Store current frameid for end_step in PIO_setframe */
     int current_frame;
+
+    /* Some caches (hash tables) for ADIOS read */
+    qhashtbl_t *cache_data_blocks;
+    qhashtbl_t *cache_block_sizes;
+    qhashtbl_t *cache_darray_info;
+
+    char io_name_reader[PIO_MAX_NAME + 1]; /* Name of io object, for ADIOS read */
 #endif /* _ADIOS2 */
 
 #ifdef _HDF5
