@@ -73,7 +73,7 @@ module pio
        PIO_get_att   => get_att
   use pionfput_mod, only : PIO_put_var   => put_var
   use pionfget_mod, only : PIO_get_var   => get_var
-  use pio_support, only: pio_writedof
+  use pio_support, only: pio_writedof, pio_readdof
   use iso_c_binding
 
   implicit none
