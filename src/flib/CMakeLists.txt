@@ -233,6 +233,19 @@ if (WITH_NETCDF)
     if (EXISTS ${NetCDF_Fortran_INCLUDE_DIR}/netcdf_par.h)
       target_compile_definitions (piof
         PUBLIC _NETCDF4)
+      # Check if NETCDF4 chunk setting constants are available
+      # Note: Not all versions of NetCDF with NetCDF4 support have
+      # these chunking constants
+      check_macro (HAVE_NC4_CHUNK_CONSTS
+        NAME CheckNC4ChunkConsts.f90
+        HINTS ${CMAKE_MODULE_PATH}
+        DEFINITIONS -I${NetCDF_Fortran_INCLUDE_DIRS}
+        COMMENT "Whether the NetCDF4 chunking constants are available")
+      if(HAVE_NC4_CHUNK_CONSTS)
+        target_compile_definitions (piof PUBLIC HAVE_NC4_CHUNK_CONSTS)
+      else ()
+        message(WARNING "NetCDF4 is available but NetCDF4 chunking constants are not defined (limits chunking support)")
+      endif ()
     endif ()
   else ()
     message(STATUS "NetCDF Fortran library not found. Disabling support for NetCDF")
