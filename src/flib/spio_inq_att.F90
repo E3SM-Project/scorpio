@@ -422,7 +422,7 @@ CONTAINS
     file%iosystem => iosys
     
     IF((fh <= 0) .OR. (varid < 0) .OR. (attid <= 0)) THEN
-      WRITE(log_msg, *) "Invalid file handle/id (fh =", fh, ") "&
+      WRITE(log_msg, *) "Invalid file handle/id (fh =", fh, ") ",&
                         "or variable id (varid = ", varid,&
                         "or attribute id (attid = ", attid,&
                         ") passed to pio_inq_attname() function, pio_inq_attname_fh_vid()"
