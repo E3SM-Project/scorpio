@@ -377,7 +377,7 @@ CONTAINS
     IF(PRESENT(nDimensions)) THEN
       ierr = pio_inq_ndims(file, nDimensions)
       IF(ierr /= PIO_NOERR) THEN
-        WRITE(log_msg, *) "Unable to query the number of dimensions in file,"&
+        WRITE(log_msg, *) "Unable to query the number of dimensions in file,",&
                           "in function, pio_inquire_file(), file%fh = ", file%fh
         ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
         RETURN
@@ -387,7 +387,7 @@ CONTAINS
     IF(PRESENT(nVariables)) THEN
       ierr = pio_inq_nvars(file, nVariables)
       IF(ierr /= PIO_NOERR) THEN
-        WRITE(log_msg, *) "Unable to query the number of variables in file,"&
+        WRITE(log_msg, *) "Unable to query the number of variables in file,",&
                           "in function, pio_inquire_file(), file%fh = ", file%fh
         ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
         RETURN
@@ -397,7 +397,7 @@ CONTAINS
     IF(PRESENT(nAttributes)) THEN
       ierr = pio_inq_natts(file, nAttributes)
       IF(ierr /= PIO_NOERR) THEN
-        WRITE(log_msg, *) "Unable to query the number of attributes in file,"&
+        WRITE(log_msg, *) "Unable to query the number of attributes in file,",&
                           "in function, pio_inquire_file(), file%fh = ", file%fh
         ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
         RETURN
@@ -407,7 +407,7 @@ CONTAINS
     IF(PRESENT(unlimitedDimID)) THEN
       ierr = pio_inq_unlimdim(file, unlimitedDimID)
       IF(ierr /= PIO_NOERR) THEN
-        WRITE(log_msg, *) "Unable to query the unlimited dimension in file,"&
+        WRITE(log_msg, *) "Unable to query the unlimited dimension in file,",&
                           "in function, pio_inquire_file(), file%fh = ", file%fh
         ierr = pio_error(file%iosystem, PIO_EINTERNAL, __PIO_FILE__, __LINE__, TRIM(log_msg))
         RETURN
