@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['var_5fdesc_5ft',['var_desc_t',['../pio_8h.html#acb64b706f665bab44861cb168a985dd2',1,'pio.h']]]
+  ['rearr_5fcomm_5ffc_5fopt_5ft_2248',['rearr_comm_fc_opt_t',['../pio_8h.html#a8cafe8418bc624dd1863e326f5feca67',1,'pio.h']]],
+  ['rearr_5fopt_5ft_2249',['rearr_opt_t',['../pio_8h.html#a2e2d375ac2b7b95a859cc17999c73f42',1,'pio.h']]]
 ];
