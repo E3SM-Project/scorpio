@@ -317,7 +317,9 @@ endif ()
 #==============================================================================
 
 # Install libpioc.a
-install (TARGETS pioc DESTINATION lib)
+install (TARGETS pioc
+          EXPORT spio-targets-pioc
+          DESTINATION lib)
 
 # Install the header file
 install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/pio.h DESTINATION include)
@@ -331,3 +333,8 @@ configure_file (
 # Install PIO config Include/Header File
 install (FILES ${PROJECT_BINARY_DIR}/pio_config.h DESTINATION include)
 
+# Install the cmake config file with targets to the cmake directory
+install (EXPORT spio-targets-pioc
+          FILE spio-targets-pioc.cmake
+          DESTINATION lib/scorpio/cmake
+          NAMESPACE scorpio::)
