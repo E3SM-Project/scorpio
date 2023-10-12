@@ -82,7 +82,7 @@ endif ()
 #==============================================================================
 
 # Library
-install (TARGETS gptl DESTINATION lib)
+install (TARGETS gptl EXPORT spio-targets-gptl DESTINATION lib)
 
 # Header/Include File
 install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/gptl.h DESTINATION include)
@@ -90,6 +90,11 @@ install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/gptl.h DESTINATION include)
 # Fortran Modules
 install (FILES ${GPTL_Fortran_MODS} DESTINATION include)
 
+# Install the cmake config file with targets to the cmake directory
+install (EXPORT spio-targets-gptl
+          FILE spio-targets-gptl.cmake
+          DESTINATION lib/scorpio/cmake
+          NAMESPACE scorpio::)
 #==============================================================================
 #  DEFINE THE DEPENDENCIES
 #==============================================================================
