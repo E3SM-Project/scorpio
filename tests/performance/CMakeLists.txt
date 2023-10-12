@@ -25,6 +25,7 @@ if (PIO_ENABLE_TIMING)
   add_dependencies (tests pioperf)
 endif ()
 
+include_directories("${CMAKE_BINARY_DIR}/src/flib" "${CMAKE_BINARY_DIR}/src/flib_legacy")
 add_executable (pioperf_rearr EXCLUDE_FROM_ALL
   pioperformance_rearr.F90)
 set_property(TARGET pioperf_rearr PROPERTY LINKER_LANGUAGE ${PIO_LINKER_LANGUAGE})
