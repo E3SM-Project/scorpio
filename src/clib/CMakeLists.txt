@@ -20,6 +20,7 @@ add_library (pioc topology.c pio_mpi_timer.c pio_timer.c pio_file.c
 #==============================================================================
 #  FIND EXTERNAL LIBRARIES/DEPENDENCIES
 #==============================================================================
+
 #===== MPI =====
 if (PIO_USE_MPISERIAL)
   find_package (MPISERIAL COMPONENTS C REQUIRED)
@@ -43,6 +44,8 @@ if (PIO_ENABLE_TIMING)
       PUBLIC ${GPTL_C_LIBRARIES})
   else ()
     message (STATUS "Using internal GPTL C library for timing")
+    target_include_directories (pioc
+      PRIVATE ${CMAKE_SOURCE_DIR}/src/gptl)
     target_link_libraries (pioc
       PUBLIC gptl)
   endif ()
@@ -209,9 +212,13 @@ include_directories(
 
 # Include the clib source and binary directory
 target_include_directories (pioc
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories (pioc
-  PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+  PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
+# Include the install include dir for all dep projects
+target_include_directories (pioc
+  PUBLIC $<INSTALL_INTERFACE:include>)
 
 # System and compiler CPP directives
 target_compile_definitions (pioc
