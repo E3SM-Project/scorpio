@@ -323,8 +323,16 @@ set (PIO_Fortran_MODS ${CMAKE_CURRENT_BINARY_DIR}/pio.mod
   ${CMAKE_CURRENT_BINARY_DIR}/pio_nf_utils.mod)
 
 # Install libpiof.a
-install (TARGETS piof DESTINATION lib)
+install (TARGETS piof
+          EXPORT spio-targets-piof
+          DESTINATION lib)
 
 # Install the Fortran modules
 install (FILES ${PIO_Fortran_MODS} DESTINATION include)
+
+# Install the cmake config file with targets to the cmake directory
+install (EXPORT spio-targets-piof
+          FILE spio-targets-piof.cmake
+          DESTINATION lib/scorpio/cmake
+          NAMESPACE scorpio::)
 
