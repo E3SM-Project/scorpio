@@ -388,3 +388,13 @@ if (PIO_ENABLE_DOC)
 else ()
   message(STATUS "Disabling SCORPIO Documentation... (default, use -DPIO_ENABLE_DOC:BOOL=ON to enable documentation)")
 endif ()
+
+#==============================================================================
+# SCORPIO PACKAGE CONFIGURE
+#==============================================================================
+include(CMakePackageConfigHelpers)
+configure_package_config_file(cmake/scorpio-config.cmake.in
+  "${CMAKE_CURRENT_BINARY_DIR}/scorpio-config.cmake"
+  INSTALL_DESTINATION lib/scorpio/cmake)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/scorpio-config.cmake"
+        DESTINATION lib/scorpio/cmake)
