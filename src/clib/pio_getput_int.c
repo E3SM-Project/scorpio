@@ -272,7 +272,7 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         file->adios_attrs[num_attrs].adios_type = adios_type;
         file->num_attrs++;
 
-        if (file->all_rank == MPI_ROOT)
+        if (ios->iomaster == MPI_ROOT)
         {
             ios->io_fstats->wb += len * atttype_len;
             file->io_fstats->wb += len * atttype_len;
