@@ -4502,9 +4502,9 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             file->adios_vars[var].interval_map = NULL;
         }
 
-        file->cache_data_blocks = qhashtbl(10000);
-        file->cache_block_sizes = qhashtbl(10000);
-        file->cache_darray_info = qhashtbl(10000);
+        file->cache_data_blocks = spio_hash(10000);
+        file->cache_block_sizes = spio_hash(10000);
+        file->cache_darray_info = spio_hash(10000);
 
         while (step < nsteps && adios2_begin_step(file->engineH, adios2_step_mode_read, -1.0, &status) == adios2_error_none)
         {
