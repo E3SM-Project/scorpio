@@ -330,6 +330,11 @@ extern "C" {
     int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid, void *iobuf);
     int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid, void *iobuf);
 
+#ifdef _ADIOS2
+    /* A helper function (used by adios reader) that maps a frame id to adios steps */
+    int adios_reader_get_step(file_desc_t *file, int var_id, int frame_id);
+#endif
+
     /* Read atts with type conversion. */
     int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void *ip);
 
