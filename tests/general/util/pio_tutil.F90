@@ -329,7 +329,7 @@ CONTAINS
 #endif
 #ifdef _PNETCDF
       ! pnetcdf
-      num_iotypes = num_iotypes + 1
+      ! num_iotypes = num_iotypes + 1
 #endif
 #ifdef _ADIOS2
       ! adios
@@ -347,9 +347,9 @@ CONTAINS
     i = 1
 #ifdef _PNETCDF
       ! pnetcdf
-      iotypes(i) = PIO_iotype_pnetcdf
-      iotype_descs(i) = "PNETCDF"
-      i = i + 1
+      ! iotypes(i) = PIO_iotype_pnetcdf
+      ! iotype_descs(i) = "PNETCDF"
+      ! i = i + 1
 #endif
 #ifdef _ADIOS2
       ! adios
@@ -522,7 +522,7 @@ CONTAINS
 #endif
 #ifdef _PNETCDF
       ! pnetcdf
-      num_iotypes = num_iotypes + 1
+      ! num_iotypes = num_iotypes + 1
 #endif
 #ifdef _ADIOS2
       ! adios
@@ -540,9 +540,9 @@ CONTAINS
     i = 1
 #ifdef _PNETCDF
       ! pnetcdf
-      iotypes(i) = PIO_iotype_pnetcdf
-      iotype_descs(i) = "PNETCDF"
-      i = i + 1
+      ! iotypes(i) = PIO_iotype_pnetcdf
+      ! iotype_descs(i) = "PNETCDF"
+      ! i = i + 1
 #endif
 #ifdef _ADIOS2
       ! adios
