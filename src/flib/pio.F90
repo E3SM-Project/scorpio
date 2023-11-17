@@ -18,7 +18,7 @@ module pio
                         pio_set_hint, pio_set_rearr_opts, pio_set_blocksize
   use spio_file, only : pio_openfile, pio_createfile, pio_closefile,&
                         pio_deletefile, pio_setframe, pio_advanceframe,&
-                        pio_syncfile, pio_file_is_open
+                        pio_syncfile, pio_file_is_open, pio_set_fill
   use spio_misc_api, only : pio_set_buffer_size_limit, pio_iotype_available
   use spio_err, only : pio_setdebuglevel, pio_seterrorhandling, pio_strerror, pio_set_log_level
 
@@ -33,7 +33,7 @@ module pio
        pio_global, pio_char, pio_write, pio_nowrite, pio_clobber, pio_noclobber, &
        pio_max_name, pio_max_var_dims, pio_rearr_subset, pio_rearr_box, &
 #if defined(_NETCDF) || defined(_PNETCDF)
-       pio_nofill, pio_unlimited, pio_fill_char, pio_fill_int, pio_fill_double, pio_fill_float, &
+       pio_fill, pio_nofill, pio_unlimited, pio_fill_char, pio_fill_int, pio_fill_double, pio_fill_float, &
 #endif
        pio_64bit_offset, pio_64bit_data, &
        pio_internal_error, pio_bcast_error, pio_reduce_error,&
