@@ -403,7 +403,9 @@ int ProcessVariableAndAttributeDefinitions(adios2::IO &bpIO, adios2::Engine &bpR
                 }
                 else
                 {
-                    ret = PIOc_put_att(ncid, vars_map[varname].nc_varid, attname, piotype, 1, adata[0].data());
+		    int type_size = adios2_type_size_a2(atype);
+		    PIO_Offset data_len = adata[0].size()/type_size; 
+                    ret = PIOc_put_att(ncid, vars_map[varname].nc_varid, attname, piotype, data_len, adata[0].data());
                 }
 
                 if (ret != PIO_NOERR)

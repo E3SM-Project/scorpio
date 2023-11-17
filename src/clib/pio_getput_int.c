@@ -286,9 +286,19 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             if (attributeH == NULL)
             {
                 if (NC_CHAR == atttype || adios2_type_string == adios_type)
+		{
                     attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_string, op);
-                else
-                    attributeH = adios2_define_attribute(file->ioH, att_name, adios_type, op);
+		}
+                else 
+		{
+		    if (len>1) 
+		    {
+                    	attributeH = adios2_define_attribute_array(file->ioH, att_name, adios_type, op, (size_t)len);
+		    } else 
+		    {
+                    	attributeH = adios2_define_attribute(file->ioH, att_name, adios_type, op);
+		    }
+		}
 
                 if (attributeH == NULL)
                 {
