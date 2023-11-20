@@ -17,7 +17,7 @@ module pio
        pio_freedecomp, pio_syncfile, &
        pio_finalize, pio_set_hint, pio_getnumiotasks, pio_file_is_open, &
        PIO_deletefile, PIO_get_numiotasks, PIO_iotype_available, &
-       pio_set_rearr_opts
+       pio_set_rearr_opts, pio_set_fill
 
   use pio_types, only : io_desc_t, file_desc_t, var_desc_t, iosystem_desc_t, &
        pio_rearr_opt_t, pio_rearr_comm_fc_opt_t, pio_rearr_comm_fc_2d_enable,&
@@ -30,7 +30,7 @@ module pio
        pio_global, pio_char, pio_write, pio_nowrite, pio_clobber, pio_noclobber, &
        pio_max_name, pio_max_var_dims, pio_rearr_subset, pio_rearr_box, &
 #if defined(_NETCDF) || defined(_PNETCDF)
-       pio_nofill, pio_unlimited, pio_fill_char, pio_fill_int, pio_fill_double, pio_fill_float, &
+       pio_fill, pio_nofill, pio_unlimited, pio_fill_char, pio_fill_int, pio_fill_double, pio_fill_float, &
 #endif
        pio_64bit_offset, pio_64bit_data, &
        pio_internal_error, pio_bcast_error, pio_reduce_error,&

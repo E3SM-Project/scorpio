@@ -154,4 +154,23 @@ INTERFACE
   END FUNCTION PIOc_File_is_Open
 END INTERFACE
 
+INTERFACE
+!> @private
+!! @brief Set the default fillmode to use for variables in a file
+!!
+!! @details
+!! @param[in] fh The handle/id to the file with the variable
+!! @param[in] fillmode The fillmode to use for variables in the file
+!! @param[out]  prev_fillmode The previous fillmode set for this file
+!! @return PIO_NOERR on success, an error code otherwise
+!!
+  INTEGER(C_INT) FUNCTION PIOc_set_fill(fh, fillmode, prev_fillmode)&
+                          bind(C,name="PIOc_set_fill")
+    USE iso_c_binding
+    INTEGER(C_INT), VALUE :: fh
+    INTEGER(C_INT), VALUE :: fillmode
+    INTEGER(C_INT)        :: prev_fillmode
+  END FUNCTION PIOc_set_fill
+END INTERFACE
+
 END MODULE spio_file_cint

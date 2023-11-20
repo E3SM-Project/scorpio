@@ -53,7 +53,8 @@ module piolib_mod
        PIO_deletefile, &
        PIO_get_numiotasks, &
        PIO_iotype_available, &
-       PIO_set_rearr_opts
+       PIO_set_rearr_opts, &
+       PIO_set_fill
 
 #ifdef MEMCHK
 !> this is an internal variable for memory leak debugging
@@ -1201,6 +1202,45 @@ contains
                                 max_pend_req_i2c)
 
   end function pio_set_rearr_opts
+
+!>
+!! @public
+!! @ingroup PIO_set_fill
+!! @brief Set the fillmode for a file
+!! @details
+!! @param file : The file handle
+!! @param fillmode : The new fillmode for the file
+!! @param prev_fillmode : (Optional) The previous/old fillmode for the file
+!<
+  integer function pio_set_fill(file, fillmode, prev_fillmode) result(ierr)
+    type(file_desc_t), intent(in) :: file
+    integer, intent(in) :: fillmode
+    integer, intent(out), optional :: prev_fillmode
+
+    integer(c_int) :: cprev_fillmode
+    interface
+       integer(c_int) function PIOc_set_fill(fh, fmode, prev_fmode) &
+            bind(C,name="PIOc_set_fill")
+         use iso_c_binding
+         integer(C_INT), value :: fh
+         integer(C_INT), value :: fmode
+         integer(C_INT) :: prev_fmode
+       end function PIOc_set_fill
+    end interface
+
+#ifdef TIMING
+    ! This call is not very costly, we can ignore it
+    !call t_startf("PIO:set_fill")
+#endif
+    ierr = PIOc_set_fill(file%fh, int(fillmode, C_INT), cprev_fillmode)
+    if(present(prev_fillmode)) then
+      prev_fillmode = int(cprev_fillmode)
+    end if
+#ifdef TIMING
+    !call t_stopf("PIO:set_fill")
+#endif
+
+  end function pio_set_fill
 
 
 end module piolib_mod

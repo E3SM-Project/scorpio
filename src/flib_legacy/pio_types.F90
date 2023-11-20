@@ -195,6 +195,7 @@ module pio_types
    integer, public, parameter :: PIO_nowrite  = nf_nowrite
    integer, public, parameter :: PIO_CLOBBER = nf_clobber
    integer, public, parameter :: PIO_NOCLOBBER = nf_NOclobber
+   integer, public, parameter :: PIO_FILL = nf_fill
    integer, public, parameter :: PIO_NOFILL = nf_nofill
    integer, public, parameter :: PIO_MAX_DIMS = min(nf_max_dims, PIO_MAX_DIMS_UB)
    integer, public, parameter :: PIO_MAX_ATTRS = min(nf_max_attrs, PIO_MAX_ATTRS_UB)
@@ -222,6 +223,7 @@ module pio_types
    integer, public, parameter :: PIO_nowrite = nf_nowrite
    integer, public, parameter :: PIO_CLOBBER = nf_clobber
    integer, public, parameter :: PIO_NOCLOBBER = nf_NOclobber
+   integer, public, parameter :: PIO_FILL = nf_fill
    integer, public, parameter :: PIO_NOFILL = nf_nofill
    integer, public, parameter :: PIO_MAX_DIMS = min(nf_max_dims, PIO_MAX_DIMS_UB)
    integer, public, parameter :: PIO_MAX_ATTRS = min(nf_max_attrs, PIO_MAX_ATTRS_UB)
@@ -246,6 +248,8 @@ module pio_types
    integer, public, parameter :: PIO_MAX_VARS = PIO_MAX_VARS_UB
    integer, public, parameter :: PIO_MAX_NAME = 25
    integer, public, parameter :: PIO_MAX_VAR_DIMS = 6
+   integer, public, parameter :: PIO_FILL = 0
+   integer, public, parameter :: PIO_NOFILL = 1
    integer, public, parameter :: PIO_CLOBBER = 10
    integer, public, parameter :: PIO_NOCLOBBER = 11
    integer, public, parameter :: PIO_WRITE = 20
