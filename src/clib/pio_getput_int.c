@@ -291,10 +291,12 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 		}
                 else 
 		{
+		    /* if len>1, it is an attribute array. Use ADIOS array attribute function. */	
 		    if (len>1) 
 		    {
                     	attributeH = adios2_define_attribute_array(file->ioH, att_name, adios_type, op, (size_t)len);
-		    } else 
+		    } 
+		    else 
 		    {
                     	attributeH = adios2_define_attribute(file->ioH, att_name, adios_type, op);
 		    }

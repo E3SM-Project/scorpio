@@ -403,8 +403,10 @@ int ProcessVariableAndAttributeDefinitions(adios2::IO &bpIO, adios2::Engine &bpR
                 }
                 else
                 {
+		    /* adata[0].data() may point to an attribute array. Compute the number of array elements. */
 		    int type_size = adios2_type_size_a2(atype);
-		    PIO_Offset data_len = adata[0].size()/type_size; 
+                    assert(type_size > 0);
+		    PIO_Offset data_len = (PIO_Offset) (adata[0].size()/type_size); 
                     ret = PIOc_put_att(ncid, vars_map[varname].nc_varid, attname, piotype, data_len, adata[0].data());
                 }
 
