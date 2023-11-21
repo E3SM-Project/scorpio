@@ -24,7 +24,7 @@ MODULE spio_file
   PRIVATE
   PUBLIC :: pio_openfile, pio_createfile, pio_closefile,&
             pio_deletefile, pio_setframe, pio_advanceframe,&
-            pio_syncfile, pio_file_is_open
+            pio_syncfile, pio_file_is_open, pio_set_fill
 
 CONTAINS
 
@@ -347,5 +347,48 @@ CONTAINS
 #endif
 
   END FUNCTION pio_file_is_open
+
+!> @defgroup pio_set_fill pio_set_fill
+!! @public
+!! @brief Set the fillmode for a file
+!!
+!! @details
+!! The fillvalue mode for all variables in a file can be set
+!! using this function. This mode can be used by the library to choose
+!! whether variables are pre-filled with fillvalues. Users can choose
+!! to disable pre-filling of variables when variables are written out
+!! completely, without any missing values, to improve write performance
+!! (by avoiding writing the variable data twice - with missing values
+!! and then the actual data).
+!!
+!! Note that this is considered as a hint to the library that can
+!! possibly improve write performance in certain use cases. However
+!! the library can ignore this hint if it is not supported by the low
+!! level I/O library.
+!!
+!! @param[in] file The handle to the file. @copydoc file_desc_t
+!! @param[in] fillmode The new fillmode for the file. Setting fillmode
+!! to PIO_FILL (the default) ensures that all variables are pre-filled
+!! with fillvalues. Set the fillmode to PIO_NOFILL to disable pre-filling
+!! of variables with fillvalues
+!! @param[out] prev_fillmode (Optional) The function returns the previous
+!! fillmode for the file in this arg
+!! @return PIO_NOERR if successful an error code otherwise
+!!
+  INTEGER FUNCTION pio_set_fill(file, fillmode, prev_fillmode) RESULT(ierr)
+    TYPE(file_desc_t), INTENT(IN) :: file
+    INTEGER, INTENT(IN) :: fillmode
+    INTEGER, INTENT(OUT), OPTIONAL :: prev_fillmode
+
+    INTEGER(C_INT) :: cfillmode, cprev_fillmode, cerr
+
+    cfillmode = INT(fillmode, C_INT)
+    cerr = PIOc_set_fill(file%fh, cfillmode, cprev_fillmode)
+    ierr = INT(cerr)
+
+    IF(PRESENT(prev_fillmode)) THEN
+      prev_fillmode = INT(cprev_fillmode)
+    END IF
+  END FUNCTION pio_set_fill
 
 END MODULE spio_file
