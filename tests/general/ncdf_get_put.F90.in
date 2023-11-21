@@ -114,14 +114,17 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_1datt
     call PIO_syncfile(pio_file)
 #endif
 
+    gval = 0
     ret = PIO_get_att(pio_file, pio_var, 'dummy_att_val', gval);
     PIO_TF_CHECK_ERR(ret, "Failed to get attribute:" // trim(filename))
 
     PIO_TF_CHECK_VAL((gval, init_val), "Got wrong value")
 
-    ! FIXME: Check the values are correct
+    gcval = ''
     ret = PIO_get_att(pio_file, pio_cvar, 'dummy_att_cval', gcval);
     PIO_TF_CHECK_ERR(ret, "Failed to get attribute:" // trim(filename))
+
+    PIO_TF_CHECK_VAL((gcval, pcval), "Got wrong value")
 
     call PIO_closefile(pio_file)
     call PIO_deletefile(pio_tf_iosystem_, filename);
@@ -189,11 +192,13 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_0dvar
     call PIO_syncfile(pio_file)
 #endif
 
+    gval = 0
     ret = PIO_get_var(pio_file, pio_var, gval);
     PIO_TF_CHECK_ERR(ret, "Failed to get scalar var:" // trim(filename))
 
     PIO_TF_CHECK_VAL((gval, pval), "Got wrong value")
 
+    gcval = ''
     ret = PIO_get_var(pio_file, pio_cvar, gcval);
     PIO_TF_CHECK_ERR(ret, "Failed to get scalar char var:" // trim(filename))
 
@@ -270,11 +275,13 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_1dvar
     call PIO_syncfile(pio_file)
 #endif
 
+    gval = 0
     ret = PIO_get_var(pio_file, pio_var, gval);
     PIO_TF_CHECK_ERR(ret, "Failed to get var:" // trim(filename))
 
     PIO_TF_CHECK_VAL((gval, pval), "Got wrong value")
 
+    gcval = ''
     ret = PIO_get_var(pio_file, pio_cvar, gcval);
     PIO_TF_CHECK_ERR(ret, "Failed to get char var:" // trim(filename))
 
@@ -383,6 +390,11 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_1dvar_ls_buf
     call PIO_syncfile(pio_file)
 #endif
 
+    do j=1,DIM_LEN
+      lgval(j) = 0
+      lgcval(j:j) = ''
+    end do
+
     ret = PIO_get_var(pio_file, pio_var, lgval);
     PIO_TF_CHECK_ERR(ret, "Failed to get var:" // trim(filename))
 
@@ -418,6 +430,8 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_1dvar_ls_buf
 
   do j=1,DIM_SMALL_LEN
     lpcval(j:j) = spcval(j:j)
+    lgval(j) = 0
+    lgcval(j:j) = ''
   end do
 
   ! Since only values in spval and spcval, i.e., <= DIM_SMALL_LEN, is written
@@ -522,6 +536,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_1dvar_slice
     call PIO_syncfile(pio_file)
 #endif
 
+    gval = 0
     ret = PIO_get_var(pio_file, pio_var, gval);
     PIO_TF_CHECK_ERR(ret, "Failed to get var:" // trim(filename))
 
@@ -602,6 +617,8 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_1dvar_4parts
 #else
     call PIO_syncfile(pio_file)
 #endif
+
+    gval = 0
 
     start = PART_LEN * 3 + 1
     ret = PIO_get_var(pio_file, pio_var, start, count, gval(PART_LEN * 3 + 1 : DIM_LEN))
@@ -795,16 +812,19 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_md2mdplus1_var
     call PIO_syncfile(pio_file)
 #endif
 
+    gval_2d = 0
     ret = PIO_get_var(pio_file, pio_2dvar, gval_2d)
     PIO_TF_CHECK_ERR(ret, "Failed to get 2d var:" // trim(filename))
 
     PIO_TF_CHECK_VAL((gval_2d, exp_val_2d), "Got wrong value (2d var)")
 
+    gval_3d = 0
     ret = PIO_get_var(pio_file, pio_3dvar, gval_3d)
     PIO_TF_CHECK_ERR(ret, "Failed to get 3d var:" // trim(filename))
 
     PIO_TF_CHECK_VAL((gval_3d, exp_val_3d), "Got wrong value (3d var)")
 
+    gval_4d = 0
     ret = PIO_get_var(pio_file, pio_4dvar, gval_4d)
     PIO_TF_CHECK_ERR(ret, "Failed to get 4d var:" // trim(filename))
 
@@ -988,16 +1008,19 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_md2mdplus1_rec
     call PIO_syncfile(pio_file)
 #endif
 
+    gval_2d = 0
     ret = PIO_get_var(pio_file, pio_2dvar, gval_2d)
     PIO_TF_CHECK_ERR(ret, "Failed to get 2d var:" // trim(filename))
 
     PIO_TF_CHECK_VAL((gval_2d, exp_val_2d), "Got wrong value (2d var)")
 
+    gval_3d = 0
     ret = PIO_get_var(pio_file, pio_3dvar, gval_3d)
     PIO_TF_CHECK_ERR(ret, "Failed to get 3d var:" // trim(filename))
 
     PIO_TF_CHECK_VAL((gval_3d, exp_val_3d), "Got wrong value (3d var)")
 
+    gval_4d = 0
     ret = PIO_get_var(pio_file, pio_4dvar, gval_4d)
     PIO_TF_CHECK_ERR(ret, "Failed to get 4d var:" // trim(filename))
 
@@ -1077,6 +1100,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_time_scalar
     call PIO_syncfile(pio_file)
 #endif
 
+    gval = 0
     ret = PIO_get_var(pio_file, pio_var, gval)
     PIO_TF_CHECK_ERR(ret, "Failed to get scalar var over time:" // trim(filename))
 
@@ -1153,6 +1177,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_time_scalar_rec
     call PIO_syncfile(pio_file)
 #endif
 
+    gval = 0
     ret = PIO_get_var(pio_file, pio_var, gval)
     PIO_TF_CHECK_ERR(ret, "Failed to get scalar var over time:" // trim(filename))
 
@@ -1245,6 +1270,10 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_1d_str_arr
 #else
     call PIO_syncfile(pio_file)
 #endif
+
+    do index=1,NUM_STRS
+      gstr_arr(index) = ' '
+    end do
 
     ! This calls get_var_1d_text()
     ret = PIO_get_var(pio_file, pio_str_arr_var1, gstr_arr);
@@ -1387,6 +1416,12 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_2d_str_arr
 #else
     call PIO_syncfile(pio_file)
 #endif
+
+    do col=1,NUM_COLS
+      do row=1,NUM_ROWS
+        gstr_arr(row, col) = ' '
+      end do
+    end do
 
     ! This calls get_var_2d_text()
     ret = PIO_get_var(pio_file, pio_str_arr_var1, gstr_arr);
@@ -1602,24 +1637,28 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_misc_str
 #endif
 
     ! This calls get_var_0d_text()
+    gstr0d = ''
     ret = PIO_get_var(pio_file, var0d, gstr0d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 0d char var in file " // trim(filename))
 
     PIO_TF_CHECK_VAL((gstr0d, exp_str0d), "Got wrong value for 0d char var")
 
     ! This calls get_var_1d_text()
+    gstr1d = ''
     ret = PIO_get_var(pio_file, var1d, gstr1d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 1d char var in file " // trim(filename))
 
     PIO_TF_CHECK_VAL((gstr1d, exp_str1d), "Got wrong value for 1d char var")
 
     ! This calls get_var_2d_text()
+    gstr2d = ''
     ret = PIO_get_var(pio_file, var2d, gstr2d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 2d char var in file " // trim(filename))
 
     PIO_TF_CHECK_VAL((gstr2d, exp_str2d), "Got wrong value for 2d char var")
 
     ! This calls get_var_3d_text()
+    gstr3d = ''
     ret = PIO_get_var(pio_file, var3d, gstr3d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 3d char var in file " // trim(filename))
 
@@ -1672,18 +1711,21 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_misc_str
 
     ! Read data back with a larger (than the size of the variable) buffer
     ! This calls get_var_0d_text()
+    glstr0d = ''
     ret = PIO_get_var(pio_file, var0d, glstr0d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 0d char var with large buf in file " // trim(filename))
 
     PIO_TF_CHECK_VAL((glstr0d, exp_sstr0d), "Got wrong value for 0d char var with large buf")
 
     ! This calls get_var_1d_text()
+    glstr1d = ''
     ret = PIO_get_var(pio_file, var1d, glstr1d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 1d char var with large buf in file " // trim(filename))
 
     PIO_TF_CHECK_VAL((glstr1d, exp_sstr1d), "Got wrong value for 1d char var with large buf")
 
     ! This calls get_var_2d_text()
+    glstr2d = ''
     ret = PIO_get_var(pio_file, var2d, glstr2d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 2d char var with large buf in file " // trim(filename))
 
@@ -1752,18 +1794,21 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_misc_str
 #endif
 
     ! This calls get_var_1d_text()
+    gstr1d = ''
     ret = PIO_get_var(pio_file, var1d, gstr1d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 1d char var in file " // trim(filename))
 
     PIO_TF_CHECK_VAL((gstr1d, exp_str1d), "Got wrong value for 1d char var written with hslab put")
 
     ! This calls get_var_2d_text()
+    gstr2d = ''
     ret = PIO_get_var(pio_file, var2d, gstr2d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 2d char var in file " // trim(filename))
 
     PIO_TF_CHECK_VAL((gstr2d, exp_str2d), "Got wrong value for 2d char var written with hslab put")
 
     ! This calls get_var_3d_text()
+    gstr3d = ''
     ret = PIO_get_var(pio_file, var3d, gstr3d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 3d char var in file " // trim(filename))
 
@@ -1950,18 +1995,21 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_str_frames
 #endif
 
     ! This calls get_var_1d_text()
+    gstr1d = ''
     ret = PIO_get_var(pio_file, var1d, gstr1d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 1d char var in file " // trim(filename))
 
     PIO_TF_CHECK_VAL((gstr1d, exp_str1d), "Got wrong value for 1d char var")
 
     ! This calls get_var_2d_text()
+    gstr2d = ''
     ret = PIO_get_var(pio_file, var2d, gstr2d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 2d char var in file " // trim(filename))
 
     PIO_TF_CHECK_VAL((gstr2d, exp_str2d), "Got wrong value for 2d char var")
 
     ! This calls get_var_3d_text()
+    gstr3d = ''
     ret = PIO_get_var(pio_file, var3d, gstr3d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 3d char var in file " // trim(filename))
 
@@ -2229,6 +2277,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_str_idx
 #endif
 
     ! This calls get_var_1d_text()
+    gstr1d = ''
     ret = PIO_get_var(pio_file, var1d, gstr1d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 1d char var in file " // trim(filename))
 
@@ -2554,16 +2603,19 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_str_hslabs
     call PIO_syncfile(pio_file)
 #endif
 
+    gstr1d = ''
     ret = PIO_get_var(pio_file, var1d, gstr1d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 1d char var in file " // trim(filename))
 
     PIO_TF_CHECK_VAL((gstr1d, exp_str1d), "Got wrong value for 1d char var with modified prefix")
 
+    gstr2d = ''
     ret = PIO_get_var(pio_file, var2d, gstr2d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 2d char var in file " // trim(filename))
 
     PIO_TF_CHECK_VAL((gstr2d, exp_str2d), "Got wrong value for 2d char var with modified prefix")
 
+    gstr3d = ''
     ret = PIO_get_var(pio_file, var3d, gstr3d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 3d char var in file " // trim(filename))
 
@@ -2708,16 +2760,19 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_str_hslabs
     call PIO_syncfile(pio_file)
 #endif
 
+    gstr1d = ''
     ret = PIO_get_var(pio_file, var1d, gstr1d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 1d char var in file " // trim(filename))
 
     PIO_TF_CHECK_VAL((gstr1d, exp_str1d), "Got wrong value for 1d char var with modified suffixes")
 
+    gstr2d = ''
     ret = PIO_get_var(pio_file, var2d, gstr2d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 2d char var in file " // trim(filename))
 
     PIO_TF_CHECK_VAL((gstr2d, exp_str2d), "Got wrong value for 2d char var with modified suffixes")
 
+    gstr3d = ''
     ret = PIO_get_var(pio_file, var3d, gstr3d);
     PIO_TF_CHECK_ERR(ret, "Failed to get 3d char var in file " // trim(filename))
 

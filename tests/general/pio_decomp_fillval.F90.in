@@ -78,6 +78,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_write_1d_explicit_fval
     call PIO_syncfile(pio_file)
 #endif
 
+    rbuf = 0
     call PIO_read_darray(pio_file, pio_var, riodesc, rbuf, ierr)
     PIO_TF_CHECK_ERR(ierr, "Failed to read darray : " // trim(filename))
 
@@ -188,6 +189,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_write_1d_implicit_fval
     call PIO_syncfile(pio_file)
 #endif
 
+    rbuf = 0
     call PIO_read_darray(pio_file, pio_var, riodesc, rbuf, ierr)
     PIO_TF_CHECK_ERR(ierr, "Failed to read darray : " // trim(filename))
 
@@ -285,6 +287,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_read_1d_explicit_fval
     call PIO_syncfile(pio_file)
 #endif
 
+    rbuf = BUF_FILLVAL
     call PIO_read_darray(pio_file, pio_var, riodesc, rbuf, ierr)
     PIO_TF_CHECK_ERR(ierr, "Failed to read darray : " // trim(filename))
 
@@ -386,6 +389,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_read_1d_implicit_fval
 #endif
 
     ! Read only part of the written data
+    rbuf = BUF_FILLVAL
     call PIO_read_darray(pio_file, pio_var, riodesc, rbuf, ierr)
     PIO_TF_CHECK_ERR(ierr, "Failed to read darray : " // trim(filename))
 

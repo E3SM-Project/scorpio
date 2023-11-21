@@ -345,6 +345,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_wr_2d_two_iodescs
 #endif
 
     ! Read data - with no shift
+    rbuf = 0
     do f=1,NFRAMES
       call PIO_setframe(pio_file, pio_var, f)
       call PIO_read_darray(pio_file, pio_var, rd_iodesc, rbuf(:,f), ierr)
