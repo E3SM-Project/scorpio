@@ -305,22 +305,26 @@ PIO_TF_AUTO_TEST_SUB_BEGIN async_copy_att
           PIO_TF_CHECK_ERR(ret, new_comm, "Could not inq var:" // trim(vfname))
 
           ! Get global attributes and verify the contents
+          rval = 0
           ret = PIO_get_att(pio_ofile, PIO_GLOBAL, attname, rval)
           PIO_TF_CHECK_ERR(ret, new_comm, "Could not get global att:" // trim(vfname))
 
           PIO_TF_ASSERT((rval == val), "Global attribute is not the expected value")
 
+          rcval = ''
           ret = PIO_get_att(pio_ofile, PIO_GLOBAL, cattname, rcval)
           PIO_TF_CHECK_ERR(ret, new_comm, "Could not get global char att:" // trim(vfname))
 
           PIO_TF_ASSERT((trim(rcval) .eq. trim(cval)), "Global char attribute is not the expected value")
 
           ! Get variable attributes and verify the contents
+          rval = 0
           ret = PIO_get_att(pio_ofile, pio_ovarid, attname, rval)
           PIO_TF_CHECK_ERR(ret, new_comm, "Could not get variable att:" // trim(vfname))
 
           PIO_TF_ASSERT((rval == val), "Variable attribute is not the expected value")
 
+          rcval = ''
           ret = PIO_get_att(pio_ofile, pio_ovarid, cattname, rcval)
           PIO_TF_CHECK_ERR(ret, new_comm, "Could not get variable char att:" // trim(vfname))
 

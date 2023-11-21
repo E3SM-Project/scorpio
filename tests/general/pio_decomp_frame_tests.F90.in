@@ -91,6 +91,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_wr_rd_2d_unlim_dim
     call PIO_syncfile(pio_file)
 #endif
 
+    rbuf = 0
     do f=1,NFRAMES
       call PIO_setframe(pio_file, pio_var, f)
       call PIO_read_darray(pio_file, pio_var, rd_iodesc, rbuf(:,f), ierr)
@@ -330,6 +331,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_write_read_4d_col_decomp
     call PIO_syncfile(pio_file)
 #endif
 
+    rbuf = 0
     do f=1,NFRAMES
       call PIO_setframe(pio_file, pio_var, f)
       call PIO_read_darray(pio_file, pio_var, rd_iodesc, rbuf(:,:,:,f), ierr)

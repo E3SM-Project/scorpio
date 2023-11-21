@@ -108,21 +108,25 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_copy_att
     PIO_TF_CHECK_ERR(ret, "Could not inq var :" // trim(ofilename))
 
     ! Check the global attribute values
+    gval = 0
     ret = PIO_get_att(pio_ofile, PIO_GLOBAL, attname, gval);
     PIO_TF_CHECK_ERR(ret, "Failed to get global attribute:" // trim(ofilename))
 
     PIO_TF_CHECK_VAL((gval, init_val), "Got wrong value")
 
+    gcval = ''
     ret = PIO_get_att(pio_ofile, PIO_GLOBAL, cattname, gcval);
     PIO_TF_CHECK_ERR(ret, "Failed to get global char attribute:" // trim(ofilename))
     PIO_TF_CHECK_VAL((gcval, pcval), "Got wrong value")
 
     ! Check the variable attribute values
+    gval = 0
     ret = PIO_get_att(pio_ofile, pio_ovar, attname, gval);
     PIO_TF_CHECK_ERR(ret, "Failed to get attribute:" // trim(ofilename))
 
     PIO_TF_CHECK_VAL((gval, init_val), "Got wrong value")
 
+    gcval = ''
     ret = PIO_get_att(pio_ofile, pio_ovar, cattname, gcval);
     PIO_TF_CHECK_ERR(ret, "Failed to get char attribute:" // trim(ofilename))
 
