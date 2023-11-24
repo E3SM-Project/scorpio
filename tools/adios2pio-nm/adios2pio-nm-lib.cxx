@@ -445,7 +445,11 @@ int ProcessVariableAndAttributeDefinitions(adios2::IO &bpIO, adios2::Engine &bpR
             }
             else
             {
-                ret = PIOc_put_att(ncid, PIO_GLOBAL, attname, piotype, 1, adata[0].data());
+		/* adata[0].data() may point to an attribute array. Compute the number of array elements. */
+		int type_size = adios2_type_size_a2(atype);
+		assert(type_size > 0);
+		PIO_Offset data_len = (PIO_Offset) (adata[0].size()/type_size); 
+		ret = PIOc_put_att(ncid, PIO_GLOBAL, attname, piotype, data_len, adata[0].data());
             }
 
             if (ret != PIO_NOERR)
