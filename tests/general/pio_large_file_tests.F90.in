@@ -411,6 +411,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_write_large_1d_fval
     call PIO_syncfile(pio_file)
 #endif
 
+    rbuf = 0
     call PIO_read_darray(pio_file, pio_var, riodesc, rbuf, ierr)
     PIO_TF_CHECK_ERR(ierr, "Failed to read darray : " // trim(filename))
 

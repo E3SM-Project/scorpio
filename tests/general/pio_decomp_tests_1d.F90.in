@@ -613,6 +613,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_wr_1d_bc_with_holes
     call PIO_syncfile(pio_file)
 #endif
 
+    rbuf = 0
     call PIO_read_darray(pio_file, pio_var, wr_iodesc, rbuf, ierr)
     PIO_TF_CHECK_ERR(ierr, "Failed to read darray : " // trim(filename))
 
@@ -703,6 +704,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_wr_1d_rev
     call PIO_syncfile(pio_file)
 #endif
 
+    rbuf = 0
     call PIO_read_darray(pio_file, pio_var, wr_iodesc, rbuf, ierr)
     PIO_TF_CHECK_ERR(ierr, "Failed to read darray : " // trim(filename))
 
