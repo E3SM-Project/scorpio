@@ -740,89 +740,15 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         switch (memtype)
         {
             case NC_DOUBLE:
-            {
-                adios2_attribute const *attr = adios2_inquire_attribute(file->ioH, full_name);
-                if (attr != NULL)
-                {
-                    size_t size_attr = 0;
-                    double attr_data = 0.0;
-                    adiosErr = adios2_attribute_data(&attr_data, &size_attr, attr);
-                    if (adiosErr != adios2_error_none)
-                    {
-                        GPTLstop("PIO:PIOc_get_att_tc");
-                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                       "Reading variable (%s, varid=%d) attribute (%s) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                                       "The low level (ADIOS) I/O library call failed to retrieve attribute data pointer (adios2_error=%s)",
-                                       pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
-                    }
-
-                    memcpy(ip, &attr_data, size_attr * sizeof(double));
-                }
-                break;
-            }
             case NC_FLOAT:
-            {
-                adios2_attribute const *attr = adios2_inquire_attribute(file->ioH, full_name);
-                if (attr != NULL)
-                {
-                    size_t size_attr = 0;
-                    float attr_data = 0.0;
-                    adiosErr = adios2_attribute_data(&attr_data, &size_attr, attr);
-                    if (adiosErr != adios2_error_none)
-                    {
-                        GPTLstop("PIO:PIOc_get_att_tc");
-                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                       "Reading variable (%s, varid=%d) attribute (%s) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                                       "The low level (ADIOS) I/O library call failed to retrieve attribute data pointer (adios2_error=%s)",
-                                       pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
-                    }
-
-                    memcpy(ip, &attr_data, size_attr * sizeof(float));
-                }
-                break;
-            }
             case NC_INT:
-            {
-                adios2_attribute const *attr = adios2_inquire_attribute(file->ioH, full_name);
-                if (attr != NULL)
-                {
-                    size_t size_attr = 0;
-                    int32_t attr_data = 0;
-                    adiosErr = adios2_attribute_data(&attr_data, &size_attr, attr);
-                    if (adiosErr != adios2_error_none)
-                    {
-                        GPTLstop("PIO:PIOc_get_att_tc");
-                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                       "Reading variable (%s, varid=%d) attribute (%s) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                                       "The low level (ADIOS) I/O library call failed to retrieve attribute data pointer (adios2_error=%s)",
-                                       pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
-                    }
-
-                    memcpy(ip, &attr_data, size_attr * sizeof(int32_t));
-                }
-                break;
-            }
             case NC_CHAR:
             {
                 adios2_attribute const *attr = adios2_inquire_attribute(file->ioH, full_name);
                 if (attr != NULL)
                 {
                     size_t size_attr = 0;
-                    adios2_attribute_size(&size_attr, attr);
-                    char attr_data[PIO_MAX_NAME] = {'\0'};
-                    adiosErr = adios2_attribute_data(&attr_data, &size_attr, attr);
+                    adiosErr = adios2_attribute_data(ip, &size_attr, attr);
                     if (adiosErr != adios2_error_none)
                     {
                         GPTLstop("PIO:PIOc_get_att_tc");
@@ -836,7 +762,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                                        pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid, convert_adios2_error_to_string(adiosErr));
                     }
 
-                    memcpy((char *)ip, &attr_data, strlen(attr_data) * sizeof(char));
+                    assert(size_attr > 0);
                 }
                 break;
             }

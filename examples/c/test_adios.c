@@ -636,6 +636,9 @@ int main(int argc, char* argv[])
 #define PUT_GET_VAR_LEN_Y 5
 #define PUT_GET_VAR_LEN_Z 2
 
+/* Length of attributes to be put/get */
+#define PUT_GET_ATT_LEN 5
+
 /* Max time steps */
 #define MAX_TIME_STEPS 10
 
@@ -708,16 +711,24 @@ int test_adios_read_case_1()
     /* Sample data for global attributes. */
     int put_global_att_int_data = -10;
     int get_global_att_int_data = 0;
+    int put_global_att_arr_int_data[PUT_GET_ATT_LEN] = {-2, -4, -6, -8, -10};
+    int get_global_att_arr_int_data[PUT_GET_ATT_LEN] = {0, 0, 0, 0, 0};
     float put_global_att_float_data = -9.9;
     float get_global_att_float_data = 0.0;
+    float put_global_att_arr_float_data[PUT_GET_ATT_LEN] = {-1.1, -3.3, -5.5, -7.7, -9.9};
+    float get_global_att_arr_float_data[PUT_GET_ATT_LEN] = {0.0, 0.0, 0.0, 0.0, 0.0};
     char put_global_att_text_data[PIO_MAX_NAME] = "Dummy global attribute string";
     char get_global_att_text_data[PIO_MAX_NAME] = "\0";
 
     /* Sample data for variable attributes. */
     int put_att_int_data = -100;
     int get_att_int_data = 0;
+    int put_att_arr_int_data[PUT_GET_ATT_LEN] = {-20, -40, -60, -80, -100};
+    int get_att_arr_int_data[PUT_GET_ATT_LEN] = {0, 0, 0, 0, 0};
     float put_att_float_data = -99.99;
     float get_att_float_data = 0.0;
+    float put_att_arr_float_data[PUT_GET_ATT_LEN] = {-11.11, -33.33, -55.55, -77.77, -99.99};
+    float get_att_arr_float_data[PUT_GET_ATT_LEN] = {0.0, 0.0, 0.0, 0.0, 0.0};
     char put_att_text_data[PIO_MAX_NAME] = "Dummy variable attribute string";
     char get_att_text_data[PIO_MAX_NAME] = "\0";
 
@@ -841,7 +852,9 @@ int test_adios_read_case_1()
 
     /* Put some global attributes. */
     ret = PIOc_put_att(ncid_write, PIO_GLOBAL, "dummy_global_att_int", PIO_INT, 1, &put_global_att_int_data); ERR
+    ret = PIOc_put_att(ncid_write, PIO_GLOBAL, "dummy_global_att_arr_int", PIO_INT, PUT_GET_ATT_LEN, put_global_att_arr_int_data); ERR
     ret = PIOc_put_att(ncid_write, PIO_GLOBAL, "dummy_global_att_float", PIO_FLOAT, 1, &put_global_att_float_data); ERR
+    ret = PIOc_put_att(ncid_write, PIO_GLOBAL, "dummy_global_att_arr_float", PIO_FLOAT, PUT_GET_ATT_LEN, put_global_att_arr_float_data); ERR
     ret = PIOc_put_att_text(ncid_write, PIO_GLOBAL, "dummy_global_att_text", strlen(put_global_att_text_data), put_global_att_text_data); ERR
 
     /* Define some scalar variables. */
@@ -860,7 +873,9 @@ int test_adios_read_case_1()
 
     /* Put some local attributes for variable dummy_darray_var_int. */
     ret = PIOc_put_att(ncid_write, varid_dummy_darray_var_int, "dummy_att_float", PIO_FLOAT, 1, &put_att_float_data); ERR
+    ret = PIOc_put_att(ncid_write, varid_dummy_darray_var_int, "dummy_att_arr_float", PIO_FLOAT, PUT_GET_ATT_LEN, put_att_arr_float_data); ERR
     ret = PIOc_put_att(ncid_write, varid_dummy_darray_var_int, "dummy_att_int", PIO_INT, 1, &put_att_int_data); ERR
+    ret = PIOc_put_att(ncid_write, varid_dummy_darray_var_int, "dummy_att_arr_int", PIO_INT, PUT_GET_ATT_LEN, put_att_arr_int_data); ERR
     ret = PIOc_put_att_text(ncid_write, varid_dummy_darray_var_int, "dummy_att_text", strlen(put_att_text_data), put_att_text_data); ERR
 
     /* Define some variables for PIOc_put_vars. */
@@ -981,6 +996,16 @@ int test_adios_read_case_1()
         return -1;
     }
 
+    ret = PIOc_get_att(ncid_read, PIO_GLOBAL, "dummy_global_att_arr_int", get_global_att_arr_int_data); ERR
+    for (int i = 0; i < PUT_GET_ATT_LEN; i++)
+    {
+        if (get_global_att_arr_int_data[i] != put_global_att_arr_int_data[i])
+        {
+            printf("rank = %d, read wrong data for dummy_global_att_arr_int at index %d\n", my_rank, i);
+            return -1;
+        }
+    }
+
     /* Get float type global attribute. */
     ret = PIOc_get_att(ncid_read, PIO_GLOBAL, "dummy_global_att_float", &get_global_att_float_data); ERR
     diff_float = get_global_att_float_data - put_global_att_float_data;
@@ -988,6 +1013,17 @@ int test_adios_read_case_1()
     {
         printf("rank = %d, read wrong data for dummy_global_att_float\n", my_rank);
         return -1;
+    }
+
+    ret = PIOc_get_att(ncid_read, PIO_GLOBAL, "dummy_global_att_arr_float", get_global_att_arr_float_data); ERR
+    for (int i = 0; i < PUT_GET_ATT_LEN; i++)
+    {
+        diff_float = get_global_att_arr_float_data[i] - put_global_att_arr_float_data[i];
+        if (fabs(diff_float) > 1E-5)
+        {
+            printf("rank = %d, read wrong data for dummy_global_att_arr_float at index %d\n", my_rank, i);
+            return -1;
+        }
     }
 
     /* Get text type global attribute. */
@@ -1085,6 +1121,16 @@ int test_adios_read_case_1()
         return -1;
     }
 
+    ret = PIOc_get_att(ncid_read, varid_dummy_darray_var_int, "dummy_att_arr_int", get_att_arr_int_data); ERR
+    for (int i = 0; i < PUT_GET_ATT_LEN; i++)
+    {
+        if (get_att_arr_int_data[i] != put_att_arr_int_data[i])
+        {
+            printf("rank = %d, read wrong data for dummy_att_arr_int at index %d\n", my_rank, i);
+            return -1;
+        }
+    }
+
     /* Get float type attribute of variable dummy_darray_var_int. */
     ret = PIOc_get_att(ncid_read, varid_dummy_darray_var_int, "dummy_att_float", &get_att_float_data); ERR
     diff_float = get_att_float_data - put_att_float_data;
@@ -1092,6 +1138,17 @@ int test_adios_read_case_1()
     {
         printf("rank = %d, read wrong data for dummy_att_float of dummy_darray_var_int\n", my_rank);
         return -1;
+    }
+
+    ret = PIOc_get_att(ncid_read, varid_dummy_darray_var_int, "dummy_att_arr_float", get_att_arr_float_data); ERR
+    for (int i = 0; i < PUT_GET_ATT_LEN; i++)
+    {
+        diff_float = get_att_arr_float_data[i] - put_att_arr_float_data[i];
+        if (fabs(diff_float) > 1E-5)
+        {
+            printf("rank = %d, read wrong data for dummy_att_arr_float at index %d\n", my_rank, i);
+            return -1;
+        }
     }
 
     /* Get text type attribute of variable dummy_darray_var_int. */
