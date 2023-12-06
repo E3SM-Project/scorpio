@@ -136,5 +136,5 @@ endif ()
 
 if (PIO_HDF5_LOGGING)
   target_compile_definitions (pio_unit_test
-    PUBLIC LOGGING)
+    PRIVATE LOGGING)
 endif ()

@@ -127,15 +127,6 @@ if (PnetCDF_C_FOUND)
     PUBLIC _PNETCDF)
   target_link_libraries (adios2pio-nm-lib
     PUBLIC ${PnetCDF_C_LIBRARIES})
-
-  # Check library for varn functions
-  set (CMAKE_REQUIRED_LIBRARIES ${PnetCDF_C_LIBRARY})
-  check_function_exists (ncmpi_get_varn PnetCDF_C_HAS_VARN)
-  if (PnetCDF_C_HAS_VARN)
-    target_compile_definitions(adios2pio-nm-lib
-      PUBLIC USE_PNETCDF_VARN
-      PUBLIC USE_PNETCDF_VARN_ON_READ)
-  endif()
 else ()
   target_compile_definitions (adios2pio-nm-lib
     PUBLIC _NOPNETCDF)
@@ -152,17 +143,6 @@ if (NetCDF_C_FOUND)
     target_compile_definitions (adios2pio-nm-lib
       PUBLIC _NETCDF4)
   endif ()
-  if (${NetCDF_C_LOGGING_ENABLED})
-    target_compile_definitions (adios2pio-nm-lib
-      PUBLIC NETCDF_C_LOGGING_ENABLED)
-    # netcdf.h needs this to be defined to use netCDF logging.
-    target_compile_definitions (adios2pio-nm-lib
-      PUBLIC LOGGING)
-  endif()
-  if (${NetCDF_C_NC__ENDDEF_EXISTS})
-    target_compile_definitions (pioc
-      PUBLIC NETCDF_C_NC__ENDDEF_EXISTS)
-  endif()
 else ()
   target_compile_definitions (adios2pio-nm-lib
     PUBLIC _NONETCDF)

@@ -95,13 +95,3 @@ if ("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "GNU")
     set ( CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fallow-argument-mismatch" )
   endif ()
 endif()
-
-if (PIO_HDF5_LOGGING)
-  if (PIO_ENABLE_TIMING)
-    # This tool requires GPTL
-    target_compile_definitions (pioperf
-      PUBLIC LOGGING)
-  endif ()
-  target_compile_definitions (pioperf_rearr
-    PUBLIC LOGGING)
-endif ()

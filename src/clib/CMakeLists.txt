@@ -76,14 +76,14 @@ if (WITH_NETCDF)
     endif ()
     if (${NetCDF_C_LOGGING_ENABLED})
       target_compile_definitions (pioc
-        PUBLIC NETCDF_C_LOGGING_ENABLED)
+        PRIVATE NETCDF_C_LOGGING_ENABLED)
       # netcdf.h needs this to be defined to use netCDF logging.
       target_compile_definitions (pioc
-        PUBLIC LOGGING)
+        PRIVATE LOGGING)
     endif()
     if (${NetCDF_C_NC__ENDDEF_EXISTS})
       target_compile_definitions (pioc
-        PUBLIC NETCDF_C_NC__ENDDEF_EXISTS)
+        PRIVATE NETCDF_C_NC__ENDDEF_EXISTS)
     endif()
   else ()
     message(STATUS "Could not find NetCDF C library, disabling support for NetCDF")
@@ -112,8 +112,8 @@ if (WITH_PNETCDF)
     check_function_exists (ncmpi_get_varn PnetCDF_C_HAS_VARN)
     if (PnetCDF_C_HAS_VARN)
       target_compile_definitions(pioc
-        PUBLIC USE_PNETCDF_VARN
-        PUBLIC USE_PNETCDF_VARN_ON_READ)
+        PRIVATE USE_PNETCDF_VARN
+        PRIVATE USE_PNETCDF_VARN_ON_READ)
     endif()
   else ()
     message(STATUS "Could not find PnetCDF library, disabling support for PnetCDF")
