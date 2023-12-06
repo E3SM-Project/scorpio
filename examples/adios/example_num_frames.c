@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <mpi.h>
 #include <pio.h>
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
 #include <gptl.h>
 #endif
 
@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
     char filename[NC_MAX_NAME + 1];
     int num_flavors = 0;
 
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
     GPTLinitialize();
 #endif
 
@@ -133,7 +133,7 @@ int main(int argc, char* argv[])
 
     MPI_Finalize();
 
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
     GPTLfinalize();
 #endif
 

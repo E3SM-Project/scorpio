@@ -131,7 +131,7 @@ MODULE pio_tutil
 CONTAINS
   ! Initialize Testing framework - Internal (Not directly used by unit tests)
   SUBROUTINE  PIO_TF_Init_(rearr)
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
    use perf_mod
 #endif
 #ifndef NO_MPIMOD
@@ -145,8 +145,8 @@ CONTAINS
     CALL MPI_COMM_DUP(MPI_COMM_WORLD, pio_tf_comm_, ierr);
     CALL MPI_COMM_RANK(pio_tf_comm_, pio_tf_world_rank_, ierr)
     CALL MPI_COMM_SIZE(pio_tf_comm_, pio_tf_world_sz_, ierr)
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
     call t_initf('gptl.nl')
 #endif
 #endif
@@ -212,7 +212,7 @@ CONTAINS
 
   ! Finalize Testing framework - Internal (Not directly used by unit tests)
   SUBROUTINE  PIO_TF_Finalize_
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
    use perf_mod
 #endif
 #ifndef NO_MPIMOD
@@ -231,8 +231,8 @@ CONTAINS
     CALL PIO_finalize(pio_tf_iosystem_, ierr);
     CALL MPI_COMM_FREE(pio_tf_comm_, ierr);
 
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
     call t_finalizef()
 #endif
 #endif

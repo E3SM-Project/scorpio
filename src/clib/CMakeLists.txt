@@ -50,10 +50,12 @@ if (PIO_ENABLE_TIMING)
       PUBLIC gptl)
   endif ()
   target_compile_definitions (pioc
-    PUBLIC TIMING)
+    PUBLIC SPIO_ENABLE_GPTL_TIMING
+    PRIVATE TIMING)
   if (PIO_ENABLE_INTERNAL_TIMING)
     target_compile_definitions (pioc
-      PUBLIC TIMING_INTERNAL)
+      PUBLIC SPIO_ENABLE_GPTL_TIMING_INTERNAL
+      PRIVATE TIMING_INTERNAL)
   endif ()
 endif ()
 

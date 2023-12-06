@@ -219,6 +219,8 @@ if (PIO_ENABLE_TIMING)
     target_link_libraries (piof
       PUBLIC gptl)
   endif ()
+  target_compile_definitions (piof
+    PRIVATE TIMING)
 endif ()
 
 #===== NetCDF-Fortran =====

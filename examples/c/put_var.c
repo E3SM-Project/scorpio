@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <mpi.h>
 #include <pio.h>
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
 #include <gptl.h>
 #endif
 
@@ -231,8 +231,8 @@ int main(int argc, char* argv[])
         }
     }
 
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
     /* Initialize the GPTL timing library. */
     if ((ret = GPTLinitialize()))
         return ret;
@@ -382,8 +382,8 @@ int main(int argc, char* argv[])
     /* Finalize the MPI library. */
     MPI_Finalize();
 
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
     /* Finalize the GPTL timing library. */
     if ((ret = GPTLfinalize()))
         return ret;

@@ -7,6 +7,12 @@
 #include <pio_internal.h>
 #include <pio_tests.h>
 
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
+#include "gptl.h"
+#endif
+#endif
+
 /* The number of dimensions in the test data. */
 #define NDIM_S1 1
 
@@ -140,8 +146,8 @@ int pio_test_init2(int argc, char **argv, int *my_rank, int *ntasks,
 {
     int ret; /* Return value. */
 
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
     /* Initialize the GPTL timing library. */
     if ((ret = GPTLinitialize()))
         return ERR_GPTL;
@@ -226,8 +232,8 @@ int pio_test_finalize(MPI_Comm *test_comm)
     /* Finalize MPI. */
     MPI_Finalize();
 
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
     /* Finalize the GPTL timing library. */
     if ((ret = GPTLfinalize()))
         return ret;

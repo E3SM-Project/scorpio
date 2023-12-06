@@ -4,7 +4,7 @@
 #ifdef BGL
 #define BGx
 #endif
-!#ifdef TIMING
+!#ifdef SPIO_ENABLE_GPTL_TIMING
 !#define MEMCHK
 !#endif
 !>
@@ -21,7 +21,7 @@ program testpio
   use pio             ! _EXTERNAL
 
   use utils_mod
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
   use perf_mod        ! _EXTERNAL
 #endif
   ! Modules from testpio suite that are used by this application
@@ -164,7 +164,7 @@ program testpio
   endif
 
   if(Debug)    print *,'testpio: before call to t_initf'
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
   !---------------------------------------------------------------
   ! timing library
   !---------------------------------------------------------------
@@ -923,7 +923,7 @@ program testpio
               call CheckMPIReturn('Call to MPI_BARRIER()',ierr,__FILE__,__LINE__)
               if(Debug)       print *,'iam: ',My_task,'testpio: point #9.0.3'
               st = MPI_Wtime()
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
               call t_startf('testpio_write')
 #endif
               if(Debug)       print *,'iam: ',My_task,'testpio: point #9.0.4'
@@ -931,7 +931,7 @@ program testpio
                  call PIO_write_darray(File_r8,vard_r8(ivar), iodesc_r8, test_r8wr, iostat)
                  call check_pioerr(iostat,__FILE__,__LINE__,' r8 write_darray')
               end do
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
               call t_stopf('testpio_write')
 #endif
               if(Debug)       print *,'iam: ',My_task,'testpio: point #9.1'
@@ -949,14 +949,14 @@ program testpio
               call MPI_Barrier(MPI_COMM_COMPUTE,ierr)
               call CheckMPIReturn('Call to MPI_BARRIER()',ierr,__FILE__,__LINE__)
               st = MPI_Wtime()
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
               call t_startf('testpio_write')
 #endif
               do ivar=1,nvars
                  call PIO_write_darray(File_r4,vard_r4(ivar),iodesc_r4, test_r4wr,iostat)
                  call check_pioerr(iostat,__FILE__,__LINE__,' r4 write_darray')
               end do
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
               call t_stopf('testpio_write')
 #endif
               call PIO_CloseFile(File_r4)
@@ -981,11 +981,11 @@ program testpio
 
 
               st = MPI_Wtime()
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
               call t_startf('testpio_write')
 #endif
               call PIO_write_darray(File_i4,vard_i4,iodesc_i4,test_i4wr,iostat)
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
               call t_stopf('testpio_write')
 #endif
               et = MPI_Wtime()
@@ -1108,14 +1108,14 @@ program testpio
               call MPI_Barrier(MPI_COMM_COMPUTE,ierr)
               call CheckMPIReturn('Call to MPI_BARRIER()',ierr,__FILE__,__LINE__)
               st = MPI_Wtime()
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
               call t_startf('testpio_read')
 #endif
               do ivar=1,nvars
                  call PIO_read_darray(File_r8,vard_r8(ivar),iodesc_r8,test_r8rd,iostat)
                  call check_pioerr(iostat,__FILE__,__LINE__,' r8 read_darray')
               enddo
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
               call t_stopf('testpio_read')
 #endif
               et = MPI_Wtime()
@@ -1135,7 +1135,7 @@ program testpio
               call MPI_Barrier(MPI_COMM_COMPUTE,ierr)
               call CheckMPIReturn('Call to MPI_BARRIER()',ierr,__FILE__,__LINE__)
               st = MPI_Wtime()
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
               call t_startf('testpio_read')
 #endif
               do ivar=1,nvars
@@ -1143,7 +1143,7 @@ program testpio
                  call check_pioerr(iostat,__FILE__,__LINE__,' r4 read_darray')
               enddo
               if(Debug)       print *,'iam: ',My_task,'testpio: point #19'
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
               call t_stopf('testpio_read')
 #endif
               et = MPI_Wtime()
@@ -1156,11 +1156,11 @@ program testpio
               call MPI_Barrier(MPI_COMM_COMPUTE,ierr)
               call CheckMPIReturn('Call to MPI_BARRIER()',ierr,__FILE__,__LINE__)
               st = MPI_Wtime()
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
               call t_startf('testpio_read')
 #endif
               call PIO_read_darray(File_i4,vard_i4dof,iodesc_i4, test_i4rd,iostat)
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
               call t_stopf('testpio_read')
 #endif
               et = MPI_Wtime()
@@ -1336,7 +1336,7 @@ program testpio
   ! Print timers and memory usage 
   !-------------------------------
 
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
   call t_stopf('testpio_total')
   call t_prf('timing.testpio',MPI_COMM_COMPUTE)
   call t_finalizef()
@@ -1604,7 +1604,7 @@ contains
   end subroutine WriteTimeTrialsStats
 
   !=======================================================================
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
   subroutine get_memusage(msize,mrss)
 
     integer :: msize,mrss
