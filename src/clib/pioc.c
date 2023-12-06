@@ -973,7 +973,15 @@ int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, i
                      const PIO_Offset *compmap, int *ioidp, int rearranger,
                      const PIO_Offset *iostart, const PIO_Offset *iocount)
 {
-    PIO_Offset* compmap_1_based = (PIO_Offset*)malloc(maplen * sizeof(PIO_Offset));
+    PIO_Offset* compmap_1_based = (PIO_Offset*)calloc(maplen, sizeof(PIO_Offset));
+    if (compmap_1_based == NULL)
+    {
+        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                       "Initializing the decomposition used with distributed arrays failed. "
+                       "Out of memory allocating %lld bytes for one-based compmap",
+                       (unsigned long long) (maplen * sizeof(PIO_Offset)));
+    }
+
     int *rearrangerp = NULL;
 
     LOG((1, "PIOc_init_decomp iosysid = %d pio_type = %d ndims = %d maplen = %d",
