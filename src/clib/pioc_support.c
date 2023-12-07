@@ -2794,6 +2794,17 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 
     file->iosystem = ios;
     file->iotype = *iotype;
+#ifdef _ADIOS2
+    if (file->iotype == PIO_IOTYPE_ADIOS)
+    {
+        if (strstr(filename, "mpassi.rst") != NULL)
+        {
+            printf("[HACK] Writing mpassi restart file %s with PIO_IOTYPE_PNETCDF instead of PIO_IOTYPE_ADIOS\n", filename);
+            file->iotype = PIO_IOTYPE_PNETCDF;
+        }
+   }
+#endif
+
     file->buffer.ioid = -1;
 #ifdef _HDF5
     file->hdf5_num_dims = 0;
