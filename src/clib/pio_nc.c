@@ -1332,7 +1332,10 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
             int *tmp_dimidsp = NULL;
-            ierr = ncmpi_inq_varndims(file->fh, varid, &ndims);
+            ndims = file->varlist[varid].ndims;
+            if(ndims <= 0){
+                ierr = ncmpi_inq_varndims(file->fh, varid, &ndims);
+            }
             LOG((2, "from pnetcdf ndims = %d", ndims));
             if(!ierr && (!dimidsp) && (file->num_unlim_dimids > 0))
             {
@@ -1375,7 +1378,10 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
 #ifdef _NETCDF
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
         {
-            ierr = nc_inq_varndims(file->fh, varid, &ndims);
+            ndims = file->varlist[varid].ndims;
+            if(ndims <= 0){
+                ierr = nc_inq_varndims(file->fh, varid, &ndims);
+            }
             LOG((3, "nc_inq_varndims called ndims = %d", ndims));
             if (!ierr)
             {
@@ -1527,13 +1533,20 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
 
     if (ndimsp)
     {
-        LOG((2, "PIOc_inq_var about to Bcast ndims = %d ios->ioroot = %d ios->my_comm = %d",
-             *ndimsp, ios->ioroot, ios->my_comm));
-        if ((mpierr = MPI_Bcast(ndimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        {
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        /* FIXME: Handle scalars by setting cached ndims to be < 0 */
+        if(file->varlist[varid].ndims > 0){
+            *ndimsp = file->varlist[varid].ndims;
+        }
+        else{
+            LOG((2, "PIOc_inq_var about to Bcast ndims = %d ios->ioroot = %d ios->my_comm = %d",
+                 *ndimsp, ios->ioroot, ios->my_comm));
+            if ((mpierr = MPI_Bcast(ndimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+            {
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            }
+            file->varlist[varid].ndims = *ndimsp;
         }
         LOG((2, "PIOc_inq_var Bcast ndims = %d", *ndimsp));
     }
