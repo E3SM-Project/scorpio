@@ -11,26 +11,34 @@ int PIOc_InitDecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, in
                     const PIO_Offset *compmap, int *ioidp, const int *rearr,
                     const PIO_Offset *iostart, const PIO_Offset *iocount)
 {
+  int ret = PIO_NOERR;
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_InitDecomp");
   assert((ndims > 0) && gdimlen);
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).
     add_arg("pio_type", pio_type).add_arg("ndims", ndims).add_arg("*gdimlen", gdimlen, ndims).
     add_arg("maplen", maplen).add_arg("*compmap", compmap).add_arg("*ioidp", ioidp).
     add_arg("*rearr", rearr).add_arg("*iostart", iostart).add_arg("*iocount", iocount).flush();
-  return PIOc_InitDecomp_impl(iosysid, pio_type, ndims, gdimlen, maplen,
+  ret = PIOc_InitDecomp_impl(iosysid, pio_type, ndims, gdimlen, maplen,
                               compmap, ioidp, rearr, iostart, iocount);
+
+  tr.add_rval("*ioidp", (ioidp) ? (*ioidp) : -1);
+  return ret;
 }
 
 int PIOc_InitDecomp_bc(int iosysid, int basetype, int ndims, const int *gdimlen,
                        const long int *start, const long int *count, int *ioidp)
 {
+  int ret = PIO_NOERR;
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_InitDecomp_bc");
   assert((ndims > 0) && gdimlen);
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).add_arg("basetype", basetype).
     add_arg("ndims", ndims).add_arg("*gdimlen", gdimlen, ndims).add_arg("*start", start).
     add_arg("*count", count).add_arg("*ioidp", ioidp).flush();
-  return PIOc_InitDecomp_bc_impl(iosysid, basetype, ndims, gdimlen,
+  ret = PIOc_InitDecomp_bc_impl(iosysid, basetype, ndims, gdimlen,
                                   start, count, ioidp);
+
+  tr.add_rval("*ioidp", (ioidp) ? (*ioidp) : -1);
+  return ret;
 }
 
 
@@ -39,6 +47,7 @@ int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, i
                      const PIO_Offset *compmap, int *ioidp, int rearranger,
                      const PIO_Offset *iostart, const PIO_Offset *iocount)
 {
+  int ret = PIO_NOERR;
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_init_decomp");
   assert((ndims > 0) && gdimlen);
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).
@@ -46,8 +55,11 @@ int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, i
     add_arg("maplen", maplen).add_arg("*compmap", compmap).add_arg("*ioidp", ioidp).
     add_arg("rearranger", rearranger).add_arg("*iostart", iostart).
     add_arg("*iocount", iocount).flush();
-  return PIOc_init_decomp_impl(iosysid, pio_type, ndims, gdimlen, maplen,
+  ret = PIOc_init_decomp_impl(iosysid, pio_type, ndims, gdimlen, maplen,
                                 compmap, ioidp, rearranger, iostart, iocount);
+
+  tr.add_rval("*ioidp", (ioidp) ? (*ioidp) : -1);
+  return ret;
 }
 
 

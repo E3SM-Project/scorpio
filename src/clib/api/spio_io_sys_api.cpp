@@ -39,6 +39,7 @@ int PIOc_init_intercomm(int component_count, const MPI_Comm peer_comm,
   ret = PIOc_init_intercomm_impl(component_count, peer_comm, ucomp_comms,
                                   uio_comm, rearranger, iosysidps);
   tr.set_iosys_id(iosysidps[0]).flush();
+  tr.add_rval("*iosysidps", iosysidps, component_count);
   return ret;
 }
 
@@ -56,14 +57,19 @@ int PIOc_Init_Intercomm_from_F90(int component_count, int f90_peer_comm,
                                             f90_comp_comms, f90_io_comm,
                                             rearranger, iosysidps);
   tr.set_iosys_id(iosysidps[0]).flush();
+  tr.add_rval("*iosysidps", iosysidps, component_count);
   return ret;
 }
 
 int PIOc_get_numiotasks(int iosysid, int *numiotasks)
 {
+  int ret = PIO_NOERR;
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_num_iotasks");
   tr.set_iosys_id(iosysid).add_arg("*numiotasks", numiotasks).flush();
-  return PIOc_get_numiotasks_impl(iosysid, numiotasks);
+  ret = PIOc_get_numiotasks_impl(iosysid, numiotasks);
+
+  tr.add_rval("*numiotasks", (numiotasks) ? (*numiotasks) : 0);
+  return ret;
 }
 
 /* Initialize an I/O system */
@@ -77,6 +83,8 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
     add_arg("*iosysidp", iosysidp);
   ret = PIOc_Init_Intracomm_impl(comp_comm, num_iotasks, stride, base, rearr, iosysidp);
   tr.set_iosys_id(*iosysidp).flush();
+
+  tr.add_rval("*iosysidp", (iosysidp) ? (*iosysidp) : -1);
   return ret;
 }
 
@@ -94,6 +102,7 @@ int PIOc_Init_Intracomm_from_F90(int f90_comp_comm,
   ret = PIOc_Init_Intracomm_from_F90_impl(f90_comp_comm, num_iotasks, stride,
                                             base, rearr, rearr_opts, iosysidp);
   tr.set_iosys_id(*iosysidp).flush();
+  tr.add_rval("*iosysidp", (iosysidp) ? (*iosysidp) : -1);
   return ret;
 }
 
@@ -130,23 +139,35 @@ int PIOc_set_iosystem_error_handling(int iosysid, int method, int *old_method)
 
 int PIOc_iam_iotask(int iosysid, bool *ioproc)
 {
+  int ret = PIO_NOERR;
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_iam_iotask");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).add_arg("*ioproc", ioproc).flush();
-  return PIOc_iam_iotask_impl(iosysid, ioproc);
+  ret = PIOc_iam_iotask_impl(iosysid, ioproc);
+
+  tr.add_rval("*ioproc", (ioproc) ? (*ioproc) : false);
+  return ret;
 }
 
 int PIOc_iotask_rank(int iosysid, int *iorank)
 {
+  int ret = PIO_NOERR;
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_iotask_rank");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).add_arg("*iorank", iorank).flush();
-  return PIOc_iotask_rank_impl(iosysid, iorank);
+  ret = PIOc_iotask_rank_impl(iosysid, iorank);
+
+  tr.add_rval("*iorank", (iorank) ? (*iorank) : -1);
+  return ret;
 }
 
 int PIOc_iosystem_is_active(int iosysid, bool *active)
 {
+  int ret = PIO_NOERR;
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_iosystem_is_active");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).add_arg("*active", active).flush();
-  return PIOc_iosystem_is_active_impl(iosysid, active);
+  ret = PIOc_iosystem_is_active_impl(iosysid, active);
+
+  tr.add_rval("*active", (active) ? (*active) : false);
+  return ret;
 }
 
 int PIOc_iotype_available(int iotype)
@@ -199,11 +220,17 @@ int PIOc_set_chunk_cache(int iosysid, int iotype, PIO_Offset size, PIO_Offset ne
 int PIOc_get_chunk_cache(int iosysid, int iotype, PIO_Offset *sizep, PIO_Offset *nelemsp,
                          float *preemptionp)
 {
+  int ret = PIO_NOERR;
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_chunk_cache");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).add_arg("iotype", iotype).
     add_arg("*sizep", sizep).add_arg("*nelemsp", nelemsp).
     add_arg("*preemptionp", preemptionp).flush();
-  return PIOc_get_chunk_cache_impl(iosysid, iotype, sizep, nelemsp, preemptionp);
+  ret = PIOc_get_chunk_cache_impl(iosysid, iotype, sizep, nelemsp, preemptionp);
+
+  tr.add_rval("*sizep", (sizep) ? (static_cast<long long int>(*sizep)) : -1).
+    add_rval("*nelemsp", (nelemsp) ? (static_cast<long long int>(*nelemsp)) : -1).
+    add_rval("*preemptionp", (preemptionp) ? (*preemptionp) : 0.0);
+  return ret;
 }
 
 int PIOc_set_blocksize(int newblocksize)

@@ -17,7 +17,7 @@ int PIOc_put_var_text(int ncid, int varid, const char *op)
 {
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_var_text");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
-    add_arg("varid", varid).add_arg("*op", op).flush();
+    add_arg("varid", varid).add_arg("*op", static_cast<const void *>(op)).flush();
   return PIOc_put_var_text_impl(ncid, varid, op);
 }
 
