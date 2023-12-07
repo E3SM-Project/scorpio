@@ -16,6 +16,7 @@ set (pio_api_src
   api/spio_file_api.cpp
   api/spio_file_md_api.cpp
   api/spio_get_att_api.cpp
+  api/spio_get_utils.cpp
   api/spio_get_var1_api.cpp
   api/spio_get_vara_api.cpp
   api/spio_get_var_api.cpp
