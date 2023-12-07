@@ -353,6 +353,9 @@ typedef struct var_desc_t
     /* Non-zero if this is a record var (i.e. uses unlimited
      * dimension). */
     int rec_var;
+
+    /* Number of dimensions for this variable - cached data */
+    int ndims;
     
     /** The record number to be written. Ignored if there is no
      * unlimited dimension. */
