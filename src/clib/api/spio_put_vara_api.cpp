@@ -21,7 +21,7 @@ int PIOc_put_vara_text(int ncid, int varid, const PIO_Offset *start,
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vara_text");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
     add_arg("varid", varid).add_arg("*start", start).
-    add_arg("*count", count).add_arg("*op", op).flush();
+    add_arg("*count", count).add_arg("*op", static_cast<const void *>(op)).flush();
   return PIOc_put_vara_text_impl(ncid, varid, start, count, op);
 }
 
