@@ -83,6 +83,8 @@ namespace SPIO_Util{
     SPIO_Util::Logger::MPI_logger<std::ofstream> &get_iosys_trace_logger(int iosysid);
     SPIO_Util::Logger::MPI_logger<std::ofstream> &get_file_trace_logger(int fh);
     void finalize_iosys_trace_logger(std::string iosys_key);
+    std::string get_trace_log_header(int iosysid);
+    std::string get_trace_log_footer(void );
     //void finalize_file_trace_logger(int fh);
   } // namespace Tracer
 } // namespace SPIO_Util

@@ -112,6 +112,31 @@ void SPIO_Util::Tracer::Timed_func_call_tracer::log_func_call_exit(void )
   }
 }
 
+std::string SPIO_Util::Tracer::get_trace_log_header(int iosysid)
+{
+  static const std::string spio_version = std::string("SCORPIO VERSION : ") +
+                                          std::to_string(PIO_VERSION_MAJOR) + "." +
+                                          std::to_string(PIO_VERSION_MINOR) + "." +
+                                          std::to_string(PIO_VERSION_PATCH) + "\n";
+  static const std::string banner =
+                                  "=================================================================\n";
+  static const std::string spio_trace_log_info = "\tSCORPIO TRACE LOG\n" + spio_version;
+
+  std::string iosys_info = std::string("I/O System ID : ") + std::to_string(iosysid) + "\n";
+
+  std::string hdr = banner + spio_trace_log_info + iosys_info + banner;
+
+  return hdr;
+}
+
+std::string SPIO_Util::Tracer::get_trace_log_footer(void )
+{
+  static const std::string banner =
+                                  "=================================================================\n";
+
+  return banner;
+}
+
 SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace_logger(int iosysid)
 {
   /* FIXME: We might need to trace both I/O and compute procs for async I/O */
@@ -140,6 +165,7 @@ SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace
 
     // FIXME: use insert() and get the iterator rather than insert and then find
     SPIO_Util::Logger::MPI_logger<std::ofstream> lstr(ios->union_comm, fstr);
+    lstr.log(SPIO_Util::Tracer::get_trace_log_header(iosysid));
     SPIO_Util::Tracer::GVars::trace_loggers_[std::to_string(iosysid)] = lstr;
     iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(std::to_string(iosysid));
     //std::pair<std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator, bool> res = SPIO_Util::Tracer::GVars::trace_loggers_.insert({std::to_string(comm), lstr});
@@ -168,6 +194,7 @@ void SPIO_Util::Tracer::finalize_iosys_trace_logger(std::string iosys_key)
 {
   std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(iosys_key);
   if(iter != SPIO_Util::Tracer::GVars::trace_loggers_.end()){
+    (*iter).second.log(SPIO_Util::Tracer::get_trace_log_footer());
     std::ofstream *fstr = (*iter).second.get_log_stream();
     assert(fstr);
     fstr->close();
