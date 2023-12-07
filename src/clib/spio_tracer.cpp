@@ -27,14 +27,6 @@ SPIO_Util::Tracer::Timed_func_call_tracer::Timed_func_call_tracer(const std::str
 {
 }
 
-/*
-SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tracer::set_mpi_comm(MPI_Comm comm)
-{
-  mpi_comm_ = comm;
-  return *this;
-}
-*/
-
 SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tracer::set_iosys_id(int iosysid)
 {
   iosysid_ = iosysid;
@@ -83,6 +75,8 @@ void SPIO_Util::Tracer::Timed_func_call_tracer::flush(void )
     logger.log(ser_fcall);
     logger.flush();
   }
+
+  args_.clear();
 }
 
 void SPIO_Util::Tracer::Timed_func_call_tracer::finalize(void )
@@ -101,43 +95,22 @@ SPIO_Util::Tracer::Timed_func_call_tracer::~Timed_func_call_tracer()
 
 void SPIO_Util::Tracer::Timed_func_call_tracer::log_func_call_exit(void )
 {
-  std::string ser_fcall(FUNC_EXIT + func_name_ + FUNC_CALL_PREFIX + FUNC_CALL_SUFFIX);
+  std::string ser_fcall(FUNC_EXIT + func_name_ + FUNC_CALL_PREFIX);
+
+  if(rvals_.size() > 0){
+    std::vector<std::pair<std::string, std::string> >::const_iterator iter = rvals_.cbegin();
+    ser_fcall += (*iter).first + ARG_EQUAL + (*iter).second;
+    for(++iter ;iter != rvals_.cend(); ++iter){
+      ser_fcall += ARG_SEP + (*iter).first + ARG_EQUAL + (*iter).second;
+    }
+  }
+  ser_fcall += FUNC_CALL_SUFFIX;
   if(iosysid_ != INVALID_IOSYSID){
     SPIO_Util::Logger::MPI_logger<std::ofstream> &logger = SPIO_Util::Tracer::get_iosys_trace_logger(iosysid_);
     logger.log(ser_fcall);
     logger.flush();
   }
 }
-
-/*
-SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_mpi_trace_logger(MPI_Comm comm)
-{
-  std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(std::to_string(comm));
-  if(iter == SPIO_Util::Tracer::GVars::trace_loggers_.end()){
-    // FIXME: use unique_ptr
-    std::ofstream *fstr = new std::ofstream();
-    const std::string LOG_FILE_PREFIX = "spio_trace_log_";
-    const std::string LOG_FILE_SUFFIX = ".log";
-    static int comm_idx = 0;
-    std::string comm_idx_str = std::string("_comm_") + std::to_string(comm_idx) + std::string("_");
-    comm_idx++;
-
-    long long int pid = static_cast<long long int>(getpid());
-    std::string log_fname = LOG_FILE_PREFIX + comm_idx_str + std::to_string(pid) + LOG_FILE_SUFFIX;
-    fstr->open(log_fname.c_str(), std::ofstream::out | std::ofstream::trunc);
-
-    // FIXME: use insert() and get the iterator rather than insert and then find
-    SPIO_Util::Logger::MPI_logger<std::ofstream> lstr(comm, fstr);
-    SPIO_Util::Tracer::GVars::trace_loggers_[std::to_string(comm)] = lstr;
-    iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(std::to_string(comm));
-    //std::pair<std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator, bool> res = SPIO_Util::Tracer::GVars::trace_loggers_.insert({std::to_string(comm), lstr});
-    //SPIO_Util::Tracer::GVars::trace_loggers_.insert({std::to_string(comm), lstr});
-    //assert(res.second);
-    //iter = res.first;
-  }
-  return iter->second;
-}
-*/
 
 SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace_logger(int iosysid)
 {
@@ -191,27 +164,8 @@ SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_file_trace_
   return get_iosys_trace_logger(file->iosystem->iosysid);
 }
 
-/*
-void SPIO_Util::Tracer::finalize_mpi_trace_logger(MPI_Comm comm)
-{
-  std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(std::to_string(comm));
-  if(iter != SPIO_Util::Tracer::GVars::trace_loggers_.end()){
-    std::ofstream *fstr = (*iter).second.get_log_stream();
-    assert(fstr);
-    fstr->close();
-    delete fstr;
-
-    SPIO_Util::Tracer::GVars::trace_loggers_.erase(iter);
-  }
-}
-*/
-
 void SPIO_Util::Tracer::finalize_iosys_trace_logger(std::string iosys_key)
 {
-  //iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);  
-  /* FIXME: Throw an exception instead */
-  //assert(ios);
-
   std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(iosys_key);
   if(iter != SPIO_Util::Tracer::GVars::trace_loggers_.end()){
     std::ofstream *fstr = (*iter).second.get_log_stream();
