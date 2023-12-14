@@ -406,6 +406,21 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             case NC_DOUBLE:
                 ierr = ncmpi_put_att_double(file->fh, varid, name, atttype, len, op);
                 break;
+            case NC_UBYTE:
+                ierr = ncmpi_put_att_uchar(file->fh, varid, name, atttype, len, op);
+                break;
+            case NC_USHORT:
+                ierr = ncmpi_put_att_ushort(file->fh, varid, name, atttype, len, op);
+                break;
+            case NC_UINT:
+                ierr = ncmpi_put_att_uint(file->fh, varid, name, atttype, len, op);
+                break;
+            case NC_INT64:
+                ierr = ncmpi_put_att_longlong(file->fh, varid, name, atttype, len, op);
+                break;
+            case NC_UINT64:
+                ierr = ncmpi_put_att_ulonglong(file->fh, varid, name, atttype, len, op);
+                break;
             default:
                 GPTLstop("PIO:PIOc_put_att_tc");
                 GPTLstop("PIO:write_total");
@@ -464,8 +479,6 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             case NC_DOUBLE:
                 ierr = nc_put_att_double(file->fh, varid, name, atttype, len, op);
                 break;
-#endif /* _NETCDF */
-#ifdef _NETCDF4
             case NC_UBYTE:
                 ierr = nc_put_att_uchar(file->fh, varid, name, atttype, len, op);
                 break;
@@ -485,7 +498,7 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                 /* case NC_STRING: */
                 /*      ierr = nc_put_att_string(file->fh, varid, name, atttype, len, op); */
                 /*      break; */
-#endif /* _NETCDF4 */
+#endif /* _NETCDF */
             default:
                 GPTLstop("PIO:PIOc_put_att_tc");
                 GPTLstop("PIO:write_total");
@@ -740,10 +753,17 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 
         switch (memtype)
         {
-            case NC_DOUBLE:
-            case NC_FLOAT:
-            case NC_INT:
+            case NC_BYTE:
             case NC_CHAR:
+            case NC_SHORT:
+            case NC_INT:
+            case NC_FLOAT:
+            case NC_DOUBLE:
+            case NC_UBYTE:
+            case NC_USHORT:
+            case NC_UINT:
+            case NC_INT64:
+            case NC_UINT64:
             {
                 adios2_attribute const *attr = adios2_inquire_attribute(file->ioH, full_name);
                 if (attr != NULL)
@@ -821,6 +841,21 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             case NC_DOUBLE:
                 ierr = ncmpi_get_att_double(file->fh, varid, name, ip);
                 break;
+            case NC_UBYTE:
+                ierr = ncmpi_get_att_uchar(file->fh, varid, name, ip);
+                break;
+            case NC_USHORT:
+                ierr = ncmpi_get_att_ushort(file->fh, varid, name, ip);
+                break;
+            case NC_UINT:
+                ierr = ncmpi_get_att_uint(file->fh, varid, name, ip);
+                break;
+            case NC_INT64:
+                ierr = ncmpi_get_att_longlong(file->fh, varid, name, ip);
+                break;
+            case NC_UINT64:
+                ierr = ncmpi_get_att_ulonglong(file->fh, varid, name, ip);
+                break;
             default:
                 GPTLstop("PIO:PIOc_get_att_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -859,8 +894,6 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             case NC_DOUBLE:
                 ierr = nc_get_att_double(file->fh, varid, name, ip);
                 break;
-#endif /* _NETCDF */
-#ifdef _NETCDF4
             case NC_UBYTE:
                 ierr = nc_get_att_uchar(file->fh, varid, name, ip);
                 break;
@@ -880,7 +913,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                 /* case NC_STRING: */
                 /*      ierr = nc_get_att_string(file->fh, varid, name, ip); */
                 /*      break; */
-#endif /* _NETCDF4 */
+#endif /* _NETCDF */
             default:
                 GPTLstop("PIO:PIOc_get_att_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -1198,9 +1231,6 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 case NC_SHORT:
                     ierr = ncmpi_get_vars_short(file->fh, varid, start, count, stride, buf);
                     break;
-                case NC_INT64:
-                    ierr = ncmpi_get_vars_longlong(file->fh, varid, start, count, stride, buf);
-                    break;
                 case NC_INT:
                     ierr = ncmpi_get_vars_int(file->fh, varid, start, count, stride, buf);
                     break;
@@ -1212,6 +1242,21 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     break;
                 case NC_DOUBLE:
                     ierr = ncmpi_get_vars_double(file->fh, varid, start, count, stride, buf);
+                    break;
+                case NC_UBYTE:
+                    ierr = ncmpi_get_vars_uchar(file->fh, varid, start, count, stride, buf);
+                    break;
+                case NC_USHORT:
+                    ierr = ncmpi_get_vars_ushort(file->fh, varid, start, count, stride, buf);
+                    break;
+                case NC_UINT:
+                    ierr = ncmpi_get_vars_uint(file->fh, varid, start, count, stride, buf);
+                    break;
+                case NC_INT64:
+                    ierr = ncmpi_get_vars_longlong(file->fh, varid, start, count, stride, buf);
+                    break;
+                case NC_UINT64:
+                    ierr = ncmpi_get_vars_ulonglong(file->fh, varid, start, count, stride, buf);
                     break;
                 default:
                     GPTLstop("PIO:PIOc_get_vars_tc");
@@ -1275,9 +1320,6 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             case NC_INT:
                 ierr = ncmpi_get_vars_int_all(file->fh, varid, start, cnt, stride, buf);
                 break;
-            case NC_INT64:
-                ierr = ncmpi_get_vars_longlong_all(file->fh, varid, start, cnt, stride, buf);
-                break;
             case PIO_LONG_INTERNAL:
                 ierr = ncmpi_get_vars_long_all(file->fh, varid, start, cnt, stride, buf);
                 break;
@@ -1286,6 +1328,21 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 break;
             case NC_DOUBLE:
                 ierr = ncmpi_get_vars_double_all(file->fh, varid, start, cnt, stride, buf);
+                break;
+            case NC_UBYTE:
+                ierr = ncmpi_get_vars_uchar_all(file->fh, varid, start, count, stride, buf);
+                break;
+            case NC_USHORT:
+                ierr = ncmpi_get_vars_ushort_all(file->fh, varid, start, count, stride, buf);
+                break;
+            case NC_UINT:
+                ierr = ncmpi_get_vars_uint_all(file->fh, varid, start, count, stride, buf);
+                break;
+            case NC_INT64:
+                ierr = ncmpi_get_vars_longlong_all(file->fh, varid, start, count, stride, buf);
+                break;
+            case NC_UINT64:
+                ierr = ncmpi_get_vars_ulonglong_all(file->fh, varid, start, count, stride, buf);
                 break;
             default:
                 GPTLstop("PIO:PIOc_get_vars_tc");
@@ -1335,8 +1392,6 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 ierr = nc_get_vars_double(file->fh, varid, (size_t *)start, (size_t *)count,
                                           (ptrdiff_t *)stride, buf);
                 break;
-#endif
-#ifdef _NETCDF4
             case NC_UBYTE:
                 ierr = nc_get_vars_uchar(file->fh, varid, (size_t *)start, (size_t *)count,
                                          (ptrdiff_t *)stride, buf);
@@ -1362,7 +1417,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 /*      ierr = nc_get_vars_string(file->fh, varid, (size_t *)start, (size_t *)count, */
                 /*                                (ptrdiff_t *)stride, (void *)buf); */
                 /*      break; */
-#endif /* _NETCDF4 */
+#endif /* _NETCDF */
             default:
                 GPTLstop("PIO:PIOc_get_vars_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -3145,6 +3200,21 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     case NC_DOUBLE:
                         ierr = ncmpi_bput_var_double(file->fh, varid, buf, request);
                         break;
+                    case NC_UBYTE:
+                        ierr = ncmpi_bput_var_uchar(file->fh, varid, buf, request);
+                        break;
+                    case NC_USHORT:
+                        ierr = ncmpi_bput_var_ushort(file->fh, varid, buf, request);
+                        break;
+                    case NC_UINT:
+                        ierr = ncmpi_bput_var_uint(file->fh, varid, buf, request);
+                        break;
+                    case NC_INT64:
+                        ierr = ncmpi_bput_var_longlong(file->fh, varid, buf, request);
+                        break;
+                    case NC_UINT64:
+                        ierr = ncmpi_bput_var_ulonglong(file->fh, varid, buf, request);
+                        break;
                     default:
                         GPTLstop("PIO:PIOc_put_vars_tc");
                         GPTLstop("PIO:write_total");
@@ -3307,8 +3377,6 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 ierr = nc_put_vars_double(file->fh, varid, (size_t *)start, (size_t *)count,
                                           (ptrdiff_t *)stride, buf);
                 break;
-#endif
-#ifdef _NETCDF4
             case NC_UBYTE:
                 ierr = nc_put_vars_uchar(file->fh, varid, (size_t *)start, (size_t *)count,
                                          (ptrdiff_t *)stride, buf);
@@ -3333,7 +3401,7 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 /*      ierr = nc_put_vars_string(file->fh, varid, (size_t *)start, (size_t *)count, */
                 /*                                (ptrdiff_t *)stride, (void *)buf); */
                 /*      break; */
-#endif /* _NETCDF4 */
+#endif /* _NETCDF */
             default:
                 GPTLstop("PIO:PIOc_put_vars_tc");
                 GPTLstop("PIO:write_total");
