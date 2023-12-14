@@ -2042,6 +2042,206 @@ int test_putget(int iosysid, int num_flavors, int *flavor, int my_rank,
     return PIO_NOERR;
 }
 
+/* Starting from version 4.4.0, the NetCDF library supports the
+ * CDF-5 file format for both sequential and parallel file access.
+ *
+ * Starting from version 1.3.0, the PnetCDF library also supports
+ * the CDF-5 file format.
+ *
+ * As an extension of CDF-2, CDF-5 format supports the following new
+ * external data types:
+ * NC_UBYTE, NC_USHORT, NC_UINT, NC_INT64, and NC_UINT64
+ *
+ * These new data types are tested here with the following IO types:
+ * PIO_IOTYPE_PNETCDF, PIO_IOTYPE_NETCDF, PIO_IOTYPE_NETCDF4C, and
+ * PIO_IOTYPE_NETCDF4P
+ *
+ * @param iosysid the iosystem ID that will be used for the test.
+ * @param num_flavors the number of different IO types that will be tested.
+ * @param flavor an array of the valid IO types.
+ * @param my_rank 0-based rank of task.
+ * @returns 0 for success, error code otherwise.
+ */
+int test_cdf5_new_data_types(int iosysid, int num_flavors, int *flavor, int my_rank, MPI_Comm test_comm)
+{
+    int ncid;
+    int ret;
+
+    int varid_ubyte;
+    int varid_ushort;
+    int varid_uint;
+    int varid_int64;
+    int varid_uint64;
+
+    unsigned char ubyte_data_in;
+    unsigned short ushort_data_in;
+    unsigned int uint_data_in;
+    long long int64_data_in;
+    unsigned long long uint64_data_in;
+
+    char filename[PIO_MAX_NAME];
+
+    for (int fmt = 0; fmt < num_flavors; fmt++)
+    {
+        snprintf(filename, PIO_MAX_NAME, "%s_cdf5_new_data_types_fmt_%d.nc", TEST_NAME, fmt);
+
+        /* Use the PIO_64BIT_DATA flag to select the CDF-5 file format. Please note that when
+         * using PIO_IOTYPE_NETCDF4C or PIO_IOTYPE_NETCDF4P, this flag is not allowed and will
+         * be internally removed by SCORPIO. */
+        if ((ret = PIOc_createfile(iosysid, &ncid, &flavor[fmt], filename, PIO_CLOBBER | PIO_64BIT_DATA)))
+            ERR(ret);
+
+        if ((ret = PIOc_put_att_uchar(ncid, PIO_GLOBAL, "att_uchar", PIO_UBYTE, 1, &ubyte_data)))
+            ERR(ret);
+
+        if ((ret = PIOc_put_att_ushort(ncid, PIO_GLOBAL, "att_ushort", PIO_USHORT, 1, &ushort_data)))
+            ERR(ret);
+
+        if ((ret = PIOc_put_att_uint(ncid, PIO_GLOBAL, "att_uint", PIO_UINT, 1, &uint_data)))
+            ERR(ret);
+
+        if ((ret = PIOc_put_att_longlong(ncid, PIO_GLOBAL, "att_int64", PIO_INT64, 1, &int64_data)))
+            ERR(ret);
+
+        if ((ret = PIOc_put_att_ulonglong(ncid, PIO_GLOBAL, "att_uint64", PIO_UINT64, 1, &uint64_data)))
+            ERR(ret);
+
+        if ((ret = PIOc_def_var(ncid, "var_ubyte", PIO_UBYTE, 0, NULL, &varid_ubyte)))
+            ERR(ret);
+
+        if ((ret = PIOc_def_var(ncid, "var_ushort", PIO_USHORT, 0, NULL, &varid_ushort)))
+            ERR(ret);
+
+        if ((ret = PIOc_def_var(ncid, "var_uint", PIO_UINT, 0, NULL, &varid_uint)))
+            ERR(ret);
+
+        if ((ret = PIOc_def_var(ncid, "var_int64", PIO_INT64, 0, NULL, &varid_int64)))
+            ERR(ret);
+
+        if ((ret = PIOc_def_var(ncid, "var_uint64", PIO_UINT64, 0, NULL, &varid_uint64)))
+            ERR(ret);
+
+        if ((ret = PIOc_enddef(ncid)))
+            ERR(ret);
+
+        if ((ret = PIOc_put_var_uchar(ncid, varid_ubyte, &ubyte_data)))
+            ERR(ret);
+
+        if ((ret = PIOc_put_var_ushort(ncid, varid_ushort, &ushort_data)))
+            ERR(ret);
+
+        if ((ret = PIOc_put_var_uint(ncid, varid_uint, &uint_data)))
+            ERR(ret);
+
+        if ((ret = PIOc_put_var_longlong(ncid, varid_int64, &int64_data)))
+            ERR(ret);
+
+        if ((ret = PIOc_put_var_ulonglong(ncid, varid_uint64, &uint64_data)))
+            ERR(ret);
+
+        if ((ret = PIOc_closefile(ncid)))
+            ERR(ret);
+
+        if ((ret = PIOc_openfile2(iosysid, &ncid, &(flavor[fmt]), filename, PIO_NOWRITE)))
+            ERR(ret);
+
+        ubyte_data_in = 0;
+        if ((ret = PIOc_get_att_uchar(ncid, PIO_GLOBAL, "att_uchar", &ubyte_data_in)))
+            ERR(ret);
+
+        if (ubyte_data_in != ubyte_data)
+            ERR(ERR_WRONG);
+
+        ushort_data_in = 0;
+        if ((ret = PIOc_get_att_ushort(ncid, PIO_GLOBAL, "att_ushort", &ushort_data_in)))
+            ERR(ret);
+
+        if (ushort_data_in != ushort_data)
+            ERR(ERR_WRONG);
+
+        uint_data_in = 0;
+        if ((ret = PIOc_get_att_uint(ncid, PIO_GLOBAL, "att_uint", &uint_data_in)))
+            ERR(ret);
+
+        if (uint_data_in != uint_data)
+            ERR(ERR_WRONG);
+
+        int64_data_in = 0;
+        if ((ret = PIOc_get_att_longlong(ncid, PIO_GLOBAL, "att_int64", &int64_data_in)))
+            ERR(ret);
+
+        if (int64_data_in != int64_data)
+            ERR(ERR_WRONG);
+
+        uint64_data_in = 0;
+        if ((ret = PIOc_get_att_ulonglong(ncid, PIO_GLOBAL, "att_uint64", &uint64_data_in)))
+            ERR(ret);
+
+        if (uint64_data_in != uint64_data)
+            ERR(ERR_WRONG);
+
+        varid_ubyte = -1;
+        if ((ret = PIOc_inq_varid(ncid, "var_ubyte", &varid_ubyte)))
+            ERR(ret);
+
+        ubyte_data_in = 0;
+        if ((ret = PIOc_get_var_uchar(ncid, varid_ubyte, &ubyte_data_in)))
+            ERR(ret);
+
+        if (ubyte_data_in != ubyte_data)
+            ERR(ERR_WRONG);
+
+        varid_ushort = -1;
+        if ((ret = PIOc_inq_varid(ncid, "var_ushort", &varid_ushort)))
+            ERR(ret);
+
+        ushort_data_in = 0;
+        if ((ret = PIOc_get_var_ushort(ncid, varid_ushort, &ushort_data_in)))
+            ERR(ret);
+
+        if (ushort_data_in != ushort_data)
+            ERR(ERR_WRONG);
+
+        varid_uint = -1;
+        if ((ret = PIOc_inq_varid(ncid, "var_uint", &varid_uint)))
+            ERR(ret);
+
+        uint_data_in = 0;
+        if ((ret = PIOc_get_var_uint(ncid, varid_uint, &uint_data_in)))
+            ERR(ret);
+
+        if (uint_data_in != uint_data)
+            ERR(ERR_WRONG);
+
+        varid_int64 = -1;
+        if ((ret = PIOc_inq_varid(ncid, "var_int64", &varid_int64)))
+            ERR(ret);
+
+        int64_data_in = 0;
+        if ((ret = PIOc_get_var_longlong(ncid, varid_int64, &int64_data_in)))
+            ERR(ret);
+
+        if (int64_data_in != int64_data)
+            ERR(ERR_WRONG);
+
+        varid_uint64 = -1;
+        if ((ret = PIOc_inq_varid(ncid, "var_uint64", &varid_uint64)))
+            ERR(ret);
+
+        uint64_data_in = 0;
+        if ((ret = PIOc_get_var_ulonglong(ncid, varid_uint64, &uint64_data_in)))
+            ERR(ret);
+
+        if (uint64_data_in != uint64_data)
+            ERR(ERR_WRONG);
+
+        if ((ret = PIOc_closefile(ncid)))
+            ERR(ret);
+    }
+
+    return PIO_NOERR;
+}
+
 /* Run all the tests. */
 int test_all(int iosysid, int num_flavors, int *flavor, int my_rank, MPI_Comm test_comm,
              int async)
@@ -2074,6 +2274,11 @@ int test_all(int iosysid, int num_flavors, int *flavor, int my_rank, MPI_Comm te
     /* Test read/write stuff. */
     printf("%d Testing putget. async = %d\n", my_rank, async);
     if ((ret = test_putget(iosysid, num_flavors, flavor, my_rank, test_comm)))
+        return ret;
+
+    /* Test the new external data types supported by CDF-5. */
+    printf("%d Testing CDF-5 new external data types. async = %d\n", my_rank, async);
+    if ((ret = test_cdf5_new_data_types(iosysid, num_flavors, flavor, my_rank, test_comm)))
         return ret;
 
     return PIO_NOERR;
