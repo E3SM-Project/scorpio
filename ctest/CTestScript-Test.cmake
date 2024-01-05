@@ -30,7 +30,10 @@ ctest_test(INCLUDE "pio_unit_test|^init|pio_file\
 |pio_decomp|pio_sync_tests|pio_buf_lim_tests|pio_iodesc_tests\
 |pio_iosystem_tests|examplePio|example1|darray_no_async|test_adios")
 elseif (DEFINED ENV{ADIOS_READ_CTEST})
-ctest_test(INCLUDE "test_adios")
+ctest_test(INCLUDE "pio_unit_test|^init|pio_file\
+|ncdf_simple_tests\
+|pio_decomp_tests_|pio_decomp_frame_tests_|pio_decomp_extra_dims_\
+|pio_iosystem_tests|examplePio|example1|darray_no_async|test_adios")
 elseif (DEFINED ENV{HDF5_CTEST})
 ctest_test(INCLUDE "test_hdf5")
 else ()
