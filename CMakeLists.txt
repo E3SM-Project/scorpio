@@ -305,7 +305,7 @@ set (MPE_MIN_VER_REQD "2.4.8")
 set (NETCDF_C_MIN_VER_REQD "4.4.0")
 set (NETCDF_FORTRAN_MIN_VER_REQD "4.4.0")
 set (PNETCDF_MIN_VER_REQD "1.8.1")
-set (ADIOS_MIN_VER_REQD "2.7.0")
+set (ADIOS_MIN_VER_REQD "2.9.0")
 
 # Setting code coverage compiler flags (only GNU is supported for now)
 if (PIO_ENABLE_COVERAGE)
