@@ -150,7 +150,7 @@ endif ()
 
 if (ADIOS2_FOUND)
   target_compile_definitions (adios2pio-nm-lib
-    PUBLIC _ADIOS2)
+    PRIVATE _ADIOS2)
   target_link_libraries (adios2pio-nm-lib
     PUBLIC adios2::adios2)
 else ()

@@ -134,6 +134,8 @@ if (WITH_ADIOS2)
   if (ADIOS2_FOUND)
     message(STATUS "Found ADIOS library")
     set(PIO_USE_ADIOS 1)
+    target_compile_definitions (pioc
+      PUBLIC _ADIOS2)
     target_link_libraries (pioc
       PUBLIC adios2::adios2 adios2pio-nm-lib)
   else ()
@@ -151,6 +153,8 @@ if (WITH_HDF5)
   if (HDF5_C_FOUND)
     message(STATUS "HDF5 C library dependencies: ${HDF5_C_LIBRARIES} ${HDF5_HL_LIBRARIES}")
     set(PIO_USE_HDF5 1)
+    target_compile_definitions (pioc
+      PUBLIC _HDF5)
     target_include_directories (pioc
       PUBLIC ${HDF5_C_INCLUDE_DIRS} ${HDF5_HL_INCLUDE_DIRS})
     target_link_libraries (pioc
