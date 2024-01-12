@@ -2890,6 +2890,9 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
             if (ios->union_rank == 0)
             {
                 struct stat sd;
+                if (0 == stat(filename, &sd))
+                    unlink(filename);
+
                 if (0 == stat(file->filename, &sd))
                     remove_directory(file->filename);
             }
@@ -2979,6 +2982,15 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                                pio_get_fname_from_file(file));
             }
             GPTLstop("PIO:adios2_open_call");
+
+            if(file->adios_rank == 0)
+            {
+                ierr = symlink(file->filename, filename);
+                if(ierr != 0)
+                {
+                    LOG((1, "PIO: WARNING: Creating symlink for %s file failed, ierr = %d", file->filename, ierr));
+                }
+            }
 
             ierr = begin_adios2_step(file, ios);
             if (ierr != PIO_NOERR)

@@ -2259,6 +2259,13 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
             ierr = BP2PIO_ERROR;
         }
 
+        /* Delete symlink, foo.nc, that points to the ADIOS BP dir, foo.nc.bp */
+        struct stat sd;
+        if(stat(outfilename.c_str(), &sd) == 0)
+        {
+            unlink(outfilename.c_str());
+        }
+
         /* Create output file */
         /*
          *   Use NC_64BIT_DATA instead of PIO_64BIT_OFFSET. Some output files will have variables
