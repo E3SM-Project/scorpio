@@ -17,6 +17,7 @@
 #include "pio_sdecomps_regex.h"
 #include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
+#include "spio_hash.h"
 
 /* uint64_t definition */
 #ifdef _ADIOS2
