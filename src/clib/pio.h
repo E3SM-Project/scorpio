@@ -68,8 +68,6 @@ extern "C" {
 #include <limits.h>
 #include <adios2_c.h>
 
-#include "spio_hash.h" /* Hash table implementation for ADIOS read */
-
 #define MAX_ADIOS_BUFFER_COUNT (PIO_MAX_CACHED_STEPS_FOR_ADIOS + 16) /* Maximum buffer size for aggregating decomp_id, frame_id, and fillval_id values */
 #define BLOCK_MAX_BUFFER ((unsigned long)INT_MAX) /* 2GB limit of MPI_Gatherv */
 /* adios end step is called if the number of blocks written out exceeds BLOCK_COUNT_THRESHOLD */
@@ -334,6 +332,9 @@ typedef PIO_OFFSET_C_TYPENAME PIO_Offset;
 /** Some fwd declarations to avoid including internal headers */
 typedef struct mtimer_info *mtimer_t;
 #endif
+
+/* Forward decl of hash map used for ADIOS reads */
+struct spio_hmap;
 
 /**
  * Variable description structure.
@@ -1075,9 +1076,9 @@ typedef struct file_desc_t
     int current_frame;
 
     /* Some caches (hash tables) for ADIOS read */
-    spio_hash_t *cache_data_blocks;
-    spio_hash_t *cache_block_sizes;
-    spio_hash_t *cache_darray_info;
+    struct spio_hmap *cache_data_blocks;
+    struct spio_hmap *cache_block_sizes;
+    struct spio_hmap *cache_darray_info;
 
     char io_name_reader[PIO_MAX_NAME + 1]; /* Name of io object, for ADIOS read */
 #endif /* _ADIOS2 */
