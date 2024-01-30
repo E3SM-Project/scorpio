@@ -3624,7 +3624,19 @@ static int adios_get_attr(file_desc_t *file, int attr_id, char *const *attr_name
                            attr_id, file->adios_attrs[attr_id].att_name, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
         }
 
-        if (type == adios2_type_int32_t)
+        if (type == adios2_type_int8_t)
+        {
+            file->adios_attrs[attr_id].att_type = NC_BYTE;
+            file->adios_attrs[attr_id].adios_type = adios2_type_int8_t;
+            file->adios_attrs[attr_id].att_len = (PIO_Offset) 1;
+        }
+        else if (type == adios2_type_int16_t)
+        {
+            file->adios_attrs[attr_id].att_type = NC_SHORT;
+            file->adios_attrs[attr_id].adios_type = adios2_type_int16_t;
+            file->adios_attrs[attr_id].att_len = (PIO_Offset) 1;
+        }
+        else if (type == adios2_type_int32_t)
         {
             file->adios_attrs[attr_id].att_type = NC_INT;
             file->adios_attrs[attr_id].adios_type = adios2_type_int32_t;
@@ -3640,6 +3652,36 @@ static int adios_get_attr(file_desc_t *file, int attr_id, char *const *attr_name
         {
             file->adios_attrs[attr_id].att_type = NC_DOUBLE;
             file->adios_attrs[attr_id].adios_type = adios2_type_double;
+            file->adios_attrs[attr_id].att_len = (PIO_Offset) 1;
+        }
+        else if (type == adios2_type_uint8_t)
+        {
+            file->adios_attrs[attr_id].att_type = NC_UBYTE;
+            file->adios_attrs[attr_id].adios_type = adios2_type_uint8_t;
+            file->adios_attrs[attr_id].att_len = (PIO_Offset) 1;
+        }
+        else if (type == adios2_type_uint16_t)
+        {
+            file->adios_attrs[attr_id].att_type = NC_USHORT;
+            file->adios_attrs[attr_id].adios_type = adios2_type_uint16_t;
+            file->adios_attrs[attr_id].att_len = (PIO_Offset) 1;
+        }
+        else if (type == adios2_type_uint32_t)
+        {
+            file->adios_attrs[attr_id].att_type = NC_UINT;
+            file->adios_attrs[attr_id].adios_type = adios2_type_uint32_t;
+            file->adios_attrs[attr_id].att_len = (PIO_Offset) 1;
+        }
+        else if (type == adios2_type_int64_t)
+        {
+            file->adios_attrs[attr_id].att_type = NC_INT64;
+            file->adios_attrs[attr_id].adios_type = adios2_type_int64_t;
+            file->adios_attrs[attr_id].att_len = (PIO_Offset) 1;
+        }
+        else if (type == adios2_type_uint64_t)
+        {
+            file->adios_attrs[attr_id].att_type = NC_UINT64;
+            file->adios_attrs[attr_id].adios_type = adios2_type_uint64_t;
             file->adios_attrs[attr_id].att_len = (PIO_Offset) 1;
         }
         else if (type == adios2_type_string)

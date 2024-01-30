@@ -19,6 +19,8 @@ int test_adios_read_case_1();
 int test_adios_read_case_2();
 
 int test_adios_read_case_3();
+
+int test_adios_cdf5_new_data_types();
 #endif
 
 int main(int argc, char* argv[])
@@ -608,6 +610,8 @@ int main(int argc, char* argv[])
     ret = test_adios_read_case_2(); ERR
 
     ret = test_adios_read_case_3(); ERR
+
+    ret = test_adios_cdf5_new_data_types(); ERR
 
     MPI_Finalize();
 
@@ -1778,6 +1782,163 @@ int test_adios_read_case_3()
         printf("varid_dummy_scalar_var_int_read = %d\n", varid_dummy_scalar_var_int_read);
 
     ret = PIOc_closefile(ncid_read); ERR
+
+    ret = PIOc_finalize(iosysid); ERR
+
+    return 0;
+}
+
+int test_adios_cdf5_new_data_types()
+{
+    /* Zero-based rank of processor. */
+    int my_rank;
+
+    /* Number of processors involved in current execution. */
+    int ntasks;
+
+    int format = PIO_IOTYPE_ADIOS;
+
+    /* Number of processors that will do IO. */
+    int niotasks;
+
+    /* Stride in the MPI rank between IO tasks. Always 1 in this example. */
+    const int ioproc_stride = 1;
+
+    /* Zero based rank of first processor to be used for I/O. */
+    const int ioproc_start = 0;
+
+    int iosysid;
+
+    /* The ncid of the netCDF file created and read in this example. */
+    int ncid;
+
+    /* The IDs of the netCDF variables in the example file. */
+    int varid_ubyte;
+    int varid_ushort;
+    int varid_uint;
+    int varid_int64;
+    int varid_uint64;
+
+    /* Write buffers with sample data for attributes and variables. */
+    unsigned char ubyte_data = 43;
+    unsigned short ushort_data = 666;
+    unsigned int uint_data = 666666;
+    long long int64_data = -99999999999;
+    unsigned long long uint64_data = 99999999999;
+
+    /* Read buffers for attributes and variables. */
+    unsigned char ubyte_data_in;
+    unsigned short ushort_data_in;
+    unsigned int uint_data_in;
+    long long int64_data_in;
+    unsigned long long uint64_data_in;
+
+    int ret = PIO_NOERR;
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
+
+    /* Keep things simple - 1 IO task per MPI process */
+    niotasks = ntasks;
+
+    /* Initialize the PIO IO system. This specifies how
+       many and which processors are involved in I/O. */
+    ret = PIOc_Init_Intracomm(MPI_COMM_WORLD, niotasks, ioproc_stride, ioproc_start, PIO_REARR_SUBSET, &iosysid); ERR
+
+    ret = PIOc_createfile(iosysid, &ncid, &format, "test_adios_cdf5_new_data_types.nc", PIO_CLOBBER); ERR
+
+    ret = PIOc_put_att_uchar(ncid, PIO_GLOBAL, "att_uchar", PIO_UBYTE, 1, &ubyte_data); ERR
+
+    ret = PIOc_put_att_ushort(ncid, PIO_GLOBAL, "att_ushort", PIO_USHORT, 1, &ushort_data); ERR
+
+    ret = PIOc_put_att_uint(ncid, PIO_GLOBAL, "att_uint", PIO_UINT, 1, &uint_data); ERR
+
+    ret = PIOc_put_att_longlong(ncid, PIO_GLOBAL, "att_int64", PIO_INT64, 1, &int64_data); ERR
+
+    ret = PIOc_put_att_ulonglong(ncid, PIO_GLOBAL, "att_uint64", PIO_UINT64, 1, &uint64_data); ERR
+
+    ret = PIOc_def_var(ncid, "var_ubyte", PIO_UBYTE, 0, NULL, &varid_ubyte); ERR
+
+    ret = PIOc_def_var(ncid, "var_ushort", PIO_USHORT, 0, NULL, &varid_ushort); ERR
+
+    ret = PIOc_def_var(ncid, "var_uint", PIO_UINT, 0, NULL, &varid_uint); ERR
+
+    ret = PIOc_def_var(ncid, "var_int64", PIO_INT64, 0, NULL, &varid_int64); ERR
+
+    ret = PIOc_def_var(ncid, "var_uint64", PIO_UINT64, 0, NULL, &varid_uint64); ERR
+
+    ret = PIOc_enddef(ncid); ERR
+
+    ret = PIOc_put_var_uchar(ncid, varid_ubyte, &ubyte_data); ERR
+
+    ret = PIOc_put_var_ushort(ncid, varid_ushort, &ushort_data); ERR
+
+    ret = PIOc_put_var_uint(ncid, varid_uint, &uint_data); ERR
+
+    ret = PIOc_put_var_longlong(ncid, varid_int64, &int64_data); ERR
+
+    ret = PIOc_put_var_ulonglong(ncid, varid_uint64, &uint64_data); ERR
+
+    ret = PIOc_closefile(ncid); ERR
+
+    ret = PIOc_openfile(iosysid, &ncid, &format, "test_adios_cdf5_new_data_types.nc", PIO_NOWRITE); ERR
+
+    ubyte_data_in = 0;
+    ret = PIOc_get_att_uchar(ncid, PIO_GLOBAL, "att_uchar", &ubyte_data_in); ERR
+    ret = (ubyte_data_in == ubyte_data)? PIO_NOERR : -1; ERR
+
+    ushort_data_in = 0;
+    ret = PIOc_get_att_ushort(ncid, PIO_GLOBAL, "att_ushort", &ushort_data_in); ERR
+    ret = (ushort_data_in == ushort_data)? PIO_NOERR : -1; ERR
+
+    uint_data_in = 0;
+    ret = PIOc_get_att_uint(ncid, PIO_GLOBAL, "att_uint", &uint_data_in); ERR
+    ret = (uint_data_in == uint_data)? PIO_NOERR : -1; ERR
+
+    int64_data_in = 0;
+    ret = PIOc_get_att_longlong(ncid, PIO_GLOBAL, "att_int64", &int64_data_in); ERR
+    ret = (int64_data_in == int64_data)? PIO_NOERR : -1; ERR
+
+    uint64_data_in = 0;
+    ret = PIOc_get_att_ulonglong(ncid, PIO_GLOBAL, "att_uint64", &uint64_data_in); ERR
+    ret = (uint64_data_in == uint64_data)? PIO_NOERR : -1; ERR
+
+    varid_ubyte = -1;
+    ret = PIOc_inq_varid(ncid, "var_ubyte", &varid_ubyte); ERR
+
+    ubyte_data_in = 0;
+    ret = PIOc_get_var_uchar(ncid, varid_ubyte, &ubyte_data_in); ERR
+    ret = (ubyte_data_in == ubyte_data)? PIO_NOERR : -1; ERR
+
+    varid_ushort = -1;
+    ret = PIOc_inq_varid(ncid, "var_ushort", &varid_ushort); ERR
+
+    ushort_data_in = 0;
+    ret = PIOc_get_var_ushort(ncid, varid_ushort, &ushort_data_in); ERR
+    ret = (ushort_data_in == ushort_data)? PIO_NOERR : -1; ERR
+
+    varid_uint = -1;
+    ret = PIOc_inq_varid(ncid, "var_uint", &varid_uint); ERR
+
+    uint_data_in = 0;
+    ret = PIOc_get_var_uint(ncid, varid_uint, &uint_data_in); ERR
+    ret = (uint_data_in == uint_data)? PIO_NOERR : -1; ERR
+
+    varid_int64 = -1;
+    ret = PIOc_inq_varid(ncid, "var_int64", &varid_int64); ERR
+
+    int64_data_in = 0;
+    ret = PIOc_get_var_longlong(ncid, varid_int64, &int64_data_in); ERR
+    ret = (int64_data_in == int64_data)? PIO_NOERR : -1; ERR
+
+    varid_uint64 = -1;
+    ret = PIOc_inq_varid(ncid, "var_uint64", &varid_uint64); ERR
+
+    uint64_data_in = 0;
+    ret = PIOc_get_var_ulonglong(ncid, varid_uint64, &uint64_data_in); ERR
+    ret = (uint64_data_in == uint64_data)? PIO_NOERR : -1; ERR
+
+    ret = PIOc_closefile(ncid); ERR
 
     ret = PIOc_finalize(iosysid); ERR
 
