@@ -21,6 +21,7 @@
 #endif
 #include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
+#include "spio_hash.h"
 
 #define VERSNO 2001
 

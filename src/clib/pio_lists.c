@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include "spio_file_mvcache.h"
 #include "spio_io_summary.h"
+#include "spio_hash.h"
 
 static io_desc_t *pio_iodesc_list = NULL;
 static io_desc_t *current_iodesc = NULL;
