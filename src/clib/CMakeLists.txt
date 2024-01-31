@@ -178,6 +178,9 @@ message(STATUS "sizeof(long long) = ${SIZEOF_LONG_LONG} bytes")
 if (NOT ${SIZEOF_SIZE_T} EQUAL ${SIZEOF_LONG_LONG})
   message (FATAL_ERROR "size_t and long long must be the same size!")
 endif ()
+if (NOT ${SIZEOF_LONG_LONG} EQUAL 8)
+  message (FATAL_ERROR "long long ints must be 64-bit!")
+endif ()
 
 # Note: This check needs to happen after the MPI library is found
 # Add paths to MPI headers in the include path before calling

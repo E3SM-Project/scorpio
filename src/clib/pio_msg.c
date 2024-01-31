@@ -1892,7 +1892,6 @@ int put_vars_handler(iosystem_desc_t *ios)
     case NC_DOUBLE:
         ret = PIOc_put_vars_double(ncid, varid, startp, countp, stridep, buf);
         break;
-#ifdef _NETCDF4
     case NC_UBYTE:
         ret = PIOc_put_vars_uchar(ncid, varid, startp, countp, stridep, buf);
         break;
@@ -1915,7 +1914,6 @@ int put_vars_handler(iosystem_desc_t *ios)
         /*    default:*/
         /* PIOc_put_vars(ncid, varid, startp, countp, */
         /*                   stridep, buf); */
-#endif /* _NETCDF4 */
     }
 
     free(buf);
@@ -2018,7 +2016,6 @@ int get_vars_handler(iosystem_desc_t *ios)
     case NC_DOUBLE:
         ret = PIOc_get_vars_double(ncid, varid, startp, countp, stridep, buf);
         break;
-#ifdef _NETCDF4
     case NC_UBYTE:
         ret = PIOc_get_vars_uchar(ncid, varid, startp, countp, stridep, buf);
         break;
@@ -2041,7 +2038,6 @@ int get_vars_handler(iosystem_desc_t *ios)
         /*    default:*/
         /* PIOc_get_vars(ncid, varid, startp, countp, */
         /*                   stridep, buf); */
-#endif /* _NETCDF4 */
     }
 
     /* Free resourses. */
