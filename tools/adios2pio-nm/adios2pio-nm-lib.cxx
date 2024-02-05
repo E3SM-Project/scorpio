@@ -2260,10 +2260,46 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         }
 
         /* Delete symlink, foo.nc, that points to the ADIOS BP dir, foo.nc.bp */
-        struct stat sd;
-        if(stat(outfilename.c_str(), &sd) == 0)
+        bool needs_conversion = false;
+        int root_rank = 0;
+        if(mpirank == root_rank)
         {
-            unlink(outfilename.c_str());
+            struct stat sd;
+            if(lstat(outfilename.c_str(), &sd) == 0)
+            {
+                if(S_ISLNK(sd.st_mode))
+                {
+                    /* These BP files, foo.nc.bp, have a symlink, foo.nc, pointing to it */
+                    fprintf(stdout, "Converting BP file : \"%s\"\n", infilepath.c_str());
+                    unlink(outfilename.c_str());
+                    needs_conversion = true;
+                }
+                else
+                {
+                    /* These BP files don't have a symlink
+                        - these should have been converted to NetCDF in a previous run of the tool
+                    */
+                    fprintf(stdout, "Skipping BP file (conversion not required): \"%s\"\n", infilepath.c_str());
+                }
+            }
+            else
+            {
+                fprintf(stdout, "WARNING: Skipping BP file (could not find/stat file) :\"%s\"\n", infilepath.c_str());
+            }
+        }
+
+        /* We need to sync procs after deleting the symlink, so hopefully this doesn't slow the conversion */
+        ierr = MPI_Bcast(&needs_conversion, 1, MPI_C_BOOL, root_rank, comm);
+        if(ierr != MPI_SUCCESS)
+        {
+            fprintf(stderr, "Bcasting BP file conversion req failed, mpierr = %d\n", ierr);
+            return BP2PIO_ERROR;
+        }
+
+        if(!needs_conversion)
+        {
+            /* Avoid converting BP files that have already been converted to NetCDF */
+            return BP2PIO_NOERR;
         }
 
         /* Create output file */
