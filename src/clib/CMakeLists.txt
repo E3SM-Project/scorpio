@@ -14,7 +14,7 @@ add_library (pioc topology.c pio_mpi_timer.c pio_timer.c pio_file.c
   pioc_support.c pio_lists.c pio_print.c
   pioc.c pioc_sc.c pio_spmd.c pio_rearrange.c pio_nc4.c bget.c
   pio_nc.c pio_put_nc.c pio_get_nc.c pio_getput_int.c pio_msg.c pio_varm.c
-  pio_darray.c pio_darray_int.c spio_hash.cpp pio_sdecomps_regex.cpp spio_io_summary.cpp
+  pio_darray.c pio_darray_int.c pio_sdecomps_regex.cpp spio_io_summary.cpp
   spio_ltimer.cpp spio_serializer.cpp spio_file_mvcache.cpp)
 
 #==============================================================================
@@ -131,6 +131,14 @@ if (WITH_ADIOS2)
     set(PIO_USE_ADIOS 1)
     target_link_libraries (pioc
       PUBLIC adios2::adios2 adios2pio-nm-lib)
+
+    if (PIO_USE_QLIBC_HASH)
+      target_sources(pioc PRIVATE spio_qlibc_hash.c)
+      target_compile_definitions(pioc
+        PRIVATE SPIO_USE_QLIBC_HASH)
+    else ()
+      target_sources(pioc PRIVATE spio_hash.cpp)
+    endif ()
   else ()
     message(STATUS "Could not find ADIOS library, disabling support for ADIOS")
     set(PIO_USE_ADIOS 0)
