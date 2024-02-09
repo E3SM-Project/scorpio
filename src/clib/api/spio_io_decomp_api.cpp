@@ -12,16 +12,20 @@ int PIOc_InitDecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, in
                     const PIO_Offset *iostart, const PIO_Offset *iocount)
 {
   int ret = PIO_NOERR;
+#if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_InitDecomp");
   assert((ndims > 0) && gdimlen);
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).
     add_arg("pio_type", pio_type).add_arg("ndims", ndims).add_arg("*gdimlen", gdimlen, ndims).
     add_arg("maplen", maplen).add_arg("*compmap", compmap).add_arg("*ioidp", ioidp).
     add_arg("*rearr", rearr).add_arg("*iostart", iostart).add_arg("*iocount", iocount).flush();
+#endif
   ret = PIOc_InitDecomp_impl(iosysid, pio_type, ndims, gdimlen, maplen,
                               compmap, ioidp, rearr, iostart, iocount);
 
+#if SPIO_ENABLE_API_TRACING
   tr.add_rval("*ioidp", (ioidp) ? (*ioidp) : -1);
+#endif
   return ret;
 }
 
@@ -29,15 +33,19 @@ int PIOc_InitDecomp_bc(int iosysid, int basetype, int ndims, const int *gdimlen,
                        const long int *start, const long int *count, int *ioidp)
 {
   int ret = PIO_NOERR;
+#if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_InitDecomp_bc");
   assert((ndims > 0) && gdimlen);
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).add_arg("basetype", basetype).
     add_arg("ndims", ndims).add_arg("*gdimlen", gdimlen, ndims).add_arg("*start", start).
     add_arg("*count", count).add_arg("*ioidp", ioidp).flush();
+#endif
   ret = PIOc_InitDecomp_bc_impl(iosysid, basetype, ndims, gdimlen,
                                   start, count, ioidp);
 
+#if SPIO_ENABLE_API_TRACING
   tr.add_rval("*ioidp", (ioidp) ? (*ioidp) : -1);
+#endif
   return ret;
 }
 
@@ -48,6 +56,7 @@ int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, i
                      const PIO_Offset *iostart, const PIO_Offset *iocount)
 {
   int ret = PIO_NOERR;
+#if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_init_decomp");
   assert((ndims > 0) && gdimlen);
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).
@@ -55,10 +64,13 @@ int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, i
     add_arg("maplen", maplen).add_arg("*compmap", compmap).add_arg("*ioidp", ioidp).
     add_arg("rearranger", rearranger).add_arg("*iostart", iostart).
     add_arg("*iocount", iocount).flush();
+#endif
   ret = PIOc_init_decomp_impl(iosysid, pio_type, ndims, gdimlen, maplen,
                                 compmap, ioidp, rearranger, iostart, iocount);
 
+#if SPIO_ENABLE_API_TRACING
   tr.add_rval("*ioidp", (ioidp) ? (*ioidp) : -1);
+#endif
   return ret;
 }
 
@@ -66,8 +78,10 @@ int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, i
 /* Free resources associated with a decomposition. */
 int PIOc_freedecomp(int iosysid, int ioid)
 {
+#if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_freedecomp");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).add_arg("ioid", ioid).flush();
+#endif
   return PIOc_freedecomp_impl(iosysid, ioid);
 }
 
@@ -114,11 +128,13 @@ int PIOc_write_decomp(const char *file, int iosysid, int ioid, MPI_Comm comm)
 int PIOc_write_nc_decomp(int iosysid, const char *filename, int cmode, int ioid,
                          const char *title, const char *history, int fortran_order)
 {
+#if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_write_nc_decomp");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).
     add_arg("*filename", filename).add_arg("cmode", cmode).add_arg("ioid", ioid).
     add_arg("*title", title).add_arg("*history", history).
     add_arg("fortran_order", fortran_order).flush();
+#endif
   return PIOc_write_nc_decomp_impl(iosysid, filename, cmode, ioid,
                                     title, history, fortran_order);
 }
@@ -128,12 +144,14 @@ int PIOc_write_nc_decomp(int iosysid, const char *filename, int cmode, int ioid,
 int PIOc_read_nc_decomp(int iosysid, const char *filename, int *ioid, MPI_Comm comm,
                         int pio_type, char *title, char *history, int *fortran_order)
 {
+#if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_read_nc_decomp");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).
     add_arg("*filename", filename).add_arg("*ioid", ioid).
     add_arg("comm", static_cast<long long int>(comm)).add_arg("pio_type", pio_type).
     add_arg("*title", title).add_arg("*history", history).
     add_arg("fortran_order", fortran_order).flush();
+#endif
   return PIOc_read_nc_decomp_impl(iosysid, filename, ioid, comm,
                                   pio_type, title, history, fortran_order);
 }
