@@ -317,6 +317,14 @@ if (ADIOS_BP2NC_TEST)
     PUBLIC _ADIOS_BP2NC_TEST)
 endif ()
 
+if (PIO_ENABLE_API_TRACING)
+  message(STATUS "Enabling API tracing")
+  set(ENABLE_API_TRACING 1)
+else ()
+  message(STATUS "API tracing disabled (default)")
+  set(ENABLE_API_TRACING 0)
+endif ()
+
 # The MPI library detection was done in the top level
 if (MPISERIAL_C_FOUND)
   target_compile_definitions (pioc
