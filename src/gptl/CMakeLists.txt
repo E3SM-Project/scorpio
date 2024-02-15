@@ -28,11 +28,11 @@ set (GPTL_Fortran_MODS ${CMAKE_CURRENT_BINARY_DIR}/perf_mod.mod
 add_library (gptl ${GPTL_Fortran_SRCS} ${GPTL_C_SRCS})
 
 target_include_directories (gptl
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-  PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+  PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 target_compile_definitions (gptl
-  PUBLIC INCLUDE_CMAKE_FCI)
+  PRIVATE INCLUDE_CMAKE_FCI)
 
 if (PIO_ENABLE_TIMING)
   if (PIO_ENABLE_INTERNAL_TIMING)
@@ -82,7 +82,7 @@ endif ()
 #==============================================================================
 
 # Library
-install (TARGETS gptl DESTINATION lib)
+install (TARGETS gptl EXPORT spio-targets-gptl DESTINATION lib)
 
 # Header/Include File
 install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/gptl.h DESTINATION include)
@@ -90,6 +90,11 @@ install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/gptl.h DESTINATION include)
 # Fortran Modules
 install (FILES ${GPTL_Fortran_MODS} DESTINATION include)
 
+# Install the cmake config file with targets to the cmake directory
+install (EXPORT spio-targets-gptl
+          FILE spio-targets-gptl.cmake
+          DESTINATION lib/scorpio/cmake
+          NAMESPACE scorpio::)
 #==============================================================================
 #  DEFINE THE DEPENDENCIES
 #==============================================================================

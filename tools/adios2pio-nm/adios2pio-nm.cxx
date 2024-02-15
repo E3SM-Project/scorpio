@@ -1,5 +1,5 @@
 #include <mpi.h>
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
 #include <gptl.h>
 #endif
 #include <iostream>
@@ -147,8 +147,8 @@ int main(int argc, char *argv[])
         return ret;
     }
 
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
     /* Initialize the GPTL timing library. */
     if ((ret = GPTLinitialize()))
         return ret;
@@ -167,8 +167,8 @@ int main(int argc, char *argv[])
     }
     MPI_Barrier(comm_in);
 
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
     /* Finalize the GPTL timing library. */
     if ((ret = GPTLfinalize()))
         return ret;

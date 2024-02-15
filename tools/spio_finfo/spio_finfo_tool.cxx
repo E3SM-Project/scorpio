@@ -1,8 +1,12 @@
 #include "pio_config.h"
 #include <mpi.h>
-#ifdef TIMING
+
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
 #include <gptl.h>
 #endif
+#endif
+
 #include <iostream>
 #include <string>
 #include <regex>
@@ -210,8 +214,8 @@ int main(int argc, char *argv[])
     return ret;
   }
 
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
   /* Initialize the GPTL timing library. */
   ret = GPTLinitialize();
   if (ret != 0){
@@ -274,8 +278,8 @@ int main(int argc, char *argv[])
     std::cout << "========================================\n";
   }
 
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
   /* Finalize the GPTL timing library. */
   ret = GPTLfinalize();
   if (ret != 0){

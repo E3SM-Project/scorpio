@@ -10,6 +10,12 @@
 #include "spio_file_mvcache.h"
 #include "spio_file_mvcache.hpp"
 
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
+#include "gptl.h"
+#endif
+#endif
+
 #define LOG_RANK0(rank, ...)                     \
             do{                                   \
                 if(rank == 0)                     \
@@ -345,8 +351,8 @@ int main(int argc, char *argv[])
   int ret;
   int wrank, wsz;
   int num_errors;
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
   ret = GPTLinitialize();
   if(ret != 0){
     LOG_RANK0(wrank, "GPTLinitialize() FAILED, ret = %d\n", ret);
@@ -384,8 +390,8 @@ int main(int argc, char *argv[])
 
   MPI_Finalize();
 
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
   ret = GPTLfinalize();
   if(ret != 0){
     LOG_RANK0(wrank, "GPTLinitialize() FAILED, ret = %d\n", ret);

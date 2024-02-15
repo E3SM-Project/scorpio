@@ -22,7 +22,7 @@ SET(WSSRC wstest.c)
 #==============================================================================
 #  SET THE COMPILER OPTIONS
 #==============================================================================
-INCLUDE_DIRECTORIES(${PIO_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(${PIO_INCLUDE_DIRS} ${CMAKE_BINARY_DIR}/src/flib ${CMAKE_BINARY_DIR}/src/flib_legacy)
 LINK_DIRECTORIES(${PIO_LIB_DIR})
 
 #==============================================================================

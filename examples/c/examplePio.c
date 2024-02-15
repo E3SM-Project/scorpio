@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <mpi.h>
 #include <pio.h>
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
 #include <gptl.h>
 #endif
 
@@ -579,8 +579,8 @@ int main(int argc, char* argv[])
 
     struct examplePioClass* pioExInst = epc_new(verbose);
     
-#ifdef TIMING    
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING    
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
     /* Initialize the GPTL timing library. */
     int ret;
     if ((ret = GPTLinitialize ()))
@@ -597,8 +597,8 @@ int main(int argc, char* argv[])
     pioExInst->closeFile(pioExInst);
     pioExInst->cleanUp(pioExInst);
     
-#ifdef TIMING    
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING    
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
 	/* Finalize the GPTL timing library. */
 	if ((ret = GPTLfinalize ()))
 	    return ret;

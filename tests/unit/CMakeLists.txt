@@ -1,6 +1,8 @@
 include (LibMPI)
 
-include_directories("${SCORPIO_SOURCE_DIR}/tests/unit")
+include_directories("${SCORPIO_SOURCE_DIR}/tests/unit"
+                    "${SCORPIO_BINARY_DIR}/src/flib"
+                    "${SCORPIO_BINARY_DIR}/src/flib_legacy")
 
 message(STATUS "===== Configuring SCORPIO legacy Fortran tests... =====")
 #==============================================================================
@@ -55,8 +57,10 @@ if (PIO_ENABLE_TIMING)
   find_package (GPTL COMPONENTS Fortran_Perf QUIET)
   if (GPTL_Fortran_Perf_FOUND)
     message (STATUS "Found GPTL Fortran Perf: ${GPTL_Fortran_Perf_LIBRARIES}")
+    include_directories(${GPTL_Fortran_Perf_INCLUDE_DIRS})
   else ()
     message (STATUS "Using internal GPTL Fortran library for timing")
+    include_directories("${CMAKE_BINARY_DIR}/src/gptl")
   endif ()
 endif ()
 
@@ -132,5 +136,5 @@ endif ()
 
 if (PIO_HDF5_LOGGING)
   target_compile_definitions (pio_unit_test
-    PUBLIC LOGGING)
+    PRIVATE LOGGING)
 endif ()

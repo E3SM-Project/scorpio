@@ -3,7 +3,7 @@
 #include <pio.h>
 #include <assert.h>
 #include <math.h>
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
 #include <gptl.h>
 #endif
 
@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
 
     int ret = PIO_NOERR;
 
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
     GPTLinitialize();
 #endif
 
@@ -608,7 +608,7 @@ int main(int argc, char* argv[])
 
     MPI_Finalize();
 
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
     GPTLfinalize();
 #endif
 

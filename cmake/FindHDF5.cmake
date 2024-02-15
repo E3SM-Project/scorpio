@@ -84,6 +84,13 @@ foreach (HDF5_comp IN LISTS HDF5_FIND_VALID_COMPONENTS)
                 if (LIBZ_FOUND)
                     list (APPEND HDF5_C_INCLUDE_DIRS ${LIBZ_INCLUDE_DIRS})
                     list (APPEND HDF5_C_LIBRARIES ${LIBZ_LIBRARIES})
+                else ()
+                    # DEPENDENCY: ZLIB
+                    find_package (ZLIB)
+                    if (ZLIB_FOUND)
+                        list (APPEND HDF5_C_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
+                        list (APPEND HDF5_C_LIBRARIES ${ZLIB_LIBRARIES})
+                    endif ()
                 endif ()
                 
                 # DEPENDENCY: SZIP (Optional)

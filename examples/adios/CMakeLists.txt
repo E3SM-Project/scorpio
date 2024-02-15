@@ -11,7 +11,9 @@ include(SPIOUtils)
 #==============================================================================
 # Include PIO include and lib directories
 INCLUDE_DIRECTORIES(${PIO_INCLUDE_DIRS})
-include_directories("${SCORPIO_SOURCE_DIR}/examples/adios")
+include_directories("${SCORPIO_SOURCE_DIR}/examples/adios"
+                    "${SCORPIO_BINARY_DIR}/src/clib"
+                    "${SCORPIO_SOURCE_DIR}/src/clib")
 LINK_DIRECTORIES(${PIO_LIB_DIR})
 
 # Compiler-specific compiler options
@@ -73,13 +75,17 @@ if (PIO_ENABLE_TIMING)
   find_package (GPTL COMPONENTS C Fortran_Perf QUIET)
   if (GPTL_C_FOUND)
     message (STATUS "Found GPTL C: ${GPTL_C_LIBRARIES}")
+    include_directories("${GPTL_C_INCLUDE_DIRS}")
   else ()
     message (STATUS "Using internal GPTL C library for timing")
+    include_directories("${CMAKE_SOURCE_DIR}/src/gptl")
   endif ()
   if (GPTL_Fortran_Perf_FOUND)
     message (STATUS "Found GPTL Fortran Perf: ${GPTL_Fortran_Perf_LIBRARIES}")
+    include_directories(${GPTL_Fortran_Perf_INCLUDE_DIRS})
   else ()
     message (STATUS "Using internal GPTL Fortran library for timing")
+    include_directories("${CMAKE_BINARY_DIR}/src/gptl")
   endif ()
 endif ()
 
@@ -98,7 +104,7 @@ if (PIO_ENABLE_FORTRAN)
     ADD_DEFINITIONS(${PIO_DEFINITIONS})
 
     # Include PIO include and lib directories
-    INCLUDE_DIRECTORIES(${PIO_INCLUDE_DIRS})
+    INCLUDE_DIRECTORIES(${PIO_INCLUDE_DIRS} ${CMAKE_BINARY_DIR}/src/flib ${CMAKE_BINARY_DIR}/src/flib_legacy)
     LINK_DIRECTORIES(${PIO_LIB_DIR})
 
     add_spio_executable(examplePioADIOS_f90 FALSE "" examplePioADIOS.f90)

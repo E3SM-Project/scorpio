@@ -38,8 +38,8 @@ program pioperformance_rearr
   external :: print_memusage
 #endif
 
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
   external :: gptlinitialize, gptlfinalize
 #endif
 #endif
@@ -79,8 +79,8 @@ program pioperformance_rearr
         niotasks, nframes, unlimdimindof, nvars, varsize,&
         rearr_opts, ierr)
 
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
   call gptlinitialize()
 #endif
 #endif
@@ -110,8 +110,8 @@ program pioperformance_rearr
      enddo
   enddo
 
-#ifdef TIMING
-#ifndef TIMING_INTERNAL
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
   call gptlfinalize()
 #endif
 #endif
