@@ -2898,7 +2898,74 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
         int64_t *decomp_int64_t = NULL;
         start_block_found = false;
 
-        for (size_t block = 0; block < decomp_blocks_size; block++)
+        /* Optimize PIOc_read_darray_adios() with efficient block guessing
+
+           Each reading process is required to locate its corresponding block in
+           the decomp variable, which consists of decomp_blocks_size blocks.
+
+           In the previous implementation, the process iterated through all blocks,
+           reading in one block at a time and checking if its index falls within the
+           loaded block. Upon finding a match, the block is cached, and the loop is exited.
+
+           If we can accurately infer the probable target block and the guess is correct, we
+           can optimize the search algorithm by immediately exiting the loop.
+
+           Considering the ADIOS writer, assuming there are M write processes and N decomp blocks.
+           Based on observed test case outcomes, we have determined the algorithm for assigning each
+           process to a designated block. The algorithm is likely as follows:
+           - Each block contains data for at most ceil(M / N) processes.
+           - Processes with lower ranks are assigned first.
+           - Blocks with lower ranks are packed first until they are full.
+
+           For example:
+               Example 1: M = 4, N = 2
+               ceil(M / N) = 2
+               block 0: proc 0, proc 1
+               block 1: proc 2, proc 3
+
+               Example 2: M = 7, N = 3
+               ceil(M / N) = 3
+               block 0: proc 0, proc 1, proc 2
+               block 1: proc 3, proc 4, proc 5
+               block 2: proc 6
+
+               Example 3: M = 5, N = 4
+               ceil(M / N) = 2
+               block 0: proc 0, proc 1
+               block 1: proc 2, proc 3
+               block 2: proc 4
+               block 3: not used
+
+           Clearly, following this algorithm, proc i will be assigned to block j = floor(i / ceil(M / N)).
+
+           Now, for the ADIOS reader, assuming there are M read processes and N decomp blocks.
+           Given the assumption about the ADIOS writer, we can deduce that for proc i, it needs to read from
+           block j = floor(i / ceil(M / N)).
+
+           However, it's important to note that the algorithm of the ADIOS writer is only summarized from some
+           limited tests, which has not been fully confirmed yet. We are not sure if the guessed block is always
+           correct for all test cases. Thus, we have to revert to linear search if the guessed block turns out to
+           be incorrect.
+         */
+
+        iosystem_desc_t *ios = file->iosystem; /* Pointer to io system information. */
+        assert(ios != NULL);
+
+        /* Determine the maximum number of compute tasks assigned to each block */
+        assert(decomp_blocks_size > 0);
+        int max_comptasks_per_block = ios->num_comptasks / decomp_blocks_size;
+        if (ios->num_comptasks % decomp_blocks_size != 0)
+            max_comptasks_per_block++;
+        assert(max_comptasks_per_block >= 1);
+
+        /* Calculate the most probable target block we try to find */
+        int guess_block = ios->comp_rank / max_comptasks_per_block;
+        assert(guess_block >= 0 && guess_block < decomp_blocks_size);
+
+        /* Since we are uncertain if our guessed target block is accurate for all scenarios, iterate through the
+         * blocks from guess_block to the end, and then from 0 to guess_block - 1. */
+        size_t block = guess_block;
+        while (!start_block_found)
         {
             adiosErr = adios2_set_block_selection(decomp_adios_var, block);
             if (adiosErr != adios2_error_none)
@@ -2964,8 +3031,13 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
             if (decomp_int64_t != NULL)
                 free(decomp_int64_t);
 
-            if (start_block_found)
-                break;
+            block++;
+
+            if (block == decomp_blocks_size)
+                block = 0;
+
+            if (block == guess_block)
+                break; /* Arrived back to first block in search */
         }
 
         if (!start_block_found)
