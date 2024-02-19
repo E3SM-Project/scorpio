@@ -53,7 +53,7 @@ extern bool fortran_order;
 /**
  * Utility function to remove a directory and all its contents.
  */
-static int remove_directory(const char *path)
+int spio_remove_directory(const char *path)
 {
     DIR *d = opendir(path);
     size_t path_len = strlen(path);
@@ -87,7 +87,7 @@ static int remove_directory(const char *path)
                 if (!stat(buf, &statbuf))
                 {
                     if (S_ISDIR(statbuf.st_mode))
-                        r2 = remove_directory(buf);
+                        r2 = spio_remove_directory(buf);
                     else
                         r2 = unlink(buf);
                 }
@@ -2882,7 +2882,7 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                         unlink(filename);
 
                     /* Delete the BP file */
-                    remove_directory(adios_bp_filename);
+                    spio_remove_directory(adios_bp_filename);
                 }
             }
         }
