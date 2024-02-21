@@ -20,6 +20,7 @@ add_library (pioc topology.c pio_mpi_timer.c pio_timer.c pio_file.c
 #==============================================================================
 #  FIND EXTERNAL LIBRARIES/DEPENDENCIES
 #==============================================================================
+
 #===== MPI =====
 if (PIO_USE_MPISERIAL)
   find_package (MPISERIAL COMPONENTS C REQUIRED)
@@ -43,14 +44,18 @@ if (PIO_ENABLE_TIMING)
       PUBLIC ${GPTL_C_LIBRARIES})
   else ()
     message (STATUS "Using internal GPTL C library for timing")
+    target_include_directories (pioc
+      PRIVATE ${CMAKE_SOURCE_DIR}/src/gptl)
     target_link_libraries (pioc
       PUBLIC gptl)
   endif ()
   target_compile_definitions (pioc
-    PUBLIC TIMING)
+    PUBLIC SPIO_ENABLE_GPTL_TIMING
+    PRIVATE TIMING)
   if (PIO_ENABLE_INTERNAL_TIMING)
     target_compile_definitions (pioc
-      PUBLIC TIMING_INTERNAL)
+      PUBLIC SPIO_ENABLE_GPTL_TIMING_INTERNAL
+      PRIVATE TIMING_INTERNAL)
   endif ()
 endif ()
 
@@ -71,14 +76,14 @@ if (WITH_NETCDF)
     endif ()
     if (${NetCDF_C_LOGGING_ENABLED})
       target_compile_definitions (pioc
-        PUBLIC NETCDF_C_LOGGING_ENABLED)
+        PRIVATE NETCDF_C_LOGGING_ENABLED)
       # netcdf.h needs this to be defined to use netCDF logging.
       target_compile_definitions (pioc
-        PUBLIC LOGGING)
+        PRIVATE LOGGING)
     endif()
     if (${NetCDF_C_NC__ENDDEF_EXISTS})
       target_compile_definitions (pioc
-        PUBLIC NETCDF_C_NC__ENDDEF_EXISTS)
+        PRIVATE NETCDF_C_NC__ENDDEF_EXISTS)
     endif()
   else ()
     message(STATUS "Could not find NetCDF C library, disabling support for NetCDF")
@@ -107,8 +112,8 @@ if (WITH_PNETCDF)
     check_function_exists (ncmpi_get_varn PnetCDF_C_HAS_VARN)
     if (PnetCDF_C_HAS_VARN)
       target_compile_definitions(pioc
-        PUBLIC USE_PNETCDF_VARN
-        PUBLIC USE_PNETCDF_VARN_ON_READ)
+        PRIVATE USE_PNETCDF_VARN
+        PRIVATE USE_PNETCDF_VARN_ON_READ)
     endif()
   else ()
     message(STATUS "Could not find PnetCDF library, disabling support for PnetCDF")
@@ -129,6 +134,8 @@ if (WITH_ADIOS2)
   if (ADIOS2_FOUND)
     message(STATUS "Found ADIOS library")
     set(PIO_USE_ADIOS 1)
+    target_compile_definitions (pioc
+      PUBLIC _ADIOS2)
     target_link_libraries (pioc
       PUBLIC adios2::adios2 adios2pio-nm-lib)
   else ()
@@ -146,6 +153,8 @@ if (WITH_HDF5)
   if (HDF5_C_FOUND)
     message(STATUS "HDF5 C library dependencies: ${HDF5_C_LIBRARIES} ${HDF5_HL_LIBRARIES}")
     set(PIO_USE_HDF5 1)
+    target_compile_definitions (pioc
+      PUBLIC _HDF5)
     target_include_directories (pioc
       PUBLIC ${HDF5_C_INCLUDE_DIRS} ${HDF5_HL_INCLUDE_DIRS})
     target_link_libraries (pioc
@@ -209,9 +218,13 @@ include_directories(
 
 # Include the clib source and binary directory
 target_include_directories (pioc
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories (pioc
-  PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+  PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
+# Include the install include dir for all dep projects
+target_include_directories (pioc
+  PUBLIC $<INSTALL_INTERFACE:include>)
 
 # System and compiler CPP directives
 target_compile_definitions (pioc
@@ -310,7 +323,9 @@ endif ()
 #==============================================================================
 
 # Install libpioc.a
-install (TARGETS pioc DESTINATION lib)
+install (TARGETS pioc
+          EXPORT spio-targets-pioc
+          DESTINATION lib)
 
 # Install the header file
 install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/pio.h DESTINATION include)
@@ -324,3 +339,8 @@ configure_file (
 # Install PIO config Include/Header File
 install (FILES ${PROJECT_BINARY_DIR}/pio_config.h DESTINATION include)
 
+# Install the cmake config file with targets to the cmake directory
+install (EXPORT spio-targets-pioc
+          FILE spio-targets-pioc.cmake
+          DESTINATION lib/scorpio/cmake
+          NAMESPACE scorpio::)

@@ -26,7 +26,9 @@ if (PIO_ENABLE_TIMING)
   find_package (GPTL COMPONENTS C QUIET)
   if (GPTL_C_FOUND)
     message (STATUS "Found GPTL C: ${GPTL_C_LIBRARIES}")
+    include_directories(${GPTL_C_INCLUDE_DIRS})
   else ()
+    include_directories(${CMAKE_SOURCE_DIR}/src/gptl)
     message (STATUS "Using internal GPTL C library for timing")
   endif ()
 endif ()
@@ -37,7 +39,9 @@ endif ()
 # Adding PIO definitions - defined in the root directory
 ADD_DEFINITIONS(${PIO_DEFINITIONS})
 
-INCLUDE_DIRECTORIES(${PIO_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(${PIO_INCLUDE_DIRS}
+                    ${CMAKE_BINARY_DIR}/src/clib
+                    ${CMAKE_SOURCE_DIR}/src/clib)
 LINK_DIRECTORIES(${PIO_LIB_DIR})
 
 #==============================================================================

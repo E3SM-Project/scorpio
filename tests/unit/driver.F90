@@ -8,7 +8,7 @@ Program pio_unit_test_driver
   use global_vars
   use basic_tests
   use ncdf_tests
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
   use perf_mod
 #endif
   Implicit None
@@ -31,7 +31,7 @@ Program pio_unit_test_driver
   call MPI_Init(ierr)
   call MPI_Comm_rank(MPI_COMM_WORLD, my_rank, ierr)
   call MPI_Comm_size(MPI_COMM_WORLD, ntasks , ierr)
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
   call t_initf('gptl.nl')
 #endif
 
@@ -204,7 +204,7 @@ Program pio_unit_test_driver
   end if
 
   call PIO_finalize(pio_iosystem, ierr)
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
   call t_finalizef()
 #endif
   call MPI_Finalize(ierr)

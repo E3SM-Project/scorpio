@@ -9,7 +9,7 @@
  *
  */
 #include <pio.h>
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
 #include <gptl.h>
 #endif
 
@@ -199,7 +199,7 @@ int main(int argc, char **argv)
     /** Return code. */
     int ret;
 
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
     /* Initialize the GPTL timing library. */
     if ((ret = GPTLinitialize()))
         return ret;
@@ -411,7 +411,7 @@ int main(int argc, char **argv)
     /* Finalize the MPI library. */
     MPI_Finalize();
 
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
     /* Finalize the GPTL timing library. */
     if ((ret = GPTLfinalize()))
         return ret;

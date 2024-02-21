@@ -24,7 +24,7 @@
 #include <bget.h>
 #include <limits.h>
 #include <math.h>
-#ifdef TIMING
+#ifdef SPIO_ENABLE_GPTL_TIMING
 #include <gptl.h>
 #else
 #include "gptl_skel.h"

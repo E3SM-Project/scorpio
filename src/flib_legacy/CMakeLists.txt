@@ -67,8 +67,8 @@ add_dependencies (piof genf90)
 #==============================================================================
 # Include flib source and binary directories (for Fortran modules)
 target_include_directories (piof
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-  PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+  PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 # System and compiler CPP directives
 target_compile_definitions (piof
@@ -169,9 +169,13 @@ if (PIO_ENABLE_TIMING)
   else ()
     message (STATUS "Using internal GPTL Fortran library for timing")
     message (STATUS "GPTL Fortran library dependencies: -lgptl")
+    target_include_directories (piof
+      PRIVATE ${CMAKE_BINARY_DIR}/src/gptl)
     target_link_libraries (piof
       PUBLIC gptl)
   endif ()
+  target_compile_definitions (piof
+    PRIVATE TIMING)
 endif ()
 
 #===== NetCDF-Fortran =====
@@ -210,15 +214,6 @@ if (WITH_PNETCDF)
       PUBLIC _PNETCDF)
     target_link_libraries (piof
       PUBLIC ${PnetCDF_Fortran_LIBRARIES})
-
-    # Check library for varn functions
-    set (CMAKE_REQUIRED_LIBRARIES ${PnetCDF_Fortran_LIBRARY})
-    check_function_exists (ncmpi_get_varn PnetCDF_Fortran_HAS_VARN)
-    if (PnetCDF_Fortran_HAS_VARN)
-      target_compile_definitions(piof
-        PUBLIC USE_PNETCDF_VARN
-        PUBLIC USE_PNETCDF_VARN_ON_READ)
-    endif()
   else ()
     message(STATUS "PnetCDF Fortran library not found. Disabling support for PnetCDF")
     target_compile_definitions (piof
@@ -253,8 +248,16 @@ set (PIO_Fortran_MODS ${CMAKE_CURRENT_BINARY_DIR}/pio.mod
   ${CMAKE_CURRENT_BINARY_DIR}/pionfput_mod.mod)
 
 # Install libpiof.a
-install (TARGETS piof DESTINATION lib)
+install (TARGETS piof
+          EXPORT spio-targets-piof
+          DESTINATION lib)
 
 # Install the Fortran modules
 install (FILES ${PIO_Fortran_MODS} DESTINATION include)
+
+# Install the cmake config file with targets to the cmake directory
+install (EXPORT spio-targets-piof
+          FILE spio-targets-piof.cmake
+          DESTINATION lib/scorpio/cmake
+          NAMESPACE scorpio::)
 

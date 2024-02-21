@@ -1,0 +1,32 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+#find_dependency(GPTL
+#                PATHS ${CMAKE_CURRENT_LIST_DIR}/lib/scorpio/cmake)
+#find_dependency(MPI
+#                PATHS ${CMAKE_CURRENT_LIST_DIR}/lib/scorpio/cmake)
+#find_dependency(NetCDF
+#                PATHS ${CMAKE_CURRENT_LIST_DIR}/lib/scorpio/cmake)
+#find_dependency(PnetCDF
+#                PATHS ${CMAKE_CURRENT_LIST_DIR}/lib/scorpio/cmake)
+#find_dependency(ADIOS2
+#                PATHS ${CMAKE_CURRENT_LIST_DIR}/lib/scorpio/cmake)
+#find_dependency(HDF5
+#                PATHS ${CMAKE_CURRENT_LIST_DIR}/lib/scorpio/cmake)
+
+find_dependency (MPI REQUIRED COMPONENTS C Fortran)
+
+# The GPTL targets config file is only generated when SCORPIO
+# uses the internal (in SCORPIO) GPTL library
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/spio-targets-gptl.cmake")
+  include("${CMAKE_CURRENT_LIST_DIR}/spio-targets-gptl.cmake")
+endif()
+# Include ADIOS conversion lib target
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/spio-targets-adios.cmake")
+  include("${CMAKE_CURRENT_LIST_DIR}/spio-targets-adios.cmake")
+endif()
+include("${CMAKE_CURRENT_LIST_DIR}/spio-targets-pioc.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/spio-targets-piof.cmake")
+
+check_required_components(SCORPIO)

@@ -95,7 +95,7 @@ else ()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif ()
 
-target_include_directories(adios2pio-nm-lib PUBLIC 
+target_include_directories(adios2pio-nm-lib PRIVATE
   ${SCORPIO_SOURCE_DIR}/src/clib
   ${SCORPIO_BINARY_DIR}/src/clib
   ${SCORPIO_SOURCE_DIR}/tools/util
@@ -103,6 +103,25 @@ target_include_directories(adios2pio-nm-lib PUBLIC
   ${NETCDF_C_INCLUDE_DIRS}
   ${HDF5_C_INCLUDE_DIRS}
   ${PIO_C_EXTRA_INCLUDE_DIRS})
+
+target_include_directories(adios2pio-nm.exe PRIVATE
+  ${SCORPIO_SOURCE_DIR}/src/clib
+  ${SCORPIO_BINARY_DIR}/src/clib
+  ${SCORPIO_SOURCE_DIR}/tools/util
+  ${PnetCDF_C_INCLUDE_DIRS}
+  ${NETCDF_C_INCLUDE_DIRS}
+  ${HDF5_C_INCLUDE_DIRS}
+  ${PIO_C_EXTRA_INCLUDE_DIRS})
+
+# Adding path to internal GPTL lib, if needed
+if (PIO_ENABLE_TIMING)
+  if (NOT GPTL_C_FOUND)
+    target_include_directories(adios2pio-nm-lib
+      PRIVATE ${CMAKE_SOURCE_DIR}/src/gptl)
+    target_include_directories(adios2pio-nm.exe
+      PRIVATE ${CMAKE_SOURCE_DIR}/src/gptl)
+  endif ()
+endif ()
 
 # System and compiler CPP directives
 target_compile_definitions (adios2pio-nm-lib
@@ -127,15 +146,6 @@ if (PnetCDF_C_FOUND)
     PUBLIC _PNETCDF)
   target_link_libraries (adios2pio-nm-lib
     PUBLIC ${PnetCDF_C_LIBRARIES})
-
-  # Check library for varn functions
-  set (CMAKE_REQUIRED_LIBRARIES ${PnetCDF_C_LIBRARY})
-  check_function_exists (ncmpi_get_varn PnetCDF_C_HAS_VARN)
-  if (PnetCDF_C_HAS_VARN)
-    target_compile_definitions(adios2pio-nm-lib
-      PUBLIC USE_PNETCDF_VARN
-      PUBLIC USE_PNETCDF_VARN_ON_READ)
-  endif()
 else ()
   target_compile_definitions (adios2pio-nm-lib
     PUBLIC _NOPNETCDF)
@@ -152,17 +162,6 @@ if (NetCDF_C_FOUND)
     target_compile_definitions (adios2pio-nm-lib
       PUBLIC _NETCDF4)
   endif ()
-  if (${NetCDF_C_LOGGING_ENABLED})
-    target_compile_definitions (adios2pio-nm-lib
-      PUBLIC NETCDF_C_LOGGING_ENABLED)
-    # netcdf.h needs this to be defined to use netCDF logging.
-    target_compile_definitions (adios2pio-nm-lib
-      PUBLIC LOGGING)
-  endif()
-  if (${NetCDF_C_NC__ENDDEF_EXISTS})
-    target_compile_definitions (pioc
-      PUBLIC NETCDF_C_NC__ENDDEF_EXISTS)
-  endif()
 else ()
   target_compile_definitions (adios2pio-nm-lib
     PUBLIC _NONETCDF)
@@ -170,7 +169,7 @@ endif ()
 
 if (ADIOS2_FOUND)
   target_compile_definitions (adios2pio-nm-lib
-    PUBLIC _ADIOS2)
+    PRIVATE _ADIOS2)
   target_link_libraries (adios2pio-nm-lib
     PUBLIC adios2::adios2)
 else ()
@@ -192,13 +191,16 @@ if (PIO_C_EXTRA_LINK_FLAGS)
     LINK_FLAGS ${PIO_C_EXTRA_LINK_FLAGS})
 endif ()
 
-TARGET_LINK_LIBRARIES(adios2pio-nm.exe PRIVATE adios2pio-nm-lib pioc)
+TARGET_LINK_LIBRARIES(adios2pio-nm-lib PRIVATE pioc)
+TARGET_LINK_LIBRARIES(adios2pio-nm.exe PRIVATE adios2pio-nm-lib)
 
 #==============================================================================
 #  INSTALL
 #==============================================================================
 # Install libadios2pio-nm-lib.a
-install (TARGETS adios2pio-nm-lib DESTINATION lib)
+install (TARGETS adios2pio-nm-lib
+          EXPORT spio-targets-adios
+          DESTINATION lib)
 
 # Install the header File
 install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/adios2pio-nm-lib.h DESTINATION include)
@@ -206,3 +208,8 @@ install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/adios2pio-nm-lib.h DESTINATION includ
 # Install the ADIOS to NetCDF conversion tool
 install (TARGETS adios2pio-nm.exe DESTINATION bin)
 
+# Install the cmake config file with targets to the cmake directory
+install (EXPORT spio-targets-adios
+          FILE spio-targets-adios.cmake
+          DESTINATION lib/scorpio/cmake
+          NAMESPACE scorpio::)
