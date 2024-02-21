@@ -2875,21 +2875,30 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                 }
                 snprintf(adios_bp_filename, adios_bp_filename_len, "%s%s", filename, adios_bp_filename_extn);
 
-                struct stat sd;
-                if (0 == stat(adios_bp_filename, &sd))
+                struct stat fsd, adios_bp_fsd;
+                if (0 == stat(filename, &fsd))
                 {
-                    /* Delete symbolic link to the BP file (foo.nc -> foo.nc.bp) */
-                    if (0 == stat(filename, &sd))
-                        unlink(filename);
+                    if(0 == stat(adios_bp_filename, &adios_bp_fsd))
+                    {
+                        /* Check if foo.nc points to foo.nc.bp */
+                        if(S_ISDIR(fsd.st_mode) && (fsd.st_dev == adios_bp_fsd.st_dev)
+                            && (fsd.st_ino == adios_bp_fsd.st_ino))
+                        {
+                            /* Delete the BP file */
+                            spio_remove_directory(adios_bp_filename);
+                        }
+                    }
 
-                    /* Delete the BP file */
-                    spio_remove_directory(adios_bp_filename);
+                    /* Delete file foo.nc (could be a symbolic link to foo.nc.bp) */
+                    unlink(filename);
                 }
+
                 free(adios_bp_filename);
             }
         }
     }
 
+    /* ADIOS: assume all procs are also IO tasks */
     /* FIXME: Frequently due to application error different MPI processes have different
      * file mode flags, so although ideally we need this barrier inside if(!(file->mode & PIO_NOCLOBBER))
      * block above adding it here to avoid a potential hang */
@@ -2902,7 +2911,6 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
         return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
     }
 
-    /* ADIOS: assume all procs are also IO tasks */
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
         LOG((2, "Calling adios_open mode = %d", file->mode));
