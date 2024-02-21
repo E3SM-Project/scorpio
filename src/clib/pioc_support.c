@@ -2886,20 +2886,19 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                 }
             }
         }
-
-        /* FIXME: Frequently due to application error different MPI processes have different
-         * file mode flags, so although ideally we need this barrier inside if(!(file->mode & PIO_NOCLOBBER))
-         * block above adding it here to avoid a potential hang */
-        /* Make sure that no task is trying to operate on the ADIOS BP file
-         * while it is being deleted */
-        if ((mpierr = MPI_Barrier(ios->io_comm)))
-        {
-            free(adios_bp_filename);
-            spio_ltimer_stop(file->io_fstats->wr_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
-        }
         free(adios_bp_filename);
+    }
+
+    /* FIXME: Frequently due to application error different MPI processes have different
+     * file mode flags, so although ideally we need this barrier inside if(!(file->mode & PIO_NOCLOBBER))
+     * block above adding it here to avoid a potential hang */
+    /* Make sure that no task is trying to operate on the ADIOS BP file
+     * while it is being deleted */
+    if ((mpierr = MPI_Barrier(ios->union_comm)))
+    {
+        spio_ltimer_stop(file->io_fstats->wr_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
     }
 
     /* ADIOS: assume all procs are also IO tasks */
