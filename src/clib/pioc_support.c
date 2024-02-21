@@ -3012,7 +3012,7 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                 ierr = symlink(file->filename, filename);
                 if(ierr != 0)
                 {
-                    LOG((1, "PIO: WARNING: Creating symlink for %s file failed, ierr = %d", file->filename, ierr));
+                    fprintf(stdout, "PIO: WARNING: Creating symlink for %s file failed, ierr = %d", file->filename, ierr);
                 }
             }
 
