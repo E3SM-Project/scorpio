@@ -2859,21 +2859,22 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     size_t adios_bp_filename_len = strlen(filename) + sizeof(adios_bp_filename_extn) + 1;
     if (ios->ioproc)
     {
-        char *adios_bp_filename = (char *) calloc(adios_bp_filename_len, sizeof(char));
-        if (adios_bp_filename == NULL)
-        {
-            spio_ltimer_stop(file->io_fstats->wr_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                           "Allocating memory for adios filename (%s) failed. Out of memory allocating %lld bytes for the file name",
-                           adios_bp_filename, (unsigned long long) (adios_bp_filename_len));
-        }
-        snprintf(adios_bp_filename, adios_bp_filename_len, "%s%s", filename, adios_bp_filename_extn);
         if (!(file->mode & PIO_NOCLOBBER))
         {
             /* If PIO_NOCLOBBER is not set, i.e., CLOBBER mode, delete any ADIOS BP files with the same name */
             if (ios->io_rank == 0)
             {
+                char *adios_bp_filename = (char *) calloc(adios_bp_filename_len, sizeof(char));
+                if (adios_bp_filename == NULL)
+                {
+                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                                   "Allocating memory for adios filename (%s) failed. Out of memory allocating %lld bytes for the file name",
+                                   adios_bp_filename, (unsigned long long) (adios_bp_filename_len));
+                }
+                snprintf(adios_bp_filename, adios_bp_filename_len, "%s%s", filename, adios_bp_filename_extn);
+
                 struct stat sd;
                 if (0 == stat(adios_bp_filename, &sd))
                 {
@@ -2884,9 +2885,9 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                     /* Delete the BP file */
                     spio_remove_directory(adios_bp_filename);
                 }
+                free(adios_bp_filename);
             }
         }
-        free(adios_bp_filename);
     }
 
     /* FIXME: Frequently due to application error different MPI processes have different
