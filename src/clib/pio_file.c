@@ -1160,11 +1160,34 @@ int PIOc_deletefile(int iosysid, const char *filename)
         mpierr = MPI_Barrier(ios->io_comm);
 
         if (!mpierr && ios->io_rank == 0)
+        {
 #ifdef _NETCDF
              ierr = nc_delete(filename);
 #else /* Assume that _PNETCDF is defined. */
              ierr = ncmpi_delete(filename, MPI_INFO_NULL);
 #endif
+#ifdef _ADIOS2
+            /* Append ".bp" to filename for the corresponding ADIOS BP filename */
+            static const char adios_bp_filename_extn[] = ".bp";
+            size_t adios_bp_filename_len = strlen(filename) + sizeof(adios_bp_filename_extn) + 1;
+            char *adios_bp_filename = (char *) calloc(adios_bp_filename_len, sizeof(char));
+            if (adios_bp_filename == NULL)
+            {
+                GPTLstop("PIO:PIOc_deletefile");
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                            "Deleting file (%s) failed. Allocating memory for adios filename failed", (filename) ? filename : "NULL");
+            }
+            snprintf(adios_bp_filename, adios_bp_filename_len, "%s%s", filename, adios_bp_filename_extn);
+
+            struct stat sd;
+            if (0 == stat(adios_bp_filename, &sd))
+            {
+                spio_remove_directory(adios_bp_filename);
+            }
+            free(adios_bp_filename);
+#endif
+        }
 
         if (!mpierr)
             mpierr = MPI_Barrier(ios->io_comm);
