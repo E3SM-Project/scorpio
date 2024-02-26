@@ -53,7 +53,7 @@ extern bool fortran_order;
 /**
  * Utility function to remove a directory and all its contents.
  */
-static int remove_directory(const char *path)
+int spio_remove_directory(const char *path)
 {
     DIR *d = opendir(path);
     size_t path_len = strlen(path);
@@ -87,7 +87,7 @@ static int remove_directory(const char *path)
                 if (!stat(buf, &statbuf))
                 {
                     if (S_ISDIR(statbuf.st_mode))
-                        r2 = remove_directory(buf);
+                        r2 = spio_remove_directory(buf);
                     else
                         r2 = unlink(buf);
                 }
@@ -2853,24 +2853,78 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
         }
     }
 
-    /* ADIOS: assume all procs are also IO tasks */
 #ifdef _ADIOS2
+    /* Append ".bp" to output filename for the corresponding ADIOS BP filename */
+    static const char adios_bp_filename_extn[] = ".bp";
+    size_t adios_bp_filename_len = strlen(filename) + sizeof(adios_bp_filename_extn) + 1;
+    if (ios->ioproc)
+    {
+        if (!(file->mode & PIO_NOCLOBBER))
+        {
+            /* If PIO_NOCLOBBER is not set, i.e., CLOBBER mode, delete any ADIOS BP files with the same name */
+            if (ios->io_rank == 0)
+            {
+                char *adios_bp_filename = (char *) calloc(adios_bp_filename_len, sizeof(char));
+                if (adios_bp_filename == NULL)
+                {
+                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                                   "Allocating memory for adios filename (%s) failed. Out of memory allocating %lld bytes for the file name",
+                                   adios_bp_filename, (unsigned long long) (adios_bp_filename_len));
+                }
+                snprintf(adios_bp_filename, adios_bp_filename_len, "%s%s", filename, adios_bp_filename_extn);
+
+                struct stat fsd, adios_bp_fsd;
+                if (0 == stat(filename, &fsd))
+                {
+                    if(0 == stat(adios_bp_filename, &adios_bp_fsd))
+                    {
+                        /* Check if foo.nc points to foo.nc.bp */
+                        if(S_ISDIR(fsd.st_mode) && (fsd.st_dev == adios_bp_fsd.st_dev)
+                            && (fsd.st_ino == adios_bp_fsd.st_ino))
+                        {
+                            /* Delete the BP file */
+                            spio_remove_directory(adios_bp_filename);
+                        }
+                    }
+
+                    /* Delete file foo.nc (could be a symbolic link to foo.nc.bp) */
+                    unlink(filename);
+                }
+
+                free(adios_bp_filename);
+            }
+        }
+    }
+
+    /* ADIOS: assume all procs are also IO tasks */
+    /* FIXME: Frequently due to application error different MPI processes have different
+     * file mode flags, so although ideally we need this barrier inside if(!(file->mode & PIO_NOCLOBBER))
+     * block above adding it here to avoid a potential hang */
+    /* Make sure that no task is trying to operate on the ADIOS BP file
+     * while it is being deleted */
+    if ((mpierr = MPI_Barrier(ios->union_comm)))
+    {
+        spio_ltimer_stop(file->io_fstats->wr_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
+    }
+
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
         LOG((2, "Calling adios_open mode = %d", file->mode));
 
-        /* Append .bp to output file for ADIOS output */
-        int len = strlen(filename);
-        file->filename = (char*)calloc(len + 4, sizeof(char));
+        file->filename = (char*)calloc(adios_bp_filename_len, sizeof(char));
         if (file->filename == NULL)
         {
             spio_ltimer_stop(file->io_fstats->wr_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                            "Creating file (%s) using ADIOS iotype failed. Out of memory allocating %lld bytes for the file name",
-                           filename, (unsigned long long) (len + 4));
+                           filename, (unsigned long long) (adios_bp_filename_len));
         }
-        snprintf(file->filename, len + 4, "%s.bp", filename);
+        snprintf(file->filename, adios_bp_filename_len, "%s%s", filename, adios_bp_filename_extn);
 
         if (file->mode & PIO_NOCLOBBER) /* Check whether BP directory filename.bp exists */
         {
@@ -2882,25 +2936,6 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                 return pio_err(ios, NULL, PIO_EEXIST, __FILE__, __LINE__,
                                "Creating file (%s) using ADIOS iotype and PIO_NOCLOBBER mode failed. BP directory (%s) already exists",
                                filename, file->filename);
-            }
-        }
-        else
-        {
-            /* Delete directory filename.bp if it exists */
-            if (ios->union_rank == 0)
-            {
-                struct stat sd;
-                if (0 == stat(file->filename, &sd))
-                    remove_directory(file->filename);
-            }
-
-            /* Make sure that no task is trying to operate on the
-             * directory while it is being deleted */
-            if ((mpierr = MPI_Barrier(ios->union_comm)))
-            {
-                spio_ltimer_stop(file->io_fstats->wr_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
             }
         }
 
@@ -2979,6 +3014,15 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                                pio_get_fname_from_file(file));
             }
             GPTLstop("PIO:adios2_open_call");
+
+            if(file->adios_rank == 0)
+            {
+                ierr = symlink(file->filename, filename);
+                if(ierr != 0)
+                {
+                    fprintf(stdout, "PIO: WARNING: Creating symlink for %s file failed, ierr = %d", file->filename, ierr);
+                }
+            }
 
             ierr = begin_adios2_step(file, ios);
             if (ierr != PIO_NOERR)
