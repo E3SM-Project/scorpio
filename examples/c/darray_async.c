@@ -122,7 +122,7 @@ int resultlen;
 /*     /\* int expected[DIM_LEN_X];        /\\* Data values we expect to find. *\\/ *\/ */
 
 /*     /\* Open the file. *\/ */
-/*     if ((ret = PIOc_openfile_retry(iosysid, &ncid, &iotype, filename, 0, 0))) */
+/*     if ((ret = PIOc_openfile_retry(iosysid, &ncid, &iotype, filename, 0))) */
 /*         return ret; */
 /*     printf("opened file %s ncid = %d\n", filename, ncid); */
 
