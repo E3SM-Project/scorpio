@@ -5238,27 +5238,45 @@ int pioc_change_def(int ncid, int is_enddef)
         {
             if (is_enddef)
             {
+                /* ncmpi__enddef has been available since PnetCDF 1.5.0 (PNETCDF_MIN_VER_REQD is currently 1.8.1):
+                   int ncmpi__enddef(int ncid,
+                                     MPI_Offset h_minfree,
+                                     MPI_Offset v_align,
+                                     MPI_Offset v_minfree,
+                                     MPI_Offset r_align);
+
+                   The usual call of ncmpi_enddef(ncid) is equivalent to ncmpi__enddef(ncid, 0, 0, 0, 0).
+
+                   Call ncmpi__enddef with appropriate arguments instead of ncmpi_enddef:
+                    - To reserve a sufficiently large space for the file header if it is expected
+                      to expand (set h_minfree > 0 explicitly).
+                      See https://github.com/E3SM-Project/scorpio/issues/436
+
+                    - To prevent PnetCDF (versions prior to 1.13.0) from implicitly selecting the
+                      file striping size to align the header extent (set v_align > 0 explicitly).
+                      See https://github.com/E3SM-Project/scorpio/issues/566
+                 */
+
+                /* Sets the pad at the end of the "header" section. */
+                MPI_Offset h_minfree = 0; /* Unless extra header space is requested, this can be left as default (0) */
+
+                /* Controls the alignment of the beginning of the data section for fixed-size/record variables. */
+                const MPI_Offset v_align = 4; /* For fixed-size variables, needs to be left as the default (4 bytes) */
+                const MPI_Offset r_align = 4; /* For record variables, needs to be left as the default (4 bytes) */
+
+                /* Sets the pad at the end of the data section for fixed-size variables. */
+                const MPI_Offset v_minfree = 0; /* This can be left as default (0) */
+
                 if (file->reserve_extra_header_space)
                 {
-                    /* Sets the pad at the end of the "header" section.
-                     * The recommended size by Charlie Zender (NCO developer) is 10 KB */
+                    /* The recommended size by Charlie Zender (NCO developer) is 10 KB */
                     assert(PIO_RESERVED_FILE_HEADER_SIZE >= 0);
-                    const MPI_Offset h_minfree = PIO_RESERVED_FILE_HEADER_SIZE;
-
-                    /* Controls the alignment of the beginning of the data section for fixed-size/record variables. */
-                    const MPI_Offset v_align = 4; /* For fixed-size variables, needs to be left as the default (4 bytes) */
-                    const MPI_Offset r_align = 4; /* For record variables, needs to be left as the default (4 bytes) */
-
-                    /* Sets the pad at the end of the data section for fixed-size variables. */
-                    const MPI_Offset v_minfree = 0; /* This can be left as default (0) */
-
-                    /* ncmpi__enddef has been available since PnetCDF 1.5.0 (PNETCDF_MIN_VER_REQD is currently 1.8.1) */
-                    ierr = ncmpi__enddef(file->fh, h_minfree, v_align, v_minfree, r_align);
+                    h_minfree = PIO_RESERVED_FILE_HEADER_SIZE;
 
                     file->reserve_extra_header_space = false;
                 }
-                else
-                    ierr = ncmpi_enddef(file->fh);
+
+                ierr = ncmpi__enddef(file->fh, h_minfree, v_align, v_minfree, r_align);
             }
             else
                 ierr = ncmpi_redef(file->fh);
