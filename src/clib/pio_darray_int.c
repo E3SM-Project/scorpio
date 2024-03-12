@@ -206,8 +206,26 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
         void *bufptr = NULL;
         size_t start[fndims];
         size_t count[fndims];
-        PIO_Offset *startlist[num_regions]; /* Array of start arrays for ncmpi_iput_varn(). */
-        PIO_Offset *countlist[num_regions]; /* Array of count  arrays for ncmpi_iput_varn(). */
+
+        assert(num_regions > 0);
+
+        PIO_Offset **startlist = (PIO_Offset**)calloc(num_regions, sizeof(PIO_Offset*)); /* Array of start arrays for ncmpi_iput_varn(). */
+        if (startlist == NULL)
+        {
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Writing variables (number of variables = %d) to file (%s, ncid=%d) failed. "
+                           "Out of memory allocating buffer (%lld bytes) for array to store starts of I/O regions written out to file",
+                           nvars, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (num_regions * sizeof(PIO_Offset*)));
+        }
+
+        PIO_Offset **countlist = (PIO_Offset**)calloc(num_regions, sizeof(PIO_Offset*)); /* Array of count arrays for ncmpi_iput_varn(). */
+        if (countlist == NULL)
+        {
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Writing variables (number of variables = %d) to file (%s, ncid=%d) failed. "
+                           "Out of memory allocating buffer (%lld bytes) for array to store counts of I/O regions written out to file",
+                           nvars, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (num_regions * sizeof(PIO_Offset*)));
+        }
 
         LOG((3, "num_regions = %d", num_regions));
 
@@ -606,6 +624,10 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
             if (region)
                 region = region->next;
         } /* next regioncnt */
+
+        /* Free resources. */
+        free(startlist);
+        free(countlist);
     } /* endif (ios->ioproc) */
 
     /* Check the return code from the netCDF/pnetcdf call. */
