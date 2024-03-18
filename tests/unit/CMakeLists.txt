@@ -60,7 +60,7 @@ if (PIO_ENABLE_TIMING)
     include_directories(${GPTL_Fortran_Perf_INCLUDE_DIRS})
   else ()
     message (STATUS "Using internal GPTL Fortran library for timing")
-    include_directories("${CMAKE_BINARY_DIR}/src/gptl")
+    include_directories("${PROJECT_BINARY_DIR}/../src/gptl")
   endif ()
 endif ()
 

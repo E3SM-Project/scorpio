@@ -1,6 +1,7 @@
 ###-------------------------------------------------------------------------###
 ### CMakeList.txt for examples using pio
 ###-------------------------------------------------------------------------###
+project (SPIOTools CXX C Fortran)
 
 if (WITH_ADIOS2)
   # ADIOS 2.8.0 overwrites/resets CMAKE_MODULE_PATH, so cache and restore it
