@@ -130,7 +130,7 @@ if (PIO_ENABLE_TIMING)
     include_directories(${GPTL_Fortran_Perf_INCLUDE_DIRS})
   else ()
     message (STATUS "Using internal GPTL Fortran library for timing")
-    include_directories(${CMAKE_BINARY_DIR}/src/gptl)
+    include_directories(${PROJECT_BINARY_DIR}/../src/gptl)
   endif ()
 endif ()
 
@@ -207,7 +207,7 @@ endif ()
 message(STATUS "Adding Fortran tests with [1...${PIO_TF_MAXNUMPROCS}] MPI processes")
 
 #===== Build the PIO testing framework =========
-include_directories(${CMAKE_BINARY_DIR}/src/flib ${CMAKE_BINARY_DIR}/src/flib_legacy)
+include_directories(${PROJECT_BINARY_DIR}/../src/flib ${PROJECT_BINARY_DIR}/../src/flib_legacy)
 add_library(pio_tutil EXCLUDE_FROM_ALL
   ${CMAKE_CURRENT_SOURCE_DIR}/util/pio_tutil.F90)
 target_link_libraries (pio_tutil piof)

@@ -50,7 +50,7 @@ if (PIO_ENABLE_TIMING)
     include_directories(${GPTL_Fortran_Perf_INCLUDE_DIRS})
   else ()
     message (STATUS "Using internal GPTL Fortran library for timing")
-    include_directories(${CMAKE_BINARY_DIR}/src/gptl)
+    include_directories(${PROJECT_BINARY_DIR}/../src/gptl)
   endif ()
 endif ()
 
@@ -66,7 +66,7 @@ if (PIO_ENABLE_TIMING)
   add_dependencies (tests pioperf)
 endif ()
 
-include_directories("${CMAKE_BINARY_DIR}/src/flib" "${CMAKE_BINARY_DIR}/src/flib_legacy")
+include_directories("${PROJECT_BINARY_DIR}/../src/flib" "${PROJECT_BINARY_DIR}/../src/flib_legacy")
 add_executable (pioperf_rearr EXCLUDE_FROM_ALL
   pioperformance_rearr.F90)
 set_property(TARGET pioperf_rearr PROPERTY LINKER_LANGUAGE ${PIO_LINKER_LANGUAGE})

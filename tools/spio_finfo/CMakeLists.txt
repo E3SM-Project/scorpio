@@ -30,7 +30,7 @@ if (PIO_ENABLE_TIMING)
     include_directories(${GPTL_C_INCLUDE_DIRS})
   else ()
     message (STATUS "Using internal GPTL C library for timing")
-    include_directories(${CMAKE_SOURCE_DIR}/src/gptl)
+    include_directories(${PROJECT_SOURCE_DIR}/../src/gptl)
   endif ()
 endif ()
 

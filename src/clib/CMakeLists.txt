@@ -45,7 +45,7 @@ if (PIO_ENABLE_TIMING)
   else ()
     message (STATUS "Using internal GPTL C library for timing")
     target_include_directories (pioc
-      PRIVATE ${CMAKE_SOURCE_DIR}/src/gptl)
+      PRIVATE ${PROJECT_SOURCE_DIR}/../gptl)
     target_link_libraries (pioc
       PUBLIC gptl)
   endif ()

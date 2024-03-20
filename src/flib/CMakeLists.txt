@@ -215,7 +215,7 @@ if (PIO_ENABLE_TIMING)
     message (STATUS "Using internal GPTL Fortran library for timing")
     message (STATUS "GPTL Fortran library dependencies: -lgptl")
     target_include_directories (piof
-      PRIVATE ${CMAKE_BINARY_DIR}/src/gptl)
+      PRIVATE ${PROJECT_BINARY_DIR}/../gptl)
     target_link_libraries (piof
       PUBLIC gptl)
   endif ()

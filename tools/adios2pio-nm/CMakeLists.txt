@@ -117,9 +117,9 @@ target_include_directories(adios2pio-nm.exe PRIVATE
 if (PIO_ENABLE_TIMING)
   if (NOT GPTL_C_FOUND)
     target_include_directories(adios2pio-nm-lib
-      PRIVATE ${CMAKE_SOURCE_DIR}/src/gptl)
+      PRIVATE ${PROJECT_SOURCE_DIR}/../src/gptl)
     target_include_directories(adios2pio-nm.exe
-      PRIVATE ${CMAKE_SOURCE_DIR}/src/gptl)
+      PRIVATE ${PROJECT_SOURCE_DIR}/../src/gptl)
   endif ()
 endif ()
 
