@@ -795,6 +795,39 @@ int PIOc_InitDecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, in
         iodesc->rearranger = *rearranger;
     LOG((2, "iodesc->rearranger = %d", iodesc->rearranger));
 
+    /* In scenarios involving ultra-high resolution E3SM/SCREAM cases,
+     * the default BOX rearranger may encounter significant performance
+     * bottlenecks due to excessively large local decomposition maps.
+     * This elongated map length can dramatically extend the execution
+     * time of the box_rearrange_create() function, thereby increasing
+     * the overall runtime of the case.
+     *
+     * To mitigate this issue and ensure efficient runtime, Impose a
+     * maximum limit on the local map length for BOX rearranger. Once
+     * this limit is surpassed, switch to SUBSET rearranger.
+     *
+     * CAUTION: This transition is most effective for ADIOS type, as it
+     * does not involve data rearrangement. However, for PnetCDF type,
+     * utilizing SUBSET rearranger may significantly increase write time,
+     * potentially negating the benefits of reduced initialization time
+     * associated with this approach.
+     */
+    if (iodesc->rearranger == PIO_REARR_BOX)
+    {
+        int max_maplen = 0;
+        if ((mpierr = MPI_Allreduce(&maplen, &max_maplen, 1, MPI_INT, MPI_MAX,
+                                    ios->union_comm)))
+            return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+
+        if (max_maplen > PIO_MAX_MAP_LEN_BOX_REARR)
+        {
+            iodesc->rearranger = PIO_REARR_SUBSET;
+
+            if (ios->union_rank == 0)
+                printf("PIO: WARNING: The maximum local length of the decomposition map (%d) has reached the limit (%d) for BOX rearranger. Switching to SUBSET rearranger to reduce initialization time\n", max_maplen, PIO_MAX_MAP_LEN_BOX_REARR);
+        }
+    }
+
     /* Is this the subset rearranger? */
     if (iodesc->rearranger == PIO_REARR_SUBSET)
     {
