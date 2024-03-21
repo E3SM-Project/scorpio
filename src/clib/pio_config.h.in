@@ -61,6 +61,9 @@
 /** Maximum number of cached application steps for ADIOS type */
 #define PIO_MAX_CACHED_STEPS_FOR_ADIOS @PIO_MAX_CACHED_STEPS_FOR_ADIOS@
 
+/** Maximum length of the local decomposition map for BOX rearanger. */
+#define PIO_MAX_MAP_LEN_BOX_REARR @PIO_MAX_MAP_LEN_BOX_REARR@
+
 /** Set to 1 if the library is configured to use the PnetCDF library,
  *  0 otherwise */
 #define PIO_USE_PNETCDF @PIO_USE_PNETCDF@

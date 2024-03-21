@@ -254,6 +254,20 @@ else()
   message (STATUS "Configurable parameters used by ADIOS type are not applicable (default)")
 endif()
 
+# Maximum length of the local decomposition map for BOX rearanger
+set(DEF_SPIO_MAX_MAP_LEN_BOX_REARR 524288)
+if(DEFINED PIO_MAX_MAP_LEN_BOX_REARR)
+  if(PIO_MAX_MAP_LEN_BOX_REARR GREATER 0)
+    message(STATUS "Setting the maximum length of the local decomposition map for BOX rearanger to PIO_MAX_MAP_LEN_BOX_REARR = " ${PIO_MAX_MAP_LEN_BOX_REARR})
+  else()
+    message(WARNING "User-defined PIO_MAX_MAP_LEN_BOX_REARR is invalid, setting it to " ${DEF_SPIO_MAX_MAP_LEN_BOX_REARR} " (default)")
+    set(PIO_MAX_MAP_LEN_BOX_REARR ${DEF_SPIO_MAX_MAP_LEN_BOX_REARR})
+  endif()
+else()
+  set(PIO_MAX_MAP_LEN_BOX_REARR ${DEF_SPIO_MAX_MAP_LEN_BOX_REARR})
+  message(STATUS "Setting the maximum length of the local decomposition map for BOX rearanger to PIO_MAX_MAP_LEN_BOX_REARR = " ${PIO_MAX_MAP_LEN_BOX_REARR} " (default)")
+endif()
+
 #==============================================================================
 #  DETECT SYSTEM/COMPILERS (and set compiler specific options)
 #==============================================================================
