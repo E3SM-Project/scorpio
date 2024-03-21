@@ -1,6 +1,7 @@
 ###-------------------------------------------------------------------------###
 ### CMakeList.txt for examples using pio
 ###-------------------------------------------------------------------------###
+project (SPIOExamples CXX C Fortran)
 
 message(STATUS "===== Configuring SCORPIO Examples... =====")
 if (PIO_ENABLE_FORTRAN)
