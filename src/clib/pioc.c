@@ -15,6 +15,7 @@
 #endif
 #include "pio_sdecomps_regex.h"
 #include "spio_io_summary.h"
+#include "spio_rearrange_any.h"
 
 bool fortran_order = false;
 
@@ -812,20 +813,9 @@ int PIOc_InitDecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, in
      * potentially negating the benefits of reduced initialization time
      * associated with this approach.
      */
-    if (iodesc->rearranger == PIO_REARR_BOX)
+    if (iodesc->rearranger == PIO_REARR_ANY)
     {
-        int max_maplen = 0;
-        if ((mpierr = MPI_Allreduce(&maplen, &max_maplen, 1, MPI_INT, MPI_MAX,
-                                    ios->union_comm)))
-            return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
-
-        if (max_maplen > PIO_MAX_MAP_LEN_BOX_REARR)
-        {
-            iodesc->rearranger = PIO_REARR_SUBSET;
-
-            if (ios->union_rank == 0)
-                printf("PIO: WARNING: The maximum local length of the decomposition map (%d) has reached the limit (%d) for BOX rearranger. Switching to SUBSET rearranger to reduce initialization time\n", max_maplen, PIO_MAX_MAP_LEN_BOX_REARR);
-        }
+        iodesc->rearranger = spio_get_opt_pio_rearr(ios, maplen);
     }
 
     /* Is this the subset rearranger? */
@@ -1290,6 +1280,9 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
     GPTLstart("PIO:PIOc_Init_Intracomm");
     /* Turn on the logging system. */
     pio_init_logging();
+
+    /* Initialize the rearrangers */
+    spio_init_pio_rearr_any();
 
 #ifdef PIO_MICRO_TIMING
     /* Initialize the timer framework - MPI_Wtime() + output from root proc */
@@ -2016,6 +2009,9 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, const int *io_proc_list,
     LOG((1, "PIOc_Init_Async num_io_procs = %d component_count = %d", num_io_procs,
          component_count));
 
+    /* Initialize the rearrangers */
+    spio_init_pio_rearr_any();
+
 #ifdef PIO_MICRO_TIMING
     /* Initialize the timer framework - MPI_Wtime() + output from root proc */
     ret = mtimer_init(PIO_MICRO_MPI_WTIME_ROOT);
@@ -2577,6 +2573,9 @@ int PIOc_init_intercomm(int component_count, const MPI_Comm peer_comm,
     /* Turn on the logging system for PIO. */
     pio_init_logging();
     LOG((1, "PIOc_init_intercomm component_count = %d", component_count));
+
+    /* Initialize the rearrangers */
+    spio_init_pio_rearr_any();
 
 #ifdef PIO_MICRO_TIMING
     /* Initialize the timer framework - MPI_Wtime() + output from root proc */
