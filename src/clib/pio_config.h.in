@@ -61,6 +61,9 @@
 /** Maximum number of cached application steps for ADIOS type */
 #define PIO_MAX_CACHED_STEPS_FOR_ADIOS @PIO_MAX_CACHED_STEPS_FOR_ADIOS@
 
+/** Range of length of the local decomposition map for SUBSET rearanger. */
+#define PIO_REARR_ANY_SUBSET_RANGE "@PIO_REARR_ANY_SUBSET_RANGE@"
+
 /** Set to 1 if the library is configured to use the PnetCDF library,
  *  0 otherwise */
 #define PIO_USE_PNETCDF @PIO_USE_PNETCDF@

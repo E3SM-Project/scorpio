@@ -254,6 +254,16 @@ else()
   message (STATUS "Configurable parameters used by ADIOS type are not applicable (default)")
 endif()
 
+# Range of the length (max across all procs) of the local decomposition map for
+# switching to SUBSET rearranger, [512K, inf)
+set(DEF_SPIO_REARR_ANY_SUBSET_RANGE "(524288, -1)")
+if(DEFINED PIO_REARR_ANY_SUBSET_RANGE)
+  message(STATUS "PIO_REARR_ANY rearranger : Setting the local decomposition map length range for SUBSET rearanger (PIO_REARR_ANY_SUBSET_RANGE) to " ${PIO_REARR_ANY_SUBSET_RANGE})
+else()
+  set(PIO_REARR_ANY_SUBSET_RANGE ${DEF_SPIO_REARR_ANY_SUBSET_RANGE})
+  message(STATUS "PIO_REARR_ANY rearranger : Setting the local decomposition map length range for SUBSET rearanger (PIO_REARR_ANY_SUBSET_RANGE) to " ${PIO_REARR_ANY_SUBSET_RANGE} " (default)")
+endif()
+
 #==============================================================================
 #  DETECT SYSTEM/COMPILERS (and set compiler specific options)
 #==============================================================================
