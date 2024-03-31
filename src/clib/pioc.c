@@ -15,6 +15,7 @@
 #endif
 #include "pio_sdecomps_regex.h"
 #include "spio_io_summary.h"
+#include "spio_rearrange_any.h"
 
 bool fortran_order = false;
 
@@ -795,6 +796,28 @@ int PIOc_InitDecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, in
         iodesc->rearranger = *rearranger;
     LOG((2, "iodesc->rearranger = %d", iodesc->rearranger));
 
+    /* In scenarios involving ultra-high resolution E3SM/SCREAM cases,
+     * the default BOX rearranger may encounter significant performance
+     * bottlenecks due to excessively large local decomposition maps.
+     * This elongated map length can dramatically extend the execution
+     * time of the box_rearrange_create() function, thereby increasing
+     * the overall runtime of the case.
+     *
+     * To mitigate this issue and ensure efficient runtime, Impose a
+     * maximum limit on the local map length for BOX rearranger. Once
+     * this limit is surpassed, switch to SUBSET rearranger.
+     *
+     * CAUTION: This transition is most effective for ADIOS type, as it
+     * does not involve data rearrangement. However, for PnetCDF type,
+     * utilizing SUBSET rearranger may significantly increase write time,
+     * potentially negating the benefits of reduced initialization time
+     * associated with this approach.
+     */
+    if (iodesc->rearranger == PIO_REARR_ANY)
+    {
+        iodesc->rearranger = spio_get_opt_pio_rearr(ios, maplen);
+    }
+
     /* Is this the subset rearranger? */
     if (iodesc->rearranger == PIO_REARR_SUBSET)
     {
@@ -1257,6 +1280,9 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
     GPTLstart("PIO:PIOc_Init_Intracomm");
     /* Turn on the logging system. */
     pio_init_logging();
+
+    /* Initialize the rearrangers */
+    spio_init_pio_rearr_any();
 
 #ifdef PIO_MICRO_TIMING
     /* Initialize the timer framework - MPI_Wtime() + output from root proc */
@@ -1983,6 +2009,9 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, const int *io_proc_list,
     LOG((1, "PIOc_Init_Async num_io_procs = %d component_count = %d", num_io_procs,
          component_count));
 
+    /* Initialize the rearrangers */
+    spio_init_pio_rearr_any();
+
 #ifdef PIO_MICRO_TIMING
     /* Initialize the timer framework - MPI_Wtime() + output from root proc */
     ret = mtimer_init(PIO_MICRO_MPI_WTIME_ROOT);
@@ -2544,6 +2573,9 @@ int PIOc_init_intercomm(int component_count, const MPI_Comm peer_comm,
     /* Turn on the logging system for PIO. */
     pio_init_logging();
     LOG((1, "PIOc_init_intercomm component_count = %d", component_count));
+
+    /* Initialize the rearrangers */
+    spio_init_pio_rearr_any();
 
 #ifdef PIO_MICRO_TIMING
     /* Initialize the timer framework - MPI_Wtime() + output from root proc */

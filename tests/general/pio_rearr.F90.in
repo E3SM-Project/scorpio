@@ -138,9 +138,9 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_rearrs_base
   character(len=PIO_TF_MAX_STR_LEN), target :: fname = "pio_test_rearrs_base.nc"
   character(len=PIO_TF_MAX_STR_LEN), parameter :: attname = "filename"
   character(len=PIO_TF_MAX_STR_LEN), parameter :: dimname = "filename_dim"
-  integer, parameter :: NUM_REARRANGERS = 2
-  integer :: rearrs(NUM_REARRANGERS) = (/pio_rearr_subset,pio_rearr_box/)
-  character(len=PIO_TF_MAX_STR_LEN) :: rearrs_info(NUM_REARRANGERS) = (/"PIO_REARR_SUBSET","PIO_REARR_BOX   "/)
+  integer, parameter :: NUM_REARRANGERS = 3
+  integer :: rearrs(NUM_REARRANGERS) = (/pio_rearr_subset,pio_rearr_box,pio_rearr_any/)
+  character(len=PIO_TF_MAX_STR_LEN) :: rearrs_info(NUM_REARRANGERS) = (/"PIO_REARR_SUBSET","PIO_REARR_BOX   ","PIO_REARR_ANY   "/)
   integer, dimension(:), allocatable :: iotypes
   character(len=PIO_TF_MAX_STR_LEN), dimension(:), allocatable :: iotype_descs
   integer :: i, j, k, num_iotypes = 0
