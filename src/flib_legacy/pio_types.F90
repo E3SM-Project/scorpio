@@ -126,10 +126,12 @@ module pio_types
 !!  - PIO_rearr_none : Do not use any form of rearrangement
 !!  - PIO_rearr_box : Use a PIO internal box rearrangement
 !! -  PIO_rearr_subset : Use a PIO internal subsetting rearrangement
+!! -  PIO_rearr_any : Let the library choose the rearranger
 !>
 
     integer(i4), public, parameter :: PIO_rearr_box =  1
     integer(i4), public, parameter :: PIO_rearr_subset =  2
+    integer(i4), public, parameter :: PIO_rearr_any = 3
 
 !>
 !! @public

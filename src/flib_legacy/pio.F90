@@ -28,7 +28,7 @@ module pio
        iotype_pnetcdf,  pio_iotype_netcdf4p, pio_iotype_netcdf4c, &
        pio_iotype_pnetcdf,pio_iotype_netcdf, pio_iotype_adios, pio_iotype_hdf5, &
        pio_global, pio_char, pio_write, pio_nowrite, pio_clobber, pio_noclobber, &
-       pio_max_name, pio_max_var_dims, pio_rearr_subset, pio_rearr_box, &
+       pio_max_name, pio_max_var_dims, pio_rearr_subset, pio_rearr_box, pio_rearr_any,&
 #if defined(_NETCDF) || defined(_PNETCDF)
        pio_fill, pio_nofill, pio_unlimited, pio_fill_char, pio_fill_int, pio_fill_double, pio_fill_float, &
 #endif
