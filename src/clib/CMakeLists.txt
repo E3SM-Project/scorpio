@@ -136,6 +136,10 @@ if (WITH_ADIOS2)
     set(PIO_USE_ADIOS 1)
     target_compile_definitions (pioc
       PUBLIC _ADIOS2)
+    # 2001 edition of the POSIX standard (IEEE Standard 1003.1-2001)
+    # Required for symlink() support/decl in unistd.h
+    target_compile_definitions (pioc
+      PRIVATE _POSIX_C_SOURCE=200112L)
     target_link_libraries (pioc
       PUBLIC adios2::adios2 adios2pio-nm-lib)
   else ()
