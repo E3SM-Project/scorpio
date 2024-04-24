@@ -43,7 +43,7 @@ option (PIO_INTERNAL_DOC     "Enable SCORPIO developer documentation"       OFF)
 option (PIO_TEST_BIG_ENDIAN  "Enable test to see if machine is big endian"  ON)
 option (PIO_USE_MPISERIAL    "Enable mpi-serial support (instead of MPI)"   OFF)
 option (PIO_USE_MALLOC       "Use native malloc (instead of bget package)"  OFF)
-option (PIO_USE_INDEP_MODE   "Use PnetCDF independent data mode"            OFF)
+option (PIO_USE_INDEP_MODE   "Use PnetCDF independent data mode"            ON)
 option (PIO_MICRO_TIMING     "Enable internal micro timers"                 OFF)
 option (PIO_SAVE_DECOMPS     "Dump the decomposition information"           OFF)
 option (PIO_LIMIT_CACHED_IO_REGIONS  "Limit the number of non-contiguous regions in an IO process" OFF)
@@ -59,6 +59,9 @@ option (PIO_VALGRIND_CHECK  "Enable memory leak check using valgrind"       OFF)
 #===== Dependent Options =====
 include(CMakeDependentOption)
 cmake_dependent_option (PIO_TEST_CLOSE_OPEN_FOR_SYNC  "SCORPIO fortran tests will close+open for sync" ON "WITH_ADIOS2" OFF)
+
+# Get the name of the build host
+cmake_host_system_information (RESULT FQDN_SITENAME QUERY FQDN)
 
 # Backwards Compatibility - allow users to define [NETCDF|PNETCDF]_DIR instead
 # of [NetCDF|PnetCDF]_PATH
@@ -152,7 +155,6 @@ endif()
 if(DEFINED PIO_MAX_LUSTRE_OSTS)
   message (STATUS "Limiting the number of Lustre OSTs used to PIO_MAX_LUSTRE_OSTS = " ${PIO_MAX_LUSTRE_OSTS})
 else()
-  cmake_host_system_information (RESULT FQDN_SITENAME QUERY FQDN)
   if(FQDN_SITENAME MATCHES "^cori")
     set(PIO_MAX_LUSTRE_OSTS 72)
     message (STATUS "Limiting the number of Lustre OSTs used to PIO_MAX_LUSTRE_OSTS = " ${PIO_MAX_LUSTRE_OSTS} " (default for Cori)")
@@ -174,7 +176,6 @@ endif()
 if(DEFINED PIO_STRIPING_UNIT)
   message (STATUS "Using filesystem striping unit, PIO_STRIPING_UNIT = " ${PIO_STRIPING_UNIT})
 else()
-  cmake_host_system_information (RESULT FQDN_SITENAME QUERY FQDN)
   if(FQDN_SITENAME MATCHES "^cori" OR
      FQDN_SITENAME MATCHES "^login.*.chn" OR
      FQDN_SITENAME MATCHES "^theta")
@@ -192,18 +193,16 @@ else()
   endif()
 endif()
 
+set(USE_INDEP_MODE 0)
 if(PIO_USE_INDEP_MODE)
-  set(USE_INDEP_MODE 1)
-  message(STATUS "Using PnetCDF independent data mode to read variables in SCORPIO")
-else()
-  set(USE_INDEP_MODE 0)
-  cmake_host_system_information (RESULT FQDN_SITENAME QUERY FQDN)
   if(FQDN_SITENAME MATCHES "^chrlogin" OR FQDN_SITENAME MATCHES "^compute-240" OR FQDN_SITENAME MATCHES "^compute-386")
-    message(STATUS "Using PnetCDF collective data mode to read variables in SCORPIO (default)")
+    message(STATUS "Using PnetCDF collective data mode to read variables in SCORPIO (overriding on Chrysalis and ANL compute nodes)")
   else()
     set(USE_INDEP_MODE 1)
     message(STATUS "Using PnetCDF independent data mode to read variables in SCORPIO (default)")
   endif()
+else()
+  message(STATUS "Using PnetCDF collective data mode to read variables in SCORPIO")
 endif()
 
 # Reserve some extra space in the header when creating NetCDF files. The recommended size by Charlie Zender (NCO developer) is 10 KB
