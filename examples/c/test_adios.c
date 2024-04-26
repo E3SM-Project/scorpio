@@ -1752,6 +1752,8 @@ int test_adios_read_case_3()
     int varid_dummy_scalar_var_int_write = -1;
     int varid_dummy_scalar_var_int_read = -1;
 
+    PIO_Offset att_len;
+
     int ret = PIO_NOERR;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
@@ -1766,10 +1768,16 @@ int test_adios_read_case_3()
 
     ret = PIOc_createfile(iosysid, &ncid_write, &format, "test_adios_read_case_3.nc", PIO_CLOBBER); ERR
 
+    ret = PIOc_put_att_text(ncid_write, PIO_GLOBAL, "last_write", strlen("1994-10-04-00000"), "1994-10-04-00000"); ERR
+    ret = PIOc_put_att_text(ncid_write, PIO_GLOBAL, "empty_string", strlen(""), ""); ERR
+
     /* Define some variables for PIOc_write_darray. */
     ret = PIOc_def_var(ncid_write, "dummy_scalar_var_int", PIO_INT, 0, NULL, &varid_dummy_scalar_var_int_write); ERR
     if (my_rank == 0)
         printf("varid_dummy_scalar_var_int_write = %d\n", varid_dummy_scalar_var_int_write);
+
+    ret = PIOc_put_att_text(ncid_write, varid_dummy_scalar_var_int_write, "last_write", strlen("1994-10-04-00000"), "1994-10-04-00000"); ERR
+    ret = PIOc_put_att_text(ncid_write, varid_dummy_scalar_var_int_write, "empty_string", strlen(""), ""); ERR
 
     ret = PIOc_enddef(ncid_write); ERR
 
@@ -1777,9 +1785,25 @@ int test_adios_read_case_3()
 
     ret = PIOc_openfile(iosysid, &ncid_read, &format, "test_adios_read_case_3.nc", PIO_NOWRITE); ERR
 
+    att_len = -1;
+    ret = PIOc_inq_attlen(ncid_read, PIO_GLOBAL, "last_write", &att_len); ERR
+    assert(att_len == strlen("1994-10-04-00000"));
+
+    att_len = -1;
+    ret = PIOc_inq_attlen(ncid_read, PIO_GLOBAL, "empty_string", &att_len); ERR
+    assert(att_len == 0);
+
     ret = PIOc_inq_varid(ncid_read, "dummy_scalar_var_int", &varid_dummy_scalar_var_int_read); ERR
     if (my_rank == 0)
         printf("varid_dummy_scalar_var_int_read = %d\n", varid_dummy_scalar_var_int_read);
+
+    att_len = -1;
+    ret = PIOc_inq_attlen(ncid_read, varid_dummy_scalar_var_int_read, "last_write", &att_len); ERR
+    assert(att_len == strlen("1994-10-04-00000"));
+
+    att_len = -1;
+    ret = PIOc_inq_attlen(ncid_read, varid_dummy_scalar_var_int_read, "empty_string", &att_len); ERR
+    assert(att_len == 0);
 
     ret = PIOc_closefile(ncid_read); ERR
 

@@ -3745,7 +3745,7 @@ static int adios_get_attr(file_desc_t *file, int attr_id, char *const *attr_name
                                attr_id, file->adios_attrs[attr_id].att_name, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
             }
 
-            file->adios_attrs[attr_id].att_len = (PIO_Offset)(strlen(attr_data) + 1);
+            file->adios_attrs[attr_id].att_len = (PIO_Offset)(strlen(attr_data));
         }
         else
         {

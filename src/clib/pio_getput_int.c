@@ -313,6 +313,12 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                 }
                 file->num_written_blocks += 1;
             }
+            else
+            {
+                fprintf(stdout, "PIO: WARNING: Writing variable (%s, varid=%d) attribute (%s) to file (%s, ncid=%d) using ADIOS iotype is ignored. "
+                        "Overwriting an existing attribute is not supported yet\n",
+                        pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), ncid);
+            }
         }
 
         GPTLstop("PIO:PIOc_put_att_tc");
