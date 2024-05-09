@@ -17,7 +17,7 @@ namespace SPIO_Util{
 
         MPI_logger(MPI_Comm comm, TStream *ostr);
 
-        MPI_logger(MPI_logger &other) = default;
+        MPI_logger(const MPI_logger &other) = default;
 
         MPI_logger &operator=(const MPI_logger &other) = default;
 
