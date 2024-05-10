@@ -1692,7 +1692,7 @@ int test_decomp_internal(int my_test_size, int my_rank, int iosysid, int dim_len
         return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__, "Getting I/O system from id failed");
 
     /* Write the decomposition file. */
-    if ((ret = pioc_write_nc_decomp_int(ios, nc_filename, 0, NDIM1, global_dimlen,
+    if ((ret = spio_write_nc_decomp_int(ios, nc_filename, 0, NDIM1, global_dimlen,
                                         TARGET_NTASKS, task_maplen, (int *)map, title,
                                         history, 0)))
         return ret;
@@ -1711,21 +1711,21 @@ int test_decomp_internal(int my_test_size, int my_rank, int iosysid, int dim_len
     int fortran_order_in;
 
     /* These should not work. */
-    if (pioc_read_nc_decomp_int(iosysid + TEST_VAL_42, nc_filename, &ndims_in, &global_dimlen_in,
+    if (spio_read_nc_decomp_int(iosysid + TEST_VAL_42, nc_filename, &ndims_in, &global_dimlen_in,
                                 &num_tasks_in, &task_maplen_in, &max_maplen_in, &map_in, title_in,
                                 history_in, source_in, version_in, &fortran_order_in) != PIO_EBADID)
         return ERR_WRONG;
-    if (pioc_read_nc_decomp_int(iosysid, NULL, &ndims_in, &global_dimlen_in,
+    if (spio_read_nc_decomp_int(iosysid, NULL, &ndims_in, &global_dimlen_in,
                                 &num_tasks_in, &task_maplen_in, &max_maplen_in, &map_in, title_in,
                                 history_in, source_in, version_in, &fortran_order_in) != PIO_EINVAL)
         return ERR_WRONG;
-    if (!pioc_read_nc_decomp_int(iosysid, "no_file", &ndims_in, &global_dimlen_in,
+    if (!spio_read_nc_decomp_int(iosysid, "no_file", &ndims_in, &global_dimlen_in,
                                 &num_tasks_in, &task_maplen_in, &max_maplen_in, &map_in, title_in,
                                 history_in, source_in, version_in, &fortran_order_in))
         return ERR_WRONG;
 
     /* Read the decomp file. */
-    if ((ret = pioc_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
+    if ((ret = spio_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
                                        &num_tasks_in, &task_maplen_in, &max_maplen_in, &map_in, title_in,
                                        history_in, source_in, version_in, &fortran_order_in)))
         return ret;
@@ -1756,7 +1756,7 @@ int test_decomp_internal(int my_test_size, int my_rank, int iosysid, int dim_len
     free(map_in);
 
     /* These should also work. */
-    if ((ret = pioc_read_nc_decomp_int(iosysid, nc_filename, NULL, &global_dimlen_in,
+    if ((ret = spio_read_nc_decomp_int(iosysid, nc_filename, NULL, &global_dimlen_in,
                                        &num_tasks_in, &task_maplen_in, &max_maplen_in, &map_in, title_in,
                                        history_in, source_in, version_in, &fortran_order_in)))
         return ret;
@@ -1764,14 +1764,14 @@ int test_decomp_internal(int my_test_size, int my_rank, int iosysid, int dim_len
     free(task_maplen_in);
     free(map_in);
 
-    if ((ret = pioc_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, NULL,
+    if ((ret = spio_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, NULL,
                                        &num_tasks_in, &task_maplen_in, &max_maplen_in, &map_in, title_in,
                                        history_in, source_in, version_in, &fortran_order_in)))
         return ret;
     free(task_maplen_in);
     free(map_in);
 
-    if ((ret = pioc_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
+    if ((ret = spio_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
                                        NULL, &task_maplen_in, &max_maplen_in, &map_in, title_in,
                                        history_in, source_in, version_in, &fortran_order_in)))
         return ret;
@@ -1779,14 +1779,14 @@ int test_decomp_internal(int my_test_size, int my_rank, int iosysid, int dim_len
     free(task_maplen_in);
     free(map_in);
 
-    if ((ret = pioc_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
+    if ((ret = spio_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
                                        &num_tasks_in, NULL, &max_maplen_in, &map_in, title_in,
                                        history_in, source_in, version_in, &fortran_order_in)))
         return ret;
     free(global_dimlen_in);
     free(map_in);
 
-    if ((ret = pioc_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
+    if ((ret = spio_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
                                        &num_tasks_in, &task_maplen_in, NULL, &map_in, title_in,
                                        history_in, source_in, version_in, &fortran_order_in)))
         return ret;
@@ -1794,14 +1794,14 @@ int test_decomp_internal(int my_test_size, int my_rank, int iosysid, int dim_len
     free(task_maplen_in);
     free(map_in);
 
-    if ((ret = pioc_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
+    if ((ret = spio_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
                                        &num_tasks_in, &task_maplen_in, &max_maplen_in, NULL, title_in,
                                        history_in, source_in, version_in, &fortran_order_in)))
         return ret;
     free(global_dimlen_in);
     free(task_maplen_in);
 
-    if ((ret = pioc_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
+    if ((ret = spio_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
                                        &num_tasks_in, &task_maplen_in, &max_maplen_in, &map_in, NULL,
                                        history_in, source_in, version_in, &fortran_order_in)))
         return ret;
@@ -1809,7 +1809,7 @@ int test_decomp_internal(int my_test_size, int my_rank, int iosysid, int dim_len
     free(task_maplen_in);
     free(map_in);
 
-    if ((ret = pioc_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
+    if ((ret = spio_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
                                        &num_tasks_in, &task_maplen_in, &max_maplen_in, &map_in, title_in,
                                        NULL, source_in, version_in, &fortran_order_in)))
         return ret;
@@ -1817,7 +1817,7 @@ int test_decomp_internal(int my_test_size, int my_rank, int iosysid, int dim_len
     free(task_maplen_in);
     free(map_in);
 
-    if ((ret = pioc_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
+    if ((ret = spio_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
                                        &num_tasks_in, &task_maplen_in, &max_maplen_in, &map_in, title_in,
                                        history_in, NULL, version_in, &fortran_order_in)))
         return ret;
@@ -1825,7 +1825,7 @@ int test_decomp_internal(int my_test_size, int my_rank, int iosysid, int dim_len
     free(task_maplen_in);
     free(map_in);
 
-    if ((ret = pioc_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
+    if ((ret = spio_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
                                        &num_tasks_in, &task_maplen_in, &max_maplen_in, &map_in, title_in,
                                        history_in, source_in, NULL, &fortran_order_in)))
         return ret;
@@ -1833,7 +1833,7 @@ int test_decomp_internal(int my_test_size, int my_rank, int iosysid, int dim_len
     free(task_maplen_in);
     free(map_in);
 
-    if ((ret = pioc_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
+    if ((ret = spio_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
                                        &num_tasks_in, &task_maplen_in, &max_maplen_in, &map_in, title_in,
                                        history_in, source_in, version_in, NULL)))
         return ret;
@@ -1958,7 +1958,7 @@ int test_decomp_public(int my_test_size, int my_rank, int iosysid, int dim_len,
     int *map_in;
 
     /* Read the decomp file. */
-    if ((ret = pioc_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
+    if ((ret = spio_read_nc_decomp_int(iosysid, nc_filename, &ndims_in, &global_dimlen_in,
                                        &num_tasks_in, &task_maplen_in, &max_maplen_in, &map_in, title_in,
                                        history_in, source_in, version_in, &fortran_order_in)))
         return ret;

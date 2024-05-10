@@ -2405,7 +2405,7 @@ int flush_buffer(int ncid, wmulti_buffer *wmb, bool flushtodisk)
         }
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        ret = PIOc_write_darray_multi(ncid, wmb->vid,  wmb->ioid, wmb->num_arrays,
+        ret = PIOc_write_darray_multi_impl(ncid, wmb->vid,  wmb->ioid, wmb->num_arrays,
                                       wmb->arraylen, wmb->data, wmb->frame,
                                       wmb->fillvalue, flushtodisk);
         if(file->mode & PIO_WRITE)

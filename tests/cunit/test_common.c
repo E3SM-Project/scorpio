@@ -531,7 +531,7 @@ create_nc_sample_1(int iosysid, int format, char *filename, int my_rank, int *nc
     printf("%d writing data\n", my_rank);
     start[0] = 0;
     count[0] = DIM_LEN_S1;
-    if ((ret = PIOc_put_vars_tc(ncid, varid, start, count, NULL, PIO_INT, data)))
+    if ((ret = spio_put_vars_tc(ncid, varid, start, count, NULL, PIO_INT, data)))
         return ret;
 
     /* Test inq_format. */
@@ -579,7 +579,7 @@ check_nc_sample_1(int iosysid, int format, char *filename, int my_rank, int *nci
     /* Try to read the data. */
     PIO_Offset start[NDIM_S1] = {0}, count[NDIM_S1] = {DIM_LEN_S1};
     int data_in[DIM_LEN_S1];
-    if ((ret = PIOc_get_vars_tc(ncid, 0, start, count, NULL, PIO_INT, data_in)))
+    if ((ret = spio_get_vars_tc(ncid, 0, start, count, NULL, PIO_INT, data_in)))
         return ret;
     for (int i = 0; i < DIM_LEN_S1; i++)
     {
@@ -740,7 +740,7 @@ create_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *nc
     printf("%d writing data\n", my_rank);
     start[0] = 0;
     count[0] = DIM_LEN_S2;
-    if ((ret = PIOc_put_vars_tc(ncid, varid, start, count, NULL, PIO_INT, data)))
+    if ((ret = spio_put_vars_tc(ncid, varid, start, count, NULL, PIO_INT, data)))
         return ret;
 
     /* Close the file if ncidp was not provided. */
@@ -798,7 +798,7 @@ check_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *nci
         return ERR_CHECK;
 
     /* Try to read the data. */
-    if ((ret = PIOc_get_vars_tc(ncid, 0, start, count, NULL, PIO_INT, data_in)))
+    if ((ret = spio_get_vars_tc(ncid, 0, start, count, NULL, PIO_INT, data_in)))
         return ERR_CHECK;
     for (int i = 0; i < DIM_LEN_S2; i++)
     {
@@ -1002,7 +1002,7 @@ create_nc_sample_64bit_offset(int iosysid, int format, char *filename, int my_ra
     printf("%d writing data\n", my_rank);
     start[0] = 0;
     count[0] = DIM_LEN_S1;
-    if ((ret = PIOc_put_vars_tc(ncid, varid, start, count, NULL, PIO_INT, data)))
+    if ((ret = spio_put_vars_tc(ncid, varid, start, count, NULL, PIO_INT, data)))
         return ret;
 
     /* Test inq_format. */
@@ -1093,7 +1093,7 @@ create_nc_sample_64bit_data(int iosysid, int format, char *filename, int my_rank
     printf("%d writing data\n", my_rank);
     start[0] = 0;
     count[0] = DIM_LEN_S1;
-    if ((ret = PIOc_put_vars_tc(ncid, varid, start, count, NULL, PIO_INT, data)))
+    if ((ret = spio_put_vars_tc(ncid, varid, start, count, NULL, PIO_INT, data)))
         return ret;
 
     /* Test inq_format. */

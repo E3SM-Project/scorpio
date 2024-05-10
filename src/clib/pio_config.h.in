@@ -92,6 +92,10 @@
  *  0 otherwise */
 #define PIO_ENABLE_IO_STATS @ENABLE_IO_STATS@
 
+/** Set to 1 if the library is configured to trace API calls,
+ *  0 otherwise */
+#define SPIO_ENABLE_API_TRACING @ENABLE_API_TRACING@
+
 /** Set to 1 if the library is configured to use PnetCDF independent data mode,
  *  0 otherwise */
 #define PIO_USE_INDEP_MODE @USE_INDEP_MODE@

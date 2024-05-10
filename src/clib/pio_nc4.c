@@ -32,7 +32,7 @@
  * @ingroup PIO_def_var
  * @author Ed Hartnett
  */
-int PIOc_def_var_deflate(int ncid, int varid, int shuffle, int deflate,
+int PIOc_def_var_deflate_impl(int ncid, int varid, int shuffle, int deflate,
                          int deflate_level)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
@@ -131,7 +131,7 @@ int PIOc_def_var_deflate(int ncid, int varid, int shuffle, int deflate,
  * @ingroup PIO_inq_var
  * @author Ed Hartnett
  */
-int PIOc_inq_var_deflate(int ncid, int varid, int *shufflep, int *deflatep,
+int PIOc_inq_var_deflate_impl(int ncid, int varid, int *shufflep, int *deflatep,
                          int *deflate_levelp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
@@ -253,7 +253,7 @@ int PIOc_inq_var_deflate(int ncid, int varid, int *shufflep, int *deflatep,
  * @return PIO_NOERR for success, otherwise an error code.
  * @author Ed Hartnett
  */
-int PIOc_def_var_chunking(int ncid, int varid, int storage, const PIO_Offset *chunksizesp)
+int PIOc_def_var_chunking_impl(int ncid, int varid, int storage, const PIO_Offset *chunksizesp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -291,7 +291,7 @@ int PIOc_def_var_chunking(int ncid, int varid, int storage, const PIO_Offset *ch
     if(!ios->async || !ios->ioproc){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+        ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_varndims failed, ierr = %d", ierr));
             return ierr;
@@ -396,7 +396,7 @@ int PIOc_def_var_chunking(int ncid, int varid, int storage, const PIO_Offset *ch
  * @ingroup PIO_inq_var
  * @author Ed Hartnett
  */
-int PIOc_inq_var_chunking(int ncid, int varid, int *storagep, PIO_Offset *chunksizesp)
+int PIOc_inq_var_chunking_impl(int ncid, int varid, int *storagep, PIO_Offset *chunksizesp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -435,7 +435,7 @@ int PIOc_inq_var_chunking(int ncid, int varid, int *storagep, PIO_Offset *chunks
         /* Find the number of dimensions of this variable. */
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        if ((ierr = PIOc_inq_varndims(ncid, varid, &ndims)))
+        if ((ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims)))
         {
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
                             "Inquiring variable chunking parameters for variable %s (varid=%d) failed on file %s (ncid=%d). Inquiring number of dimensions of the variable failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
@@ -553,7 +553,7 @@ int PIOc_inq_var_chunking(int ncid, int varid, int *storagep, PIO_Offset *chunks
  * @ingroup PIO_def_var
  * @author Ed Hartnett
  */
-int PIOc_def_var_endian(int ncid, int varid, int endian)
+int PIOc_def_var_endian_impl(int ncid, int varid, int endian)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -634,7 +634,7 @@ int PIOc_def_var_endian(int ncid, int varid, int endian)
  * @ingroup PIO_inq_var
  * @author Ed Hartnett
  */
-int PIOc_inq_var_endian(int ncid, int varid, int *endianp)
+int PIOc_inq_var_endian_impl(int ncid, int varid, int *endianp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -736,7 +736,7 @@ int PIOc_inq_var_endian(int ncid, int varid, int *endianp)
  * @ingroup PIO_def_var
  * @author Ed Hartnett
  */
-int PIOc_set_chunk_cache(int iosysid, int iotype, PIO_Offset size, PIO_Offset nelems,
+int PIOc_set_chunk_cache_impl(int iosysid, int iotype, PIO_Offset size, PIO_Offset nelems,
                          float preemption)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
@@ -833,7 +833,7 @@ int PIOc_set_chunk_cache(int iosysid, int iotype, PIO_Offset size, PIO_Offset ne
  * @ingroup PIO_def_var
  * @author Ed Hartnett
  */
-int PIOc_get_chunk_cache(int iosysid, int iotype, PIO_Offset *sizep, PIO_Offset *nelemsp,
+int PIOc_get_chunk_cache_impl(int iosysid, int iotype, PIO_Offset *sizep, PIO_Offset *nelemsp,
                          float *preemptionp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
@@ -955,7 +955,7 @@ int PIOc_get_chunk_cache(int iosysid, int iotype, PIO_Offset *sizep, PIO_Offset 
  * @ingroup PIO_def_var
  * @author Ed Hartnett
  */
-int PIOc_set_var_chunk_cache(int ncid, int varid, PIO_Offset size, PIO_Offset nelems,
+int PIOc_set_var_chunk_cache_impl(int ncid, int varid, PIO_Offset size, PIO_Offset nelems,
                              float preemption)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
@@ -1042,7 +1042,7 @@ int PIOc_set_var_chunk_cache(int ncid, int varid, PIO_Offset size, PIO_Offset ne
  * @ingroup PIO_inq_var
  * @author Ed Hartnett
  */
-int PIOc_get_var_chunk_cache(int ncid, int varid, PIO_Offset *sizep, PIO_Offset *nelemsp,
+int PIOc_get_var_chunk_cache_impl(int ncid, int varid, PIO_Offset *sizep, PIO_Offset *nelemsp,
                              float *preemptionp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */

@@ -1687,7 +1687,7 @@ int att_put_handler(iosystem_desc_t *ios)
          ncid, varid, namelen, name, atttype, attlen, atttype_len, memtype, memtype_len));
 
     /* Call the function to write the attribute. */
-    ret = PIOc_put_att_tc(ncid, varid, name, atttype, attlen, memtype, op);
+    ret = spio_put_att_tc(ncid, varid, name, atttype, attlen, memtype, op);
 
     /* Free resources. */
     free(op);
@@ -1793,7 +1793,7 @@ int att_get_handler(iosystem_desc_t *ios)
     }
 
     /* Call the function to read the attribute. */
-    ret = PIOc_get_att_tc(ncid, varid, name, memtype, ip);
+    ret = spio_get_att_tc(ncid, varid, name, memtype, ip);
 
     /* Free resources. */
     free(ip);

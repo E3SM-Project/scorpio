@@ -33,10 +33,10 @@
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vars_text(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
+int PIOc_get_vars_text_impl(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                        const PIO_Offset *stride, char *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, stride, NC_CHAR, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, stride, NC_CHAR, buf);
 }
 
 /**
@@ -60,10 +60,10 @@ int PIOc_get_vars_text(int ncid, int varid, const PIO_Offset *start, const PIO_O
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vars_uchar(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vars_uchar_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, const PIO_Offset *stride, unsigned char *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, stride, NC_UBYTE, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, stride, NC_UBYTE, buf);
 }
 
 /**
@@ -87,10 +87,10 @@ int PIOc_get_vars_uchar(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vars_schar(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vars_schar_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, const PIO_Offset *stride, signed char *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, stride, NC_BYTE, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, stride, NC_BYTE, buf);
 }
 
 /**
@@ -115,10 +115,10 @@ int PIOc_get_vars_schar(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vars_ushort(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vars_ushort_impl(int ncid, int varid, const PIO_Offset *start,
                          const PIO_Offset *count, const PIO_Offset *stride, unsigned short *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, stride, NC_USHORT, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, stride, NC_USHORT, buf);
 }
 
 /**
@@ -142,10 +142,10 @@ int PIOc_get_vars_ushort(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vars_short(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vars_short_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, const PIO_Offset *stride, short *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, stride, NC_SHORT, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, stride, NC_SHORT, buf);
 }
 
 /**
@@ -169,10 +169,10 @@ int PIOc_get_vars_short(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vars_uint(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vars_uint_impl(int ncid, int varid, const PIO_Offset *start,
                        const PIO_Offset *count, const PIO_Offset *stride, unsigned int *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, stride, NC_UINT, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, stride, NC_UINT, buf);
 }
 
 /**
@@ -196,10 +196,10 @@ int PIOc_get_vars_uint(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vars_int(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
+int PIOc_get_vars_int_impl(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                       const PIO_Offset *stride, int *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, stride, NC_INT, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, stride, NC_INT, buf);
 }
 
 /**
@@ -223,10 +223,10 @@ int PIOc_get_vars_int(int ncid, int varid, const PIO_Offset *start, const PIO_Of
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vars_long(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vars_long_impl(int ncid, int varid, const PIO_Offset *start,
                        const PIO_Offset *count, const PIO_Offset *stride, long *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, stride, PIO_LONG_INTERNAL, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, stride, PIO_LONG_INTERNAL, buf);
 }
 
 /**
@@ -250,10 +250,10 @@ int PIOc_get_vars_long(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vars_float(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vars_float_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, const PIO_Offset *stride, float *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, stride, NC_FLOAT, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, stride, NC_FLOAT, buf);
 }
 
 /**
@@ -278,10 +278,10 @@ int PIOc_get_vars_float(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vars_double(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vars_double_impl(int ncid, int varid, const PIO_Offset *start,
                          const PIO_Offset *count, const PIO_Offset *stride, double *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, stride, NC_DOUBLE, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, stride, NC_DOUBLE, buf);
 }
 
 /**
@@ -306,11 +306,11 @@ int PIOc_get_vars_double(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vars_ulonglong(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vars_ulonglong_impl(int ncid, int varid, const PIO_Offset *start,
                             const PIO_Offset *count, const PIO_Offset *stride,
                             unsigned long long *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, stride, PIO_LONG_INTERNAL, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, stride, PIO_LONG_INTERNAL, buf);
 }
 
 /**
@@ -334,10 +334,10 @@ int PIOc_get_vars_ulonglong(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vars_longlong(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vars_longlong_impl(int ncid, int varid, const PIO_Offset *start,
                            const PIO_Offset *count, const PIO_Offset *stride, long long *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, stride, NC_INT64, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, stride, NC_INT64, buf);
 }
 
 /**
@@ -358,10 +358,10 @@ int PIOc_get_vars_longlong(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vara_text(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vara_text_impl(int ncid, int varid, const PIO_Offset *start,
                        const PIO_Offset *count, char *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, NULL, NC_CHAR, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, NULL, NC_CHAR, buf);
 }
 
 /**
@@ -382,10 +382,10 @@ int PIOc_get_vara_text(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vara_uchar(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vara_uchar_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, unsigned char *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, NULL, NC_UBYTE, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, NULL, NC_UBYTE, buf);
 }
 
 /**
@@ -406,10 +406,10 @@ int PIOc_get_vara_uchar(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vara_schar(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vara_schar_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, signed char *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, NULL, NC_BYTE, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, NULL, NC_BYTE, buf);
 }
 
 /**
@@ -431,10 +431,10 @@ int PIOc_get_vara_schar(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vara_ushort(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vara_ushort_impl(int ncid, int varid, const PIO_Offset *start,
                          const PIO_Offset *count, unsigned short *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, NULL, NC_USHORT, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, NULL, NC_USHORT, buf);
 }
 
 /**
@@ -455,10 +455,10 @@ int PIOc_get_vara_ushort(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vara_short(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vara_short_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, short *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, NULL, NC_SHORT, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, NULL, NC_SHORT, buf);
 }
 
 /**
@@ -479,10 +479,10 @@ int PIOc_get_vara_short(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vara_long(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vara_long_impl(int ncid, int varid, const PIO_Offset *start,
                        const PIO_Offset *count, long *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, NULL, PIO_LONG_INTERNAL, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, NULL, PIO_LONG_INTERNAL, buf);
 }
 
 /**
@@ -503,10 +503,10 @@ int PIOc_get_vara_long(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vara_uint(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vara_uint_impl(int ncid, int varid, const PIO_Offset *start,
                        const PIO_Offset *count, unsigned int *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, NULL, NC_UINT, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, NULL, NC_UINT, buf);
 }
 
 /**
@@ -527,10 +527,10 @@ int PIOc_get_vara_uint(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vara_int(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vara_int_impl(int ncid, int varid, const PIO_Offset *start,
                       const PIO_Offset *count, int *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, NULL, NC_INT, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, NULL, NC_INT, buf);
 }
 
 /**
@@ -551,10 +551,10 @@ int PIOc_get_vara_int(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vara_float(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vara_float_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, float *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, NULL, NC_FLOAT, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, NULL, NC_FLOAT, buf);
 }
 
 /**
@@ -575,10 +575,10 @@ int PIOc_get_vara_float(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vara_double(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vara_double_impl(int ncid, int varid, const PIO_Offset *start,
                          const PIO_Offset *count, double *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, NULL, NC_DOUBLE, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, NULL, NC_DOUBLE, buf);
 }
 
 /**
@@ -600,10 +600,10 @@ int PIOc_get_vara_double(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vara_ulonglong(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vara_ulonglong_impl(int ncid, int varid, const PIO_Offset *start,
                             const PIO_Offset *count, unsigned long long *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, NULL, NC_UINT64, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, NULL, NC_UINT64, buf);
 }
 
 /**
@@ -624,10 +624,10 @@ int PIOc_get_vara_ulonglong(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vara_longlong(int ncid, int varid, const PIO_Offset *start,
+int PIOc_get_vara_longlong_impl(int ncid, int varid, const PIO_Offset *start,
                            const PIO_Offset *count, long long *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, NULL, NC_INT64, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, NULL, NC_INT64, buf);
 }
 
 /**
@@ -642,9 +642,9 @@ int PIOc_get_vara_longlong(int ncid, int varid, const PIO_Offset *start,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var_text(int ncid, int varid, char *buf)
+int PIOc_get_var_text_impl(int ncid, int varid, char *buf)
 {
-    return PIOc_get_var_tc(ncid, varid, NC_CHAR, buf);
+    return spio_get_var_tc(ncid, varid, NC_CHAR, buf);
 }
 
 /**
@@ -659,9 +659,9 @@ int PIOc_get_var_text(int ncid, int varid, char *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var_uchar(int ncid, int varid, unsigned char *buf)
+int PIOc_get_var_uchar_impl(int ncid, int varid, unsigned char *buf)
 {
-    return PIOc_get_var_tc(ncid, varid, NC_UBYTE, buf);
+    return spio_get_var_tc(ncid, varid, NC_UBYTE, buf);
 }
 
 /**
@@ -676,9 +676,9 @@ int PIOc_get_var_uchar(int ncid, int varid, unsigned char *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var_schar(int ncid, int varid, signed char *buf)
+int PIOc_get_var_schar_impl(int ncid, int varid, signed char *buf)
 {
-    return PIOc_get_var_tc(ncid, varid, NC_BYTE, buf);
+    return spio_get_var_tc(ncid, varid, NC_BYTE, buf);
 }
 
 /**
@@ -693,9 +693,9 @@ int PIOc_get_var_schar(int ncid, int varid, signed char *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var_ushort(int ncid, int varid, unsigned short *buf)
+int PIOc_get_var_ushort_impl(int ncid, int varid, unsigned short *buf)
 {
-    return PIOc_get_var_tc(ncid, varid, NC_USHORT, buf);
+    return spio_get_var_tc(ncid, varid, NC_USHORT, buf);
 }
 
 /**
@@ -710,9 +710,9 @@ int PIOc_get_var_ushort(int ncid, int varid, unsigned short *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var_short(int ncid, int varid, short *buf)
+int PIOc_get_var_short_impl(int ncid, int varid, short *buf)
 {
-    return PIOc_get_var_tc(ncid, varid, NC_SHORT, buf);
+    return spio_get_var_tc(ncid, varid, NC_SHORT, buf);
 }
 
 /**
@@ -727,9 +727,9 @@ int PIOc_get_var_short(int ncid, int varid, short *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var_uint(int ncid, int varid, unsigned int *buf)
+int PIOc_get_var_uint_impl(int ncid, int varid, unsigned int *buf)
 {
-    return PIOc_get_var_tc(ncid, varid, NC_UINT, buf);
+    return spio_get_var_tc(ncid, varid, NC_UINT, buf);
 }
 
 /**
@@ -744,9 +744,9 @@ int PIOc_get_var_uint(int ncid, int varid, unsigned int *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var_int(int ncid, int varid, int *buf)
+int PIOc_get_var_int_impl(int ncid, int varid, int *buf)
 {
-    return PIOc_get_var_tc(ncid, varid, NC_INT, buf);
+    return spio_get_var_tc(ncid, varid, NC_INT, buf);
 }
 
 /**
@@ -761,9 +761,9 @@ int PIOc_get_var_int(int ncid, int varid, int *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var_long (int ncid, int varid, long *buf)
+int PIOc_get_var_long_impl(int ncid, int varid, long *buf)
 {
-    return PIOc_get_var_tc(ncid, varid, PIO_LONG_INTERNAL, buf);
+    return spio_get_var_tc(ncid, varid, PIO_LONG_INTERNAL, buf);
 }
 
 /**
@@ -778,9 +778,9 @@ int PIOc_get_var_long (int ncid, int varid, long *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var_float(int ncid, int varid, float *buf)
+int PIOc_get_var_float_impl(int ncid, int varid, float *buf)
 {
-    return PIOc_get_var_tc(ncid, varid, NC_FLOAT, buf);
+    return spio_get_var_tc(ncid, varid, NC_FLOAT, buf);
 }
 
 /**
@@ -795,9 +795,9 @@ int PIOc_get_var_float(int ncid, int varid, float *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var_double(int ncid, int varid, double *buf)
+int PIOc_get_var_double_impl(int ncid, int varid, double *buf)
 {
-    return PIOc_get_var_tc(ncid, varid, NC_DOUBLE, buf);
+    return spio_get_var_tc(ncid, varid, NC_DOUBLE, buf);
 }
 
 /**
@@ -812,9 +812,9 @@ int PIOc_get_var_double(int ncid, int varid, double *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var_ulonglong(int ncid, int varid, unsigned long long *buf)
+int PIOc_get_var_ulonglong_impl(int ncid, int varid, unsigned long long *buf)
 {
-    return PIOc_get_var_tc(ncid, varid, NC_UINT64, buf);
+    return spio_get_var_tc(ncid, varid, NC_UINT64, buf);
 }
 
 /**
@@ -829,9 +829,9 @@ int PIOc_get_var_ulonglong(int ncid, int varid, unsigned long long *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var_longlong(int ncid, int varid, long long *buf)
+int PIOc_get_var_longlong_impl(int ncid, int varid, long long *buf)
 {
-    return PIOc_get_var_tc(ncid, varid, NC_INT64, buf);
+    return spio_get_var_tc(ncid, varid, NC_INT64, buf);
 }
 
 /**
@@ -849,9 +849,9 @@ int PIOc_get_var_longlong(int ncid, int varid, long long *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var1_text(int ncid, int varid, const PIO_Offset *index, char *buf)
+int PIOc_get_var1_text_impl(int ncid, int varid, const PIO_Offset *index, char *buf)
 {
-    return PIOc_get_var1_tc(ncid, varid, index, NC_CHAR, buf);
+    return spio_get_var1_tc(ncid, varid, index, NC_CHAR, buf);
 }
 
 /**
@@ -869,9 +869,9 @@ int PIOc_get_var1_text(int ncid, int varid, const PIO_Offset *index, char *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var1_uchar (int ncid, int varid, const PIO_Offset *index, unsigned char *buf)
+int PIOc_get_var1_uchar_impl(int ncid, int varid, const PIO_Offset *index, unsigned char *buf)
 {
-    return PIOc_get_var1_tc(ncid, varid, index, NC_UBYTE, buf);
+    return spio_get_var1_tc(ncid, varid, index, NC_UBYTE, buf);
 }
 
 /**
@@ -889,9 +889,9 @@ int PIOc_get_var1_uchar (int ncid, int varid, const PIO_Offset *index, unsigned 
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var1_schar(int ncid, int varid, const PIO_Offset *index, signed char *buf)
+int PIOc_get_var1_schar_impl(int ncid, int varid, const PIO_Offset *index, signed char *buf)
 {
-    return PIOc_get_var1_tc(ncid, varid, index, NC_BYTE, buf);
+    return spio_get_var1_tc(ncid, varid, index, NC_BYTE, buf);
 }
 
 /**
@@ -909,9 +909,9 @@ int PIOc_get_var1_schar(int ncid, int varid, const PIO_Offset *index, signed cha
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var1_ushort(int ncid, int varid, const PIO_Offset *index, unsigned short *buf)
+int PIOc_get_var1_ushort_impl(int ncid, int varid, const PIO_Offset *index, unsigned short *buf)
 {
-    return PIOc_get_var1_tc(ncid, varid, index, NC_USHORT, buf);
+    return spio_get_var1_tc(ncid, varid, index, NC_USHORT, buf);
 }
 
 /**
@@ -929,9 +929,9 @@ int PIOc_get_var1_ushort(int ncid, int varid, const PIO_Offset *index, unsigned 
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var1_short(int ncid, int varid, const PIO_Offset *index, short *buf)
+int PIOc_get_var1_short_impl(int ncid, int varid, const PIO_Offset *index, short *buf)
 {
-    int ret = PIOc_get_var1_tc(ncid, varid, index, NC_SHORT, buf);
+    int ret = spio_get_var1_tc(ncid, varid, index, NC_SHORT, buf);
     LOG((1, "PIOc_get_var1_short returned %d", ret));
     return ret;
 }
@@ -951,9 +951,9 @@ int PIOc_get_var1_short(int ncid, int varid, const PIO_Offset *index, short *buf
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var1_uint(int ncid, int varid, const PIO_Offset *index, unsigned int *buf)
+int PIOc_get_var1_uint_impl(int ncid, int varid, const PIO_Offset *index, unsigned int *buf)
 {
-    return PIOc_get_var1_tc(ncid, varid, index, NC_UINT, buf);
+    return spio_get_var1_tc(ncid, varid, index, NC_UINT, buf);
 }
 
 /**
@@ -971,9 +971,9 @@ int PIOc_get_var1_uint(int ncid, int varid, const PIO_Offset *index, unsigned in
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var1_long (int ncid, int varid, const PIO_Offset *index, long *buf)
+int PIOc_get_var1_long_impl(int ncid, int varid, const PIO_Offset *index, long *buf)
 {
-    return PIOc_get_var1_tc(ncid, varid, index, PIO_LONG_INTERNAL, buf);
+    return spio_get_var1_tc(ncid, varid, index, PIO_LONG_INTERNAL, buf);
 }
 
 /**
@@ -991,9 +991,9 @@ int PIOc_get_var1_long (int ncid, int varid, const PIO_Offset *index, long *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var1_int(int ncid, int varid, const PIO_Offset *index, int *buf)
+int PIOc_get_var1_int_impl(int ncid, int varid, const PIO_Offset *index, int *buf)
 {
-    return PIOc_get_var1_tc(ncid, varid, index, NC_INT, buf);
+    return spio_get_var1_tc(ncid, varid, index, NC_INT, buf);
 }
 
 /**
@@ -1011,9 +1011,9 @@ int PIOc_get_var1_int(int ncid, int varid, const PIO_Offset *index, int *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var1_float(int ncid, int varid, const PIO_Offset *index, float *buf)
+int PIOc_get_var1_float_impl(int ncid, int varid, const PIO_Offset *index, float *buf)
 {
-    return PIOc_get_var1_tc(ncid, varid, index, NC_FLOAT, buf);
+    return spio_get_var1_tc(ncid, varid, index, NC_FLOAT, buf);
 }
 
 /**
@@ -1031,9 +1031,9 @@ int PIOc_get_var1_float(int ncid, int varid, const PIO_Offset *index, float *buf
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var1_double (int ncid, int varid, const PIO_Offset *index, double *buf)
+int PIOc_get_var1_double_impl(int ncid, int varid, const PIO_Offset *index, double *buf)
 {
-    return PIOc_get_var1_tc(ncid, varid, index, NC_DOUBLE, buf);
+    return spio_get_var1_tc(ncid, varid, index, NC_DOUBLE, buf);
 }
 
 /**
@@ -1051,10 +1051,10 @@ int PIOc_get_var1_double (int ncid, int varid, const PIO_Offset *index, double *
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var1_ulonglong (int ncid, int varid, const PIO_Offset *index,
+int PIOc_get_var1_ulonglong_impl(int ncid, int varid, const PIO_Offset *index,
                              unsigned long long *buf)
 {
-    return PIOc_get_var1_tc(ncid, varid, index, NC_INT64, buf);
+    return spio_get_var1_tc(ncid, varid, index, NC_INT64, buf);
 }
 
 /**
@@ -1072,10 +1072,10 @@ int PIOc_get_var1_ulonglong (int ncid, int varid, const PIO_Offset *index,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var1_longlong(int ncid, int varid, const PIO_Offset *index,
+int PIOc_get_var1_longlong_impl(int ncid, int varid, const PIO_Offset *index,
                            long long *buf)
 {
-    return PIOc_get_var1_tc(ncid, varid, index, NC_INT64, buf);
+    return spio_get_var1_tc(ncid, varid, index, NC_INT64, buf);
 }
 
 /**
@@ -1091,9 +1091,9 @@ int PIOc_get_var1_longlong(int ncid, int varid, const PIO_Offset *index,
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var(int ncid, int varid, void *buf)
+int PIOc_get_var_impl(int ncid, int varid, void *buf)
 {
-    return PIOc_get_var_tc(ncid, varid, PIO_NAT, buf);
+    return spio_get_var_tc(ncid, varid, PIO_NAT, buf);
 }
 
 /**
@@ -1112,9 +1112,9 @@ int PIOc_get_var(int ncid, int varid, void *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_var1(int ncid, int varid, const PIO_Offset *index, void *buf)
+int PIOc_get_var1_impl(int ncid, int varid, const PIO_Offset *index, void *buf)
 {
-    return PIOc_get_var1_tc(ncid, varid, index, PIO_NAT, buf);
+    return spio_get_var1_tc(ncid, varid, index, PIO_NAT, buf);
 }
 
 /**
@@ -1136,10 +1136,10 @@ int PIOc_get_var1(int ncid, int varid, const PIO_Offset *index, void *buf)
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vara(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
+int PIOc_get_vara_impl(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                   void *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, NULL, PIO_NAT, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, NULL, PIO_NAT, buf);
 }
 
 /**
@@ -1164,8 +1164,8 @@ int PIOc_get_vara(int ncid, int varid, const PIO_Offset *start, const PIO_Offset
  * @return PIO_NOERR on success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_get_vars(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
+int PIOc_get_vars_impl(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                   const PIO_Offset *stride, void *buf)
 {
-    return PIOc_get_vars_tc(ncid, varid, start, count, stride, PIO_NAT, buf);
+    return spio_get_vars_tc(ncid, varid, start, count, stride, PIO_NAT, buf);
 }
