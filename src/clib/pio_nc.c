@@ -84,7 +84,7 @@ int get_adios2_type_size(adios2_type type, const void *var)
  * PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
+int PIOc_inq_impl(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -294,10 +294,10 @@ int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
  * @returns 0 for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_ndims(int ncid, int *ndimsp)
+int PIOc_inq_ndims_impl(int ncid, int *ndimsp)
 {
     LOG((1, "PIOc_inq_ndims"));
-    return PIOc_inq(ncid, ndimsp, NULL, NULL, NULL);
+    return PIOc_inq_impl(ncid, ndimsp, NULL, NULL, NULL);
 }
 
 /**
@@ -309,9 +309,9 @@ int PIOc_inq_ndims(int ncid, int *ndimsp)
  * @returns 0 for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_nvars(int ncid, int *nvarsp)
+int PIOc_inq_nvars_impl(int ncid, int *nvarsp)
 {
-    return PIOc_inq(ncid, NULL, nvarsp, NULL, NULL);
+    return PIOc_inq_impl(ncid, NULL, nvarsp, NULL, NULL);
 }
 
 /**
@@ -323,9 +323,9 @@ int PIOc_inq_nvars(int ncid, int *nvarsp)
  * @returns 0 for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_natts(int ncid, int *ngattsp)
+int PIOc_inq_natts_impl(int ncid, int *ngattsp)
 {
-    return PIOc_inq(ncid, NULL, NULL, ngattsp, NULL);
+    return PIOc_inq_impl(ncid, NULL, NULL, ngattsp, NULL);
 }
 
 /**
@@ -338,10 +338,10 @@ int PIOc_inq_natts(int ncid, int *ngattsp)
  * @returns 0 for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_unlimdim(int ncid, int *unlimdimidp)
+int PIOc_inq_unlimdim_impl(int ncid, int *unlimdimidp)
 {
     LOG((1, "PIOc_inq_unlimdim ncid = %d", ncid));
-    return PIOc_inq(ncid, NULL, NULL, NULL, unlimdimidp);
+    return PIOc_inq_impl(ncid, NULL, NULL, NULL, unlimdimidp);
 }
 
 /**
@@ -357,7 +357,7 @@ int PIOc_inq_unlimdim(int ncid, int *unlimdimidp)
  * @ingroup PIO_inq_unlimdim
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
+int PIOc_inq_unlimdims_impl(int ncid, int *nunlimdimsp, int *unlimdimidsp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -523,7 +523,7 @@ int PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
  * @returns 0 for success, error code otherwise.
  * @author Ed Hartnett
  */
-int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
+int PIOc_inq_type_impl(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -565,14 +565,14 @@ int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
 #ifdef _PNETCDF
         /* For PnetCDF IO type, if async is not in use, we do not need any
          * communication across processes. All tasks can directly call the
-         * internal helper function pioc_pnetcdf_inq_type to get the name
+         * internal helper function spio_pnetcdf_inq_type to get the name
          * and size of a type. */
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
-            ierr = pioc_pnetcdf_inq_type(ncid, xtype, name, sizep);
+            ierr = spio_pnetcdf_inq_type(ncid, xtype, name, sizep);
             if (ierr != PIO_NOERR)
             {
-                LOG((1, "pioc_pnetcdf_inq_type failed, ierr = %d", ierr));
+                LOG((1, "spio_pnetcdf_inq_type failed, ierr = %d", ierr));
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
                 return ierr;
@@ -591,7 +591,7 @@ int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
     {
         if (sizep)
         {
-            adios2_type atype = PIOc_get_adios_type(xtype);
+            adios2_type atype = spio_get_adios_type(xtype);
             int asize = get_adios2_type_size(atype, NULL);
             *sizep = (PIO_Offset) asize;
         }
@@ -619,7 +619,7 @@ int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
-            ierr = pioc_pnetcdf_inq_type(ncid, xtype, name, sizep);
+            ierr = spio_pnetcdf_inq_type(ncid, xtype, name, sizep);
 #endif /* _PNETCDF */
 
 #ifdef _NETCDF
@@ -680,7 +680,7 @@ int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
  * @returns 0 for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_format(int ncid, int *formatp)
+int PIOc_inq_format_impl(int ncid, int *formatp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -781,7 +781,7 @@ int PIOc_inq_format(int ncid, int *formatp)
  * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
+int PIOc_inq_dim_impl(int ncid, int dimid, char *name, PIO_Offset *lenp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -981,10 +981,10 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
  * @returns 0 for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_dimname(int ncid, int dimid, char *name)
+int PIOc_inq_dimname_impl(int ncid, int dimid, char *name)
 {
     LOG((1, "PIOc_inq_dimname ncid = %d dimid = %d", ncid, dimid));
-    return PIOc_inq_dim(ncid, dimid, name, NULL);
+    return PIOc_inq_dim_impl(ncid, dimid, name, NULL);
 }
 
 /**
@@ -998,9 +998,9 @@ int PIOc_inq_dimname(int ncid, int dimid, char *name)
  * @returns 0 for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_dimlen(int ncid, int dimid, PIO_Offset *lenp)
+int PIOc_inq_dimlen_impl(int ncid, int dimid, PIO_Offset *lenp)
 {
-    return PIOc_inq_dim(ncid, dimid, NULL, lenp);
+    return PIOc_inq_dim_impl(ncid, dimid, NULL, lenp);
 }
 
 /**
@@ -1018,7 +1018,7 @@ int PIOc_inq_dimlen(int ncid, int dimid, PIO_Offset *lenp)
  * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_dimid(int ncid, const char *name, int *idp)
+int PIOc_inq_dimid_impl(int ncid, const char *name, int *idp)
 {
     iosystem_desc_t *ios;
     file_desc_t *file;
@@ -1200,7 +1200,7 @@ int PIOc_inq_dimid(int ncid, const char *name, int *idp)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, int *ndimsp,
+int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xtypep, int *ndimsp,
                  int *dimidsp, int *nattsp)
 {
     iosystem_desc_t *ios;
@@ -1332,7 +1332,10 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
             int *tmp_dimidsp = NULL;
-            ierr = ncmpi_inq_varndims(file->fh, varid, &ndims);
+            ndims = file->varlist[varid].ndims;
+            if(ndims <= 0){
+                ierr = ncmpi_inq_varndims(file->fh, varid, &ndims);
+            }
             LOG((2, "from pnetcdf ndims = %d", ndims));
             if(!ierr && (!dimidsp) && (file->num_unlim_dimids > 0))
             {
@@ -1375,7 +1378,10 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
 #ifdef _NETCDF
         if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
         {
-            ierr = nc_inq_varndims(file->fh, varid, &ndims);
+            ndims = file->varlist[varid].ndims;
+            if(ndims <= 0){
+                ierr = nc_inq_varndims(file->fh, varid, &ndims);
+            }
             LOG((3, "nc_inq_varndims called ndims = %d", ndims));
             if (!ierr)
             {
@@ -1527,13 +1533,20 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
 
     if (ndimsp)
     {
-        LOG((2, "PIOc_inq_var about to Bcast ndims = %d ios->ioroot = %d ios->my_comm = %d",
-             *ndimsp, ios->ioroot, ios->my_comm));
-        if ((mpierr = MPI_Bcast(ndimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        {
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        /* FIXME: Handle scalars by setting cached ndims to be < 0 */
+        if(file->varlist[varid].ndims > 0){
+            *ndimsp = file->varlist[varid].ndims;
+        }
+        else{
+            LOG((2, "PIOc_inq_var about to Bcast ndims = %d ios->ioroot = %d ios->my_comm = %d",
+                 *ndimsp, ios->ioroot, ios->my_comm));
+            if ((mpierr = MPI_Bcast(ndimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+            {
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            }
+            file->varlist[varid].ndims = *ndimsp;
         }
         LOG((2, "PIOc_inq_var Bcast ndims = %d", *ndimsp));
     }
@@ -1576,9 +1589,9 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_varname(int ncid, int varid, char *name, int namelen)
+int PIOc_inq_varname_impl(int ncid, int varid, char *name, int namelen)
 {
-    return PIOc_inq_var(ncid, varid, name, namelen, NULL, NULL, NULL, NULL);
+    return PIOc_inq_var_impl(ncid, varid, name, namelen, NULL, NULL, NULL, NULL);
 }
 
 /**
@@ -1592,9 +1605,9 @@ int PIOc_inq_varname(int ncid, int varid, char *name, int namelen)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_vartype(int ncid, int varid, nc_type *xtypep)
+int PIOc_inq_vartype_impl(int ncid, int varid, nc_type *xtypep)
 {
-    return PIOc_inq_var(ncid, varid, NULL, 0, xtypep, NULL, NULL, NULL);
+    return PIOc_inq_var_impl(ncid, varid, NULL, 0, xtypep, NULL, NULL, NULL);
 }
 
 /**
@@ -1608,9 +1621,9 @@ int PIOc_inq_vartype(int ncid, int varid, nc_type *xtypep)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_varndims(int ncid, int varid, int *ndimsp)
+int PIOc_inq_varndims_impl(int ncid, int varid, int *ndimsp)
 {
-    return PIOc_inq_var(ncid, varid, NULL, 0, NULL, ndimsp, NULL, NULL);
+    return PIOc_inq_var_impl(ncid, varid, NULL, 0, NULL, ndimsp, NULL, NULL);
 }
 
 /**
@@ -1624,9 +1637,9 @@ int PIOc_inq_varndims(int ncid, int varid, int *ndimsp)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_vardimid(int ncid, int varid, int *dimidsp)
+int PIOc_inq_vardimid_impl(int ncid, int varid, int *dimidsp)
 {
-    return PIOc_inq_var(ncid, varid, NULL, 0, NULL, NULL, dimidsp, NULL);
+    return PIOc_inq_var_impl(ncid, varid, NULL, 0, NULL, NULL, dimidsp, NULL);
 }
 
 /**
@@ -1640,9 +1653,9 @@ int PIOc_inq_vardimid(int ncid, int varid, int *dimidsp)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_varnatts(int ncid, int varid, int *nattsp)
+int PIOc_inq_varnatts_impl(int ncid, int varid, int *nattsp)
 {
-    return PIOc_inq_var(ncid, varid, NULL, 0, NULL, NULL, NULL, nattsp);
+    return PIOc_inq_var_impl(ncid, varid, NULL, 0, NULL, NULL, NULL, nattsp);
 }
 
 /**
@@ -1661,7 +1674,7 @@ int PIOc_inq_varnatts(int ncid, int varid, int *nattsp)
  * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_varid(int ncid, const char *name, int *varidp)
+int PIOc_inq_varid_impl(int ncid, const char *name, int *varidp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -1878,7 +1891,7 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
+int PIOc_inq_att_impl(int ncid, int varid, const char *name, nc_type *xtypep,
                  PIO_Offset *lenp)
 {
     int msg = PIO_MSG_INQ_ATT;
@@ -2067,9 +2080,9 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_attlen(int ncid, int varid, const char *name, PIO_Offset *lenp)
+int PIOc_inq_attlen_impl(int ncid, int varid, const char *name, PIO_Offset *lenp)
 {
-    return PIOc_inq_att(ncid, varid, name, NULL, lenp);
+    return PIOc_inq_att_impl(ncid, varid, name, NULL, lenp);
 }
 
 /**
@@ -2084,9 +2097,9 @@ int PIOc_inq_attlen(int ncid, int varid, const char *name, PIO_Offset *lenp)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_atttype(int ncid, int varid, const char *name, nc_type *xtypep)
+int PIOc_inq_atttype_impl(int ncid, int varid, const char *name, nc_type *xtypep)
 {
-    return PIOc_inq_att(ncid, varid, name, xtypep, NULL);
+    return PIOc_inq_att_impl(ncid, varid, name, xtypep, NULL);
 }
 
 /**
@@ -2105,7 +2118,7 @@ int PIOc_inq_atttype(int ncid, int varid, const char *name, nc_type *xtypep)
  * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
+int PIOc_inq_attname_impl(int ncid, int varid, int attnum, char *name)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -2278,7 +2291,7 @@ int PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
  * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
+int PIOc_inq_attid_impl(int ncid, int varid, const char *name, int *idp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -2448,7 +2461,7 @@ int PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
  * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_rename_dim(int ncid, int dimid, const char *name)
+int PIOc_rename_dim_impl(int ncid, int dimid, const char *name)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -2549,7 +2562,7 @@ int PIOc_rename_dim(int ncid, int dimid, const char *name)
  * @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_rename_var(int ncid, int varid, const char *name)
+int PIOc_rename_var_impl(int ncid, int varid, const char *name)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -2651,7 +2664,7 @@ int PIOc_rename_var(int ncid, int varid, const char *name)
  * PIOc_Set_File_Error_Handling
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_rename_att(int ncid, int varid, const char *name,
+int PIOc_rename_att_impl(int ncid, int varid, const char *name,
                     const char *newname)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
@@ -2762,7 +2775,7 @@ int PIOc_rename_att(int ncid, int varid, const char *name,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_del_att(int ncid, int varid, const char *name)
+int PIOc_del_att_impl(int ncid, int varid, const char *name)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -2863,7 +2876,7 @@ int PIOc_del_att(int ncid, int varid, const char *name)
  * @ingroup PIO_set_fill
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_set_fill(int ncid, int fillmode, int *old_modep)
+int PIOc_set_fill_impl(int ncid, int fillmode, int *old_modep)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -2982,9 +2995,9 @@ int PIOc_set_fill(int ncid, int fillmode, int *old_modep)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_enddef(int ncid)
+int PIOc_enddef_impl(int ncid)
 {
-    return pioc_change_def(ncid, 1);
+    return spio_change_def(ncid, 1);
 }
 
 /**
@@ -3001,9 +3014,9 @@ int PIOc_enddef(int ncid)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_redef(int ncid)
+int PIOc_redef_impl(int ncid)
 {
-    return pioc_change_def(ncid, 0);
+    return spio_change_def(ncid, 0);
 }
 
 /**
@@ -3021,7 +3034,7 @@ int PIOc_redef(int ncid)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
+int PIOc_def_dim_impl(int ncid, const char *name, PIO_Offset len, int *idp)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -3260,7 +3273,7 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
  * @ingroup PIO_def_var
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
+int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
                  const int *dimidsp, int *varidp)
 {
     iosystem_desc_t *ios;      /* Pointer to io system information. */
@@ -3312,7 +3325,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
             
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            ierr = PIOc_inq_dimlen(ncid, dimidsp[d], &dimlen);
+            ierr = PIOc_inq_dimlen_impl(ncid, dimidsp[d], &dimlen);
             if(ierr != PIO_NOERR){
                 LOG((1, "PIOc_inq_dimlen failed, ierr = %d", ierr));
                 return ierr;
@@ -3389,7 +3402,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
         }
 
         file->adios_vars[file->num_vars].nc_type = xtype;
-        file->adios_vars[file->num_vars].adios_type = PIOc_get_adios_type(xtype);
+        file->adios_vars[file->num_vars].adios_type = spio_get_adios_type(xtype);
         file->adios_vars[file->num_vars].adios_type_size = (size_t)get_adios2_type_size(file->adios_vars[file->num_vars].adios_type, NULL);
         file->adios_vars[file->num_vars].nattrs = 0;
         file->adios_vars[file->num_vars].ndims = ndims;
@@ -3596,7 +3609,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
             if (ierr != PIO_NOERR)
             {
                 char errmsg[PIO_MAX_NAME];
-                ierr2 = PIOc_strerror(ierr, errmsg, PIO_MAX_NAME);
+                ierr2 = PIOc_strerror_impl(ierr, errmsg, PIO_MAX_NAME);
                 ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
                                 "Defining variable %s (ndims = %d) in file %s (ncid=%d, iotype=%s) failed. %s", name, ndims, pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype), ((ierr2 == PIO_NOERR) ? errmsg : ""));
             }
@@ -3610,7 +3623,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
             if (ierr != PIO_NOERR)
             {
                 char errmsg[PIO_MAX_NAME];
-                ierr2 = PIOc_strerror(ierr, errmsg, PIO_MAX_NAME);
+                ierr2 = PIOc_strerror_impl(ierr, errmsg, PIO_MAX_NAME);
                 ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
                                 "Defining variable %s (ndims = %d) in file %s (ncid=%d, iotype=%s) failed. %s", name, ndims, pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype), ((ierr2 == PIO_NOERR) ? errmsg : ""));
             }
@@ -3627,7 +3640,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
             if (ierr != PIO_NOERR)
             {
                 char errmsg[PIO_MAX_NAME];
-                ierr2 = PIOc_strerror(ierr, errmsg, PIO_MAX_NAME);
+                ierr2 = PIOc_strerror_impl(ierr, errmsg, PIO_MAX_NAME);
                 ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
                                 "Defining variable %s (varid = %d, ndims = %d) in file %s (ncid=%d, iotype=%s) failed. Turning on compression on the variable failed. %s", name, *varidp, ndims, pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype), ((ierr2 == PIO_NOERR) ? errmsg : ""));
             }
@@ -3640,7 +3653,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
             if (ierr != PIO_NOERR)
             {
                 char errmsg[PIO_MAX_NAME];
-                ierr2 = PIOc_strerror(ierr, errmsg, PIO_MAX_NAME);
+                ierr2 = PIOc_strerror_impl(ierr, errmsg, PIO_MAX_NAME);
                 ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
                                 "Defining variable %s (varid = %d, ndims = %d) in file %s (ncid=%d, iotype=%s) failed. Setting parallel access for the variable failed. %s", name, *varidp, ndims, pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype), ((ierr2 == PIO_NOERR) ? errmsg : ""));
             }
@@ -3783,7 +3796,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
  * @ingroup PIO_def_var
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_valuep)
+int PIOc_def_var_fill_impl(int ncid, int varid, int fill_mode, const void *fill_valuep)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -3825,12 +3838,12 @@ int PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_value
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        ierr = PIOc_inq_vartype(ncid, varid, &xtype);
+        ierr = PIOc_inq_vartype_impl(ncid, varid, &xtype);
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_vartype failed, ierr = %d", ierr));
             return ierr;
         }
-        ierr = PIOc_inq_type(ncid, xtype, NULL, &type_size);
+        ierr = PIOc_inq_type_impl(ncid, xtype, NULL, &type_size);
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_type failed, ierr = %d", ierr));
             return ierr;
@@ -3950,7 +3963,7 @@ int PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_value
  * @ingroup PIO_inq_var_fill
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
+int PIOc_inq_var_fill_impl(int ncid, int varid, int *no_fill, void *fill_valuep)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -3981,12 +3994,12 @@ int PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        ierr = PIOc_inq_vartype(ncid, varid, &xtype);
+        ierr = PIOc_inq_vartype_impl(ncid, varid, &xtype);
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_vartype failed, ierr = %d", ierr));
             return ierr;
         }
-        ierr = PIOc_inq_type(ncid, xtype, NULL, &type_size);
+        ierr = PIOc_inq_type_impl(ncid, xtype, NULL, &type_size);
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_type failed, ierr = %d", ierr));
             return ierr;
@@ -4158,7 +4171,7 @@ int PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
  * @ingroup PIO_get_att
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_get_att(int ncid, int varid, const char *name, void *ip)
+int PIOc_get_att_impl(int ncid, int varid, const char *name, void *ip)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
@@ -4189,14 +4202,14 @@ int PIOc_get_att(int ncid, int varid, const char *name, void *ip)
     LOG((1, "PIOc_get_att ncid %d varid %d name %s", ncid, varid, name));
 
     /* Get the type of the attribute. */
-    ierr = PIOc_inq_att(ncid, varid, name, &atttype, NULL);
+    ierr = PIOc_inq_att_impl(ncid, varid, name, &atttype, NULL);
     if(ierr != PIO_NOERR){
         LOG((1, "PIOc_inq_att failed, ierr = %d", ierr));
         return ierr;
     }
     LOG((2, "atttype = %d", atttype));
 
-    return PIOc_get_att_tc(ncid, varid, name, atttype, ip);
+    return spio_get_att_tc(ncid, varid, name, atttype, ip);
 }
 
 /**
@@ -4216,10 +4229,10 @@ int PIOc_get_att(int ncid, int varid, const char *name, void *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_put_att(int ncid, int varid, const char *name, nc_type xtype,
+int PIOc_put_att_impl(int ncid, int varid, const char *name, nc_type xtype,
                  PIO_Offset len, const void *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, xtype, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, xtype, op);
 }
 
 /**
@@ -4237,9 +4250,9 @@ int PIOc_put_att(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_get_att_double(int ncid, int varid, const char *name, double *ip)
+int PIOc_get_att_double_impl(int ncid, int varid, const char *name, double *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_DOUBLE, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_DOUBLE, (void *)ip);
 }
 
 /**
@@ -4257,9 +4270,9 @@ int PIOc_get_att_double(int ncid, int varid, const char *name, double *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_get_att_uchar(int ncid, int varid, const char *name, unsigned char *ip)
+int PIOc_get_att_uchar_impl(int ncid, int varid, const char *name, unsigned char *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_UBYTE, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_UBYTE, (void *)ip);
 }
 
 /**
@@ -4277,9 +4290,9 @@ int PIOc_get_att_uchar(int ncid, int varid, const char *name, unsigned char *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_get_att_ushort(int ncid, int varid, const char *name, unsigned short *ip)
+int PIOc_get_att_ushort_impl(int ncid, int varid, const char *name, unsigned short *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_USHORT, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_USHORT, (void *)ip);
 }
 
 /**
@@ -4297,9 +4310,9 @@ int PIOc_get_att_ushort(int ncid, int varid, const char *name, unsigned short *i
  * @ingroup PIO_get_att
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_get_att_uint(int ncid, int varid, const char *name, unsigned int *ip)
+int PIOc_get_att_uint_impl(int ncid, int varid, const char *name, unsigned int *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_UINT, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_UINT, (void *)ip);
 }
 
 /**
@@ -4317,9 +4330,9 @@ int PIOc_get_att_uint(int ncid, int varid, const char *name, unsigned int *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_get_att_long(int ncid, int varid, const char *name, long *ip)
+int PIOc_get_att_long_impl(int ncid, int varid, const char *name, long *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_LONG_INTERNAL, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_LONG_INTERNAL, (void *)ip);
 }
 
 /**
@@ -4339,9 +4352,9 @@ int PIOc_get_att_long(int ncid, int varid, const char *name, long *ip)
  * @ingroup PIO_get_att
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_get_att_text(int ncid, int varid, const char *name, char *ip)
+int PIOc_get_att_text_impl(int ncid, int varid, const char *name, char *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_CHAR, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_CHAR, (void *)ip);
 }
 
 /**
@@ -4359,9 +4372,9 @@ int PIOc_get_att_text(int ncid, int varid, const char *name, char *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_get_att_schar(int ncid, int varid, const char *name, signed char *ip)
+int PIOc_get_att_schar_impl(int ncid, int varid, const char *name, signed char *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_BYTE, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_BYTE, (void *)ip);
 }
 
 /**
@@ -4379,9 +4392,9 @@ int PIOc_get_att_schar(int ncid, int varid, const char *name, signed char *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_get_att_ulonglong(int ncid, int varid, const char *name, unsigned long long *ip)
+int PIOc_get_att_ulonglong_impl(int ncid, int varid, const char *name, unsigned long long *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_UINT64, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_UINT64, (void *)ip);
 }
 
 /**
@@ -4399,9 +4412,9 @@ int PIOc_get_att_ulonglong(int ncid, int varid, const char *name, unsigned long 
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_get_att_short(int ncid, int varid, const char *name, short *ip)
+int PIOc_get_att_short_impl(int ncid, int varid, const char *name, short *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_SHORT, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_SHORT, (void *)ip);
 }
 
 /**
@@ -4419,9 +4432,9 @@ int PIOc_get_att_short(int ncid, int varid, const char *name, short *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_get_att_int(int ncid, int varid, const char *name, int *ip)
+int PIOc_get_att_int_impl(int ncid, int varid, const char *name, int *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_INT, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_INT, (void *)ip);
 }
 
 /**
@@ -4439,9 +4452,9 @@ int PIOc_get_att_int(int ncid, int varid, const char *name, int *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_get_att_longlong(int ncid, int varid, const char *name, long long *ip)
+int PIOc_get_att_longlong_impl(int ncid, int varid, const char *name, long long *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_INT64, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_INT64, (void *)ip);
 }
 
 /**
@@ -4459,9 +4472,9 @@ int PIOc_get_att_longlong(int ncid, int varid, const char *name, long long *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_get_att_float(int ncid, int varid, const char *name, float *ip)
+int PIOc_get_att_float_impl(int ncid, int varid, const char *name, float *ip)
 {
-    return PIOc_get_att_tc(ncid, varid, name, PIO_FLOAT, (void *)ip);
+    return spio_get_att_tc(ncid, varid, name, PIO_FLOAT, (void *)ip);
 }
 
 /**
@@ -4481,10 +4494,10 @@ int PIOc_get_att_float(int ncid, int varid, const char *name, float *ip)
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_put_att_schar(int ncid, int varid, const char *name, nc_type xtype,
+int PIOc_put_att_schar_impl(int ncid, int varid, const char *name, nc_type xtype,
                        PIO_Offset len, const signed char *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_BYTE, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_BYTE, op);
 }
 
 /**
@@ -4504,10 +4517,10 @@ int PIOc_put_att_schar(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_put_att_long(int ncid, int varid, const char *name, nc_type xtype,
+int PIOc_put_att_long_impl(int ncid, int varid, const char *name, nc_type xtype,
                       PIO_Offset len, const long *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_LONG_INTERNAL, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_LONG_INTERNAL, op);
 }
 
 /**
@@ -4527,10 +4540,10 @@ int PIOc_put_att_long(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_put_att_int(int ncid, int varid, const char *name, nc_type xtype,
+int PIOc_put_att_int_impl(int ncid, int varid, const char *name, nc_type xtype,
                      PIO_Offset len, const int *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_INT, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_INT, op);
 }
 
 /**
@@ -4550,10 +4563,10 @@ int PIOc_put_att_int(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_put_att_uchar(int ncid, int varid, const char *name, nc_type xtype,
+int PIOc_put_att_uchar_impl(int ncid, int varid, const char *name, nc_type xtype,
                        PIO_Offset len, const unsigned char *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_UBYTE, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_UBYTE, op);
 }
 
 /**
@@ -4573,10 +4586,10 @@ int PIOc_put_att_uchar(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_put_att_longlong(int ncid, int varid, const char *name, nc_type xtype,
+int PIOc_put_att_longlong_impl(int ncid, int varid, const char *name, nc_type xtype,
                           PIO_Offset len, const long long *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_INT64, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_INT64, op);
 }
 
 /**
@@ -4596,10 +4609,10 @@ int PIOc_put_att_longlong(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_put_att_uint(int ncid, int varid, const char *name, nc_type xtype,
+int PIOc_put_att_uint_impl(int ncid, int varid, const char *name, nc_type xtype,
                       PIO_Offset len, const unsigned int *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_UINT, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_UINT, op);
 }
 
 /**
@@ -4619,10 +4632,10 @@ int PIOc_put_att_uint(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_put_att_float(int ncid, int varid, const char *name, nc_type xtype,
+int PIOc_put_att_float_impl(int ncid, int varid, const char *name, nc_type xtype,
                        PIO_Offset len, const float *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_FLOAT, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_FLOAT, op);
 }
 
 /**
@@ -4642,10 +4655,10 @@ int PIOc_put_att_float(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_put_att_ulonglong(int ncid, int varid, const char *name, nc_type xtype,
+int PIOc_put_att_ulonglong_impl(int ncid, int varid, const char *name, nc_type xtype,
                            PIO_Offset len, const unsigned long long *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_UINT64, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_UINT64, op);
 }
 
 /**
@@ -4665,10 +4678,10 @@ int PIOc_put_att_ulonglong(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_put_att_ushort(int ncid, int varid, const char *name, nc_type xtype,
+int PIOc_put_att_ushort_impl(int ncid, int varid, const char *name, nc_type xtype,
                         PIO_Offset len, const unsigned short *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_USHORT, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_USHORT, op);
 }
 
 /**
@@ -4688,10 +4701,10 @@ int PIOc_put_att_ushort(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_put_att_text(int ncid, int varid, const char *name,
+int PIOc_put_att_text_impl(int ncid, int varid, const char *name,
                       PIO_Offset len, const char *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, NC_CHAR, len, NC_CHAR, op);
+    return spio_put_att_tc(ncid, varid, name, NC_CHAR, len, NC_CHAR, op);
 }
 
 /**
@@ -4711,10 +4724,10 @@ int PIOc_put_att_text(int ncid, int varid, const char *name,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_put_att_short(int ncid, int varid, const char *name, nc_type xtype,
+int PIOc_put_att_short_impl(int ncid, int varid, const char *name, nc_type xtype,
                        PIO_Offset len, const short *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_SHORT, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_SHORT, op);
 }
 
 /**
@@ -4734,10 +4747,10 @@ int PIOc_put_att_short(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_put_att_double(int ncid, int varid, const char *name, nc_type xtype,
+int PIOc_put_att_double_impl(int ncid, int varid, const char *name, nc_type xtype,
                         PIO_Offset len, const double *op)
 {
-    return PIOc_put_att_tc(ncid, varid, name, xtype, len, PIO_DOUBLE, op);
+    return spio_put_att_tc(ncid, varid, name, xtype, len, PIO_DOUBLE, op);
 }
 
 /**
@@ -4759,7 +4772,7 @@ int PIOc_put_att_double(int ncid, int varid, const char *name, nc_type xtype,
  * @return PIO_NOERR for success, error code otherwise.
  * @author Jayesh Krishna
  */
-int PIOc_copy_att(int incid, int ivarid, const char *name,
+int PIOc_copy_att_impl(int incid, int ivarid, const char *name,
                   int oncid, int ovarid)
 {
   int msg = PIO_MSG_COPY_ATT;
@@ -4857,13 +4870,13 @@ int PIOc_copy_att(int incid, int ivarid, const char *name,
             PIO_Offset att_len = 0, type_sz = 0;
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             GPTLstop(ifile->io_fstats->tot_timer_name);
-            ierr = PIOc_inq_att(ifile->fh, ivarid, name, &att_type, &att_len);
+            ierr = PIOc_inq_att_impl(ifile->fh, ivarid, name, &att_type, &att_len);
             if(ierr != PIO_NOERR){
               ierr = pio_err(ios, ifile, ierr, __FILE__, __LINE__,
                       "Copying attribute, %s, associated with variable %s (varid=%d) in file %s (ncid=%d) to file %s (ncid=%d) failed. Inquiring attribute type and length in file %s (ncid=%d) failed", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, pio_get_fname_from_file(ofile), oncid, pio_get_fname_from_file(ifile), incid);
               break;
             }
-            ierr = PIOc_inq_type(ifile->fh, att_type, NULL, &type_sz);
+            ierr = PIOc_inq_type_impl(ifile->fh, att_type, NULL, &type_sz);
             if(ierr != PIO_NOERR){
               ierr = pio_err(ios, ifile, ierr, __FILE__, __LINE__,
                       "Copying attribute, %s, associated with variable %s (varid=%d) in file %s (ncid=%d) to file %s (ncid=%d) failed. Inquiring attribute type size (attribute type = %x) failed", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, pio_get_fname_from_file(ofile), oncid, att_type);
@@ -4875,13 +4888,13 @@ int PIOc_copy_att(int incid, int ivarid, const char *name,
                       "Copying attribute, %s, associated with variable %s (varid=%d) in file %s (ncid=%d) to file %s (ncid=%d) failed. Unable to allocate %lld bytes to temporarily cache the attribute for copying", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, pio_get_fname_from_file(ofile), oncid, (long long int) (type_sz * att_len));
               break;
             }
-            ierr = PIOc_get_att(ifile->fh, ivarid, name, pbuf);
+            ierr = PIOc_get_att_impl(ifile->fh, ivarid, name, pbuf);
             if(ierr != PIO_NOERR){
               ierr = pio_err(ios, ifile, ierr, __FILE__, __LINE__,
                       "Copying attribute, %s, associated with variable %s (varid=%d) in file %s (ncid=%d) to file %s (ncid=%d) failed. Getting attribute from file %s (ncid=%d) failed", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, pio_get_fname_from_file(ofile), oncid, pio_get_fname_from_file(ifile), incid);
               break;
             }
-            ierr = PIOc_put_att(ofile->fh, ovarid, name, att_type, att_len, pbuf);
+            ierr = PIOc_put_att_impl(ofile->fh, ovarid, name, att_type, att_len, pbuf);
             if(ierr != PIO_NOERR){
               ierr = pio_err(ios, ifile, ierr, __FILE__, __LINE__,
                       "Copying attribute, %s, associated with variable %s (varid=%d) in file %s (ncid=%d) to file %s (ncid=%d) failed. Putting/Writing attribute to file %s (ncid=%d, varid=%d) failed", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, pio_get_fname_from_file(ofile), oncid, pio_get_fname_from_file(ofile), oncid, ovarid);

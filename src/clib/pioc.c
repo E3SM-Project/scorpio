@@ -35,7 +35,7 @@ extern int blocksize;
  * @returns 0 on success, error code otherwise
  * @author Jim Edwards
  */
-int PIOc_iosystem_is_active(int iosysid, bool *active)
+int PIOc_iosystem_is_active_impl(int iosysid, bool *active)
 {
     iosystem_desc_t *ios;
 
@@ -62,7 +62,7 @@ int PIOc_iosystem_is_active(int iosysid, bool *active)
  * @returns 1 if file is open, 0 otherwise.
  * @author Jim Edwards
  */
-int PIOc_File_is_Open(int ncid)
+int PIOc_File_is_Open_impl(int ncid)
 {
     file_desc_t *file;
 
@@ -129,7 +129,7 @@ static const char *PIO_error_handler_to_string(int eh)
  * @ingroup PIO_error_method
  * @author Jim Edwards
  */
-int PIOc_Set_File_Error_Handling(int ncid, int method)
+int PIOc_Set_File_Error_Handling_impl(int ncid, int method)
 {
     file_desc_t *file;
     int oldmethod;
@@ -162,7 +162,7 @@ int PIOc_Set_File_Error_Handling(int ncid, int method)
  * @returns 0 on success, error code otherwise
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_advanceframe(int ncid, int varid)
+int PIOc_advanceframe_impl(int ncid, int varid)
 {
     file_desc_t *file;
     iosystem_desc_t *ios;
@@ -216,7 +216,7 @@ int PIOc_advanceframe(int ncid, int varid)
  * @ingroup PIO_setframe
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_setframe(int ncid, int varid, int frame)
+int PIOc_setframe_impl(int ncid, int varid, int frame)
 {
     file_desc_t *file;
     iosystem_desc_t *ios;
@@ -392,7 +392,7 @@ int PIOc_setframe(int ncid, int varid, int frame)
  * @returns 0 on success, error code otherwise
  * @author Ed Hartnett
  */
-int PIOc_get_numiotasks(int iosysid, int *numiotasks)
+int PIOc_get_numiotasks_impl(int iosysid, int *numiotasks)
 {
     iosystem_desc_t *ios;
 
@@ -418,7 +418,7 @@ int PIOc_get_numiotasks(int iosysid, int *numiotasks)
  * @returns the local size (size on the local process) of the variable.
  * @author Jim Edwards
  */
-int PIOc_get_local_array_size(int ioid)
+int PIOc_get_local_array_size_impl(int ioid)
 {
     io_desc_t *iodesc;
 
@@ -442,7 +442,7 @@ int PIOc_get_local_array_size(int ioid)
  * @ingroup PIO_error_method
  * @author Jim Edwards
  */
-int PIOc_Set_IOSystem_Error_Handling(int iosysid, int method)
+int PIOc_Set_IOSystem_Error_Handling_impl(int iosysid, int method)
 {
     iosystem_desc_t *ios;
     int oldmethod;
@@ -455,7 +455,7 @@ int PIOc_Set_IOSystem_Error_Handling(int iosysid, int method)
             piodie(__FILE__, __LINE__, "Setting error handler for the IO system failed. Invalid iosystem id (%d) provided. Could not find IO system corresponding to the iosystem id", iosysid);
 
     /* Set the error handler. */
-    if (PIOc_set_iosystem_error_handling(iosysid, method, &oldmethod))
+    if (PIOc_set_iosystem_error_handling_impl(iosysid, method, &oldmethod))
         piodie(__FILE__, __LINE__, "Setting error handler for the IO system (id = %d) failed. Internal error.", iosysid);
 
     return oldmethod;
@@ -474,7 +474,7 @@ int PIOc_Set_IOSystem_Error_Handling(int iosysid, int method)
  * @ingroup PIO_error_method
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_set_iosystem_error_handling(int iosysid, int method, int *old_method)
+int PIOc_set_iosystem_error_handling_impl(int iosysid, int method, int *old_method)
 {
     iosystem_desc_t *ios = NULL;
     int ret = PIO_NOERR;
@@ -668,7 +668,7 @@ int pio_create_uniq_str(iosystem_desc_t *ios, io_desc_t *iodesc, char *str, int 
  * @ingroup PIO_initdecomp
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_InitDecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, int maplen,
+int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimlen, int maplen,
                     const PIO_Offset *compmap, int *ioidp, const int *rearranger,
                     const PIO_Offset *iostart, const PIO_Offset *iocount)
 {
@@ -925,7 +925,7 @@ int PIOc_InitDecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, in
                             "Initializing the PIO decomposition failed. Creating a unique file name for saving the decomposition failed");
         }
         LOG((2, "Saving decomp map to %s", filename));
-        PIOc_writemap(filename, *ioidp, ndims, gdimlen, maplen, (PIO_Offset *)compmap, ios->my_comm);
+        PIOc_writemap_impl(filename, *ioidp, ndims, gdimlen, maplen, (PIO_Offset *)compmap, ios->my_comm);
         iodesc->is_saved = true;
     }
 #endif
@@ -992,7 +992,7 @@ int PIOc_InitDecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, in
  * @ingroup PIO_initdecomp
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, int maplen,
+int PIOc_init_decomp_impl(int iosysid, int pio_type, int ndims, const int *gdimlen, int maplen,
                      const PIO_Offset *compmap, int *ioidp, int rearranger,
                      const PIO_Offset *iostart, const PIO_Offset *iocount)
 {
@@ -1022,7 +1022,7 @@ int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, i
     }
 
     /* Call the legacy version of the function. */
-    int ret = PIOc_InitDecomp(iosysid, pio_type, ndims, gdimlen, maplen, compmap_1_based,
+    int ret = PIOc_InitDecomp_impl(iosysid, pio_type, ndims, gdimlen, maplen, compmap_1_based,
                               ioidp, rearrangerp, iostart, iocount);
 
     free(compmap_1_based);
@@ -1046,7 +1046,7 @@ int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, i
  * @ingroup PIO_initdecomp
  * @author Jim Edwards
  */
-int PIOc_InitDecomp_bc(int iosysid, int pio_type, int ndims, const int *gdimlen,
+int PIOc_InitDecomp_bc_impl(int iosysid, int pio_type, int ndims, const int *gdimlen,
                        const long int *start, const long int *count, int *ioidp)
 
 {
@@ -1110,7 +1110,7 @@ int PIOc_InitDecomp_bc(int iosysid, int pio_type, int ndims, const int *gdimlen,
         }
     }
 
-    return PIOc_InitDecomp(iosysid, pio_type, ndims, gdimlen, maplen, compmap, ioidp,
+    return PIOc_InitDecomp_impl(iosysid, pio_type, ndims, gdimlen, maplen, compmap, ioidp,
                            &rearr, NULL, NULL);
 }
 
@@ -1260,7 +1260,7 @@ static int init_adios_comm(iosystem_desc_t *ios)
  * @ingroup PIO_init
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int base,
+int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, int base,
                         int rearr, int *iosysidp)
 {
     iosystem_desc_t *ios;
@@ -1529,14 +1529,14 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
  * @returns 0 for success, error code otherwise
  * @author Jim Edwards
  */
-int PIOc_Init_Intracomm_from_F90(int f90_comp_comm,
+int PIOc_Init_Intracomm_from_F90_impl(int f90_comp_comm,
                                  const int num_iotasks, const int stride,
                                  const int base, const int rearr,
                                  rearr_opt_t *rearr_opts, int *iosysidp)
 {
     int ret = PIO_NOERR;
     fortran_order = true;
-    ret = PIOc_Init_Intracomm(MPI_Comm_f2c(f90_comp_comm), num_iotasks,
+    ret = PIOc_Init_Intracomm_impl(MPI_Comm_f2c(f90_comp_comm), num_iotasks,
                               stride, base, rearr,
                               iosysidp);
     if (ret != PIO_NOERR)
@@ -1548,7 +1548,7 @@ int PIOc_Init_Intracomm_from_F90(int f90_comp_comm,
     if (rearr_opts)
     {
         LOG((1, "Setting rearranger options, iosys=%d", *iosysidp));
-        ret = PIOc_set_rearr_opts(*iosysidp, rearr_opts->comm_type,
+        ret = PIOc_set_rearr_opts_impl(*iosysidp, rearr_opts->comm_type,
                                    rearr_opts->fcd,
                                    rearr_opts->comp2io.hs,
                                    rearr_opts->comp2io.isend,
@@ -1574,7 +1574,7 @@ int PIOc_Init_Intracomm_from_F90(int f90_comp_comm,
  * @returns 0 for success, or PIO_BADID if iosysid can't be found.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_set_hint(int iosysid, const char *hint, const char *hintval)
+int PIOc_set_hint_impl(int iosysid, const char *hint, const char *hintval)
 {
     iosystem_desc_t *ios;
     int mpierr; /* Return value for MPI calls. */
@@ -1629,7 +1629,7 @@ int PIOc_set_hint(int iosysid, const char *hint, const char *hintval)
  * @ingroup PIO_finalize
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_finalize(int iosysid)
+int PIOc_finalize_impl(int iosysid)
 {
     iosystem_desc_t *ios;
     int niosysid;          /* The number of currently open IO systems. */
@@ -1815,7 +1815,7 @@ int PIOc_finalize(int iosysid)
  * @returns 0 for success, or PIO_BADID if iosysid can't be found.
  * @author Jim Edwards
  */
-int PIOc_iam_iotask(int iosysid, bool *ioproc)
+int PIOc_iam_iotask_impl(int iosysid, bool *ioproc)
 {
     iosystem_desc_t *ios;
 
@@ -1841,7 +1841,7 @@ int PIOc_iam_iotask(int iosysid, bool *ioproc)
  * @returns 0 for success, or PIO_BADID if iosysid can't be found.
  * @author Jim Edwards
  */
-int PIOc_iotask_rank(int iosysid, int *iorank)
+int PIOc_iotask_rank_impl(int iosysid, int *iorank)
 {
     iosystem_desc_t *ios;
 
@@ -1864,7 +1864,7 @@ int PIOc_iotask_rank(int iosysid, int *iorank)
  * @returns 1 if iotype is in build, 0 if not.
  * @author Jim Edwards
  */
-int PIOc_iotype_available(int iotype)
+int PIOc_iotype_available_impl(int iotype)
 {
     switch(iotype)
     {
@@ -1964,7 +1964,7 @@ int PIOc_iotype_available(int iotype)
  * @ingroup PIO_init
  * @author Ed Hartnett
  */
-int PIOc_init_async(MPI_Comm world, int num_io_procs, const int *io_proc_list,
+int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_list,
                     int component_count, const int *num_procs_per_comp, const int **proc_list,
                     MPI_Comm *user_io_comm, MPI_Comm *user_comp_comm, int rearranger,
                     int *iosysidp)
@@ -2546,7 +2546,7 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, const int *io_proc_list,
  * comp_comms array)
  */
 
-int PIOc_init_intercomm(int component_count, const MPI_Comm peer_comm,
+int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                         const MPI_Comm *ucomp_comms, const MPI_Comm uio_comm,
                         int rearranger, int *iosysidps)
 {
@@ -3143,7 +3143,7 @@ int PIOc_init_intercomm(int component_count, const MPI_Comm peer_comm,
  * @returns 0 for success, error code otherwise
  * operations (defined in PIO_types).*
  */
-int PIOc_Init_Intercomm_from_F90(int component_count, int f90_peer_comm,
+int PIOc_Init_Intercomm_from_F90_impl(int component_count, int f90_peer_comm,
                                   const int *f90_comp_comms, int f90_io_comm,
                                   int rearranger, int *iosysidps)
 {
@@ -3165,7 +3165,7 @@ int PIOc_Init_Intercomm_from_F90(int component_count, int f90_peer_comm,
         iosysidps[i] = -1;
     }
 
-    ret = PIOc_init_intercomm(component_count, peer_comm, comp_comms,
+    ret = PIOc_init_intercomm_impl(component_count, peer_comm, comp_comms,
             io_comm, rearranger, iosysidps);
     if (ret != PIO_NOERR)
     {
@@ -3184,7 +3184,7 @@ int PIOc_Init_Intercomm_from_F90(int component_count, int f90_peer_comm,
  * @ingroup PIO_set_blocksize
  * @author Jim Edwards
  */
-int PIOc_set_blocksize(int newblocksize)
+int PIOc_set_blocksize_impl(int newblocksize)
 {
     if (newblocksize <= 0)
     {

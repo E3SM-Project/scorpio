@@ -10,7 +10,7 @@
 ///
 /// Refer to the <A HREF="http://www.unidata.ucar.edu/software/netcdf/docs/netcdf_documentation.html"> netcdf documentation. </A>
 ///
-int PIOc_put_varm (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const void *buf, PIO_Offset bufcount, MPI_Datatype buftype)
+int PIOc_put_varm_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const void *buf, PIO_Offset bufcount, MPI_Datatype buftype)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -96,7 +96,7 @@ int PIOc_put_varm (int ncid, int varid, const PIO_Offset start[], const PIO_Offs
 ///
 /// Refer to the <A HREF="http://www.unidata.ucar.edu/software/netcdf/docs/netcdf_documentation.html"> netcdf documentation. </A>
 ///
-int PIOc_put_varm_uchar (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const unsigned char *op)
+int PIOc_put_varm_uchar_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const unsigned char *op)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -180,7 +180,7 @@ int PIOc_put_varm_uchar (int ncid, int varid, const PIO_Offset start[], const PI
 ///
 /// Refer to the <A HREF="http://www.unidata.ucar.edu/software/netcdf/docs/netcdf_documentation.html"> netcdf documentation. </A>
 ///
-int PIOc_put_varm_short (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const short *op)
+int PIOc_put_varm_short_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const short *op)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -259,7 +259,7 @@ int PIOc_put_varm_short (int ncid, int varid, const PIO_Offset start[], const PI
 ///
 /// Refer to the <A HREF="http://www.unidata.ucar.edu/software/netcdf/docs/netcdf_documentation.html"> netcdf documentation. </A>
 ///
-int PIOc_put_varm_text (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const char *op)
+int PIOc_put_varm_text_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const char *op)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -341,7 +341,7 @@ int PIOc_put_varm_text (int ncid, int varid, const PIO_Offset start[], const PIO
 ///
 /// Refer to the <A HREF="http://www.unidata.ucar.edu/software/netcdf/docs/netcdf_documentation.html"> netcdf documentation. </A>
 ///
-int PIOc_put_varm_ushort (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const unsigned short *op)
+int PIOc_put_varm_ushort_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const unsigned short *op)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -423,7 +423,7 @@ int PIOc_put_varm_ushort (int ncid, int varid, const PIO_Offset start[], const P
 ///
 /// Refer to the <A HREF="http://www.unidata.ucar.edu/software/netcdf/docs/netcdf_documentation.html"> netcdf documentation. </A>
 ///
-int PIOc_put_varm_ulonglong (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const unsigned long long *op)
+int PIOc_put_varm_ulonglong_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const unsigned long long *op)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -504,7 +504,7 @@ int PIOc_put_varm_ulonglong (int ncid, int varid, const PIO_Offset start[], cons
 ///
 /// Refer to the <A HREF="http://www.unidata.ucar.edu/software/netcdf/docs/netcdf_documentation.html"> netcdf documentation. </A>
 ///
-int PIOc_put_varm_int (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const int *op)
+int PIOc_put_varm_int_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const int *op)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -586,7 +586,7 @@ int PIOc_put_varm_int (int ncid, int varid, const PIO_Offset start[], const PIO_
 ///
 /// Refer to the <A HREF="http://www.unidata.ucar.edu/software/netcdf/docs/netcdf_documentation.html"> netcdf documentation. </A>
 ///
-int PIOc_put_varm_float (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const float *op)
+int PIOc_put_varm_float_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const float *op)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -667,7 +667,7 @@ int PIOc_put_varm_float (int ncid, int varid, const PIO_Offset start[], const PI
 ///
 /// Refer to the <A HREF="http://www.unidata.ucar.edu/software/netcdf/docs/netcdf_documentation.html"> netcdf documentation. </A>
 ///
-int PIOc_put_varm_long (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const long *op)
+int PIOc_put_varm_long_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const long *op)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -749,7 +749,7 @@ int PIOc_put_varm_long (int ncid, int varid, const PIO_Offset start[], const PIO
 ///
 /// Refer to the <A HREF="http://www.unidata.ucar.edu/software/netcdf/docs/netcdf_documentation.html"> netcdf documentation. </A>
 ///
-int PIOc_put_varm_uint (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const unsigned int *op)
+int PIOc_put_varm_uint_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const unsigned int *op)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -832,7 +832,7 @@ int PIOc_put_varm_uint (int ncid, int varid, const PIO_Offset start[], const PIO
 ///
 /// Refer to the <A HREF="http://www.unidata.ucar.edu/software/netcdf/docs/netcdf_documentation.html"> netcdf documentation. </A>
 ///
-int PIOc_put_varm_double (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const double *op)
+int PIOc_put_varm_double_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const double *op)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -913,7 +913,7 @@ int PIOc_put_varm_double (int ncid, int varid, const PIO_Offset start[], const P
 ///
 /// Refer to the <A HREF="http://www.unidata.ucar.edu/software/netcdf/docs/netcdf_documentation.html"> netcdf documentation. </A>
 ///
-int PIOc_put_varm_schar (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const signed char *op)
+int PIOc_put_varm_schar_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const signed char *op)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -995,7 +995,7 @@ int PIOc_put_varm_schar (int ncid, int varid, const PIO_Offset start[], const PI
 ///
 /// Refer to the <A HREF="http://www.unidata.ucar.edu/software/netcdf/docs/netcdf_documentation.html"> netcdf documentation. </A>
 ///
-int PIOc_put_varm_longlong (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const long long *op)
+int PIOc_put_varm_longlong_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], const long long *op)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -1069,7 +1069,7 @@ int PIOc_put_varm_longlong (int ncid, int varid, const PIO_Offset start[], const
     return ierr;
 }
 
-int PIOc_get_varm_uchar (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], unsigned char *buf)
+int PIOc_get_varm_uchar_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], unsigned char *buf)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -1084,7 +1084,7 @@ int PIOc_get_varm_uchar (int ncid, int varid, const PIO_Offset start[], const PI
         return ierr;
     ios = file->iosystem;
     ibuftype = MPI_UNSIGNED_CHAR;
-    ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+    ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
     ibufcnt = 1;
     for(int i=0;i<ndims;i++){
         ibufcnt *= count[i]/stride[i];
@@ -1147,7 +1147,7 @@ int PIOc_get_varm_uchar (int ncid, int varid, const PIO_Offset start[], const PI
     return ierr;
 }
 
-int PIOc_get_varm_schar (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], signed char *buf)
+int PIOc_get_varm_schar_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], signed char *buf)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -1162,7 +1162,7 @@ int PIOc_get_varm_schar (int ncid, int varid, const PIO_Offset start[], const PI
         return ierr;
     ios = file->iosystem;
     ibuftype = MPI_CHAR;
-    ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+    ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
     ibufcnt = 1;
     for(int i=0;i<ndims;i++){
         ibufcnt *= count[i]/stride[i];
@@ -1225,7 +1225,7 @@ int PIOc_get_varm_schar (int ncid, int varid, const PIO_Offset start[], const PI
     return ierr;
 }
 
-int PIOc_get_varm_double (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], double *buf)
+int PIOc_get_varm_double_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], double *buf)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -1240,7 +1240,7 @@ int PIOc_get_varm_double (int ncid, int varid, const PIO_Offset start[], const P
         return ierr;
     ios = file->iosystem;
     ibuftype = MPI_DOUBLE;
-    ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+    ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
     ibufcnt = 1;
     for(int i=0;i<ndims;i++){
         ibufcnt *= count[i]/stride[i];
@@ -1303,7 +1303,7 @@ int PIOc_get_varm_double (int ncid, int varid, const PIO_Offset start[], const P
     return ierr;
 }
 
-int PIOc_get_varm_text (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], char *buf)
+int PIOc_get_varm_text_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], char *buf)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -1318,7 +1318,7 @@ int PIOc_get_varm_text (int ncid, int varid, const PIO_Offset start[], const PIO
         return ierr;
     ios = file->iosystem;
     ibuftype = MPI_CHAR;
-    ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+    ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
     ibufcnt = 1;
     for(int i=0;i<ndims;i++){
         ibufcnt *= count[i]/stride[i];
@@ -1381,7 +1381,7 @@ int PIOc_get_varm_text (int ncid, int varid, const PIO_Offset start[], const PIO
     return ierr;
 }
 
-int PIOc_get_varm_int (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], int *buf)
+int PIOc_get_varm_int_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], int *buf)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -1396,7 +1396,7 @@ int PIOc_get_varm_int (int ncid, int varid, const PIO_Offset start[], const PIO_
         return ierr;
     ios = file->iosystem;
     ibuftype = MPI_INT;
-    ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+    ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
     ibufcnt = 1;
     for(int i=0;i<ndims;i++){
         ibufcnt *= count[i]/stride[i];
@@ -1459,7 +1459,7 @@ int PIOc_get_varm_int (int ncid, int varid, const PIO_Offset start[], const PIO_
     return ierr;
 }
 
-int PIOc_get_varm_uint (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], unsigned int *buf)
+int PIOc_get_varm_uint_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], unsigned int *buf)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -1474,7 +1474,7 @@ int PIOc_get_varm_uint (int ncid, int varid, const PIO_Offset start[], const PIO
         return ierr;
     ios = file->iosystem;
     ibuftype = MPI_UNSIGNED;
-    ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+    ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
     ibufcnt = 1;
     for(int i=0;i<ndims;i++){
         ibufcnt *= count[i]/stride[i];
@@ -1537,7 +1537,7 @@ int PIOc_get_varm_uint (int ncid, int varid, const PIO_Offset start[], const PIO
     return ierr;
 }
 
-int PIOc_get_varm (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], void *buf, PIO_Offset bufcount, MPI_Datatype buftype)
+int PIOc_get_varm_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], void *buf, PIO_Offset bufcount, MPI_Datatype buftype)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -1610,7 +1610,7 @@ int PIOc_get_varm (int ncid, int varid, const PIO_Offset start[], const PIO_Offs
     return ierr;
 }
 
-int PIOc_get_varm_float (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], float *buf)
+int PIOc_get_varm_float_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], float *buf)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -1625,7 +1625,7 @@ int PIOc_get_varm_float (int ncid, int varid, const PIO_Offset start[], const PI
         return ierr;
     ios = file->iosystem;
     ibuftype = MPI_FLOAT;
-    ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+    ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
     ibufcnt = 1;
     for(int i=0;i<ndims;i++){
         ibufcnt *= count[i]/stride[i];
@@ -1688,7 +1688,7 @@ int PIOc_get_varm_float (int ncid, int varid, const PIO_Offset start[], const PI
     return ierr;
 }
 
-int PIOc_get_varm_long (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], long *buf)
+int PIOc_get_varm_long_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], long *buf)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -1703,7 +1703,7 @@ int PIOc_get_varm_long (int ncid, int varid, const PIO_Offset start[], const PIO
         return ierr;
     ios = file->iosystem;
     ibuftype = MPI_LONG;
-    ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+    ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
     ibufcnt = 1;
     for(int i=0;i<ndims;i++){
         ibufcnt *= count[i]/stride[i];
@@ -1766,7 +1766,7 @@ int PIOc_get_varm_long (int ncid, int varid, const PIO_Offset start[], const PIO
     return ierr;
 }
 
-int PIOc_get_varm_ushort (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], unsigned short *buf)
+int PIOc_get_varm_ushort_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], unsigned short *buf)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -1781,7 +1781,7 @@ int PIOc_get_varm_ushort (int ncid, int varid, const PIO_Offset start[], const P
         return ierr;
     ios = file->iosystem;
     ibuftype = MPI_UNSIGNED_SHORT;
-    ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+    ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
     ibufcnt = 1;
     for(int i=0;i<ndims;i++){
         ibufcnt *= count[i]/stride[i];
@@ -1844,7 +1844,7 @@ int PIOc_get_varm_ushort (int ncid, int varid, const PIO_Offset start[], const P
     return ierr;
 }
 
-int PIOc_get_varm_longlong (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], long long *buf)
+int PIOc_get_varm_longlong_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], long long *buf)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -1859,7 +1859,7 @@ int PIOc_get_varm_longlong (int ncid, int varid, const PIO_Offset start[], const
         return ierr;
     ios = file->iosystem;
     ibuftype = MPI_LONG_LONG;
-    ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+    ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
     ibufcnt = 1;
     for(int i=0;i<ndims;i++){
         ibufcnt *= count[i]/stride[i];
@@ -1922,7 +1922,7 @@ int PIOc_get_varm_longlong (int ncid, int varid, const PIO_Offset start[], const
     return ierr;
 }
 
-int PIOc_get_varm_short (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], short *buf)
+int PIOc_get_varm_short_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], short *buf)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -1937,7 +1937,7 @@ int PIOc_get_varm_short (int ncid, int varid, const PIO_Offset start[], const PI
         return ierr;
     ios = file->iosystem;
     ibuftype = MPI_SHORT;
-    ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+    ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
     ibufcnt = 1;
     for(int i=0;i<ndims;i++){
         ibufcnt *= count[i]/stride[i];
@@ -2000,7 +2000,7 @@ int PIOc_get_varm_short (int ncid, int varid, const PIO_Offset start[], const PI
     return ierr;
 }
 
-int PIOc_get_varm_ulonglong (int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], unsigned long long *buf)
+int PIOc_get_varm_ulonglong_impl(int ncid, int varid, const PIO_Offset start[], const PIO_Offset count[], const PIO_Offset stride[], const PIO_Offset imap[], unsigned long long *buf)
 {
     int ierr;
     iosystem_desc_t *ios;
@@ -2015,7 +2015,7 @@ int PIOc_get_varm_ulonglong (int ncid, int varid, const PIO_Offset start[], cons
         return ierr;
     ios = file->iosystem;
     ibuftype = MPI_UNSIGNED_LONG_LONG;
-    ierr = PIOc_inq_varndims(ncid, varid, &ndims);
+    ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
     ibufcnt = 1;
     for(int i=0;i<ndims;i++){
         ibufcnt *= count[i]/stride[i];
