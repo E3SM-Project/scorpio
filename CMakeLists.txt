@@ -1,6 +1,7 @@
 cmake_minimum_required (VERSION 3.7)
 project (SCORPIO C CXX Fortran)
-#cmake_policy(VERSION 3.5.2)
+cmake_policy(SET CMP0074 NEW)
+
 
 message(STATUS "===== Configuring SCORPIO... =====")
 
