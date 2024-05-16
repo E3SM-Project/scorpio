@@ -174,7 +174,7 @@ PIO_Offset GCDblocksize_gaps(int arrlen, const PIO_Offset *arr_in)
 
     if (arrlen > 1)
     {
-        if (!(del_arr = malloc((arrlen - 1) * sizeof(PIO_Offset))))
+        if (!(del_arr = (PIO_Offset *) malloc((arrlen - 1) * sizeof(PIO_Offset))))
         {
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Internal error while calculating GCD block size. Out of memory allocating %lld bytes for internal array", (unsigned long long) ((arrlen - 1) * sizeof(PIO_Offset)));
@@ -227,7 +227,7 @@ PIO_Offset GCDblocksize_gaps(int arrlen, const PIO_Offset *arr_in)
         }
 
         /* If numblks > 1 then arrlen must be > 1 */
-        PIO_Offset *loc_arr = calloc(arrlen - 1, sizeof(PIO_Offset));
+        PIO_Offset *loc_arr = (PIO_Offset *) calloc(arrlen - 1, sizeof(PIO_Offset));
         if (!loc_arr)
         {
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
