@@ -234,7 +234,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
         }
         if(!fillvalue_present)
         {
-            amsg_fillvalue = calloc(nvars * iodesc->piotype_size, sizeof(char ));
+            amsg_fillvalue = (char *) calloc(nvars * iodesc->piotype_size, sizeof(char ));
         }
 
         PIO_SEND_ASYNC_MSG(ios, msg, &ierr,
@@ -2235,7 +2235,7 @@ if (file->iotype != PIO_IOTYPE_HDF5)
     {
         /* Allocate a buffer. */
         LOG((3, "allocating multi-buffer"));
-        if (!(wmb->next = calloc(1, sizeof(wmulti_buffer))))
+        if (!(wmb->next = (wmulti_buffer *) calloc(1, sizeof(wmulti_buffer))))
         {
             GPTLstop("PIO:PIOc_write_darray");
             GPTLstop("PIO:write_total");
@@ -2389,7 +2389,7 @@ if (file->iotype != PIO_IOTYPE_HDF5)
 
     /* vid is an array of variable ids in the wmb list, grow the list
      * and add the new entry. */
-    if (!(wmb->vid = realloc(wmb->vid, sizeof(int) * (1 + wmb->num_arrays))))
+    if (!(wmb->vid = (int *) realloc(wmb->vid, sizeof(int) * (1 + wmb->num_arrays))))
     {
         GPTLstop("PIO:PIOc_write_darray");
         GPTLstop("PIO:write_total");
@@ -2405,7 +2405,7 @@ if (file->iotype != PIO_IOTYPE_HDF5)
      * in the wmb list may not all have the same unlimited dimension
      * value although they usually do. */
     if (vdesc->record >= 0)
-        if (!(wmb->frame = realloc(wmb->frame, sizeof(int) * (1 + wmb->num_arrays))))
+        if (!(wmb->frame = (int *) realloc(wmb->frame, sizeof(int) * (1 + wmb->num_arrays))))
         {
             GPTLstop("PIO:PIOc_write_darray");
             GPTLstop("PIO:write_total");
@@ -2710,7 +2710,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
     char suffix_att_name[] = "/def/decomp";
     size_t att_name_len = strlen(prefix_var_name) + strlen(adios_vdesc->name) + strlen(suffix_att_name) + 1;
 
-    char *att_name = calloc(att_name_len, 1);
+    char *att_name = (char *) calloc(att_name_len, 1);
     if (att_name == NULL)
     {
         return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2742,7 +2742,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
     char prefix_decomp_name[] = "/__pio__/decomp/";
     int decomp_name_len = strlen(prefix_decomp_name) + strlen(attr_data) + 1;
 
-    char *decomp_name = calloc(decomp_name_len, 1);
+    char *decomp_name = (char *) calloc(decomp_name_len, 1);
     if (decomp_name == NULL)
     {
         return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -3233,7 +3233,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
     assert(current_adios_step == required_adios_step);
 
     size_t var_track_frame_id_len = strlen(prefix_track_frame_id) + strlen(adios_vdesc->name) + 1;
-    char *var_track_frame_id = calloc(var_track_frame_id_len, 1);
+    char *var_track_frame_id = (char *) calloc(var_track_frame_id_len, 1);
     if (var_track_frame_id == NULL)
     {
         return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -3294,7 +3294,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
     free(var_track_frame_id);
 
     int var_name_len = strlen(prefix_var_name) + strlen(adios_vdesc->name) + 1;
-    char *var_name = calloc(var_name_len, 1);
+    char *var_name = (char *) calloc(var_name_len, 1);
     if (var_name == NULL)
     {
         return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -3368,7 +3368,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
                            pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
         }
 
-        char* data_buf = calloc(block_size * read_type_size, 1);
+        char* data_buf = (char *) calloc(block_size * read_type_size, 1);
         if (data_buf == NULL)
         {
             return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
