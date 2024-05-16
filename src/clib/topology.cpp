@@ -2,6 +2,7 @@
 
 #include <pio.h>
 #include <pio_internal.h>
+#include <pio_minmax.h>
 
 #include <math.h>
 

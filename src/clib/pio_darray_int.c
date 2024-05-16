@@ -13,6 +13,7 @@
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
+#include <pio_minmax.h>
 #ifdef PIO_MICRO_TIMING
 #include "pio_timer.h"
 #endif

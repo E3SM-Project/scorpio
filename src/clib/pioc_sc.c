@@ -8,6 +8,7 @@
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
+#include <pio_minmax.h>
 
 /** The default target blocksize in bytes for each io task when the box
  * rearranger is used. */
