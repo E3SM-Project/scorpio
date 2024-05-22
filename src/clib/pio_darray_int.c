@@ -333,13 +333,13 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                 {
                     /* Allocate storage for start/count arrays for
                      * this region. */
-                    if (!(startlist[rrcnt] = calloc(fndims, sizeof(PIO_Offset))))
+                    if (!(startlist[rrcnt] = (PIO_Offset *) calloc(fndims, sizeof(PIO_Offset))))
                     {
                         ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
                                           "Writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_PNETCDF iotype failed. Out of memory allocating buffer (%lld bytes) for array to store starts of I/O regions written out to file", nvars, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (fndims * sizeof(PIO_Offset)));
                         break;
                     }
-                    if (!(countlist[rrcnt] = calloc(fndims, sizeof(PIO_Offset))))
+                    if (!(countlist[rrcnt] = (PIO_Offset *) calloc(fndims, sizeof(PIO_Offset))))
                     {
                         ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
                                           "Writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_PNETCDF iotype failed. Out of memory allocating buffer (%lld bytes) for array to store counts of I/O regions written out to file", nvars, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (fndims * sizeof(PIO_Offset)));
@@ -377,7 +377,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
 
                         if (vdesc->nreqs % PIO_REQUEST_ALLOC_CHUNK == 0)
                         {
-                            if (!(vdesc->request = realloc(vdesc->request, sizeof(int) *
+                            if (!(vdesc->request = (int *) realloc(vdesc->request, sizeof(int) *
                                                            (vdesc->nreqs + PIO_REQUEST_ALLOC_CHUNK))))
                             {
                                 ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -385,7 +385,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                                 break;
                             }
 
-                            vdesc->request_sz = realloc(vdesc->request_sz,
+                            vdesc->request_sz = (PIO_Offset *) realloc(vdesc->request_sz,
                                                   sizeof(PIO_Offset) *
                                                   (vdesc->nreqs +
                                                     PIO_REQUEST_ALLOC_CHUNK));
@@ -457,7 +457,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
 
                     /* Allocate storage for start/count arrays for
                      * this region. */
-                    if (!(startlist[rrcnt] = calloc(fndims, sizeof(PIO_Offset))))
+                    if (!(startlist[rrcnt] = (PIO_Offset *) calloc(fndims, sizeof(PIO_Offset))))
                     {
                         ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
                                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
@@ -465,7 +465,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                                        nvars, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (fndims * sizeof(PIO_Offset)));
                         break;
                     }
-                    if (!(countlist[rrcnt] = calloc(fndims, sizeof(PIO_Offset))))
+                    if (!(countlist[rrcnt] = (PIO_Offset *) calloc(fndims, sizeof(PIO_Offset))))
                     {
                         ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
                                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
@@ -1304,8 +1304,8 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
 
                 if (tmp_bufsize > 0)
                 {
-                    startlist[rrlen] = bget(fndims * sizeof(PIO_Offset));
-                    countlist[rrlen] = bget(fndims * sizeof(PIO_Offset));
+                    startlist[rrlen] = (PIO_Offset *) bget(fndims * sizeof(PIO_Offset));
+                    countlist[rrlen] = (PIO_Offset *) bget(fndims * sizeof(PIO_Offset));
 
                     for (int j = 0; j < fndims; j++)
                     {
@@ -2408,7 +2408,7 @@ int flush_buffer(int ncid, wmulti_buffer *wmb, bool flushtodisk)
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         ret = PIOc_write_darray_multi_impl(ncid, wmb->vid,  wmb->ioid, wmb->num_arrays,
                                       wmb->arraylen, wmb->data, wmb->frame,
-                                      wmb->fillvalue, flushtodisk);
+                                      ((const void **) wmb->fillvalue), flushtodisk);
         if(file->mode & PIO_WRITE)
         {
             spio_ltimer_start(ios->io_fstats->wr_timer_name);
