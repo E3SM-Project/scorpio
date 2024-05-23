@@ -39,7 +39,7 @@ add_library (pioc ${pio_api_src}
   topology.cpp pio_mpi_timer.cpp pio_timer.c pio_file.cpp
   pioc_support.cpp pio_lists.cpp pio_print.cpp
   pioc.cpp pioc_sc.cpp pio_spmd.c pio_rearrange.c pio_nc4.cpp bget.cpp
-  pio_nc.cpp pio_put_nc.c pio_get_nc.cpp pio_getput_int.cpp pio_msg.cpp pio_varm.c
+  pio_nc.cpp pio_put_nc.cpp pio_get_nc.cpp pio_getput_int.cpp pio_msg.cpp pio_varm.c
   pio_darray.cpp pio_darray_int.cpp spio_hash.cpp pio_sdecomps_regex.cpp spio_io_summary.cpp
   spio_ltimer.cpp spio_serializer.cpp spio_file_mvcache.cpp spio_tracer.cpp spio_rearrange_any.cpp)
 
