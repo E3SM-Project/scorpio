@@ -441,7 +441,7 @@ int PIOc_inq_unlimdims_impl(int ncid, int *nunlimdimsp, int *unlimdimidsp)
                 if (nunlimdimsp)
                     *nunlimdimsp = tmp_nunlimdims;
                 LOG((3, "tmp_nunlimdims = %d", tmp_nunlimdims));
-                if (!(tmp_unlimdimids = malloc(tmp_nunlimdims * sizeof(int))))
+                if (!(tmp_unlimdimids = (int *) malloc(tmp_nunlimdims * sizeof(int))))
                     ierr = PIO_ENOMEM;
                 if (!ierr)
                     ierr = nc_inq_unlimdims(file->fh, &tmp_nunlimdims, tmp_unlimdimids);
@@ -3574,7 +3574,7 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
                     int alt_name_len = strlen(name) + strlen(non_coord_prpend) + 1;
                     assert(alt_name_len < PIO_MAX_NAME);
 
-                    char* alt_name = malloc(alt_name_len);
+                    char* alt_name = (char *) malloc(alt_name_len);
                     if (alt_name == NULL)
                     {
                         const char *vname = (name) ? name : "UNKNOWN";
