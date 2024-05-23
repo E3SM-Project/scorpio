@@ -359,7 +359,7 @@ int create_mpi_datatypes(MPI_Datatype mpitype, int msgcnt,
 
             if (len > 0)
             {
-                if (!(displace = calloc(len, sizeof(int))))
+                if (!(displace = (int *) calloc(len, sizeof(int))))
                 {
                     return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                                     "Creating MPI datatypes to rearrange data from/to compute processes to/from io processes failed. Out of memory allocating %lld bytes to store displacements", (unsigned long long) (len * sizeof(int)));
@@ -462,7 +462,7 @@ int define_iodesc_datatypes(iosystem_desc_t *ios, io_desc_t *iodesc)
             if (iodesc->nrecvs > 0)
             {
                 /* Allocate memory for array of MPI types for the IO tasks. */
-                if (!(iodesc->rtype = malloc(iodesc->nrecvs * sizeof(MPI_Datatype))))
+                if (!(iodesc->rtype = (MPI_Datatype *) malloc(iodesc->nrecvs * sizeof(MPI_Datatype))))
                 {
                     return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                                     "Defining MPI datatypes for I/O decomposition failed. Out of memory allocating %lld bytes for storing MPI datatypes for data received from each compute process", (unsigned long long) (iodesc->nrecvs * sizeof(MPI_Datatype)));
@@ -502,7 +502,7 @@ int define_iodesc_datatypes(iosystem_desc_t *ios, io_desc_t *iodesc)
             ntypes = iodesc->rearranger == PIO_REARR_SUBSET ? 1 : ios->num_iotasks;
             
             /* Allocate memory for array of MPI types for the computation tasks. */
-            if (!(iodesc->stype = malloc(ntypes * sizeof(MPI_Datatype))))
+            if (!(iodesc->stype = (MPI_Datatype *) malloc(ntypes * sizeof(MPI_Datatype))))
             {
                 return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                                 "Defining MPI datatypes for I/O decomposition failed. Out of memory allocating %lld bytes for storing MPI datatypes for data sent from each compute process", (unsigned long long) (ntypes * sizeof(MPI_Datatype)));
@@ -588,7 +588,7 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
     PIO_Offset *s2rindex = NULL;
     if (iodesc->ndof > 0)
     {
-        if (!(s2rindex = malloc(iodesc->ndof * sizeof(PIO_Offset))))
+        if (!(s2rindex = (PIO_Offset *) malloc(iodesc->ndof * sizeof(PIO_Offset))))
         {
           return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                           "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory allocating %lld bytes to store index mapping between compute and I/O processes", (unsigned long long) (iodesc->ndof * sizeof(PIO_Offset)));
@@ -596,7 +596,7 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
     }
 
     /* Allocate memory for the array of counts and init to zero. */
-    if (!(iodesc->scount = calloc(ios->num_iotasks, sizeof(int))))
+    if (!(iodesc->scount = (int *) calloc(ios->num_iotasks, sizeof(int))))
     {
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                           "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory allocating %lld bytes to store amount of data sent between compute and I/O processes", (unsigned long long) (ios->num_iotasks * sizeof(int)));
@@ -646,7 +646,7 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
     {
         /* Allocate memory to hold array of the scounts from all
          * computation tasks. */
-        if (!(recv_buf = calloc(ios->num_comptasks, sizeof(int))))
+        if (!(recv_buf = (int *) calloc(ios->num_comptasks, sizeof(int))))
         {
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory in I/O process allocating %lld bytes to store offsets of data from compute to I/O processes", (unsigned long long) (ios->num_comptasks * sizeof(int)));
@@ -684,14 +684,14 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
         }
 
         /* Get memory to hold the count of data receives. */
-        if (!(iodesc->rcount = calloc(max(1, nrecvs), sizeof(int))))
+        if (!(iodesc->rcount = (int *) calloc(max(1, nrecvs), sizeof(int))))
         {
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory in I/O process allocating %lld bytes to store amount of data received from compute processes", (unsigned long long) (max(1, nrecvs) * sizeof(int)));
         }
 
         /* Get memory to hold the list of task data was from. */
-        if (!(iodesc->rfrom = calloc(max(1, nrecvs), sizeof(int))))
+        if (!(iodesc->rfrom = (int *) calloc(max(1, nrecvs), sizeof(int))))
         {
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory in I/O process allocating %lld bytes to store rank of compute processes that send data", (unsigned long long) (max(1, nrecvs) * sizeof(int)));
@@ -718,7 +718,7 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
     /* Allocate an array for indicies on the computation tasks (the
      * send side when writing). */
     if (iodesc->sindex == NULL && iodesc->ndof > 0)
-        if (!(iodesc->sindex = malloc(iodesc->ndof * sizeof(PIO_Offset))))
+        if (!(iodesc->sindex = (PIO_Offset *) malloc(iodesc->ndof * sizeof(PIO_Offset))))
         {
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory allocating %lld bytes to store offset/index of data", (unsigned long long) (iodesc->ndof * sizeof(PIO_Offset)));
@@ -805,7 +805,7 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
         LOG((3, "totalrecv = %d", totalrecv));
         if (totalrecv > 0)
         {
-            if (!(iodesc->rindex = calloc(totalrecv, sizeof(PIO_Offset))))
+            if (!(iodesc->rindex = (PIO_Offset *) calloc(totalrecv, sizeof(PIO_Offset))))
             {
                 return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory allocating %lld bytes to store receive index/offset of data", (unsigned long long) (totalrecv * sizeof(PIO_Offset)));
@@ -1342,21 +1342,21 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
 
     if (maplen > 0)
     {
-        if (!(dest_ioproc = malloc(maplen * sizeof(int))))
+        if (!(dest_ioproc = (int *) malloc(maplen * sizeof(int))))
         {
             GPTLstop("PIO:box_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Creating BOX rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes to store destination I/O process ranks while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (maplen * sizeof(int)));
         }
 
-        if (!(dest_ioindex = malloc(maplen * sizeof(PIO_Offset))))
+        if (!(dest_ioindex = (PIO_Offset *) malloc(maplen * sizeof(PIO_Offset))))
         {
             GPTLstop("PIO:box_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Creating BOX rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes to store destination I/O indices while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (maplen * sizeof(PIO_Offset)));
         }
 
-        if (!(gcoord_map = malloc(maplen * sizeof(PIO_Offset*))))
+        if (!(gcoord_map = (PIO_Offset **) malloc(maplen * sizeof(PIO_Offset*))))
         {
             GPTLstop("PIO:box_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -1365,7 +1365,7 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
 
         for (int i = 0; i < maplen; i++)
         {
-            if (!(gcoord_map[i] = calloc(ndims, sizeof(PIO_Offset))))
+            if (!(gcoord_map[i] = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset))))
             {
                 GPTLstop("PIO:box_rearrange_create");
                 return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -1666,21 +1666,21 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
 
     if (maplen > 0)
     {
-        if (!(dest_ioproc = malloc(maplen * sizeof(int))))
+        if (!(dest_ioproc = (int *) malloc(maplen * sizeof(int))))
         {
             GPTLstop("PIO:box_rearrange_create_with_holes");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Creating BOX rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes to store destination I/O process ranks while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (maplen * sizeof(int)));
         }
 
-        if (!(dest_ioindex = malloc(maplen * sizeof(PIO_Offset))))
+        if (!(dest_ioindex = (PIO_Offset *) malloc(maplen * sizeof(PIO_Offset))))
         {
             GPTLstop("PIO:box_rearrange_create_with_holes");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Creating BOX rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes to store destination I/O indices while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (maplen * sizeof(PIO_Offset)));
         }
 
-        if (!(gcoord_map = malloc(maplen * sizeof(PIO_Offset*))))
+        if (!(gcoord_map = (PIO_Offset **) malloc(maplen * sizeof(PIO_Offset*))))
         {
             GPTLstop("PIO:box_rearrange_create_with_holes");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -1689,7 +1689,7 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
 
         for (int i = 0; i < maplen; i++)
         {
-            if (!(gcoord_map[i] = calloc(ndims, sizeof(PIO_Offset))))
+            if (!(gcoord_map[i] = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset))))
             {
                 GPTLstop("PIO:box_rearrange_create_with_holes");
                 return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2257,7 +2257,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
     if (ios->ioproc)
     {
         /* Allocate space to hold count of data to be received in pio_swapm(). */
-        if (!(iodesc->rcount = malloc(ntasks * sizeof(int))))
+        if (!(iodesc->rcount = (int *) malloc(ntasks * sizeof(int))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2268,7 +2268,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
     }
 
     /* Allocate space to hold count of data to be sent in pio_swapm(). */
-    if (!(iodesc->scount = malloc(sizeof(int))))
+    if (!(iodesc->scount = (int *) malloc(sizeof(int))))
     {
         GPTLstop("PIO:subset_rearrange_create");
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2297,7 +2297,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
     /* Allocate an array for indicies on the computation tasks (the
      * send side when writing). */
     if (iodesc->scount[0] > 0)
-        if (!(iodesc->sindex = calloc(iodesc->scount[0], sizeof(PIO_Offset))))
+        if (!(iodesc->sindex = (PIO_Offset *) calloc(iodesc->scount[0], sizeof(PIO_Offset))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2337,7 +2337,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
 
         if (iodesc->llen > 0)
         {
-            if (!(srcindex = calloc(iodesc->llen, sizeof(PIO_Offset))))
+            if (!(srcindex = (PIO_Offset *) calloc(iodesc->llen, sizeof(PIO_Offset))))
             {
                 GPTLstop("PIO:subset_rearrange_create");
                 return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2378,14 +2378,14 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
      * iomap. */
     if (ios->ioproc && iodesc->llen > 0)
     {
-        if (!(map = calloc(iodesc->llen, sizeof(mapsort))))
+        if (!(map = (mapsort *) calloc(iodesc->llen, sizeof(mapsort))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing internal map while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->llen * sizeof(mapsort)));
         }
 
-        if (!(iomap = calloc(iodesc->llen, sizeof(PIO_Offset))))
+        if (!(iomap = (PIO_Offset *) calloc(iodesc->llen, sizeof(PIO_Offset))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2397,7 +2397,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
     PIO_Offset *shrtmap;
     if (maplen > iodesc->scount[0] && iodesc->scount[0] > 0)
     {
-        if (!(shrtmap = calloc(iodesc->scount[0], sizeof(PIO_Offset))))
+        if (!(shrtmap = (PIO_Offset *) calloc(iodesc->scount[0], sizeof(PIO_Offset))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2448,14 +2448,14 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
         /* sort the mapping, this will transpose the data into IO order */
         qsort(map, iodesc->llen, sizeof(mapsort), compare_offsets);
 
-        if (!(iodesc->rindex = calloc(1, iodesc->llen * sizeof(PIO_Offset))))
+        if (!(iodesc->rindex = (PIO_Offset *) calloc(1, iodesc->llen * sizeof(PIO_Offset))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing receive indices while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->llen * sizeof(PIO_Offset)));
         }
 
-        if (!(iodesc->rfrom = calloc(1, iodesc->llen * sizeof(int))))
+        if (!(iodesc->rfrom = (int *) calloc(1, iodesc->llen * sizeof(int))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2532,7 +2532,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
                     displs[i] = displs[i - 1] + gcnt[i - 1];
 
                 /* Allocate storage for the grid. */
-                if (!(myusegrid = malloc(thisgridsize[nio] * sizeof(PIO_Offset))))
+                if (!(myusegrid = (PIO_Offset *) malloc(thisgridsize[nio] * sizeof(PIO_Offset))))
                 {
                     GPTLstop("PIO:subset_rearrange_create");
                     return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2556,7 +2556,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
         PIO_Offset *grid = NULL;
         if (thisgridsize[ios->io_rank] > 0)
         {
-            if (!(grid = malloc(thisgridsize[ios->io_rank] * sizeof(PIO_Offset))))
+            if (!(grid = (PIO_Offset *) malloc(thisgridsize[ios->io_rank] * sizeof(PIO_Offset))))
             {
                 GPTLstop("PIO:subset_rearrange_create");
                 return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2586,7 +2586,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
         if (iodesc->holegridsize > 0)
         {
             /* Allocate space for the fillgrid. */
-            if (!(myfillgrid = malloc(iodesc->holegridsize * sizeof(PIO_Offset))))
+            if (!(myfillgrid = (PIO_Offset *) malloc(iodesc->holegridsize * sizeof(PIO_Offset))))
             {
                 GPTLstop("PIO:subset_rearrange_create");
                 return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
