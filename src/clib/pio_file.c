@@ -888,6 +888,12 @@ int PIOc_closefile_impl(int ncid)
             }
         }
 
+        if (file->adios_reader_target_block_proc_list != NULL)
+        {
+            free(file->adios_reader_target_block_proc_list);
+            file->adios_reader_target_block_proc_list = NULL;
+        }
+
 #ifdef _ADIOS_BP2NC_TEST /* Comment out for large scale run */
         if (file->mode & PIO_WRITE)
         {

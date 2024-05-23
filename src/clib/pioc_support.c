@@ -2950,6 +2950,10 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
         file->num_adiostasks = ios->num_adiostasks;
         file->adios_io_process = ios->adios_io_process;
 
+        file->adios_reader_target_block = 0;
+        file->adios_reader_target_block_proc_list = NULL;
+        file->adios_reader_target_block_nprocs = 0;
+
         /* Create a new ADIOS group */
         char declare_name[PIO_MAX_NAME];
         snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->filename, get_adios2_io_cnt());
@@ -3526,6 +3530,7 @@ static int adios_get_step_info(file_desc_t *file, int, size_t, size_t);
 static int adios_get_dim_ids(file_desc_t *file, int);
 static int adios_get_nc_op_tag(file_desc_t *file, int);
 static int adios_get_attr(file_desc_t *file, int current_var_cnt, char *const *attr_names, size_t);
+static int adios_get_target_block_info(file_desc_t *file);
 static size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *const *var_names);
 static size_t adios_read_vars_attrs(file_desc_t *file, size_t attr_size, char *const *attr_names);
 
@@ -4102,6 +4107,98 @@ static int adios_get_step_info(file_desc_t *file, int varid, size_t adios_step, 
     return 0;
 }
 
+static int adios_get_target_block_info(file_desc_t *file)
+{
+    adios2_variable *variableH = adios2_inquire_variable(file->ioH, "/__pio__/info/block_nprocs");
+    if (variableH == NULL)
+    {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Getting target block info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                       "/__pio__/info/block_nprocs is missing",
+                       pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    adios2_error adiosErr = adios2_get(file->engineH, variableH, &file->adios_reader_target_block_nprocs, adios2_mode_sync);
+    if (adiosErr != adios2_error_none)
+    {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Getting target block info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to get data associated with a variable from an engine (adios2_error=%s)",
+                       pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+    }
+
+    file->adios_reader_target_block_proc_list = (int*)calloc(file->adios_reader_target_block_nprocs, sizeof(int));
+    if (file->adios_reader_target_block_proc_list == NULL)
+    {
+        return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
+                       "Getting target block info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                       "Out of memory allocating %lld bytes for adios_reader_target_block_proc_list",
+                       pio_get_fname_from_file(file), file->pio_ncid, (long long int)(file->adios_reader_target_block_nprocs * sizeof(int)));
+    }
+
+    variableH = adios2_inquire_variable(file->ioH, "/__pio__/info/block_list");
+    if (variableH == NULL)
+    {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Getting target block info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                       "/__pio__/info/block_list is missing",
+                       pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    adios2_varinfo *info_block_list = adios2_inquire_blockinfo(file->engineH, variableH, 0);
+    if (info_block_list == NULL)
+    {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Getting target block info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to get the list of blocks for a variable in a given step (NULL pointer returned)",
+                       pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    bool target_block_found = false;
+    for (size_t block = 0; block < info_block_list->nblocks; block++)
+    {
+        adiosErr = adios2_set_block_selection(variableH, block);
+        if (adiosErr != adios2_error_none)
+        {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Getting target block info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "The low level (ADIOS) I/O library call failed to set block selection (adios2_error=%s)",
+                           pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+        }
+
+        size_t block_size = 0;
+        adiosErr = adios2_selection_size(&block_size, variableH);
+        if (adiosErr != adios2_error_none)
+        {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Getting target block info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "The low level (ADIOS) I/O library call failed to return the minimum required allocation for the current selection (adios2_error=%s)",
+                           pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+        }
+        assert(block_size <= file->adios_reader_target_block_nprocs);
+
+        adiosErr = adios2_get(file->engineH, variableH, file->adios_reader_target_block_proc_list, adios2_mode_sync);
+        for (size_t proc = 0; proc < block_size; proc++)
+        {
+            if (file->adios_reader_target_block_proc_list[proc] == file->all_rank)
+            {
+                file->adios_reader_target_block = block;
+                file->adios_reader_target_block_nprocs = block_size;
+                target_block_found = true;
+                break;
+            }
+        }
+
+        if (target_block_found)
+            break;
+    }
+
+    /* Free adios2_varinfo structure (this ADIOS2 API returns void) */
+    adios2_free_blockinfo(info_block_list);
+
+    return 0;
+}
+
 static size_t adios_read_vars_attrs(file_desc_t *file, size_t attr_size, char *const *attr_names)
 {
     size_t current_var_cnt = 0;
@@ -4593,6 +4690,10 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
         file->cache_block_sizes = spio_hash(10000);
         file->cache_darray_info = spio_hash(10000);
 
+        file->adios_reader_target_block = 0;
+        file->adios_reader_target_block_proc_list = NULL;
+        file->adios_reader_target_block_nprocs = 0;
+
         while (step < nsteps && adios2_begin_step(file->engineH, adios2_step_mode_read, -1.0, &status) == adios2_error_none)
         {
             file->begin_step_called = 1;
@@ -4657,6 +4758,9 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                 adios_get_dim_ids(file, var_id);
                 adios_get_step_info(file, var_id, step, nsteps);
             }
+
+            if (step == 0)
+                adios_get_target_block_info(file);
 
             adiosErr = adios2_end_step(file->engineH);
             if (adiosErr != adios2_error_none)

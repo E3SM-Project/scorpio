@@ -1084,6 +1084,9 @@ typedef struct file_desc_t
     struct spio_hmap *cache_darray_info;
 
     char io_name_reader[PIO_MAX_NAME + 1]; /* Name of io object, for ADIOS read */
+    size_t adios_reader_target_block;
+    int *adios_reader_target_block_proc_list;
+    size_t adios_reader_target_block_nprocs;
 #endif /* _ADIOS2 */
 
 #ifdef _HDF5
