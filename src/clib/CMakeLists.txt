@@ -365,8 +365,12 @@ install (TARGETS pioc
           EXPORT spio-targets-pioc
           DESTINATION lib)
 
+set (SPIO_INSTALL_FILES
+      ${CMAKE_CURRENT_SOURCE_DIR}/pio.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/pio_api.h)
+
 # Install the header file
-install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/pio.h DESTINATION include)
+install (FILES ${SPIO_INSTALL_FILES} DESTINATION include)
 
 # Generate and install pio_config.h
 configure_file (

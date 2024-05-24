@@ -716,7 +716,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             full_name = calloc(full_name_len, 1);
             if (full_name == NULL)
             {
-                GPTLstop("PIO:PIOc_get_att_tc");
+                GPTLstop("PIO:spio_get_att_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -737,7 +737,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             full_name = calloc(full_name_len, 1);
             if (full_name == NULL)
             {
-                GPTLstop("PIO:PIOc_get_att_tc");
+                GPTLstop("PIO:spio_get_att_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -778,7 +778,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                     adiosErr = adios2_attribute_data(ip, &size_attr, attr);
                     if (adiosErr != adios2_error_none)
                     {
-                        GPTLstop("PIO:PIOc_get_att_tc");
+                        GPTLstop("PIO:spio_get_att_tc");
                         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                         spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -794,7 +794,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                 break;
             }
             default:
-                GPTLstop("PIO:PIOc_get_att_tc");
+                GPTLstop("PIO:spio_get_att_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -807,7 +807,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 
         free(full_name);
 
-        GPTLstop("PIO:PIOc_get_att_tc");
+        GPTLstop("PIO:spio_get_att_tc");
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
