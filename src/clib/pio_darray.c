@@ -2759,6 +2759,38 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
     decomp_info_buff = file->cache_darray_info->get(file->cache_darray_info, decomp_name);
     if (decomp_info_buff == NULL)
     {
+        /* For ADIOS type, both read and write operations must use identical decomposition maps.
+         * If this condition is met, we can utilize the read decomposition map to determine the
+         * expected start and end indices of the write decomposition map within the target block.
+         *
+         * These indices serve two purposes:
+         * 1. They provide a hint for the match_decomp_part helper function to prioritize and verify.
+         * 2. They will be default indices to read a portion of the distributed array data buffers in
+         *    case the write decomposition map is not stored (a new option to reduce disk space usage).
+         */
+        int expected_decomp_start_idx = -1;
+        int expected_decomp_end_idx = -1;
+
+        iosystem_desc_t *ios = file->iosystem;
+        assert(ios != NULL);
+
+        /* Store the length of the decomposition map on each computation task */
+        int task_maplen[ios->num_comptasks];
+
+        /* Gather map lengths from all computation tasks and fill the task_maplen array on all tasks */
+        int mpierr = MPI_SUCCESS;
+        if ((mpierr = MPI_Allgather(&iodesc->maplen, 1, MPI_INT, task_maplen, 1, MPI_INT, ios->comp_comm)))
+            return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+        assert(task_maplen[file->all_rank] == iodesc->maplen);
+
+        expected_decomp_start_idx = 0;
+        for (int proc = 0; proc < file->adios_reader_target_block_nprocs; proc++)
+        {
+            if (file->adios_reader_target_block_proc_list[proc] < file->all_rank)
+                expected_decomp_start_idx += task_maplen[file->adios_reader_target_block_proc_list[proc]];
+        }
+        expected_decomp_end_idx = expected_decomp_start_idx + iodesc->maplen - 1;
+
         /* We should search decomposition array from the step 0 if the decomp info is not in the cache, so we close and open the bp file */
         /* Should not reopen opened file at step 0 */
         if ((file->engineH != NULL && current_adios_step != 0) ||
@@ -2928,15 +2960,29 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
                            pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
         }
 
-        /* Search for the start and end index of the decomposition map inside target block */
-        for (size_t pos = 0; pos < block_size; pos++)
+        /* Search for the start and end index of the decomposition map inside target block
+         * We start with a hint based on expected_decomp_start_idx for verification
+         */
+        size_t start_idx_hint = expected_decomp_start_idx;
+        if (match_decomp_part(decomp_int64_t, start_idx_hint, start_decomp, len_decomp))
         {
-            if (match_decomp_part(decomp_int64_t, pos, start_decomp, len_decomp))
+            start_idx_in_target_block = expected_decomp_start_idx;
+            end_idx_in_target_block = expected_decomp_end_idx;
+            decomp_in_target_block_found = true;
+        }
+
+        /* If the verification above fails, iterate through all possible start indices within the block */
+        if (!decomp_in_target_block_found)
+        {
+            for (size_t pos = 0; (pos + len_decomp - 1) < block_size; pos++)
             {
-                start_idx_in_target_block = pos;
-                end_idx_in_target_block = (int)(pos + len_decomp - 1);
-                decomp_in_target_block_found = true;
-                break;
+                if (match_decomp_part(decomp_int64_t, pos, start_decomp, len_decomp))
+                {
+                    start_idx_in_target_block = (int)pos;
+                    end_idx_in_target_block = (int)(pos + len_decomp - 1);
+                    decomp_in_target_block_found = true;
+                    break;
+                }
             }
         }
 
