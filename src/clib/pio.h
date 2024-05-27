@@ -1087,6 +1087,9 @@ typedef struct file_desc_t
     size_t adios_reader_target_block;
     int *adios_reader_target_block_proc_list;
     size_t adios_reader_target_block_nprocs;
+
+    /* Indicates whether the decomposition maps (for ADIOS write) need to be stored in BP files. Default is true */
+    bool store_adios_decomp;
 #endif /* _ADIOS2 */
 
 #ifdef _HDF5
