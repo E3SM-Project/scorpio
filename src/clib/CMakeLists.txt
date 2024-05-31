@@ -291,6 +291,12 @@ if (ADIOS_BP2NC_TEST)
     PUBLIC _ADIOS_BP2NC_TEST)
 endif ()
 
+if (ADIOS_NO_DECOMPS)
+  message(STATUS "No decomposition data will be saved to ADIOS BP files to reduce disk usage")
+  target_compile_definitions (pioc
+    PUBLIC _SPIO_ADIOS_NO_DECOMPS)
+endif ()
+
 # The MPI library detection was done in the top level
 if (MPISERIAL_C_FOUND)
   target_compile_definitions (pioc
