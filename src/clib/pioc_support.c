@@ -2952,6 +2952,8 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 
         file->adios_reader_num_decomp_blocks = 0;
 
+        file->store_adios_decomp = true;
+
         /* Create a new ADIOS group */
         char declare_name[PIO_MAX_NAME];
         snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->filename, get_adios2_io_cnt());
@@ -3064,7 +3066,35 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                                    "Putting (ADIOS) variable (name=/__pio__/info/nproc) failed (adios2_error=%s) for file (%s)",
                                    convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
                 }
-                (file->num_written_blocks)++;
+
+                variableH = adios2_inquire_variable(file->ioH, "/__pio__/info/decomp_stored");
+                if (variableH == NULL)
+                {
+                    variableH = adios2_define_variable(file->ioH,
+                                                       "/__pio__/info/decomp_stored", adios2_type_int32_t,
+                                                       0, NULL, NULL, NULL,
+                                                       adios2_constant_dims_true);
+                    if (variableH == NULL)
+                    {
+                        spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Defining (ADIOS) variable (name=/__pio__/info/decomp_stored) failed for file (%s)",
+                                       pio_get_fname_from_file(file));
+                    }
+                }
+
+                int info_decomp_stored = (file->store_adios_decomp)? 1 : 0;
+                adiosErr = adios2_put(file->engineH, variableH, &info_decomp_stored, adios2_mode_sync);
+                if (adiosErr != adios2_error_none)
+                {
+                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Putting (ADIOS) variable (name=/__pio__/info/decomp_stored) failed (adios2_error=%s) for file (%s)",
+                                   convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+                }
+                file->num_written_blocks += 2;
             }
 
             /* Write the number and list of processes in block merges */
@@ -3529,6 +3559,7 @@ static int adios_get_dim_ids(file_desc_t *file, int);
 static int adios_get_nc_op_tag(file_desc_t *file, int);
 static int adios_get_attr(file_desc_t *file, int current_var_cnt, char *const *attr_names, size_t);
 static int adios_get_num_decomp_blocks(file_desc_t *file);
+static int adios_get_decomp_storage_info(file_desc_t *file);
 static size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *const *var_names);
 static size_t adios_read_vars_attrs(file_desc_t *file, size_t attr_size, char *const *attr_names);
 
@@ -4133,6 +4164,34 @@ static int adios_get_num_decomp_blocks(file_desc_t *file)
     return PIO_NOERR;
 }
 
+static int adios_get_decomp_storage_info(file_desc_t *file)
+{
+    adios2_variable *variableH = adios2_inquire_variable(file->ioH, "/__pio__/info/decomp_stored");
+
+    /* Maintains backward compatibility with earlier generated BP files where decomposition storage
+     * information is absent. */
+    if (variableH == NULL)
+    {
+        file->store_adios_decomp = true;
+        return PIO_NOERR;
+    }
+
+    int info_decomp_stored = -1;
+    adios2_error adiosErr = adios2_get(file->engineH, variableH, &info_decomp_stored, adios2_mode_sync);
+    if (adiosErr != adios2_error_none)
+    {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Getting decomposition storage info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to get data associated with a variable from an engine (adios2_error=%s)",
+                       pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+    }
+    assert(info_decomp_stored == 0 || info_decomp_stored == 1);
+
+    file->store_adios_decomp = (info_decomp_stored == 0)? false : true;
+
+    return PIO_NOERR;
+}
+
 static size_t adios_read_vars_attrs(file_desc_t *file, size_t attr_size, char *const *attr_names)
 {
     size_t current_var_cnt = 0;
@@ -4626,6 +4685,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
         file->adios_reader_num_decomp_blocks = 0;
 
+        file->store_adios_decomp = true;
+
         while (step < nsteps && adios2_begin_step(file->engineH, adios2_step_mode_read, -1.0, &status) == adios2_error_none)
         {
             file->begin_step_called = 1;
@@ -4694,6 +4755,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             if (step == 0)
             {
                 adios_get_num_decomp_blocks(file);
+                adios_get_decomp_storage_info(file);
             }
 
             adiosErr = adios2_end_step(file->engineH);
