@@ -842,6 +842,11 @@ static int MPI_BigAdios_Gatherv(const void *sendbuf, int sendcount, MPI_Datatype
 static int needs_to_write_decomp(file_desc_t *file, int ioid)
 {
     assert(file != NULL);
+
+    /* No need to write the decomposition maps to ADIOS BP files. */
+    if (!file->store_adios_decomp)
+        return 0;
+
     int ret = 1; // Yes
     for (int i = 0; i < file->n_written_ioids; i++)
     {
@@ -2759,6 +2764,8 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
     decomp_info_buff = file->cache_darray_info->get(file->cache_darray_info, decomp_name);
     if (decomp_info_buff == NULL)
     {
+      if (file->store_adios_decomp)
+      {
         /* We should search decomposition array from the step 0 if the decomp info is not in the cache, so we close and open the bp file */
         /* Should not reopen opened file at step 0 */
         if ((file->engineH != NULL && current_adios_step != 0) ||
@@ -2874,7 +2881,8 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
                            pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
 
-        int32_t decomp_blocks_size = decomp_blocks->nblocks;
+        size_t decomp_blocks_size = decomp_blocks->nblocks;
+        assert(decomp_blocks_size == file->adios_reader_num_decomp_blocks);
 
         /* Free memory */
         for (size_t i = 0; i < decomp_blocks->nblocks; i++)
@@ -3015,7 +3023,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
             }
 
             /* Search for the start and end index of the decomposition map inside one block */
-            for (size_t pos = 0; pos < block_size; pos++)
+            for (size_t pos = 0; (pos + len_decomp - 1) < block_size; pos++)
             {
                 if (match_decomp_part(decomp_int64_t, pos, start_decomp, len_decomp))
                 {
@@ -3047,7 +3055,55 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
                            "Cannot determine block for the decomposition map (ADIOS read and write must use the same decomposition map)",
                            pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
+      } /* End if (file->store_adios_decomp) */
+      else
+      {
+          /* In case the write decomposition map is not available for verification,
+           * we simply use the anticipated block and start/end indices to read data. */
+          iosystem_desc_t *ios = file->iosystem; /* Pointer to io system information. */
+          assert(ios != NULL);
 
+          /* Determine the maximum number of compute tasks assigned to each block. */
+          size_t decomp_blocks_size = file->adios_reader_num_decomp_blocks;
+          assert(decomp_blocks_size > 0);
+          int max_comptasks_per_block = ios->num_comptasks / decomp_blocks_size;
+          if (ios->num_comptasks % decomp_blocks_size != 0)
+              max_comptasks_per_block++;
+          assert(max_comptasks_per_block >= 1);
+
+          /* Calculate the most probable target block we try to find. */
+          int guess_block = ios->comp_rank / max_comptasks_per_block;
+          assert(guess_block >= 0 && guess_block < decomp_blocks_size);
+
+          target_block = guess_block;
+
+          /* Store the length of the decomposition map on each computation task. */
+          int task_maplen[ios->num_comptasks];
+
+          /* Gather map lengths from all computation tasks and fill the task_maplen array on all tasks. */
+          int mpierr = MPI_SUCCESS;
+          if ((mpierr = MPI_Allgather(&iodesc->maplen, 1, MPI_INT, task_maplen, 1, MPI_INT, ios->comp_comm)))
+              return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+          assert(task_maplen[file->all_rank] == iodesc->maplen);
+
+          start_idx_in_target_block = 0;
+          for (int proc = 0; proc < ios->num_comptasks; proc++)
+          {
+              int proc_block = proc / max_comptasks_per_block;
+              if (proc_block == target_block && proc < file->all_rank)
+              {
+                  /* Handle the special case where the map length is 0 or 1.
+                   * The ADIOS writer always ensures that the map length is
+                   * at least 2 by padding if the original length is 0 or 1. */
+                  if (task_maplen[proc] > 1)
+                      start_idx_in_target_block += task_maplen[proc];
+                  else
+                      start_idx_in_target_block += 2;
+              }
+          }
+
+          end_idx_in_target_block = start_idx_in_target_block + iodesc->maplen - 1;
+      }
         /* Add to cache */
         int *buff = (int*)calloc(3, sizeof(int));
         if (buff == NULL)

@@ -52,6 +52,7 @@ option (WITH_NETCDF          "Require the use of NetCDF"                    ON)
 option (WITH_ADIOS2          "Require the use of ADIOS 2.x"                 OFF)
 option (WITH_HDF5            "Require the use of HDF5"                      OFF)
 option (ADIOS_BP2NC_TEST     "Enable testing of BP to NetCDF conversion"    OFF)
+option (ADIOS_NO_DECOMPS     "Save no decomposition data to ADIOS BP files" OFF)
 #===== Testing Options =====
 option (PIO_ENABLE_TESTS  "Enable the testing builds"                       OFF)
 option (PIO_ENABLE_LARGE_TESTS  "Enable large (file, processes) tests"      OFF)
