@@ -178,8 +178,6 @@ extern "C" {
                   void *recvbuf, const int *recvcounts, const int *rdispls, const MPI_Datatype *recvtypes,
                   MPI_Comm comm, const rearr_comm_fc_opt_t *fc);
 
-    long long lgcd_array(int nain, long long* ain);
-
     void PIO_Offset_size(MPI_Datatype *dtype, int *tsize);
     PIO_Offset GCDblocksize(int arrlen, const PIO_Offset *arr_in);
 
@@ -256,14 +254,11 @@ extern "C" {
     /* Delete an entry from the lost of open IO systems. */
     int pio_delete_iosystem_from_list(int piosysid);
 
-    /* Find greatest commond divisor. */
-    int gcd(int a, int b);
-
-    /* Find greatest commond divisor for long long. */
-    long long lgcd (long long a, long long b );
+    /* Find greatest commond divisor for PIO_Offset type. */
+    PIO_Offset lgcd (PIO_Offset a, PIO_Offset b);
 
     /* Find greatest commond divisor in an array. */
-    int gcd_array(int nain, int *ain);
+    PIO_Offset lgcd_array(int nain, PIO_Offset* ain);
 
     void free_region_list(io_region *top);
 
