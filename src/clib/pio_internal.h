@@ -184,12 +184,6 @@ extern "C" {
     /* Initialize the rearranger options. */
     void init_rearr_opts(iosystem_desc_t *iosys);
 
-    /* Convert an index into dimension values. */
-    void idx_to_dim_list(int ndims, const int *gdims, PIO_Offset idx, PIO_Offset *dim_list);
-
-    /* Convert a global coordinate value into a local array index. */
-    PIO_Offset coord_to_lindex(int ndims, const PIO_Offset *lcoord, const PIO_Offset *count);
-
     /* Determine whether fill values are needed. */
     int determine_fill(iosystem_desc_t *ios, io_desc_t *iodesc, const int *gsize,
                        const PIO_Offset *compmap);
@@ -261,9 +255,6 @@ extern "C" {
     PIO_Offset lgcd_array(int nain, PIO_Offset* ain);
 
     void free_region_list(io_region *top);
-
-    /* Convert a global coordinate value into a local array index. */
-    PIO_Offset coord_to_lindex(int ndims, const PIO_Offset *lcoord, const PIO_Offset *count);
 
     int ceil2(int i);
     int pair(int np, int p, int k);
