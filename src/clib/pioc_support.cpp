@@ -3792,7 +3792,7 @@ static int adios_get_dim_ids(file_desc_t *file, int varid)
 
         if (size_attr > 0)
         {
-            char **attr_data = (char *) calloc(size_attr, sizeof(char *));
+            char **attr_data = (char **) calloc(size_attr, sizeof(char *));
             if (attr_data == NULL)
             {
                 return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -3941,7 +3941,7 @@ static int adios_get_adios_type(file_desc_t *file, int varid)
     adios2_attribute *attr = adios2_inquire_attribute(file->ioH, attr_name);
     if (attr != NULL)
     {
-        int32_t attr_data = adios2_type_unknown;
+        adios2_type attr_data = adios2_type_unknown;
         size_t size_attr = 0;
         adios2_error adiosErr = adios2_attribute_data(&attr_data, &size_attr, attr);
         if (adiosErr != adios2_error_none)

@@ -1700,7 +1700,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         char varname[PIO_MAX_NAME] = {'\0'};
                         snprintf(varname, PIO_MAX_NAME, "%d", varid);
 
-                        char *mem_buffer = file->cache_data_blocks->get(file->cache_data_blocks, varname);
+                        char *mem_buffer = (char *) file->cache_data_blocks->get(file->cache_data_blocks, varname);
                         if (mem_buffer == NULL)
                         {
                             mem_buffer = (char *) calloc(av->adios_type_size, 1);
@@ -1881,7 +1881,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             char varname_size[PIO_MAX_NAME] = {'\0'};
                             snprintf(varname_size, PIO_MAX_NAME, "%d  %zu sel_size", varid, block_id);
 
-                            char *mem_buffer_size = mem_buffer_size = file->cache_block_sizes->get(file->cache_block_sizes, varname_size);
+                            char *mem_buffer_size = (char *)file->cache_block_sizes->get(file->cache_block_sizes, varname_size);
                             if (mem_buffer_size == NULL)
                             {
                                 mem_buffer_size = (char *) calloc(1, sizeof(size_t));
@@ -1937,7 +1937,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             char varname[PIO_MAX_NAME] = {'\0'};
                             snprintf(varname, PIO_MAX_NAME, "%d %zu", varid, block_id);
 
-                            char *mem_buffer = file->cache_data_blocks->get(file->cache_data_blocks, varname);
+                            char *mem_buffer = (char *) file->cache_data_blocks->get(file->cache_data_blocks, varname);
                             if (mem_buffer == NULL)
                             {
                                 mem_buffer = (char *) calloc(var_size, av->adios_type_size);

@@ -1135,7 +1135,7 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
     if (can_merge_buffers)
     {
         ierr = MPI_BigAdios_Gatherv(mapbuf, (int)inp_count, m_type, file->block_array,
-                                    file->array_counts, file->array_disp, m_type, 0, file->block_comm);
+                                    (int *) (file->array_counts), (int *) (file->array_disp), m_type, 0, file->block_comm);
         if (ierr != PIO_NOERR)
         {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "MPI_BigAdios_Gatherv failed for file (%s, ncid=%d)",
@@ -1840,7 +1840,7 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
     }
 
     ierr = MPI_BigAdios_Gatherv(databuf, (int)inp_count, m_type, file->block_array,
-                                   file->array_counts, file->array_disp, m_type, 0, file->block_comm);
+                                   (int *)(file->array_counts), (int *) (file->array_disp), m_type, 0, file->block_comm);
     if (ierr != PIO_NOERR)
     {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "MPI_BigAdios_Gatherv failed for file (%s, ncid=%d)",
@@ -2727,7 +2727,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
 
     /* Get from cache */
     const char *attr_data_buff = NULL;
-    attr_data_buff = file->cache_darray_info->get(file->cache_darray_info, att_name);
+    attr_data_buff = (const char *) file->cache_darray_info->get(file->cache_darray_info, att_name);
     if (attr_data_buff == NULL)
     {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -2756,7 +2756,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
 
     /* Try to read it from cache */
     const int *decomp_info_buff = NULL;
-    decomp_info_buff = file->cache_darray_info->get(file->cache_darray_info, decomp_name);
+    decomp_info_buff = (const int *) file->cache_darray_info->get(file->cache_darray_info, decomp_name);
     if (decomp_info_buff == NULL)
     {
         /* We should search decomposition array from the step 0 if the decomp info is not in the cache, so we close and open the bp file */
