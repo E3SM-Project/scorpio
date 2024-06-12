@@ -58,8 +58,8 @@ int PIOc_put_varm_impl(int ncid, int varid, const PIO_Offset start[], const PIO_
             vdesc = file->varlist + varid;
 
             if (vdesc->nreqs%PIO_REQUEST_ALLOC_CHUNK == 0 ){
-                vdesc->request = realloc(vdesc->request,
-                                         sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
+                vdesc->request = (int *) realloc(vdesc->request,
+                                          sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
             }
             request = vdesc->request+vdesc->nreqs;
 
@@ -142,8 +142,8 @@ int PIOc_put_varm_uchar_impl(int ncid, int varid, const PIO_Offset start[], cons
             vdesc = file->varlist + varid;
 
             if (vdesc->nreqs%PIO_REQUEST_ALLOC_CHUNK == 0 ){
-                vdesc->request = realloc(vdesc->request,
-                                         sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
+                vdesc->request = (int *) realloc(vdesc->request,
+                                          sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
             }
             request = vdesc->request+vdesc->nreqs;
 
@@ -222,8 +222,8 @@ int PIOc_put_varm_short_impl(int ncid, int varid, const PIO_Offset start[], cons
             vdesc = file->varlist + varid;
 
             if (vdesc->nreqs%PIO_REQUEST_ALLOC_CHUNK == 0 ){
-                vdesc->request = realloc(vdesc->request,
-                                         sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
+                vdesc->request = (int *) realloc(vdesc->request,
+                                          sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
             }
             request = vdesc->request+vdesc->nreqs;
 
@@ -303,8 +303,8 @@ int PIOc_put_varm_text_impl(int ncid, int varid, const PIO_Offset start[], const
             vdesc = file->varlist + varid;
 
             if (vdesc->nreqs%PIO_REQUEST_ALLOC_CHUNK == 0 ){
-                vdesc->request = realloc(vdesc->request,
-                                         sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
+                vdesc->request = (int *) realloc(vdesc->request,
+                                          sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
             }
             request = vdesc->request+vdesc->nreqs;
 
@@ -385,8 +385,8 @@ int PIOc_put_varm_ushort_impl(int ncid, int varid, const PIO_Offset start[], con
             vdesc = file->varlist + varid;
 
             if (vdesc->nreqs%PIO_REQUEST_ALLOC_CHUNK == 0 ){
-                vdesc->request = realloc(vdesc->request,
-                                         sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
+                vdesc->request = (int *) realloc(vdesc->request,
+                                          sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
             }
             request = vdesc->request+vdesc->nreqs;
 
@@ -467,8 +467,8 @@ int PIOc_put_varm_ulonglong_impl(int ncid, int varid, const PIO_Offset start[], 
             vdesc = file->varlist + varid;
 
             if (vdesc->nreqs%PIO_REQUEST_ALLOC_CHUNK == 0 ){
-                vdesc->request = realloc(vdesc->request,
-                                         sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
+                vdesc->request = (int *) realloc(vdesc->request,
+                                          sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
             }
             request = vdesc->request+vdesc->nreqs;
 
@@ -548,8 +548,8 @@ int PIOc_put_varm_int_impl(int ncid, int varid, const PIO_Offset start[], const 
             vdesc = file->varlist + varid;
 
             if (vdesc->nreqs%PIO_REQUEST_ALLOC_CHUNK == 0 ){
-                vdesc->request = realloc(vdesc->request,
-                                         sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
+                vdesc->request = (int *) realloc(vdesc->request,
+                                          sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
             }
             request = vdesc->request+vdesc->nreqs;
 
@@ -630,8 +630,8 @@ int PIOc_put_varm_float_impl(int ncid, int varid, const PIO_Offset start[], cons
             vdesc = file->varlist + varid;
 
             if (vdesc->nreqs%PIO_REQUEST_ALLOC_CHUNK == 0 ){
-                vdesc->request = realloc(vdesc->request,
-                                         sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
+                vdesc->request = (int *) realloc(vdesc->request,
+                                          sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
             }
             request = vdesc->request+vdesc->nreqs;
 
@@ -711,8 +711,8 @@ int PIOc_put_varm_long_impl(int ncid, int varid, const PIO_Offset start[], const
             vdesc = file->varlist + varid;
 
             if (vdesc->nreqs%PIO_REQUEST_ALLOC_CHUNK == 0 ){
-                vdesc->request = realloc(vdesc->request,
-                                         sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
+                vdesc->request = (int *) realloc(vdesc->request,
+                                          sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
             }
             request = vdesc->request+vdesc->nreqs;
 
@@ -794,8 +794,8 @@ int PIOc_put_varm_uint_impl(int ncid, int varid, const PIO_Offset start[], const
             vdesc = file->varlist + varid;
 
             if (vdesc->nreqs%PIO_REQUEST_ALLOC_CHUNK == 0 ){
-                vdesc->request = realloc(vdesc->request,
-                                         sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
+                vdesc->request = (int *) realloc(vdesc->request,
+                                          sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
             }
             request = vdesc->request+vdesc->nreqs;
 
@@ -876,8 +876,8 @@ int PIOc_put_varm_double_impl(int ncid, int varid, const PIO_Offset start[], con
             vdesc = file->varlist + varid;
 
             if (vdesc->nreqs%PIO_REQUEST_ALLOC_CHUNK == 0 ){
-                vdesc->request = realloc(vdesc->request,
-                                         sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
+                vdesc->request = (int *) realloc(vdesc->request,
+                                          sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
             }
             request = vdesc->request+vdesc->nreqs;
 
@@ -957,8 +957,8 @@ int PIOc_put_varm_schar_impl(int ncid, int varid, const PIO_Offset start[], cons
             vdesc = file->varlist + varid;
 
             if (vdesc->nreqs%PIO_REQUEST_ALLOC_CHUNK == 0 ){
-                vdesc->request = realloc(vdesc->request,
-                                         sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
+                vdesc->request = (int *) realloc(vdesc->request,
+                                          sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
             }
             request = vdesc->request+vdesc->nreqs;
 
@@ -1038,8 +1038,8 @@ int PIOc_put_varm_longlong_impl(int ncid, int varid, const PIO_Offset start[], c
             vdesc = file->varlist + varid;
 
             if (vdesc->nreqs%PIO_REQUEST_ALLOC_CHUNK == 0 ){
-                vdesc->request = realloc(vdesc->request,
-                                         sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
+                vdesc->request = (int *) realloc(vdesc->request,
+                                          sizeof(int)*(vdesc->nreqs+PIO_REQUEST_ALLOC_CHUNK));
             }
             request = vdesc->request+vdesc->nreqs;
 

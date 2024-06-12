@@ -10,9 +10,7 @@
 #include "pio.h"
 //#include "pio_internal.h"
 
-extern "C"{
 #include "spio_rearrange_any.h"
-}
 
 namespace SPIO_Util{
 

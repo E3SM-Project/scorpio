@@ -8,6 +8,7 @@
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
+#include <pio_minmax.h>
 
 /** The default target blocksize in bytes for each io task when the box
  * rearranger is used. */
@@ -18,28 +19,14 @@
 int blocksize = DEFAULT_BLOCKSIZE;
 
 /**
- * Recursive Standard C Function: Greatest Common Divisor.
- *
- * @param a
- * @param b
- * @returns greatest common divisor.
- */
-int gcd(int a, int b )
-{
-    if (a == 0)
-        return b;
-    return gcd(b % a, a);
-}
-
-/**
- * Recursive Standard C Function: Greatest Common Divisor for 64 bit
+ * Recursive Standard C Function: Greatest Common Divisor for PIO_Offset
  * ints.
  *
  * @param a
  * @param b
  * @returns greates common divisor.
  */
-long long lgcd(long long a, long long b)
+PIO_Offset lgcd(PIO_Offset a, PIO_Offset b)
 {
     if (a == 0)
         return b;
@@ -47,43 +34,16 @@ long long lgcd(long long a, long long b)
 }
 
 /**
- * Return the gcd of elements in an int array.
- *
- * @param nain length of the array
- * @param ain an array of length nain
- * @returns greatest common divisor.
- */
-int gcd_array(int nain, int *ain)
-{
-    int i;
-    int bsize = 1;
-
-    for (i = 0; i < nain; i++)
-        if (ain[i] <= 1)
-            return bsize;
-
-    bsize = ain[0];
-    i = 1;
-    while (i < nain && bsize > 1)
-    {
-        bsize = gcd(bsize, ain[i]);
-        i++;
-    }
-
-    return bsize;
-}
-
-/**
- * Return the greatest common devisor of array ain as int_64.
+ * Return the greatest common devisor of array ain as PIO_Offset
  *
  * @param nain number of elements in ain.
  * @param ain array of length nain.
  * @returns GCD of elements in ain.
  */
-long long lgcd_array(int nain, long long *ain)
+PIO_Offset lgcd_array(int nain, PIO_Offset *ain)
 {
     int i;
-    long long bsize = 1;
+    PIO_Offset bsize = 1;
 
     for (i = 0; i < nain; i++)
         if(ain[i] <= 1)
@@ -93,7 +53,7 @@ long long lgcd_array(int nain, long long *ain)
     i = 1;
     while (i < nain && bsize > 1)
     {
-        bsize = gcd(bsize, ain[i]);
+        bsize = lgcd(bsize, ain[i]);
         i++;
     }
 
@@ -173,7 +133,7 @@ PIO_Offset GCDblocksize_gaps(int arrlen, const PIO_Offset *arr_in)
 
     if (arrlen > 1)
     {
-        if (!(del_arr = malloc((arrlen - 1) * sizeof(PIO_Offset))))
+        if (!(del_arr = (PIO_Offset *) malloc((arrlen - 1) * sizeof(PIO_Offset))))
         {
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Internal error while calculating GCD block size. Out of memory allocating %lld bytes for internal array", (unsigned long long) ((arrlen - 1) * sizeof(PIO_Offset)));
@@ -226,7 +186,7 @@ PIO_Offset GCDblocksize_gaps(int arrlen, const PIO_Offset *arr_in)
         }
 
         /* If numblks > 1 then arrlen must be > 1 */
-        PIO_Offset *loc_arr = calloc(arrlen - 1, sizeof(PIO_Offset));
+        PIO_Offset *loc_arr = (PIO_Offset *) calloc(arrlen - 1, sizeof(PIO_Offset));
         if (!loc_arr)
         {
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,

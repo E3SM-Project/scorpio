@@ -80,6 +80,7 @@ int PIOc_set_iosystem_error_handling(int iosysid, int method, int *old_method);
 
 int PIOc_iam_iotask(int iosysid, bool *ioproc);
 int PIOc_iotask_rank(int iosysid, int *iorank);
+int PIOc_get_iosystem(int ncid);
 int PIOc_iosystem_is_active(int iosysid, bool *active);
 int PIOc_iotype_available(int iotype);
 int PIOc_set_rearr_opts(int iosysid, int comm_type, int fcd,

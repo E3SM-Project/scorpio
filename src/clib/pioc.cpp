@@ -10,6 +10,7 @@
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
+#include "pio_api.h"
 #ifdef PIO_MICRO_TIMING
 #include "pio_timer.h"
 #endif
@@ -722,11 +723,11 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
 
         if(!iostart_present)
         {
-            amsg_iostart = calloc(ndims, sizeof(PIO_Offset));
+            amsg_iostart = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset));
         }
         if(!iocount_present)
         {
-            amsg_iocount = calloc(ndims, sizeof(PIO_Offset));
+            amsg_iocount = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset));
         }
         if(!amsg_iostart || !amsg_iocount)
         {
@@ -768,7 +769,7 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
     iodesc->maplen = maplen;
 
     /* Remember the map. */
-    if (!(iodesc->map = malloc(sizeof(PIO_Offset) * maplen)))
+    if (!(iodesc->map = (PIO_Offset *) malloc(sizeof(PIO_Offset) * maplen)))
     {
         GPTLstop("PIO:PIOc_initdecomp");
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -779,7 +780,7 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
         iodesc->map[m] = compmap[m];
 
     /* Remember the dim sizes. */
-    if (!(iodesc->dimlen = malloc(sizeof(int) * ndims)))
+    if (!(iodesc->dimlen = (int *)malloc(sizeof(int) * ndims)))
     {
         GPTLstop("PIO:PIOc_initdecomp");
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1318,14 +1319,14 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
          "rearr = %d", comp_comm, num_iotasks, stride, base, rearr));
 
     /* Allocate memory for the iosystem info. */
-    if (!(ios = calloc(1, sizeof(iosystem_desc_t))))
+    if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
     {
         GPTLstop("PIO:PIOc_Init_Intracomm");
         return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "PIO Init failed. Out of memory allocating %lld bytes for I/O system descriptor", (unsigned long long) sizeof(iosystem_desc_t));
     }
 
-    ios->io_fstats = calloc(1, sizeof(spio_io_fstats_summary_t));
+    ios->io_fstats = (spio_io_fstats_summary_t *) calloc(1, sizeof(spio_io_fstats_summary_t));
     if(!(ios->io_fstats))
     {
         return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -1405,7 +1406,7 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
 
     /* Create an array that holds the ranks of the tasks to be used
      * for computation. */
-    if (!(ios->compranks = calloc(ios->num_comptasks, sizeof(int))))
+    if (!(ios->compranks = (int *)calloc(ios->num_comptasks, sizeof(int))))
     {
         GPTLstop("PIO:PIOc_Init_Intracomm");
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -1421,7 +1422,7 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
 
     /* Create an array that holds the ranks of the tasks to be used
      * for IO. */
-    if (!(ios->ioranks = calloc(ios->num_iotasks, sizeof(int))))
+    if (!(ios->ioranks = (int *)calloc(ios->num_iotasks, sizeof(int))))
     {
         GPTLstop("PIO:PIOc_Init_Intracomm");
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2027,7 +2028,7 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     if (!io_proc_list)
     {
         LOG((3, "calculating processors for IO component"));
-        if (!(io_proc_list_buf = malloc(num_io_procs * sizeof(int))))
+        if (!(io_proc_list_buf = (int *) malloc(num_io_procs * sizeof(int))))
         {
             GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2050,7 +2051,7 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         int last_proc = num_io_procs;
 
         /* Allocate space for array of arrays. */
-        if (!(proc_list_buf = malloc((component_count) * sizeof(int *))))
+        if (!(proc_list_buf = (int **)malloc((component_count) * sizeof(int *))))
         {
             GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2063,7 +2064,7 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
             LOG((3, "calculating processors for component %d num_procs_per_comp[cmp] = %d", cmp, num_procs_per_comp[cmp]));
 
             /* Allocate space for each array. */
-            if (!(proc_list_buf[cmp] = malloc(num_procs_per_comp[cmp] * sizeof(int))))
+            if (!(proc_list_buf[cmp] = (int *)malloc(num_procs_per_comp[cmp] * sizeof(int))))
             {
                 GPTLstop("PIO:PIOc_init_async");
                 return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2108,7 +2109,7 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "PIO Init (async) failed. Out of memory");
         }
-        iosys[cmp1]->io_fstats = calloc(1, sizeof(spio_io_fstats_summary_t));
+        iosys[cmp1]->io_fstats = (spio_io_fstats_summary_t *) calloc(1, sizeof(spio_io_fstats_summary_t));
         if(!(iosys[cmp1]->io_fstats))
         {
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2254,7 +2255,7 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
             proc_list_union[p + num_io_procs] = my_proc_list[cmp][p];
 
         /* Allocate space for computation task ranks. */
-        if (!(my_iosys->compranks = calloc(my_iosys->num_comptasks, sizeof(int))))
+        if (!(my_iosys->compranks = (int *)calloc(my_iosys->num_comptasks, sizeof(int))))
         {
             GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2347,7 +2348,7 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
 
         /* Create an array that holds the ranks of the tasks to be used
          * for IO. */
-        if (!(my_iosys->ioranks = calloc(my_iosys->num_iotasks, sizeof(int))))
+        if (!(my_iosys->ioranks = (int *) calloc(my_iosys->num_iotasks, sizeof(int))))
         {
             GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2590,7 +2591,7 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
     /* Dup the comp comms from the user, since we cache
      * these communicators inside PIO
      */
-    MPI_Comm *comp_comms = calloc(component_count, sizeof(MPI_Comm));
+    MPI_Comm *comp_comms = (MPI_Comm *)calloc(component_count, sizeof(MPI_Comm));
     if(comp_comms)
     {
         for(int i=0; i<component_count; i++)
@@ -2627,7 +2628,7 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "PIO init (async) failed. Out of memory allocating %lld bytes for storing I/O system descriptor for component %d", (unsigned long long) sizeof(iosystem_desc_t), i);
         }
-        iosys[i]->io_fstats = calloc(1, sizeof(spio_io_fstats_summary_t));
+        iosys[i]->io_fstats = (spio_io_fstats_summary_t *) calloc(1, sizeof(spio_io_fstats_summary_t));
         if(!(iosys[i]->io_fstats))
         {
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2825,7 +2826,7 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             iosys[i]->comproot = COMP_ROOT_URANK;
             iosys[i]->ioroot = iosys[i]->num_comptasks + IO_ROOT_URANK;
 
-            iosys[i]->ioranks = malloc(iosys[i]->num_iotasks * sizeof(int));
+            iosys[i]->ioranks = (int *)malloc(iosys[i]->num_iotasks * sizeof(int));
             if(!(iosys[i]->ioranks))
             {
                 GPTLstop("PIO:PIOc_init_intercomm");
@@ -2837,7 +2838,7 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 iosys[i]->ioranks[j] = iosys[i]->num_comptasks + j;
             }
 
-            iosys[i]->compranks = malloc(iosys[i]->num_comptasks * sizeof(int));
+            iosys[i]->compranks = (int *)malloc(iosys[i]->num_comptasks * sizeof(int));
             if(!(iosys[i]->compranks))
             {
                 GPTLstop("PIO:PIOc_init_intercomm");
@@ -2992,7 +2993,7 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 iosys[i]->comproot = COMP_ROOT_URANK;
                 iosys[i]->ioroot = iosys[i]->num_comptasks + IO_ROOT_URANK;
 
-                iosys[i]->ioranks = malloc(iosys[i]->num_iotasks * sizeof(int));
+                iosys[i]->ioranks = (int *)malloc(iosys[i]->num_iotasks * sizeof(int));
                 if(!(iosys[i]->ioranks))
                 {
                     GPTLstop("PIO:PIOc_init_intercomm");
@@ -3004,7 +3005,7 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                     iosys[i]->ioranks[j] = iosys[i]->num_comptasks + j;
                 }
 
-                iosys[i]->compranks = malloc(iosys[i]->num_comptasks * sizeof(int));
+                iosys[i]->compranks = (int *)malloc(iosys[i]->num_comptasks * sizeof(int));
                 if(!(iosys[i]->compranks))
                 {
                     GPTLstop("PIO:PIOc_init_intercomm");

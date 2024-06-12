@@ -309,7 +309,7 @@ int PIOc_def_var_chunking_impl(int ncid, int varid, int storage, const PIO_Offse
         PIO_Offset *amsg_chunksizesp = NULL;
         if(!chunksizes_present)
         {
-            amsg_chunksizesp = calloc(ndims, sizeof(PIO_Offset));
+            amsg_chunksizesp = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset));
         }
 
         PIO_SEND_ASYNC_MSG(ios, msg, &ierr, ncid, varid, storage, ndims,

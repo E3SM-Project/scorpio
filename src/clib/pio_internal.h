@@ -44,18 +44,6 @@ extern "C" {
     #define LOG(e)
 #endif /* PIO_ENABLE_LOGGING */
 
-#if !defined(__cplusplus)
-    #define max(a,b)                                \
-        ({ __typeof__ (a) _a = (a);                 \
-            __typeof__ (b) _b = (b);                \
-            _a > _b ? _a : _b; })
-
-    #define min(a,b)                                \
-        ({ __typeof__ (a) _a = (a);                 \
-            __typeof__ (b) _b = (b);                \
-            _a < _b ? _a : _b; })
-#endif
-
     #define MAX_GATHER_BLOCK_SIZE 0
     #define PIO_REQUEST_ALLOC_CHUNK 16
 
@@ -190,19 +178,11 @@ extern "C" {
                   void *recvbuf, const int *recvcounts, const int *rdispls, const MPI_Datatype *recvtypes,
                   MPI_Comm comm, const rearr_comm_fc_opt_t *fc);
 
-    long long lgcd_array(int nain, long long* ain);
-
     void PIO_Offset_size(MPI_Datatype *dtype, int *tsize);
     PIO_Offset GCDblocksize(int arrlen, const PIO_Offset *arr_in);
 
     /* Initialize the rearranger options. */
     void init_rearr_opts(iosystem_desc_t *iosys);
-
-    /* Convert an index into dimension values. */
-    void idx_to_dim_list(int ndims, const int *gdims, PIO_Offset idx, PIO_Offset *dim_list);
-
-    /* Convert a global coordinate value into a local array index. */
-    PIO_Offset coord_to_lindex(int ndims, const PIO_Offset *lcoord, const PIO_Offset *count);
 
     /* Determine whether fill values are needed. */
     int determine_fill(iosystem_desc_t *ios, io_desc_t *iodesc, const int *gsize,
@@ -268,19 +248,13 @@ extern "C" {
     /* Delete an entry from the lost of open IO systems. */
     int pio_delete_iosystem_from_list(int piosysid);
 
-    /* Find greatest commond divisor. */
-    int gcd(int a, int b);
-
-    /* Find greatest commond divisor for long long. */
-    long long lgcd (long long a, long long b );
+    /* Find greatest commond divisor for PIO_Offset type. */
+    PIO_Offset lgcd (PIO_Offset a, PIO_Offset b);
 
     /* Find greatest commond divisor in an array. */
-    int gcd_array(int nain, int *ain);
+    PIO_Offset lgcd_array(int nain, PIO_Offset* ain);
 
     void free_region_list(io_region *top);
-
-    /* Convert a global coordinate value into a local array index. */
-    PIO_Offset coord_to_lindex(int ndims, const PIO_Offset *lcoord, const PIO_Offset *count);
 
     int ceil2(int i);
     int pair(int np, int p, int k);

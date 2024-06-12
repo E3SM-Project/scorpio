@@ -10,6 +10,7 @@
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
+#include <pio_minmax.h>
 
 /**
  * Returns the smallest power of 2 greater than

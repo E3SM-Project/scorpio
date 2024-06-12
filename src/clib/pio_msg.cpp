@@ -1764,7 +1764,7 @@ int att_get_handler(iosystem_desc_t *ios)
     PIO_Offset atttype_len; /* Length in bytes of an element of attype. */
     nc_type memtype;        /* Type of att in memory. */
     PIO_Offset memtype_len; /* Length in bytes of an element of memype. */
-    int *ip;
+    void *ip = NULL;
     int iotype;
     int ret;
 
@@ -1872,40 +1872,40 @@ int put_vars_handler(iosystem_desc_t *ios)
     switch(xtype)
     {
     case NC_BYTE:
-        ret = PIOc_put_vars_schar(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_put_vars_schar(ncid, varid, startp, countp, stridep, (const signed char *) buf);
         break;
     case NC_CHAR:
-        ret = PIOc_put_vars_text(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_put_vars_text(ncid, varid, startp, countp, stridep, (const char *) buf);
         break;
     case NC_SHORT:
-        ret = PIOc_put_vars_short(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_put_vars_short(ncid, varid, startp, countp, stridep, (const short int *) buf);
         break;
     case NC_INT:
-        ret = PIOc_put_vars_int(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_put_vars_int(ncid, varid, startp, countp, stridep, (const int *) buf);
         break;
     case PIO_LONG_INTERNAL:
-        ret = PIOc_put_vars_long(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_put_vars_long(ncid, varid, startp, countp, stridep, (const long int *) buf);
         break;
     case NC_FLOAT:
-        ret = PIOc_put_vars_float(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_put_vars_float(ncid, varid, startp, countp, stridep, (const float *) buf);
         break;
     case NC_DOUBLE:
-        ret = PIOc_put_vars_double(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_put_vars_double(ncid, varid, startp, countp, stridep, (const double *) buf);
         break;
     case NC_UBYTE:
-        ret = PIOc_put_vars_uchar(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_put_vars_uchar(ncid, varid, startp, countp, stridep, (const unsigned char *) buf);
         break;
     case NC_USHORT:
-        ret = PIOc_put_vars_ushort(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_put_vars_ushort(ncid, varid, startp, countp, stridep, (const unsigned short int *) buf);
         break;
     case NC_UINT:
-        ret = PIOc_put_vars_uint(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_put_vars_uint(ncid, varid, startp, countp, stridep, (const unsigned int *) buf);
         break;
     case NC_INT64:
-        ret = PIOc_put_vars_longlong(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_put_vars_longlong(ncid, varid, startp, countp, stridep, (const long long int *) buf);
         break;
     case NC_UINT64:
-        ret = PIOc_put_vars_ulonglong(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_put_vars_ulonglong(ncid, varid, startp, countp, stridep, (const unsigned long long int *) buf);
         break;
         /* case NC_STRING: */
         /*      PIOc_put_vars_string(ncid, varid, startp, countp, */
@@ -1996,40 +1996,40 @@ int get_vars_handler(iosystem_desc_t *ios)
     switch(xtype)
     {
     case NC_BYTE:
-        ret = PIOc_get_vars_schar(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_get_vars_schar(ncid, varid, startp, countp, stridep, (signed char *) buf);
         break;
     case NC_CHAR:
-        ret = PIOc_get_vars_text(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_get_vars_text(ncid, varid, startp, countp, stridep, (char *) buf);
         break;
     case NC_SHORT:
-        ret = PIOc_get_vars_short(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_get_vars_short(ncid, varid, startp, countp, stridep, (short int *) buf);
         break;
     case NC_INT:
-        ret = PIOc_get_vars_int(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_get_vars_int(ncid, varid, startp, countp, stridep, (int *) buf);
         break;
     case PIO_LONG_INTERNAL:
-        ret = PIOc_get_vars_long(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_get_vars_long(ncid, varid, startp, countp, stridep, (long int *) buf);
         break;
     case NC_FLOAT:
-        ret = PIOc_get_vars_float(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_get_vars_float(ncid, varid, startp, countp, stridep, (float *) buf);
         break;
     case NC_DOUBLE:
-        ret = PIOc_get_vars_double(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_get_vars_double(ncid, varid, startp, countp, stridep, (double *) buf);
         break;
     case NC_UBYTE:
-        ret = PIOc_get_vars_uchar(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_get_vars_uchar(ncid, varid, startp, countp, stridep, (unsigned char *) buf);
         break;
     case NC_USHORT:
-        ret = PIOc_get_vars_ushort(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_get_vars_ushort(ncid, varid, startp, countp, stridep, (unsigned short *) buf);
         break;
     case NC_UINT:
-        ret = PIOc_get_vars_uint(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_get_vars_uint(ncid, varid, startp, countp, stridep, (unsigned int *) buf);
         break;
     case NC_INT64:
-        ret = PIOc_get_vars_longlong(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_get_vars_longlong(ncid, varid, startp, countp, stridep, (long long int *) buf);
         break;
     case NC_UINT64:
-        ret = PIOc_get_vars_ulonglong(ncid, varid, startp, countp, stridep, buf);
+        ret = PIOc_get_vars_ulonglong(ncid, varid, startp, countp, stridep, (unsigned long long int *) buf);
         break;
         /* case NC_STRING: */
         /*      PIOc_get_vars_string(ncid, varid, startp, countp, */
@@ -2175,7 +2175,7 @@ int inq_var_fill_handler(iosystem_desc_t *ios)
     char fill_mode_present, fill_value_present;
     PIO_Offset type_size;
     int fill_mode, *fill_modep = NULL;
-    PIO_Offset *fill_value, *fill_valuep = NULL;
+    void *fill_value, *fill_valuep = NULL;
     int ret = PIO_NOERR;
 
     assert(ios);
@@ -3261,7 +3261,7 @@ int write_darray_multi_handler(iosystem_desc_t *ios)
     /* Call the function from IO tasks. Errors are handled within
      * function. */
     ret = PIOc_write_darray_multi(ncid, varids, ioid, nvars, arraylen,
-                            array, framep, fillvaluep, flushtodisk);
+                            array, framep, (const void **) fillvaluep, flushtodisk);
 
     /* Free resources. */
     if(varids_sz > 0)
