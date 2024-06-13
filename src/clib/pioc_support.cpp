@@ -5934,7 +5934,7 @@ char *spio_strdup(const char *str)
     return dup;
 }
 
-inline PIO_Offset spio_get_nc_type_size(nc_type xtype)
+PIO_Offset spio_get_nc_type_size(nc_type xtype)
 {
     switch (xtype)
     {
