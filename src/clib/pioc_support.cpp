@@ -5934,7 +5934,7 @@ char *spio_strdup(const char *str)
     return dup;
 }
 
-inline PIO_Offset spio_get_nc_type_size(nc_type xtype)
+PIO_Offset spio_get_nc_type_size(nc_type xtype)
 {
     switch (xtype)
     {
@@ -5961,7 +5961,7 @@ inline PIO_Offset spio_get_nc_type_size(nc_type xtype)
 }
 
 #ifdef _HDF5
-inline hid_t spio_nc_type_to_hdf5_type(nc_type xtype)
+hid_t spio_nc_type_to_hdf5_type(nc_type xtype)
 {
     switch (xtype)
     {
