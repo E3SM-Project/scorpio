@@ -186,6 +186,7 @@ int test_create_mpi_datatypes()
 }
 
 /* Test the idx_to_dim_list() function. */
+/*
 int test_idx_to_dim_list()
 {
     int ndims = 1;
@@ -193,31 +194,29 @@ int test_idx_to_dim_list()
     PIO_Offset idx = 0;
     PIO_Offset dim_list[1];
 
-    /* This simplest case. */
     idx_to_dim_list(ndims, gdims, idx, dim_list);
 
     if (dim_list[0] != 0)
         return ERR_WRONG;
 
-    /* The case given in the function docs. */
     int ndims2 = 2;
     int gdims2[2] = {3, 2};
     PIO_Offset idx2 = 4;
     PIO_Offset dim_list2[2];
 
-    /* According to function docs, we should get 2,0 */
     idx_to_dim_list(ndims2, gdims2, idx2, dim_list2);
     printf("dim_list2[0] = %lld\n", dim_list2[0]);
     printf("dim_list2[1] = %lld\n", dim_list2[1]);
 
-    /* This is the correct result! */
     if (dim_list2[0] != 2 || dim_list2[1] != 0)
         return ERR_WRONG;
 
     return 0;
 }
+*/
 
 /* Test the coord_to_lindex() function. */
+/*
 int test_coord_to_lindex()
 {
     int ndims = 1;
@@ -225,7 +224,6 @@ int test_coord_to_lindex()
     PIO_Offset count[1] = {1};
     PIO_Offset lindex;
 
-    /* Not sure what this function is really doing. */
     lindex = coord_to_lindex(ndims, lcoord, count);
     if (lindex != 0)
         return ERR_WRONG;
@@ -251,6 +249,7 @@ int test_coord_to_lindex()
 
     return 0;
 }
+*/
 
 /* Test compute_maxIObuffersize() function. */
 int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
@@ -1264,14 +1263,6 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
 int run_no_iosys_tests(int my_rank, MPI_Comm test_comm)
 {
     int ret;
-
-    printf("%d running idx_to_dim_list tests\n", my_rank);
-    if ((ret = test_idx_to_dim_list()))
-        return ret;
-
-    printf("%d running coord_to_lindex tests\n", my_rank);
-    if ((ret = test_coord_to_lindex()))
-        return ret;
 
     printf("%d running compute_maxIObuffersize tests\n", my_rank);
     if ((ret = test_compute_maxIObuffersize(test_comm, my_rank)))

@@ -25,6 +25,17 @@
 
 #define VERSNO 2001
 
+#if defined(__cplusplus)
+extern "C"{
+#endif
+
+void PIOc_warn(int iosysid, int ncid, const char *fname, int line, const char *uwarn_msg);
+int PIOc_error(int iosysid, int ncid, int err_num, const char *fname, int line, const char *uerr_msg);
+
+#if defined(__cplusplus)
+}
+#endif
+
 /* Some logging constants. */
 #if PIO_ENABLE_LOGGING
 #define MAX_LOG_MSG 1024
@@ -76,7 +87,7 @@ int spio_remove_directory(const char *path)
                 continue;
 
             len = path_len + strlen(p->d_name) + 2;
-            buf = malloc(len);
+            buf = (char *) malloc(len);
 
             if (buf)
             {
@@ -1114,7 +1125,7 @@ int pio_err(iosystem_desc_t *ios, file_desc_t *file,
     va_end(argp);
 
     /* If logging is in use, log an error message. */
-    LOG((1, "ERROR: %s. %s err_num = %d fname = %s line = %d", uerr_msg, err_msg, err_num, fname ? fname : '\0', line));
+    LOG((1, "ERROR: %s. %s err_num = %d fname = %s line = %d", uerr_msg, err_msg, err_num, fname ? fname : "\0", line));
 
     /* What error handler should we use? */
     if (file)
@@ -1142,7 +1153,7 @@ int pio_err(iosystem_desc_t *ios, file_desc_t *file,
 
         if (print_err_msg)
         {
-            fprintf(stderr, "PIO: ERROR: %s. %s (error num=%d), (%s:%d)\n", uerr_msg, err_msg, err_num, (fname) ? fname : '\0', line); 
+            fprintf(stderr, "PIO: ERROR: %s. %s (error num=%d), (%s:%d)\n", uerr_msg, err_msg, err_num, (fname) ? fname : "\0", line);
             fflush(stderr);
         }
     }
@@ -1228,7 +1239,7 @@ void PIOc_warn(int iosysid, int ncid,
 
   bool print_warn_msg = (ios) ? (ios->union_rank == ios->ioroot) : true;
   if(print_warn_msg){
-    fprintf(stderr, "PIO: WARNING: %s, (%s:%d)\n", uwarn_msg, (fname) ? fname : '\0', line);
+    fprintf(stderr, "PIO: WARNING: %s, (%s:%d)\n", uwarn_msg, (fname) ? fname : "\0", line);
     fflush(stderr);
   }
 }
@@ -1253,21 +1264,21 @@ int alloc_region2(iosystem_desc_t *ios, int ndims, io_region **regionp)
          sizeof(io_region)));
     
     /* Allocate memory for the io_region struct. */
-    if (!(region = calloc(1, sizeof(io_region))))
+    if (!(region = (io_region *) calloc(1, sizeof(io_region))))
     {
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "Internal error while allocating region. Out of memory allocating %lld bytes I/O region", (unsigned long long) sizeof(io_region));
     }
 
     /* Allocate memory for the array of start indicies. */
-    if (!(region->start = calloc(ndims, sizeof(PIO_Offset))))
+    if (!(region->start = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset))))
     {
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "Internal error while allocating region. Out of memory allocating %lld bytes  for start array in the I/O region", (unsigned long long) (ndims * sizeof(PIO_Offset)));
     }
 
     /* Allocate memory for the array of counts. */
-    if (!(region->count = calloc(ndims, sizeof(PIO_Offset))))
+    if (!(region->count = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset))))
     {
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "Internal error while allocating region. Out of memory allocating %lld bytes  for count array in the I/O region", (unsigned long long) (ndims * sizeof(PIO_Offset)));
@@ -1401,7 +1412,7 @@ int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims,
     }
 
     /* Allocate space for the io_desc_t struct. */
-    if (!(*iodesc = calloc(1, sizeof(io_desc_t))))
+    if (!(*iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
     {
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "Internal error while allocating memory for iodesc. Out of memory allocating %lld bytes for the I/O descriptor", (unsigned long long) sizeof(io_desc_t));
@@ -1652,7 +1663,7 @@ int PIOc_readmap_impl(const char *file, int *ndims, int **gdims, PIO_Offset *fma
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Bcast(ndims, 1, MPI_INT, 0, comm)))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-        if (!(tdims = calloc(*ndims, sizeof(int))))
+        if (!(tdims = (int *) calloc(*ndims, sizeof(int))))
         {
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes for temp buffer to store dimension ids", file, (unsigned long long) ((*ndims) * sizeof(int)));
@@ -1671,7 +1682,7 @@ int PIOc_readmap_impl(const char *file, int *ndims, int **gdims, PIO_Offset *fma
                 return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
                                 "Reading I/O decomposition from file (%s) failed. Corrupt/invalid entries in file. Expected decomposition info of process %d but read decomposition info of process %d instead", file, i, j);
             }
-            if (!(tmap = malloc(maplen * sizeof(PIO_Offset))))
+            if (!(tmap = (PIO_Offset *) malloc(maplen * sizeof(PIO_Offset))))
             {
                 return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                                 "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes for storing I/O decomposition map", file, (unsigned long long) (maplen * sizeof(PIO_Offset)));
@@ -1701,7 +1712,7 @@ int PIOc_readmap_impl(const char *file, int *ndims, int **gdims, PIO_Offset *fma
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Bcast(ndims, 1, MPI_INT, 0, comm)))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-        if (!(tdims = calloc(*ndims, sizeof(int))))
+        if (!(tdims = (int *) calloc(*ndims, sizeof(int))))
         {
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes for temp buffer to store dimension ids", file, (unsigned long long)((*ndims) * sizeof(int)));
@@ -1713,7 +1724,7 @@ int PIOc_readmap_impl(const char *file, int *ndims, int **gdims, PIO_Offset *fma
         {
             if ((mpierr = MPI_Recv(&maplen, 1, PIO_OFFSET, 0, myrank + npes, comm, &status)))
                 return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-            if (!(tmap = malloc(maplen * sizeof(PIO_Offset))))
+            if (!(tmap = (PIO_Offset *) malloc(maplen * sizeof(PIO_Offset))))
             {
                 return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                                 "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes to store I/O decomposition map", file, (unsigned long long) (maplen * sizeof(PIO_Offset)));
@@ -2405,7 +2416,7 @@ int spio_read_nc_decomp_int(int iosysid, const char *filename, int *ndims, int *
     }
     if (global_dimlen)
     {
-        if (!(*global_dimlen = malloc(ndims_in * sizeof(int))))
+        if (!(*global_dimlen = (int *) malloc(ndims_in * sizeof(int))))
         {
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Reading I/O decomposition from NetCDF file (%s) failed. Out of memory allocating %lld bytes for global dimension length array", filename, (unsigned long long) (ndims_in * sizeof(int)));
@@ -2447,7 +2458,7 @@ int spio_read_nc_decomp_int(int iosysid, const char *filename, int *ndims, int *
     }
     if (task_maplen)
     {
-        if (!(*task_maplen = malloc(num_tasks_in * sizeof(int))))
+        if (!(*task_maplen = (int *) malloc(num_tasks_in * sizeof(int))))
         {
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Reading I/O decomposition from NetCDF file (%s) failed. Out of memory allocating %lld bytes to store length of I/O decomposition maps for each task", filename, (unsigned long long) (num_tasks_in * sizeof(int)));
@@ -2471,7 +2482,7 @@ int spio_read_nc_decomp_int(int iosysid, const char *filename, int *ndims, int *
     }
     if (map)
     {
-        if (!(*map = malloc(num_tasks_in * max_maplen_in * sizeof(int))))
+        if (!(*map = (int *) malloc(num_tasks_in * max_maplen_in * sizeof(int))))
         {
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Reading I/O decomposition from NetCDF file (%s) failed. Out of memory allocating %lld bytes for the I/O decomposition map", filename, (unsigned long long) (num_tasks_in * max_maplen_in * sizeof(int)));
@@ -2562,7 +2573,7 @@ int PIOc_writemap_impl(const char *file, int ioid, int ndims, const int *gdims, 
 
     /* Allocate memory for the nmaplen. */
     if (myrank == 0)
-        if (!(nmaplen = malloc(npes * sizeof(PIO_Offset))))
+        if (!(nmaplen = (PIO_Offset *) malloc(npes * sizeof(PIO_Offset))))
         {
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Writing I/O decomposition to file (%s) failed. Out of memory allocating %lld bytes for array of map lengths", file, (unsigned long long) (npes * sizeof(PIO_Offset)));
@@ -2761,13 +2772,13 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
          iosysid, *iotype, filename, mode));
 
     /* Allocate space for the file info. */
-    if (!(file = calloc(sizeof(file_desc_t), 1)))
+    if (!(file = (file_desc_t *) calloc(sizeof(file_desc_t), 1)))
     {
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "Creating file (%s) failed. Out of memory allocating %lld bytes for the file descriptor", filename, (unsigned long long) (sizeof(file_desc_t)));
     }
 
-    file->io_fstats = calloc(sizeof(spio_io_fstats_summary_t), 1);
+    file->io_fstats = (spio_io_fstats_summary_t *) calloc(sizeof(spio_io_fstats_summary_t), 1);
     if(!(file->io_fstats))
     {
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -3575,7 +3586,7 @@ static int adios_read_global_dimensions(iosystem_desc_t *ios, file_desc_t *file,
 
             if (file->dim_names[file->num_dim_vars] == NULL)
             {
-                file->dim_names[file->num_dim_vars] = calloc(sub_length + 1, 1);
+                file->dim_names[file->num_dim_vars] = (char *) calloc(sub_length + 1, 1);
                 if (file->dim_names[file->num_dim_vars] == NULL)
                 {
                     return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -3781,7 +3792,7 @@ static int adios_get_dim_ids(file_desc_t *file, int varid)
 
         if (size_attr > 0)
         {
-            char **attr_data = calloc(size_attr, sizeof(char *));
+            char **attr_data = (char **) calloc(size_attr, sizeof(char *));
             if (attr_data == NULL)
             {
                 return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -3792,7 +3803,7 @@ static int adios_get_dim_ids(file_desc_t *file, int varid)
 
             for (size_t a = 0; a < size_attr; a++)
             {
-                attr_data[a] = calloc(PIO_MAX_NAME, 1);
+                attr_data[a] = (char *) calloc(PIO_MAX_NAME, 1);
                 if (attr_data[a] == NULL)
                 {
                     return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -3813,7 +3824,7 @@ static int adios_get_dim_ids(file_desc_t *file, int varid)
 
             if (file->adios_vars[varid].gdimids == NULL)
             {
-                file->adios_vars[varid].gdimids = calloc(file->adios_vars[varid].ndims, sizeof(int));
+                file->adios_vars[varid].gdimids = (int *) calloc(file->adios_vars[varid].ndims, sizeof(int));
                 if (file->adios_vars[varid].gdimids == NULL)
                 {
                     return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -3867,7 +3878,7 @@ static int adios_get_nc_op_tag(file_desc_t *file, int varid)
 
         if (size_attr > 0)
         {
-            char* attr_data = calloc(NC_OP_TAG_MAX_LEN, 1);
+            char* attr_data = (char *) calloc(NC_OP_TAG_MAX_LEN, 1);
             if (attr_data == NULL)
             {
                 return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -3930,7 +3941,7 @@ static int adios_get_adios_type(file_desc_t *file, int varid)
     adios2_attribute *attr = adios2_inquire_attribute(file->ioH, attr_name);
     if (attr != NULL)
     {
-        int32_t attr_data = adios2_type_unknown;
+        adios2_type attr_data = adios2_type_unknown;
         size_t size_attr = 0;
         adios2_error adiosErr = adios2_attribute_data(&attr_data, &size_attr, attr);
         if (adiosErr != adios2_error_none)
@@ -4114,7 +4125,7 @@ static size_t adios_read_vars_attrs(file_desc_t *file, size_t attr_size, char *c
             int suffix_length = strlen(adios_def_ndims_suffix);
             int sub_length = full_length - prefix_length - suffix_length;
 
-            char *name_tmp = calloc(sub_length + 1, 1);
+            char *name_tmp = (char *) calloc(sub_length + 1, 1);
             if (name_tmp == NULL)
             {
                 return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -4143,7 +4154,7 @@ static size_t adios_read_vars_attrs(file_desc_t *file, size_t attr_size, char *c
                 continue;
             }
 
-            file->adios_vars[file->num_vars].name = calloc(sub_length + 1, 1);
+            file->adios_vars[file->num_vars].name = (char *) calloc(sub_length + 1, 1);
             if (file->adios_vars[file->num_vars].name == NULL)
             {
                 return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -4176,7 +4187,7 @@ static size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *con
             int prefix_length = strlen(adios_pio_var_prefix);
 
             /* Check that we do not have it already */
-            char *name_tmp = calloc(sub_length + 1, 1);
+            char *name_tmp = (char *) calloc(sub_length + 1, 1);
             if (name_tmp == NULL)
             {
                 return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -4204,7 +4215,7 @@ static size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *con
                 continue;
             }
 
-            file->adios_vars[file->num_vars].name = calloc(sub_length + 1, 1);
+            file->adios_vars[file->num_vars].name = (char *) calloc(sub_length + 1, 1);
             if (file->adios_vars[file->num_vars].name == NULL)
             {
                 return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -4291,7 +4302,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
          iosysid, *iotype, filename, mode, retry));
 
     /* Allocate space for the file info. */
-    if (!(file = calloc(sizeof(file_desc_t), 1)))
+    if (!(file = (file_desc_t *) calloc(sizeof(file_desc_t), 1)))
     {
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -4299,7 +4310,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                         "Opening file (%s) failed. Out of memory allocating %lld bytes for the file structure", filename, (unsigned long long) (sizeof(*file)));
     }
 
-    file->io_fstats = calloc(sizeof(spio_io_fstats_summary_t), 1);
+    file->io_fstats = (spio_io_fstats_summary_t *) calloc(sizeof(spio_io_fstats_summary_t), 1);
     if(!(file->io_fstats))
     {
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -4702,7 +4713,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                 int full_length = strlen(attr_names[i]);
                 int prefix_length = strlen(adios_pio_global_prefix);
 
-                file->adios_attrs[attr_id].att_name = calloc(sub_length + 1, 1);
+                file->adios_attrs[attr_id].att_name = (char *) calloc(sub_length + 1, 1);
                 if (file->adios_attrs[attr_id].att_name == NULL)
                 {
                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -4732,7 +4743,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                 if (attributeH != NULL)
                 {
                     size_t size_attr = 0;
-                    char *attr_data = calloc(PIO_MAX_NAME, 1);
+                    char *attr_data = (char *) calloc(PIO_MAX_NAME, 1);
                     if (attr_data == NULL)
                     {
                         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -4783,7 +4794,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                     if (strrchr(attr_names[i], '/') > &attr_names[i][prefix_length])
                         continue;
 
-                    file->adios_attrs[attr_id].att_name = calloc(sub_length + 1, 1);
+                    file->adios_attrs[attr_id].att_name = (char *) calloc(sub_length + 1, 1);
                     if (file->adios_attrs[attr_id].att_name == NULL)
                     {
                         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -5923,7 +5934,7 @@ char *spio_strdup(const char *str)
     return dup;
 }
 
-inline PIO_Offset spio_get_nc_type_size(nc_type xtype)
+PIO_Offset spio_get_nc_type_size(nc_type xtype)
 {
     switch (xtype)
     {
@@ -5950,7 +5961,7 @@ inline PIO_Offset spio_get_nc_type_size(nc_type xtype)
 }
 
 #ifdef _HDF5
-inline hid_t spio_nc_type_to_hdf5_type(nc_type xtype)
+hid_t spio_nc_type_to_hdf5_type(nc_type xtype)
 {
     switch (xtype)
     {

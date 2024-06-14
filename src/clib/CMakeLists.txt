@@ -36,11 +36,11 @@ set (pio_api_src
 
 # Add sources for libpioc.a
 add_library (pioc ${pio_api_src}
-  topology.c pio_mpi_timer.c pio_timer.c pio_file.c
-  pioc_support.c pio_lists.c pio_print.c
-  pioc.c pioc_sc.c pio_spmd.c pio_rearrange.c pio_nc4.c bget.c
-  pio_nc.c pio_put_nc.c pio_get_nc.c pio_getput_int.c pio_msg.c pio_varm.c
-  pio_darray.c pio_darray_int.c spio_hash.cpp pio_sdecomps_regex.cpp spio_io_summary.cpp
+  topology.cpp pio_mpi_timer.cpp pio_timer.cpp pio_file.cpp
+  pioc_support.cpp pio_lists.cpp pio_print.cpp
+  pioc.cpp pioc_sc.cpp pio_spmd.cpp pio_rearrange.cpp pio_nc4.cpp bget.cpp
+  pio_nc.cpp pio_put_nc.cpp pio_get_nc.cpp pio_getput_int.cpp pio_msg.cpp pio_varm.cpp
+  pio_darray.cpp pio_darray_int.cpp spio_hash.cpp pio_sdecomps_regex.cpp spio_io_summary.cpp
   spio_ltimer.cpp spio_serializer.cpp spio_file_mvcache.cpp spio_tracer.cpp spio_rearrange_any.cpp)
 
 #==============================================================================
