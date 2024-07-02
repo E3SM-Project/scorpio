@@ -2555,20 +2555,17 @@ if (file->iotype != PIO_IOTYPE_HDF5)
 }
 
 #ifdef _ADIOS2
-#define MAX_LEN_MATCH 64 /* Match first 64 elements only so far */
-static bool match_decomp_part(const int64_t *decomp, size_t offset, PIO_Offset *start, PIO_Offset len_decomp)
+/* FIXME: pass in PIO_Offset *decomp instead of int64_t */
+static inline bool match_decomp_full(const int64_t *decomp, size_t offset, PIO_Offset *start, PIO_Offset len_decomp)
 {
-    PIO_Offset len = len_decomp;
-    if (len > MAX_LEN_MATCH)
-        len = MAX_LEN_MATCH;
+    /* Handle the special case where the map length is 0 */
+    if (len_decomp < 1)
+        return true;
 
-    for (PIO_Offset idx = 0; idx < len; idx++)
-    {
-        if (decomp[offset + idx] != start[idx])
-            return false;
-    }
+    assert(decomp != NULL && start != NULL && len_decomp > 0);
+    assert(sizeof(int64_t) == sizeof(PIO_Offset));
 
-    return true;
+    return memcmp(&decomp[offset], start, len_decomp * sizeof(PIO_Offset)) == 0;
 }
 
 #define ADIOS_READ_CONVERT_COPY_ARRAY(from_type, to_type) \
@@ -3023,9 +3020,9 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
             }
 
             /* Search for the start and end index of the decomposition map inside one block */
-            for (size_t pos = 0; (pos + len_decomp - 1) < block_size; pos++)
+            for (size_t pos = 0; (pos + len_decomp) <= block_size; pos++)
             {
-                if (match_decomp_part(decomp_int64_t, pos, start_decomp, len_decomp))
+                if (match_decomp_full(decomp_int64_t, pos, start_decomp, len_decomp))
                 {
                     target_block = block;
                     start_idx_in_target_block = pos;
