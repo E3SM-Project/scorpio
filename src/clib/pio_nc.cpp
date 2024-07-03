@@ -1357,19 +1357,13 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
             }
             if(!ierr && (file->num_unlim_dimids > 0))
             {
+                /* For PnetCDF, checking whether a variable is a record
+                 * variable can be done by checking the first dimension,
+                 * because CDF-1,2,5 formats allow only the first dimension to
+                 * be unlimited.
+                 */
                 int *p = (dimidsp) ? dimidsp : tmp_dimidsp;
-                int is_rec_var = file->varlist[varid].rec_var;
-                for(int i=0; (i<ndims) && (!is_rec_var); i++)
-                {
-                    for(int j=0; (j<file->num_unlim_dimids) && (!is_rec_var); j++)
-                    {
-                        if(p[i] == file->unlim_dimids[j])
-                        {
-                            is_rec_var = 1;
-                        }
-                    }
-                }
-                file->varlist[varid].rec_var = is_rec_var;
+                file->varlist[varid].rec_var = (ndims > 0 && p[0] == PIO_UNLIMITED) ? 1 : 0;
             }
             free(tmp_dimidsp);
         }
