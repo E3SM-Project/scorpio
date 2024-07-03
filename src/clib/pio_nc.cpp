@@ -469,7 +469,8 @@ int PIOc_inq_unlimdims_impl(int ncid, int *nunlimdimsp, int *unlimdimidsp)
 #endif
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Allreduce(MPI_IN_PLACE, &ierr, 1, MPI_INT, MPI_BOR, ios->my_comm);
+
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
