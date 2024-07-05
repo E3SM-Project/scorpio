@@ -2963,7 +2963,11 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 
         file->adios_reader_num_decomp_blocks = 0;
 
+#ifdef _SPIO_ADIOS_NO_DECOMPS
+        file->store_adios_decomp = false;
+#else
         file->store_adios_decomp = true;
+#endif
 
         /* Create a new ADIOS group */
         char declare_name[PIO_MAX_NAME];
