@@ -2184,6 +2184,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
     string err_msg = "No errors";
     int ncid = -1;
     int n_bp_writers;
+    int decomp_stored_flag = -1;
     int ret = PIO_NOERR;
     int iosysid;
 
@@ -2250,6 +2251,26 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         {
             fprintf(stderr, "ERROR: /__pio__/info/nproc is missing.\n");
             return BP2PIO_ERROR;
+        }
+
+        /* Get the value of /__pio__/info/decomp_stored flag */
+        adios2::Variable<int> bpDecompStored = bpIO[0].InquireVariable<int>("/__pio__/info/decomp_stored");
+        if (bpDecompStored)
+        {
+            bpReader[0].Get(bpDecompStored, &decomp_stored_flag, adios2::Mode::Sync);
+            assert(decomp_stored_flag == 0 || decomp_stored_flag == 1);
+        }
+        else
+        {
+            /* Maintains backward compatibility with earlier generated BP files where decomposition storage
+             * information is absent. */
+            decomp_stored_flag = 1;
+        }
+
+        if (decomp_stored_flag == 0)
+        {
+            if (w_mpirank == 0)
+                fprintf(stdout, "WARNING: Skipping conversion of distributed array variables due to missing decomposition data for BP file : \"%s\"\n", infilepath.c_str());
         }
 
         uint64_t time_step = 0;
@@ -2408,6 +2429,9 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
                     }
                     else if (var.op == "darray")
                     {
+                      /* Convert distributed array variables only when decomposition maps are available. */
+                      if (decomp_stored_flag == 1)
+                      {
                         /* Variable was written with pio_write_darray() with a decomposition */
                         if (debug_out)
                         {
@@ -2418,6 +2442,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
                                                      iosysid, file0, adios_new, time_step,
                                                      comm, mpirank, nproc, block_procs, local_proc_blocks,
                                                      block_list, processed_attrs, decomp_cache);
+                      }
                     }
                 }
 
