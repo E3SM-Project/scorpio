@@ -317,6 +317,12 @@ if (ADIOS_BP2NC_TEST)
     PUBLIC _ADIOS_BP2NC_TEST)
 endif ()
 
+if (ADIOS_NO_DECOMPS)
+  message(STATUS "No decomposition data will be saved to ADIOS BP files to reduce disk usage")
+  target_compile_definitions (pioc
+    PUBLIC _SPIO_ADIOS_NO_DECOMPS)
+endif ()
+
 if (PIO_ENABLE_API_TRACING)
   message(STATUS "Enabling API tracing")
   set(ENABLE_API_TRACING 1)
