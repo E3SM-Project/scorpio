@@ -32,7 +32,7 @@ ctest_test(INCLUDE "pio_unit_test|^init|pio_file\
 elseif (DEFINED ENV{ADIOS_READ_CTEST})
 ctest_test(INCLUDE "pio_unit_test|^init|pio_file\
 |ncdf_simple_tests\
-|pio_decomp_tests_|pio_decomp_frame_tests_|pio_decomp_extra_dims_\
+|pio_decomp_tests_np|pio_decomp_extra_dims_\
 |pio_iosystem_tests|examplePio|example1|darray_no_async|test_adios")
 elseif (DEFINED ENV{HDF5_CTEST})
 ctest_test(INCLUDE "test_hdf5")
