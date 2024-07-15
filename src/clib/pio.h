@@ -1085,6 +1085,9 @@ typedef struct file_desc_t
 
     char io_name_reader[PIO_MAX_NAME + 1]; /* Name of io object, for ADIOS read */
     size_t adios_reader_num_decomp_blocks; /* Number of decomposition blocks, for ADIOS read */
+    int adios_reader_target_block; /* The target decomposition block that the current proc belongs to, for ADIOS read */
+    int *adios_reader_target_block_proc_list; /* All procs that belong to the same target block, for ADIOS read */
+    size_t adios_reader_target_block_nprocs; /* Number of procs that belong to the same target block, for ADIOS read */
 
     /* Indicates whether the decomposition maps (for ADIOS write) need to be stored in BP files. Default is true. */
     bool store_adios_decomp;

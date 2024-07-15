@@ -2962,6 +2962,9 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
         file->adios_io_process = ios->adios_io_process;
 
         file->adios_reader_num_decomp_blocks = 0;
+        file->adios_reader_target_block = -1;
+        file->adios_reader_target_block_proc_list = NULL;
+        file->adios_reader_target_block_nprocs = 0;
 
 #ifdef _SPIO_ADIOS_NO_DECOMPS
         file->store_adios_decomp = false;
@@ -3574,6 +3577,7 @@ static int adios_get_dim_ids(file_desc_t *file, int);
 static int adios_get_nc_op_tag(file_desc_t *file, int);
 static int adios_get_attr(file_desc_t *file, int current_var_cnt, char *const *attr_names, size_t);
 static int adios_get_num_decomp_blocks(file_desc_t *file);
+static int adios_get_target_decomp_block_info(file_desc_t *file);
 static int adios_get_decomp_storage_info(file_desc_t *file);
 static size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *const *var_names);
 static size_t adios_read_vars_attrs(file_desc_t *file, size_t attr_size, char *const *attr_names);
@@ -4179,6 +4183,134 @@ static int adios_get_num_decomp_blocks(file_desc_t *file)
     return PIO_NOERR;
 }
 
+static int adios_get_target_decomp_block_info(file_desc_t *file)
+{
+    /*
+       Considering the ADIOS writer, assuming there are M write processes and N decomp blocks.
+       Based on observed test case outcomes, we have determined the algorithm for assigning each
+       process to a designated block. The algorithm is likely as follows:
+       - Each block contains data for at most ceil(M / N) processes.
+       - Processes with lower ranks are assigned first.
+       - Blocks with lower ranks are packed first until they are full.
+
+       For example:
+           Example 1: M = 4, N = 2
+           ceil(M / N) = 2
+           block 0: proc 0, proc 1
+           block 1: proc 2, proc 3
+
+           Example 2: M = 7, N = 3
+           ceil(M / N) = 3
+           block 0: proc 0, proc 1, proc 2
+           block 1: proc 3, proc 4, proc 5
+           block 2: proc 6
+
+           Example 3: M = 5, N = 4
+           ceil(M / N) = 2
+           block 0: proc 0, proc 1
+           block 1: proc 2, proc 3
+           block 2: proc 4
+           block 3: not used
+
+       Clearly, following this algorithm, proc i will be assigned to block j = floor(i / ceil(M / N)).
+
+       Now, for the ADIOS reader, assuming there are M read processes and N decomp blocks.
+       Given the assumption about the ADIOS writer, we can deduce that for proc i, it needs to read from
+       the target block j = floor(i / ceil(M / N)).
+
+       However, it's important to note that the algorithm of the ADIOS writer is only summarized from some
+       limited tests, and the expected target block needs to be verified with metadata saved in ADIOS BP
+       files regarding block merging.
+     */
+
+    iosystem_desc_t *ios = file->iosystem; /* Pointer to io system information. */
+    assert(ios != NULL);
+
+    /* Determine the maximum number of compute tasks assigned to each block */
+    size_t decomp_blocks_size = file->adios_reader_num_decomp_blocks;
+    assert(decomp_blocks_size > 0);
+
+    int max_comptasks_per_block = ios->num_comptasks / decomp_blocks_size;
+    if (ios->num_comptasks % decomp_blocks_size != 0)
+        max_comptasks_per_block++;
+    assert(max_comptasks_per_block >= 1);
+
+    /* Calculate the expected target block and verify it afterwards with metadata
+       read from ADIOS BP files regarding block merging. */
+    int target_block = ios->comp_rank / max_comptasks_per_block;
+    assert(target_block >= 0 && target_block < (int)decomp_blocks_size);
+
+    adios2_variable *variableH = adios2_inquire_variable(file->ioH, "/__pio__/info/block_list");
+    if (variableH == NULL)
+    {
+        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Getting target decomposition block info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                       "/__pio__/info/block_list is missing",
+                       pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    adios2_error adiosErr = adios2_set_block_selection(variableH, target_block);
+    if (adiosErr != adios2_error_none)
+    {
+        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Getting target decomposition block info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to set block selection (adios2_error=%s)",
+                       pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+    }
+
+    size_t block_nprocs = 0;
+    adiosErr = adios2_selection_size(&block_nprocs, variableH);
+    if (adiosErr != adios2_error_none)
+    {
+        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                      "Getting target decomposition block info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to return the minimum required allocation for the current selection (adios2_error=%s)",
+                       pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+    }
+
+    assert(block_nprocs > 0);
+    file->adios_reader_target_block_nprocs = block_nprocs;
+
+    file->adios_reader_target_block_proc_list = (int*)calloc(block_nprocs, sizeof(int));
+    if (file->adios_reader_target_block_proc_list == NULL)
+    {
+        return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                       "Getting target decomposition block info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                       "Out of memory allocating %lld bytes to store procs that belong to the same target block",
+                       pio_get_fname_from_file(file), file->pio_ncid, (long long int)(block_nprocs * sizeof(int)));
+    }
+
+    adiosErr = adios2_get(file->engineH, variableH, file->adios_reader_target_block_proc_list, adios2_mode_sync);
+    if (adiosErr != adios2_error_none)
+    {
+        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Getting target decomposition block info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to get data associated with a variable from an engine (adios2_error=%s)",
+                       pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+    }
+
+    bool target_block_verified = false;
+    for (size_t proc = 0; proc < block_nprocs; proc++)
+    {
+        if (file->adios_reader_target_block_proc_list[proc] == ios->comp_rank)
+        {
+            file->adios_reader_target_block = target_block;
+            target_block_verified = true;
+            break;
+        }
+    }
+
+    if (!target_block_verified)
+    {
+        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Getting target decomposition block info in file (%s, ncid=%d) using ADIOS iotype failed. "
+                       "Failed to verify the target block that the current proc belongs to",
+                       pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    return 0;
+}
+
 static int adios_get_decomp_storage_info(file_desc_t *file)
 {
     adios2_variable *variableH = adios2_inquire_variable(file->ioH, "/__pio__/info/decomp_stored");
@@ -4699,6 +4831,9 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
         file->cache_darray_info = spio_hash(10000);
 
         file->adios_reader_num_decomp_blocks = 0;
+        file->adios_reader_target_block = -1;
+        file->adios_reader_target_block_proc_list = NULL;
+        file->adios_reader_target_block_nprocs = 0;
 
         file->store_adios_decomp = true;
 
@@ -4770,6 +4905,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
             if (step == 0)
             {
                 adios_get_num_decomp_blocks(file);
+                adios_get_target_decomp_block_info(file);
                 adios_get_decomp_storage_info(file);
             }
 
