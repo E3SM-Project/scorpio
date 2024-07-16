@@ -2701,10 +2701,9 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
     PIO_Offset len_decomp = iodesc->maplen;
 
     /* Get decomposition info from file */
-    int target_block = -1;
+    int target_block = file->adios_reader_target_block;
     int start_idx_in_target_block = -1;
     int end_idx_in_target_block = -1;
-    bool start_block_found = false;
 
     /* Get attribute mapping from variable name to the id */
     char prefix_var_name[] = "/__pio__/var/";
@@ -2761,89 +2760,94 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
     decomp_info_buff = (const int *) file->cache_darray_info->get(file->cache_darray_info, decomp_name);
     if (decomp_info_buff == NULL)
     {
-      if (file->store_adios_decomp)
-      {
-        /* We should search decomposition array from the step 0 if the decomp info is not in the cache, so we close and open the bp file */
-        /* Should not reopen opened file at step 0 */
-        if ((file->engineH != NULL && current_adios_step != 0) ||
-            (file->engineH != NULL && current_adios_step == 0 && file->begin_step_called == 0))
+        /* For ADIOS type, both read and write operations must use identical decomposition maps.
+         * If this condition is met, we can utilize the read decomposition map to determine the
+         * expected start and end indices of the write decomposition map within the target block.
+         *
+         * These indices will be verified by the match_decomp_full helper function afterwards.
+         */
+        int expected_decomp_start_idx = -1;
+        int expected_decomp_end_idx = -1;
+
+        iosystem_desc_t *ios = file->iosystem;
+        assert(ios != NULL);
+
+        /* Store the length of the decomposition map on each computation task */
+        int task_maplen[ios->num_comptasks];
+
+        /* Gather map lengths from all computation tasks and fill the task_maplen array on all tasks */
+        int mpierr = MPI_SUCCESS;
+        if ((mpierr = MPI_Allgather(&iodesc->maplen, 1, MPI_INT, task_maplen, 1, MPI_INT, ios->comp_comm)))
+            return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+        assert(task_maplen[ios->comp_rank] == iodesc->maplen);
+
+        expected_decomp_start_idx = 0;
+        for (int proc = 0; proc < file->adios_reader_target_block_nprocs; proc++)
         {
-            if (file->begin_step_called == 1)
+            if (file->adios_reader_target_block_proc_list[proc] < ios->comp_rank)
             {
-                adiosErr = adios2_end_step(file->engineH);
-                if (adiosErr != adios2_error_none)
-                {
-                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                                   "The low level (ADIOS) I/O library call failed to terminate interaction with current step (adios2_error=%s)",
-                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
-                }
-
-                file->begin_step_called = 0;
-            }
-
-            /* Close bp file and remove IO object */
-            adiosErr = adios2_close(file->engineH);
-            if (adiosErr != adios2_error_none)
-            {
-                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                               "The low level (ADIOS) I/O library call failed to close all transports in adios2_Engine (adios2_error=%s)",
-                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
-            }
-
-            file->begin_step_called = 0;
-
-            file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
-            if (file->engineH == NULL)
-            {
-                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                               "The low level (ADIOS) I/O library call failed to open an engine to start heavy-weight input/output operations (adios2_error=%s)",
-                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
-            }
-        }
-        /* End of reopening files */
-
-        adios2_variable *decomp_adios_var = NULL;
-
-        /* Search for decomposition array; if begin_step is done, do not make it again */
-        if (current_adios_step == 0 && file->begin_step_called == 1)
-        {
-            decomp_adios_var = adios2_inquire_variable(file->ioH, decomp_name);
-            if (decomp_adios_var == NULL)
-            {
-                adiosErr = adios2_end_step(file->engineH);
-                if (adiosErr != adios2_error_none)
-                {
-                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                                   "The low level (ADIOS) I/O library call failed to terminate interaction with current step (adios2_error=%s)",
-                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
-                }
-
-                file->begin_step_called = 0;
-            }
-        }
-
-        if (decomp_adios_var == NULL)
-        {
-            while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0, &status) == adios2_error_none)
-            {
-                file->begin_step_called = 1;
-                if (status == adios2_step_status_end_of_stream)
-                {
-                    free(decomp_name);
-                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                                   "adios2_begin_step returned adios2_step_status_end_of_stream",
-                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-                }
-
-                decomp_adios_var = adios2_inquire_variable(file->ioH, decomp_name);
-                if (decomp_adios_var)
-                    break;
+                /* Handle the special case where the map length is 0 or 1.
+                 * The ADIOS writer always ensures that the map length is
+                 * at least 2 by padding if the original length is 0 or 1. */
+                if (task_maplen[file->adios_reader_target_block_proc_list[proc]] > 1)
+                    expected_decomp_start_idx += task_maplen[file->adios_reader_target_block_proc_list[proc]];
                 else
+                    expected_decomp_start_idx += 2;
+            }
+        }
+        expected_decomp_end_idx = expected_decomp_start_idx + iodesc->maplen - 1;
+
+        if (file->store_adios_decomp)
+        {
+            /* We should search decomposition array from the step 0 if the decomp info is not in the cache, so we close and open the bp file */
+            /* Should not reopen opened file at step 0 */
+            if ((file->engineH != NULL && current_adios_step != 0) ||
+                (file->engineH != NULL && current_adios_step == 0 && file->begin_step_called == 0))
+            {
+                if (file->begin_step_called == 1)
+                {
+                    adiosErr = adios2_end_step(file->engineH);
+                    if (adiosErr != adios2_error_none)
+                    {
+                        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                       "The low level (ADIOS) I/O library call failed to terminate interaction with current step (adios2_error=%s)",
+                                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+                    }
+
+                    file->begin_step_called = 0;
+                }
+
+                /* Close bp file and remove IO object */
+                adiosErr = adios2_close(file->engineH);
+                if (adiosErr != adios2_error_none)
+                {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                   "The low level (ADIOS) I/O library call failed to close all transports in adios2_Engine (adios2_error=%s)",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+                }
+
+                file->begin_step_called = 0;
+
+                file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+                if (file->engineH == NULL)
+                {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                   "The low level (ADIOS) I/O library call failed to open an engine to start heavy-weight input/output operations (adios2_error=%s)",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+                }
+            }
+            /* End of reopening files */
+
+            adios2_variable *decomp_adios_var = NULL;
+
+            /* Search for decomposition array; if begin_step is done, do not make it again */
+            if (current_adios_step == 0 && file->begin_step_called == 1)
+            {
+                decomp_adios_var = adios2_inquire_variable(file->ioH, decomp_name);
+                if (decomp_adios_var == NULL)
                 {
                     adiosErr = adios2_end_step(file->engineH);
                     if (adiosErr != adios2_error_none)
@@ -2857,122 +2861,78 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
                     file->begin_step_called = 0;
                 }
             }
-        }
 
-        /* Search for start block and indices */
-        adiosErr = adios2_current_step(&current_adios_step, file->engineH);
-        if (adiosErr != adios2_error_none)
-        {
-            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                           "The low level (ADIOS) I/O library call failed to inspect current logical step (adios2_error=%s)",
-                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
-        }
+            if (decomp_adios_var == NULL)
+            {
+                while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0, &status) == adios2_error_none)
+                {
+                    file->begin_step_called = 1;
+                    if (status == adios2_step_status_end_of_stream)
+                    {
+                        free(decomp_name);
+                        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                       "adios2_begin_step returned adios2_step_status_end_of_stream",
+                                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                    }
 
-        adios2_varinfo *decomp_blocks = adios2_inquire_blockinfo(file->engineH, decomp_adios_var, current_adios_step);
-        if (decomp_blocks == NULL)
-        {
-            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                           "The low level (ADIOS) I/O library call failed to get the list of blocks for a variable in a given step (NULL pointer returned)",
-                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-        }
+                    decomp_adios_var = adios2_inquire_variable(file->ioH, decomp_name);
+                    if (decomp_adios_var)
+                        break;
+                    else
+                    {
+                        adiosErr = adios2_end_step(file->engineH);
+                        if (adiosErr != adios2_error_none)
+                        {
+                            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                                           "The low level (ADIOS) I/O library call failed to terminate interaction with current step (adios2_error=%s)",
+                                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+                        }
 
-        size_t decomp_blocks_size = decomp_blocks->nblocks;
-        assert(decomp_blocks_size == file->adios_reader_num_decomp_blocks);
+                        file->begin_step_called = 0;
+                    }
+                }
+            }
+            assert(decomp_adios_var != NULL);
 
-        /* Free memory */
-        for (size_t i = 0; i < decomp_blocks->nblocks; i++)
-        {
-            free(decomp_blocks->BlocksInfo[i].Start);
-            free(decomp_blocks->BlocksInfo[i].Count);
-        }
-        free(decomp_blocks->BlocksInfo);
-        free(decomp_blocks);
+            /* Search for start block and indices */
+            adiosErr = adios2_current_step(&current_adios_step, file->engineH);
+            if (adiosErr != adios2_error_none)
+            {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                               "The low level (ADIOS) I/O library call failed to inspect current logical step (adios2_error=%s)",
+                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+            }
 
-        adios2_type type;
-        adiosErr = adios2_variable_type(&type, decomp_adios_var);
-        if (adiosErr != adios2_error_none)
-        {
-            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                           "The low level (ADIOS) I/O library call failed to retrieve variable type (adios2_error=%s)",
-                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
-        }
+            adios2_varinfo *decomp_blocks = adios2_inquire_blockinfo(file->engineH, decomp_adios_var, current_adios_step);
+            if (decomp_blocks == NULL)
+            {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                               "The low level (ADIOS) I/O library call failed to get the list of blocks for a variable in a given step (NULL pointer returned)",
+                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+            }
+            assert(decomp_blocks->nblocks == file->adios_reader_num_decomp_blocks);
+            assert(target_block >= 0 && target_block < (int)decomp_blocks->nblocks);
 
-        int64_t *decomp_int64_t = NULL;
-        start_block_found = false;
+            /* Free adios2_varinfo structure (this ADIOS2 API returns void) */
+            adios2_free_blockinfo(decomp_blocks);
+            decomp_blocks = NULL;
 
-        /* Optimize PIOc_read_darray_adios() with efficient block guessing
+            adios2_type type;
+            adiosErr = adios2_variable_type(&type, decomp_adios_var);
+            if (adiosErr != adios2_error_none)
+            {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                               "The low level (ADIOS) I/O library call failed to retrieve variable type (adios2_error=%s)",
+                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+            }
+            assert(type == adios2_type_int64_t);
 
-           Each reading process is required to locate its corresponding block in
-           the decomp variable, which consists of decomp_blocks_size blocks.
-
-           In the previous implementation, the process iterated through all blocks,
-           reading in one block at a time and checking if its index falls within the
-           loaded block. Upon finding a match, the block is cached, and the loop is exited.
-
-           If we can accurately infer the probable target block and the guess is correct, we
-           can optimize the search algorithm by immediately exiting the loop.
-
-           Considering the ADIOS writer, assuming there are M write processes and N decomp blocks.
-           Based on observed test case outcomes, we have determined the algorithm for assigning each
-           process to a designated block. The algorithm is likely as follows:
-           - Each block contains data for at most ceil(M / N) processes.
-           - Processes with lower ranks are assigned first.
-           - Blocks with lower ranks are packed first until they are full.
-
-           For example:
-               Example 1: M = 4, N = 2
-               ceil(M / N) = 2
-               block 0: proc 0, proc 1
-               block 1: proc 2, proc 3
-
-               Example 2: M = 7, N = 3
-               ceil(M / N) = 3
-               block 0: proc 0, proc 1, proc 2
-               block 1: proc 3, proc 4, proc 5
-               block 2: proc 6
-
-               Example 3: M = 5, N = 4
-               ceil(M / N) = 2
-               block 0: proc 0, proc 1
-               block 1: proc 2, proc 3
-               block 2: proc 4
-               block 3: not used
-
-           Clearly, following this algorithm, proc i will be assigned to block j = floor(i / ceil(M / N)).
-
-           Now, for the ADIOS reader, assuming there are M read processes and N decomp blocks.
-           Given the assumption about the ADIOS writer, we can deduce that for proc i, it needs to read from
-           block j = floor(i / ceil(M / N)).
-
-           However, it's important to note that the algorithm of the ADIOS writer is only summarized from some
-           limited tests, which has not been fully confirmed yet. We are not sure if the guessed block is always
-           correct for all test cases. Thus, we have to revert to linear search if the guessed block turns out to
-           be incorrect.
-         */
-
-        iosystem_desc_t *ios = file->iosystem; /* Pointer to io system information. */
-        assert(ios != NULL);
-
-        /* Determine the maximum number of compute tasks assigned to each block */
-        assert(decomp_blocks_size > 0);
-        int max_comptasks_per_block = ios->num_comptasks / decomp_blocks_size;
-        if (ios->num_comptasks % decomp_blocks_size != 0)
-            max_comptasks_per_block++;
-        assert(max_comptasks_per_block >= 1);
-
-        /* Calculate the most probable target block we try to find */
-        int guess_block = ios->comp_rank / max_comptasks_per_block;
-        assert(guess_block >= 0 && guess_block < decomp_blocks_size);
-
-        /* Since we are uncertain if our guessed target block is accurate for all scenarios, iterate through the
-         * blocks from guess_block to the end, and then from 0 to guess_block - 1. */
-        size_t block = guess_block;
-        while (!start_block_found)
-        {
-            adiosErr = adios2_set_block_selection(decomp_adios_var, block);
+            adiosErr = adios2_set_block_selection(decomp_adios_var, target_block);
             if (adiosErr != adios2_error_none)
             {
                 return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -2981,7 +2941,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
                                pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
             }
 
-            size_t block_size;
+            size_t block_size = 0;
             adiosErr = adios2_selection_size(&block_size, decomp_adios_var);
             if (adiosErr != adios2_error_none)
             {
@@ -2991,130 +2951,62 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
                                pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
             }
 
-            if (type == adios2_type_int64_t)
+            int64_t *decomp_int64_t = (int64_t *)calloc(block_size, sizeof(int64_t));
+            if (decomp_int64_t == NULL)
             {
-                decomp_int64_t = (int64_t *)calloc(block_size, sizeof(int64_t));
-                if (decomp_int64_t == NULL)
-                {
-                    return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
-                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                                   "Out of memory allocating %lld bytes for decomposition map",
-                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int)(block_size * sizeof(int64_t)));
-                }
+                return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                               "Out of memory allocating %lld bytes for decomposition map",
+                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int)(block_size * sizeof(int64_t)));
+            }
 
-                adiosErr = adios2_get(file->engineH, decomp_adios_var, decomp_int64_t, adios2_mode_sync);
-                if (adiosErr != adios2_error_none)
-                {
-                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                                   "The low level (ADIOS) I/O library call failed to get data associated with a variable from an engine (adios2_error=%s)",
-                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
-                }
+            adiosErr = adios2_get(file->engineH, decomp_adios_var, decomp_int64_t, adios2_mode_sync);
+            if (adiosErr != adios2_error_none)
+            {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                               "The low level (ADIOS) I/O library call failed to get data associated with a variable from an engine (adios2_error=%s)",
+                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
+            }
+
+            /* Verify that the write decomposition map inside target block is the same as the read one */
+            if (expected_decomp_end_idx < (int)block_size && match_decomp_full(decomp_int64_t, expected_decomp_start_idx, start_decomp, len_decomp))
+            {
+                start_idx_in_target_block = expected_decomp_start_idx;
+                end_idx_in_target_block = expected_decomp_end_idx;
             }
             else
             {
                 return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                               "Unsupported ADIOS type (%x)",
-                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, type);
+                               "Failed to match the write decomposition map with the read one (ADIOS read and write must use the same decomposition map)",
+                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
             }
 
-            /* Search for the start and end index of the decomposition map inside one block */
-            for (size_t pos = 0; (pos + len_decomp) <= block_size; pos++)
-            {
-                if (match_decomp_full(decomp_int64_t, pos, start_decomp, len_decomp))
-                {
-                    target_block = block;
-                    start_idx_in_target_block = pos;
-                    end_idx_in_target_block = (int)(pos + len_decomp - 1);
-                    start_block_found = true;
-                    break;
-                }
-            }
-
-            /* Free recourses */
-            if (decomp_int64_t != NULL)
-                free(decomp_int64_t);
-
-            block++;
-
-            if (block == decomp_blocks_size)
-                block = 0;
-
-            if (block == guess_block)
-                break; /* Arrived back to first block in search */
-        }
-
-        if (!start_block_found)
+            /* Free resources. */
+            free(decomp_int64_t);
+            decomp_int64_t = NULL;
+        } /* End if (file->store_adios_decomp) */
+        else
         {
-            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                           "Cannot determine block for the decomposition map (ADIOS read and write must use the same decomposition map)",
-                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+            /* In case the write decomposition map is not available for verification,
+             * we simply use the anticipated start and end indices to read data */
+            start_idx_in_target_block = expected_decomp_start_idx;
+            end_idx_in_target_block = expected_decomp_end_idx;
         }
-      } /* End if (file->store_adios_decomp) */
-      else
-      {
-          /* In case the write decomposition map is not available for verification,
-           * we simply use the anticipated block and start/end indices to read data. */
-          iosystem_desc_t *ios = file->iosystem; /* Pointer to io system information. */
-          assert(ios != NULL);
-
-          /* Determine the maximum number of compute tasks assigned to each block. */
-          size_t decomp_blocks_size = file->adios_reader_num_decomp_blocks;
-          assert(decomp_blocks_size > 0);
-          int max_comptasks_per_block = ios->num_comptasks / decomp_blocks_size;
-          if (ios->num_comptasks % decomp_blocks_size != 0)
-              max_comptasks_per_block++;
-          assert(max_comptasks_per_block >= 1);
-
-          /* Calculate the most probable target block we try to find. */
-          int guess_block = ios->comp_rank / max_comptasks_per_block;
-          assert(guess_block >= 0 && guess_block < decomp_blocks_size);
-
-          target_block = guess_block;
-
-          /* Store the length of the decomposition map on each computation task. */
-          int task_maplen[ios->num_comptasks];
-
-          /* Gather map lengths from all computation tasks and fill the task_maplen array on all tasks. */
-          int mpierr = MPI_SUCCESS;
-          if ((mpierr = MPI_Allgather(&iodesc->maplen, 1, MPI_INT, task_maplen, 1, MPI_INT, ios->comp_comm)))
-              return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
-          assert(task_maplen[file->all_rank] == iodesc->maplen);
-
-          start_idx_in_target_block = 0;
-          for (int proc = 0; proc < ios->num_comptasks; proc++)
-          {
-              int proc_block = proc / max_comptasks_per_block;
-              if (proc_block == target_block && proc < file->all_rank)
-              {
-                  /* Handle the special case where the map length is 0 or 1.
-                   * The ADIOS writer always ensures that the map length is
-                   * at least 2 by padding if the original length is 0 or 1. */
-                  if (task_maplen[proc] > 1)
-                      start_idx_in_target_block += task_maplen[proc];
-                  else
-                      start_idx_in_target_block += 2;
-              }
-          }
-
-          end_idx_in_target_block = start_idx_in_target_block + iodesc->maplen - 1;
-      }
 
         /* Add to cache */
-        int *buff = (int*)calloc(3, sizeof(int));
+        int *buff = (int*)calloc(2, sizeof(int));
         if (buff == NULL)
         {
             return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
                            "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
                            "Out of memory allocating %lld bytes for a temporary buffer",
-                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int)(3 * sizeof(int)));
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int)(2 * sizeof(int)));
         }
 
-        buff[0] = target_block;
-        buff[1] = start_idx_in_target_block;
-        buff[2] = end_idx_in_target_block;
+        buff[0] = start_idx_in_target_block;
+        buff[1] = end_idx_in_target_block;
 
         /* buff will be deleted in the cache delete operation */
         file->cache_darray_info->put(file->cache_darray_info, decomp_name, buff);
@@ -3122,13 +3014,11 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
     else
     {
         /* Read from cache */
-        target_block = decomp_info_buff[0];
-        start_idx_in_target_block = decomp_info_buff[1];
-        end_idx_in_target_block = decomp_info_buff[2];
+        start_idx_in_target_block = decomp_info_buff[0];
+        end_idx_in_target_block = decomp_info_buff[1];
     }
 
     free(decomp_name);
-    assert(target_block >= 0);
     /* End of get decomposition info from file */
 
     /* Traverse through the steps to the data blocks */
@@ -3373,15 +3263,6 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
                            pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
 
-        int32_t data_blocks_size = data_blocks->nblocks;
-
-        /* Free memory */
-        for (size_t i = 0; i < data_blocks->nblocks; i++)
-            free(data_blocks->BlocksInfo[i].Count);
-
-        free(data_blocks->BlocksInfo);
-        free(data_blocks);
-
         adios2_type read_type;
         adiosErr = adios2_variable_type(&read_type, adios_vdesc->adios_varid);
         if (adiosErr != adios2_error_none)
@@ -3399,9 +3280,11 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
         /* Check that frame_id is not a special case of -1 */
         if (starting_frame >= 0 && frame_id >= 0)
             target_block = target_block * n_frames + frame_id - starting_frame;
+        assert(target_block >= 0 && target_block < (int)data_blocks->nblocks);
 
-        assert(target_block >= 0);
-        assert(target_block < data_blocks_size);
+        /* Free adios2_varinfo structure (this ADIOS2 API returns void) */
+        adios2_free_blockinfo(data_blocks);
+        data_blocks = NULL;
 
         adiosErr = adios2_set_block_selection(adios_vdesc->adios_varid, target_block);
         if (adiosErr != adios2_error_none)
@@ -3412,7 +3295,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
                            pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, convert_adios2_error_to_string(adiosErr));
         }
 
-        size_t block_size; /* Size of the block */
+        size_t block_size = 0; /* Size of the block */
         adiosErr = adios2_selection_size(&block_size, adios_vdesc->adios_varid);
         if (adiosErr != adios2_error_none)
         {
@@ -3448,7 +3331,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
             /* Inside one block */
             /* |000xxx00| */
             memcpy((char *)iobuf, &data_buf[start_idx_in_target_block * read_type_size],
-                   (end_idx_in_target_block - start_idx_in_target_block + 1) * out_type_size);
+                   len * out_type_size);
         }
         else if (read_type == adios2_type_double)
         {

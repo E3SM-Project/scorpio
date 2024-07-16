@@ -1841,16 +1841,9 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
                         size_t number_of_data_blocks = data_blocks->nblocks;
 
-                        /* Free memory */
-                        for (size_t i = 0; i < data_blocks->nblocks; i++)
-                        {
-                            free(data_blocks->BlocksInfo[i].Start);
-                            free(data_blocks->BlocksInfo[i].Count);
-                        }
-
-                        free(data_blocks->BlocksInfo);
-                        free(data_blocks->Shape);
-                        free(data_blocks);
+                        /* Free adios2_varinfo structure (this ADIOS2 API returns void) */
+                        adios2_free_blockinfo(data_blocks);
+                        data_blocks = NULL;
 
                         adios2_type read_type;
                         adiosErr = adios2_variable_type(&read_type, av->adios_varid);
