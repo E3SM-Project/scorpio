@@ -887,7 +887,7 @@ void piodie(const char *fname, int line, const char *fmt, ...)
  * @param fname name of code file where error occured
  * @param line the line of code where the error occurred.
  */
-void pioassert(_Bool expression, const char *msg, const char *fname, int line)
+void pioassert(bool expression, const char *msg, const char *fname, int line)
 {
 #ifndef NDEBUG
     if (!expression)
