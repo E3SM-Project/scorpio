@@ -235,7 +235,7 @@ int PIOc_inq_impl(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdi
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Allreduce(MPI_IN_PLACE, &ierr, 1, MPI_INT, MPI_BOR, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -922,7 +922,7 @@ int PIOc_inq_dim_impl(int ncid, int dimid, char *name, PIO_Offset *lenp)
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Allreduce(MPI_IN_PLACE, &ierr, 1, MPI_INT, MPI_BOR, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1156,7 +1156,7 @@ int PIOc_inq_dimid_impl(int ncid, const char *name, int *idp)
     LOG((3, "nc_inq_dimid call complete ierr = %d", ierr));
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Allreduce(MPI_IN_PLACE, &ierr, 1, MPI_INT, MPI_BOR, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1431,7 +1431,7 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Allreduce(MPI_IN_PLACE, &ierr, 1, MPI_INT, MPI_BOR, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1797,7 +1797,7 @@ int PIOc_inq_varid_impl(int ncid, const char *name, int *varidp)
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Allreduce(MPI_IN_PLACE, &ierr, 1, MPI_INT, MPI_BOR, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2034,7 +2034,7 @@ int PIOc_inq_att_impl(int ncid, int varid, const char *name, nc_type *xtypep,
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Allreduce(MPI_IN_PLACE, &ierr, 1, MPI_INT, MPI_BOR, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2420,7 +2420,7 @@ int PIOc_inq_attid_impl(int ncid, int varid, const char *name, int *idp)
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Allreduce(MPI_IN_PLACE, &ierr, 1, MPI_INT, MPI_BOR, ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
