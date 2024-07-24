@@ -1145,7 +1145,10 @@ enum PIO_REARRANGERS
     PIO_REARR_BOX = 1,
 
     /** Subset rearranger. */
-    PIO_REARR_SUBSET = 2
+    PIO_REARR_SUBSET = 2,
+
+    /** Let the library choose the rearranger. Always set to box in 1.4.* */
+    PIO_REARR_ANY = PIO_REARR_BOX
 };
 
 /**
