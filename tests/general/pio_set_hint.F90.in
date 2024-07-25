@@ -75,7 +75,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_set_hint
   Implicit none
   interface
     integer function test_file_write(iotype, iotype_desc)
-      integer, intent(in) :: iotype
+      integer, intent(inout) :: iotype
       character(len=*), intent(in) :: iotype_desc
     end function
   end interface

@@ -2019,7 +2019,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 {
                                     int64_t offset_buf = block_info_start[0] - start[0] + start_in_block_idx;
                                     int64_t offset_mem_buf = start_in_block_idx;
-                                    memcpy((char *) (buf + offset_buf * read_type_size),
+                                    memcpy((char *)buf + offset_buf * read_type_size,
                                            mem_buffer + header_size + offset_mem_buf * read_type_size,
                                            (end_in_block_idx - start_in_block_idx) * read_type_size);
                                 }
@@ -2092,7 +2092,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                         int64_t size_dim_1 = file->dim_values[av->gdimids[1]];
                                         int64_t offset_buf = (idx_0 + block_info_start[0] - start[0]) * size_dim_1 + offset_buf_1D;
                                         int64_t offset_mem_buf = idx_0 * size_dim_1 + offset_mem_buf_1D;
-                                        memcpy((char *) (buf + offset_buf * read_type_size),
+                                        memcpy((char *)buf + offset_buf * read_type_size,
                                                mem_buffer + header_size + offset_mem_buf * read_type_size,
                                                (end_in_block_idx_1 - start_in_block_idx_1) * read_type_size);
                                     }
@@ -2193,7 +2193,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                             int64_t offset_mem_buf_2D = idx_1 * size_dim_2;
                                             int64_t offset_mem_buf = offset_mem_buf_1D + offset_mem_buf_2D + idx_0 * block_info_count[1] * block_info_count[2];
                                             int64_t offset_buf = offset_buf_1D + offset_buf_2D + (idx_0 + block_info_start[0] - start[0]) * size_dim_1 * size_dim_2;
-                                            memcpy((char *) (buf + offset_buf * read_type_size),
+                                            memcpy((char *)buf + offset_buf * read_type_size,
                                                    mem_buffer + header_size + offset_mem_buf * read_type_size,
                                                    (end_in_block_idx_2 - start_in_block_idx_2) * read_type_size);
                                         }
