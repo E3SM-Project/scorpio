@@ -20,6 +20,9 @@ namespace SPIO_Util{
     namespace GVars{
       static std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> > trace_loggers_;
     }
+
+    /* static member defn */
+    const std::string Timed_func_call_tracer::NULL_PTR = "NULL";
   } // namespace Tracer
 } // namespace SPIO_Util
 
