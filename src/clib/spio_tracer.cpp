@@ -35,7 +35,19 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
   assert(iosys);
   mpi_comm_ = iosys->union_comm;
 
-  iosys_trace_key_ = std::to_string(iosysid);
+  if(mpi_comm_ != MPI_COMM_NULL){
+    iosys_trace_key_ = std::to_string(iosysid);
+  }
+  else{
+    /* For compute comps in async I/O, the I/O system ids corresponding
+      to other compute comms are mostly just placeholders, all comms are
+      NULL here - just ignore these */
+    assert((iosys->io_comm == MPI_COMM_NULL) &&
+            (iosys->comp_comm == MPI_COMM_NULL) &&
+            (iosys->async));
+    /* Ignore logging in this process */
+    iosysid_ = INVALID_IOSYSID;
+  }
 
   return *this;
 }
