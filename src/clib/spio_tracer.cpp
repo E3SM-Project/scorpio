@@ -37,8 +37,14 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
   if(iosysid != PIO_DEFAULT){
     iosystem_desc_t *iosys = pio_get_iosystem_from_id(iosysid);
     /* FIXME: Throw an exception instead */
-    assert(iosys);
-    mpi_comm_ = iosys->union_comm;
+    if(iosys){
+      mpi_comm_ = iosys->union_comm;
+    }
+    else{
+      /* User error - invalid iosysid */
+      mpi_comm_ = PIO_DEFAULT_COMM;
+      iosysid_ = PIO_DEFAULT;
+    }
     /* For compute comps in async I/O, the I/O system ids corresponding
       to other compute comms are mostly just placeholders, all comms are
       NULL here - just ignore these */
@@ -52,7 +58,7 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
   }
 
   if(mpi_comm_ != MPI_COMM_NULL){
-    iosys_trace_key_ = std::to_string(iosysid);
+    iosys_trace_key_ = std::to_string(iosysid_);
   }
   else{
     /* For compute comps in async I/O, the I/O system ids corresponding
