@@ -39,7 +39,7 @@ int PIOc_get_var_schar(int ncid, int varid, signed char *buf)
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_schar");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
-    add_arg("varid", varid).add_arg("*buf", buf).flush();
+    add_arg("varid", varid).add_arg("*buf", static_cast<void *>(buf)).flush();
 #endif
   ret = PIOc_get_var_schar_impl(ncid, varid, buf);
 
@@ -135,7 +135,7 @@ int PIOc_get_var_uchar(int ncid, int varid, unsigned char *buf)
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_uchar");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
-    add_arg("varid", varid).add_arg("*buf", buf).flush();
+    add_arg("varid", varid).add_arg("*buf", static_cast<void *>(buf)).flush();
 #endif
   ret = PIOc_get_var_uchar_impl(ncid, varid, buf);
 

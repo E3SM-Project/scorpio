@@ -29,8 +29,11 @@ int PIOc_put_var_schar(int ncid, int varid, const signed char *op)
 {
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_var_schar");
+  /* Both bytes and chars are written using this interface, trying to trace/log
+      a (byte *) as a (char *), a NUL terminated string can cause issues.
+      So explicitly type-cast pointer to (void *) when tracing it */
   tr.set_file_id(ncid).add_arg("ncid", ncid).
-    add_arg("varid", varid).add_arg("*op", op).flush();
+    add_arg("varid", varid).add_arg("*op", static_cast<const void *>(op)).flush();
 #endif
   return PIOc_put_var_schar_impl(ncid, varid, op);
 }
@@ -89,8 +92,11 @@ int PIOc_put_var_uchar(int ncid, int varid, const unsigned char *op)
 {
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_var_uchar");
+  /* Both bytes and chars are written using this interface, trying to trace/log
+      a (byte *) as a (char *), a NUL terminated string can cause issues.
+      So explicitly type-cast pointer to (void *) when tracing it */
   tr.set_file_id(ncid).add_arg("ncid", ncid).
-    add_arg("varid", varid).add_arg("*op", op).flush();
+    add_arg("varid", varid).add_arg("*op", static_cast<const void *>(op)).flush();
 #endif
   return PIOc_put_var_uchar_impl(ncid, varid, op);
 }
