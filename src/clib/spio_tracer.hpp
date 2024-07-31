@@ -60,6 +60,8 @@ namespace SPIO_Util{
         static const int INVALID_IOSYSID = -1;
         static const int INVALID_FH = -1;
 
+        static const std::string NULL_PTR;
+
         static const char ARRAY_ARG_PREFIX = '[';
         static const char ARRAY_ARG_SUFFIX = ']';
         static const char ARG_SEP = ',';
@@ -79,7 +81,7 @@ namespace SPIO_Util{
         template<typename T>
         std::string arr_to_string(const T *arr, std::size_t arr_sz);
     };
-    
+
     SPIO_Util::Logger::MPI_logger<std::ofstream> &get_iosys_trace_logger(int iosysid);
     SPIO_Util::Logger::MPI_logger<std::ofstream> &get_file_trace_logger(int fh);
     void finalize_iosys_trace_logger(std::string iosys_key);
@@ -100,7 +102,13 @@ template<typename T>
 SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tracer::add_arg(const std::string &arg_name, T *arg)
 {
   std::stringstream ss;
-  ss << arg;
+  if(arg){
+    ss << arg;
+  }
+  else{
+    ss << NULL_PTR;
+  }
+
   args_.push_back(std::pair<std::string, std::string>(arg_name, ss.str()));
   return *this;
 }
@@ -123,10 +131,14 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
 template<typename T>
 SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tracer::add_rval(const std::string &name, T *rval)
 {
-  assert(rval);
-
   std::stringstream ss;
-  ss << *rval;
+  if(rval){
+    ss << *rval;
+  }
+  else{
+    ss << NULL_PTR;
+  }
+
   rvals_.push_back(std::pair<std::string, std::string>(name, ss.str()));
   return *this;
 }
