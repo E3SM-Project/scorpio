@@ -37,16 +37,31 @@ int PIOc_init_intercomm(int component_count, const MPI_Comm peer_comm,
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_init_intercomm");
+  bool is_io_proc = false;
+  int my_comp_idx = 0;
+  if(uio_comm != MPI_COMM_NULL){
+    is_io_proc = true;
+  }
+  else{
+    for(int i = 0; i < component_count; i++){
+      if(ucomp_comms[i] != MPI_COMM_NULL){
+        my_comp_idx = i;
+        break;
+      }
+    }
+  }
   tr.add_arg("component_count", component_count).
-    add_arg("peer_comm", peer_comm).add_arg("ucomp_comms", ucomp_comms).
+    add_arg("peer_comm", peer_comm).add_arg("ucomp_comms", ucomp_comms, component_count).
     add_arg("uio_comm", uio_comm).add_arg("rearranger", rearranger).
     add_arg("*iosysidps", iosysidps);
 #endif
   ret = PIOc_init_intercomm_impl(component_count, peer_comm, ucomp_comms,
                                   uio_comm, rearranger, iosysidps);
 #if SPIO_ENABLE_API_TRACING
-  tr.set_iosys_id(iosysidps[0]).flush();
-  tr.add_rval("*iosysidps", iosysidps, component_count);
+  if(!is_io_proc){
+    tr.set_iosys_id(iosysidps[my_comp_idx]).flush();
+    tr.add_rval("*iosysidps", iosysidps, component_count);
+  }
 #endif
   return ret;
 }
@@ -58,17 +73,34 @@ int PIOc_Init_Intercomm_from_F90(int component_count, int f90_peer_comm,
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_Init_Intercomm_from_F90");
+  bool is_io_proc = false;
+  int my_comp_idx = 0;
+  MPI_Comm ccomp_comms[component_count];
+  if(MPI_Comm_f2c(f90_io_comm) != MPI_COMM_NULL){
+    is_io_proc = true;
+  }
+  else{
+    for(int i = 0; i < component_count; i++){
+      ccomp_comms[i] = MPI_Comm_f2c(f90_comp_comms[i]);
+      if(ccomp_comms[i] != MPI_COMM_NULL){
+        my_comp_idx = i;
+      }
+    }
+  }
   tr.add_arg("component_count", component_count).
-    add_arg("f90_peer_comm", MPI_Comm_f2c(f90_peer_comm)).add_arg("f90_comp_comms", f90_comp_comms).
-    add_arg("f90_io_comm", f90_io_comm).add_arg("rearranger", rearranger).
+    add_arg("f90_peer_comm", MPI_Comm_f2c(f90_peer_comm)).
+    add_arg("f90_comp_comms", ccomp_comms, component_count).
+    add_arg("f90_io_comm", MPI_Comm_f2c(f90_io_comm)).add_arg("rearranger", rearranger).
     add_arg("*iosysidps", iosysidps);
 #endif
   ret = PIOc_Init_Intercomm_from_F90_impl(component_count, f90_peer_comm,
                                             f90_comp_comms, f90_io_comm,
                                             rearranger, iosysidps);
 #if SPIO_ENABLE_API_TRACING
-  tr.set_iosys_id(iosysidps[0]).flush();
-  tr.add_rval("*iosysidps", iosysidps, component_count);
+  if(!is_io_proc){
+    tr.set_iosys_id(iosysidps[my_comp_idx]).flush();
+    tr.add_rval("*iosysidps", iosysidps, component_count);
+  }
 #endif
   return ret;
 }
