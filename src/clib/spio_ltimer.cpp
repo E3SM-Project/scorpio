@@ -31,8 +31,9 @@ void PIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer::stop(void )
     return;
   }
 
-  wtime_ += MPI_Wtime() - start_;
-  start_ = 0.0;
+  stop_ = MPI_Wtime();
+  wtime_ += stop_ - start_;
+  //start_ = 0.0;
 }
 
 double PIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer::get_wtime(void ) const
