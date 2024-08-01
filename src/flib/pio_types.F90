@@ -278,7 +278,7 @@ module pio_types
    integer, public, parameter :: PIO_MAX_NAME = min(nf_max_name, PIO_MAX_NAME_UB)
    integer, public, parameter :: PIO_MAX_VAR_DIMS = min(nf_max_var_dims, PIO_MAX_VAR_DIMS_UB)
    integer, public, parameter :: PIO_64BIT_OFFSET = nf_64bit_offset
-   integer, public, parameter :: PIO_64BIT_DATA = 0
+   integer, public, parameter :: PIO_64BIT_DATA = nf_64bit_data
    integer, public, parameter :: PIO_FILL_CHAR = nf_fill_char;
    integer, public, parameter :: PIO_FILL_INT = nf_fill_int;
    real, public, parameter :: PIO_FILL_FLOAT = nf_fill_float;
