@@ -55,6 +55,7 @@ namespace SPIO_Util{
         /* The name of the function being traced */
         const std::string func_name_;
         MPI_Comm mpi_comm_;
+        MPI_Comm wrank_;
         int iosysid_;
         int fh_;
         bool is_io_proc_;
@@ -68,6 +69,7 @@ namespace SPIO_Util{
         /* Note: PIO_DEFAULT, the default I/O system id is -1 */
         static const int INVALID_IOSYSID = -2;
         static const int INVALID_FH = -1;
+        static const int INVALID_RANK = -1;
 
         static const std::string NULL_PTR;
 
@@ -93,8 +95,8 @@ namespace SPIO_Util{
         std::string arr_to_string(const T *arr, std::size_t arr_sz);
     };
 
-    SPIO_Util::Logger::MPI_logger<std::ofstream> &get_iosys_trace_logger(int iosysid);
-    SPIO_Util::Logger::MPI_logger<std::ofstream> &get_file_trace_logger(int fh);
+    SPIO_Util::Logger::MPI_logger<std::ofstream> &get_iosys_trace_logger(int iosysid, int mpi_rank);
+    SPIO_Util::Logger::MPI_logger<std::ofstream> &get_file_trace_logger(int fh, int mpi_rank);
     void finalize_iosys_trace_logger(std::string iosys_key);
     std::string get_trace_log_header(int iosysid);
     std::string get_trace_log_footer(void );
