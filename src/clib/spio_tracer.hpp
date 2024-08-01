@@ -11,6 +11,7 @@
 #include "pio.h"
 #include "pio_internal.h"
 #include "spio_logger.hpp"
+#include "spio_ltimer.hpp"
 
 namespace SPIO_Util{
   namespace Tracer{
@@ -60,6 +61,8 @@ namespace SPIO_Util{
         bool needs_finalize_;
         std::string iosys_trace_key_;
 
+        PIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer timer_;
+
         /* Note: PIO_DEFAULT, the default I/O system id is -1 */
         static const int INVALID_IOSYSID = -2;
         static const int INVALID_FH = -1;
@@ -74,6 +77,7 @@ namespace SPIO_Util{
         static const char FUNC_CALL_SUFFIX = ')';
         static const char FUNC_ENTER = '\\';
         static const char FUNC_EXIT = '/';
+        static const char FUNC_TIME_SEP = ':';
         
         /* FIXME: Use a named aggregate or tagged tuples */
         /* Array of <argument name, argument> pairs */
