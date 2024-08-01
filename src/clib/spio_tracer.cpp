@@ -28,7 +28,7 @@ namespace SPIO_Util{
   } // namespace Tracer
 } // namespace SPIO_Util
 
-SPIO_Util::Tracer::Timed_func_call_tracer::Timed_func_call_tracer(const std::string &func_name) : func_name_(func_name), mpi_comm_(MPI_COMM_NULL), iosysid_(INVALID_IOSYSID), fh_(INVALID_FH), is_io_proc_(false), needs_finalize_(false)
+SPIO_Util::Tracer::Timed_func_call_tracer::Timed_func_call_tracer(const std::string &func_name) : func_name_(func_name), mpi_comm_(MPI_COMM_NULL), wrank_(INVALID_RANK), iosysid_(INVALID_IOSYSID), fh_(INVALID_FH), is_io_proc_(false), needs_finalize_(false)
 {
   timer_.start();
 }
@@ -61,6 +61,9 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
 
   if(mpi_comm_ != MPI_COMM_NULL){
     iosys_trace_key_ = std::to_string(iosysid_);
+
+    int ret = MPI_Comm_rank(MPI_COMM_WORLD, &wrank_);
+    assert(ret == MPI_SUCCESS);
   }
   else{
     /* For compute comps in async I/O, the I/O system ids corresponding
@@ -113,7 +116,7 @@ void SPIO_Util::Tracer::Timed_func_call_tracer::flush(void )
   ser_fcall += FUNC_CALL_SUFFIX;
 
   if(iosysid_ != INVALID_IOSYSID){
-    SPIO_Util::Logger::MPI_logger<std::ofstream> &logger = SPIO_Util::Tracer::get_iosys_trace_logger(iosysid_);
+    SPIO_Util::Logger::MPI_logger<std::ofstream> &logger = SPIO_Util::Tracer::get_iosys_trace_logger(iosysid_, wrank_);
     logger.log(ser_fcall);
     logger.flush();
   }
@@ -156,7 +159,7 @@ void SPIO_Util::Tracer::Timed_func_call_tracer::log_func_call_exit(void )
   }
   ser_fcall += FUNC_CALL_SUFFIX;
   if(iosysid_ != INVALID_IOSYSID){
-    SPIO_Util::Logger::MPI_logger<std::ofstream> &logger = SPIO_Util::Tracer::get_iosys_trace_logger(iosysid_);
+    SPIO_Util::Logger::MPI_logger<std::ofstream> &logger = SPIO_Util::Tracer::get_iosys_trace_logger(iosysid_, wrank_);
     logger.log(ser_fcall);
     logger.flush();
   }
@@ -187,7 +190,7 @@ std::string SPIO_Util::Tracer::get_trace_log_footer(void )
   return banner;
 }
 
-SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace_logger(int iosysid)
+SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace_logger(int iosysid, int mpi_rank)
 {
   /* FIXME: We might need to trace both I/O and compute procs for async I/O */
   std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(std::to_string(iosysid));
@@ -215,7 +218,7 @@ SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace
     std::string iosys_str = std::string("_iosys_") + ((iosysid != PIO_DEFAULT) ? std::to_string(iosysid) : "PIO_DEFAULT") + std::string("_");
 
     long long int pid = static_cast<long long int>(getpid());
-    std::string log_fname = LOG_FILE_PREFIX + iosys_str + std::to_string(pid) + LOG_FILE_SUFFIX;
+    std::string log_fname = LOG_FILE_PREFIX + iosys_str + std::to_string(pid) + std::string("_") + std::to_string(mpi_rank) + LOG_FILE_SUFFIX;
 
     /* FIXME: We always log from the root proc, 0, and in the case of PIO_DEFAULT its the root process. This can cause issues when we use
      * PIO_DEFAULT as the I/O system, to handle user error cases etc where we cannot determine the I/O system, to log calls from a component
@@ -235,7 +238,7 @@ SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace
   return iter->second;
 }
 
-SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_file_trace_logger(int fh)
+SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_file_trace_logger(int fh, int mpi_rank)
 {
   file_desc_t *file = NULL;
   int ret = PIO_NOERR;
@@ -246,7 +249,7 @@ SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_file_trace_
   assert(file->iosystem);
 
   /* FIXME: We might need to trace both I/O and compute procs for async I/O */
-  return get_iosys_trace_logger(file->iosystem->iosysid);
+  return get_iosys_trace_logger(file->iosystem->iosysid, mpi_rank);
 }
 
 void SPIO_Util::Tracer::finalize_iosys_trace_logger(std::string iosys_key)
