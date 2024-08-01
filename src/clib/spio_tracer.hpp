@@ -61,6 +61,8 @@ namespace SPIO_Util{
         bool needs_finalize_;
         std::string iosys_trace_key_;
 
+        static int func_id_;
+
         PIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer timer_;
 
         /* Note: PIO_DEFAULT, the default I/O system id is -1 */
@@ -78,6 +80,7 @@ namespace SPIO_Util{
         static const char FUNC_ENTER = '\\';
         static const char FUNC_EXIT = '/';
         static const char FUNC_TIME_SEP = ':';
+        static const char FUNC_ID_SEP = ':';
         
         /* FIXME: Use a named aggregate or tagged tuples */
         /* Array of <argument name, argument> pairs */

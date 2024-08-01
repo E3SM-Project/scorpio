@@ -24,6 +24,7 @@ namespace SPIO_Util{
     /* static member defn */
     const MPI_Comm Timed_func_call_tracer::PIO_DEFAULT_COMM = MPI_COMM_WORLD;
     const std::string Timed_func_call_tracer::NULL_PTR = "NULL";
+    int Timed_func_call_tracer::func_id_ = 0;
   } // namespace Tracer
 } // namespace SPIO_Util
 
@@ -99,7 +100,8 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
 void SPIO_Util::Tracer::Timed_func_call_tracer::flush(void )
 {
   /* Serialize the function call */
-  std::string ser_fcall(  std::to_string(timer_.get_start_time()) + FUNC_TIME_SEP +
+  std::string ser_fcall(  std::to_string(func_id_++) + FUNC_ID_SEP +
+                          std::to_string(timer_.get_start_time()) + FUNC_TIME_SEP +
                           FUNC_ENTER + func_name_ + FUNC_CALL_PREFIX);
   if(args_.size() > 0){
     std::vector<std::pair<std::string, std::string> >::const_iterator iter = args_.cbegin();
