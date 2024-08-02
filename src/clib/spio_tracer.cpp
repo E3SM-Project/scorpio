@@ -165,7 +165,31 @@ void SPIO_Util::Tracer::Timed_func_call_tracer::log_func_call_exit(void )
   }
 }
 
-std::string SPIO_Util::Tracer::get_trace_log_header(int iosysid)
+static inline std::string get_trace_log_fname(int iosysid, int mpi_rank)
+{
+  const std::string LOG_FILE_PREFIX = "spio_trace_log_";
+  const std::string LOG_FILE_SUFFIX = ".log";
+  std::string iosys_str = std::string("_iosys_") + ((iosysid != PIO_DEFAULT) ? std::to_string(iosysid) : "PIO_DEFAULT") + std::string("_");
+
+  long long int pid = static_cast<long long int>(getpid());
+  std::string log_fname = LOG_FILE_PREFIX + iosys_str + std::to_string(pid) + std::string("_") + std::to_string(mpi_rank) + LOG_FILE_SUFFIX;
+
+  return log_fname;
+}
+
+static inline std::string get_trace_mdata_fname(int iosysid, int mpi_rank)
+{
+  const std::string LOG_FILE_PREFIX = "spio_trace_mdata_";
+  const std::string LOG_FILE_SUFFIX = ".log";
+  std::string iosys_str = std::string("_iosys_") + ((iosysid != PIO_DEFAULT) ? std::to_string(iosysid) : "PIO_DEFAULT") + std::string("_");
+
+  long long int pid = static_cast<long long int>(getpid());
+  std::string log_fname = LOG_FILE_PREFIX + iosys_str + std::to_string(pid) + std::string("_") + std::to_string(mpi_rank) + LOG_FILE_SUFFIX;
+
+  return log_fname;
+}
+
+static inline std::string get_trace_log_header(int iosysid, int mpi_rank)
 {
   static const std::string spio_version = std::string("SCORPIO VERSION : ") +
                                           std::to_string(PIO_VERSION_MAJOR) + "." +
@@ -177,12 +201,16 @@ std::string SPIO_Util::Tracer::get_trace_log_header(int iosysid)
 
   std::string iosys_info = std::string("I/O System ID : ") + std::to_string(iosysid) + "\n";
 
-  std::string hdr = banner + spio_trace_log_info + iosys_info + banner;
+  std::string rank_info = std::string("MPI World rank : ") + std::to_string(mpi_rank) + "\n";
+
+  std::string mdata_info = std::string("Trace Mdata file : ") + get_trace_mdata_fname(iosysid, mpi_rank) + "\n";
+
+  std::string hdr = banner + spio_trace_log_info + iosys_info + rank_info + mdata_info + banner;
 
   return hdr;
 }
 
-std::string SPIO_Util::Tracer::get_trace_log_footer(void )
+static inline std::string get_trace_log_footer(void )
 {
   static const std::string banner =
                                   "=================================================================\n";
@@ -213,12 +241,7 @@ SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace
     // FIXME: use unique_ptr
     std::ofstream *fstr = new std::ofstream();
     const std::string DEV_NULL = "/dev/null";
-    const std::string LOG_FILE_PREFIX = "spio_trace_log_";
-    const std::string LOG_FILE_SUFFIX = ".log";
-    std::string iosys_str = std::string("_iosys_") + ((iosysid != PIO_DEFAULT) ? std::to_string(iosysid) : "PIO_DEFAULT") + std::string("_");
-
-    long long int pid = static_cast<long long int>(getpid());
-    std::string log_fname = LOG_FILE_PREFIX + iosys_str + std::to_string(pid) + std::string("_") + std::to_string(mpi_rank) + LOG_FILE_SUFFIX;
+    std::string log_fname = get_trace_log_fname(iosysid, mpi_rank);
 
     /* FIXME: We always log from the root proc, 0, and in the case of PIO_DEFAULT its the root process. This can cause issues when we use
      * PIO_DEFAULT as the I/O system, to handle user error cases etc where we cannot determine the I/O system, to log calls from a component
@@ -227,7 +250,7 @@ SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace
 
     // FIXME: use insert() and get the iterator rather than insert and then find
     SPIO_Util::Logger::MPI_logger<std::ofstream> lstr(comm, fstr);
-    lstr.log(SPIO_Util::Tracer::get_trace_log_header(iosysid));
+    lstr.log(get_trace_log_header(iosysid, mpi_rank));
     SPIO_Util::Tracer::GVars::trace_loggers_[std::to_string(iosysid)] = lstr;
     iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(std::to_string(iosysid));
     //std::pair<std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator, bool> res = SPIO_Util::Tracer::GVars::trace_loggers_.insert({std::to_string(comm), lstr});
@@ -256,7 +279,7 @@ void SPIO_Util::Tracer::finalize_iosys_trace_logger(std::string iosys_key)
 {
   std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(iosys_key);
   if(iter != SPIO_Util::Tracer::GVars::trace_loggers_.end()){
-    (*iter).second.log(SPIO_Util::Tracer::get_trace_log_footer());
+    (*iter).second.log(get_trace_log_footer());
     std::ofstream *fstr = (*iter).second.get_log_stream();
     assert(fstr);
     fstr->close();
