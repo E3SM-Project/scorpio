@@ -25,12 +25,13 @@ namespace SPIO_Util{
     /* static member defn */
     const MPI_Comm Timed_func_call_tracer::PIO_DEFAULT_COMM = MPI_COMM_WORLD;
     const std::string Timed_func_call_tracer::NULL_PTR = "NULL";
-    int Timed_func_call_tracer::func_id_ = 0;
+    int Timed_func_call_tracer::gfunc_id_ = 0;
   } // namespace Tracer
 } // namespace SPIO_Util
 
-SPIO_Util::Tracer::Timed_func_call_tracer::Timed_func_call_tracer(const std::string &func_name) : func_name_(func_name), mpi_comm_(MPI_COMM_NULL), wrank_(INVALID_RANK), iosysid_(INVALID_IOSYSID), fh_(INVALID_FH), is_io_proc_(false), needs_finalize_(false)
+SPIO_Util::Tracer::Timed_func_call_tracer::Timed_func_call_tracer(const std::string &func_name) : func_id_(gfunc_id_), func_name_(func_name), mpi_comm_(MPI_COMM_NULL), wrank_(INVALID_RANK), iosysid_(INVALID_IOSYSID), fh_(INVALID_FH), is_io_proc_(false), needs_finalize_(false)
 {
+  gfunc_id_++;
   timer_.start();
 }
 
@@ -174,7 +175,7 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
 void SPIO_Util::Tracer::Timed_func_call_tracer::flush(void )
 {
   /* Serialize the function call */
-  std::string ser_fcall(  std::to_string(func_id_++) + FUNC_ID_SEP +
+  std::string ser_fcall(  std::to_string(func_id_) + FUNC_ID_SEP +
                           std::to_string(timer_.get_start_time()) + FUNC_TIME_SEP +
                           FUNC_ENTER + func_name_ + FUNC_CALL_PREFIX);
   if(args_.size() > 0){
@@ -220,7 +221,8 @@ SPIO_Util::Tracer::Timed_func_call_tracer::~Timed_func_call_tracer()
 
 void SPIO_Util::Tracer::Timed_func_call_tracer::log_func_call_exit(void )
 {
-  std::string ser_fcall(  std::to_string(timer_.get_stop_time()) + FUNC_TIME_SEP +
+  std::string ser_fcall(  std::to_string(func_id_) + FUNC_ID_SEP +
+                          std::to_string(timer_.get_stop_time()) + FUNC_TIME_SEP +
                           FUNC_EXIT + func_name_ + FUNC_CALL_PREFIX);
 
   if(rvals_.size() > 0){
