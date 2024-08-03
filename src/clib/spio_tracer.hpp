@@ -58,6 +58,7 @@ namespace SPIO_Util{
         static std::string arr_to_string(const T *arr, std::size_t arr_sz);
       private:
         /* The name of the function being traced */
+        int func_id_;
         const std::string func_name_;
         MPI_Comm mpi_comm_;
         MPI_Comm wrank_;
@@ -67,7 +68,8 @@ namespace SPIO_Util{
         bool needs_finalize_;
         std::string iosys_trace_key_;
 
-        static int func_id_;
+        /* Global function id : */
+        static int gfunc_id_;
 
         PIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer timer_;
 
