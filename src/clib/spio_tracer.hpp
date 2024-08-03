@@ -27,6 +27,8 @@ namespace SPIO_Util{
         Timed_func_call_tracer &set_iosys_id(int iosysid);
         /* Set the id of PIO file associated with this tracer */
         Timed_func_call_tracer &set_file_id(int fh);
+        /* Set the decomp info */
+        Timed_func_call_tracer &set_decomp_info(int decomp_id, const PIO_Offset *map, int sz);
 
         /* Set the args of the function that need to be traced */
         template<typename T>
@@ -51,6 +53,9 @@ namespace SPIO_Util{
         void finalize(void );
 
         ~Timed_func_call_tracer();
+
+        template<typename T>
+        static std::string arr_to_string(const T *arr, std::size_t arr_sz);
       private:
         /* The name of the function being traced */
         const std::string func_name_;
@@ -90,14 +95,13 @@ namespace SPIO_Util{
         std::vector<std::pair<std::string, std::string> > rvals_;
 
         void log_func_call_exit(void );
-
-        template<typename T>
-        std::string arr_to_string(const T *arr, std::size_t arr_sz);
     };
 
     SPIO_Util::Logger::MPI_logger<std::ofstream> &get_iosys_trace_logger(int iosysid, int mpi_rank);
+    SPIO_Util::Logger::MPI_logger<std::ofstream> &get_iosys_trace_mdata_logger(int iosysid, int mpi_rank);
     SPIO_Util::Logger::MPI_logger<std::ofstream> &get_file_trace_logger(int fh, int mpi_rank);
     void finalize_iosys_trace_logger(std::string iosys_key);
+    void finalize_iosys_trace_mdata_logger(std::string iosys_key);
     //void finalize_file_trace_logger(int fh);
   } // namespace Tracer
 } // namespace SPIO_Util
