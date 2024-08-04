@@ -130,7 +130,6 @@ SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace
 
     if(iosysid != PIO_DEFAULT){
       iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
-      /* FIXME: Throw an exception instead */
       assert(ios);
       comm = ios->union_comm;
     }

@@ -169,11 +169,9 @@ int PIOc_finalize(int iosysid)
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_finalize");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).flush();
-#endif
-  ret = PIOc_finalize_impl(iosysid);
-#if SPIO_ENABLE_API_TRACING
   tr.finalize();
 #endif
+  ret = PIOc_finalize_impl(iosysid);
   return ret;
 }
 

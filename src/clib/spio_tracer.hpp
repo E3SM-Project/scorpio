@@ -27,6 +27,10 @@ namespace SPIO_Util{
         Timed_func_call_tracer &set_iosys_id(int iosysid);
         /* Set the id of PIO file associated with this tracer */
         Timed_func_call_tracer &set_file_id(int fh);
+        /* Set the id of PIO dim associated with this tracer */
+        Timed_func_call_tracer &set_dim_id(int fh, int dimid);
+        /* Set the id of PIO var associated with this tracer */
+        Timed_func_call_tracer &set_var_id(int fh, int varid);
         /* Set the decomp info */
         Timed_func_call_tracer &set_decomp_info(int decomp_id, const PIO_Offset *map, int sz);
 
