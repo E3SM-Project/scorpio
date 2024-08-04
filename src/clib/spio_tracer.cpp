@@ -4,6 +4,7 @@
 #include <utility>
 #include <cassert>
 #include <fstream>
+#include <iostream>
 
 #include <unistd.h>
 
@@ -20,6 +21,7 @@ namespace SPIO_Util{
     /* FIXME: Move to a singleton */
     namespace GVars{
       static std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> > trace_loggers_;
+      static Tracer_mdata tracer_mdata_;
     }
 
     /* static member defn */
@@ -76,9 +78,7 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
   }
 
   if(iosysid_ != INVALID_IOSYSID){
-    SPIO_Util::Logger::MPI_logger<std::ofstream> &logger = SPIO_Util::Tracer::get_iosys_trace_mdata_logger(iosysid_, wrank_);
-    logger.slog(get_mpi_comm_info(mpi_comm_));
-    logger.flush();
+    GVars::tracer_mdata_.add_iosysid(iosysid_);
   }
 
   return *this;
@@ -96,6 +96,8 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
     assert(file && file->iosystem);
     iosysid_ = file->iosystem->iosysid;
     mpi_comm_ = file->iosystem->union_comm;
+
+    GVars::tracer_mdata_.add_ncid(iosysid_, fh);
   }
   else{
     /* Most likely a user error, specifying an invalid file id, log the call to default logger */
@@ -108,12 +110,26 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
   return *this;
 }
 
+SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tracer::set_dim_id(int fh, int dimid)
+{
+  assert(iosysid_ != INVALID_IOSYSID);
+  GVars::tracer_mdata_.add_dimid(iosysid_, fh, dimid);
+
+  return *this;
+}
+
+SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tracer::set_var_id(int fh, int varid)
+{
+  assert(iosysid_ != INVALID_IOSYSID);
+  GVars::tracer_mdata_.add_varid(iosysid_, fh, varid);
+
+  return *this;
+}
+
 SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tracer::set_decomp_info(int decomp_id, const PIO_Offset *map, int sz)
 {
   if(iosysid_ != INVALID_IOSYSID){
-    SPIO_Util::Logger::MPI_logger<std::ofstream> &logger = SPIO_Util::Tracer::get_iosys_trace_mdata_logger(iosysid_, wrank_);
-    logger.log(get_trace_decomp_fname(iosysid_, wrank_));
-    logger.flush();
+    GVars::tracer_mdata_.add_ioid(iosysid_);
   }
 
   return *this;
@@ -145,6 +161,12 @@ void SPIO_Util::Tracer::Timed_func_call_tracer::flush(void )
 
 void SPIO_Util::Tracer::Timed_func_call_tracer::finalize(void )
 {
+  if(iosysid_ != INVALID_IOSYSID){
+    SPIO_Util::Logger::MPI_logger<std::ofstream> &logger = SPIO_Util::Tracer::get_iosys_trace_mdata_logger(iosysid_, wrank_);
+    logger.slog(get_mpi_comm_info(mpi_comm_));
+    logger.log(std::string("I/O System Info: ") + GVars::tracer_mdata_.get_mdata(iosysid_));
+    logger.flush();
+  }
   needs_finalize_ = true;
 }
 
