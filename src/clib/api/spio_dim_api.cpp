@@ -33,6 +33,7 @@ int PIOc_inq_dimid(int ncid, const char *name, int *idp)
   ret = PIOc_inq_dimid_impl(ncid, name, idp);
 
 #if SPIO_ENABLE_API_TRACING
+  tr.set_dim_id(ncid, *idp);
   tr.add_rval("*idp", idp);
 #endif
   return ret;
@@ -92,6 +93,7 @@ int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
   ret = PIOc_def_dim_impl(ncid, name, len, idp);
 
 #if SPIO_ENABLE_API_TRACING
+  tr.set_dim_id(ncid, *idp);
   tr.add_rval("*idp", idp);
 #endif
   return ret;

@@ -16,6 +16,7 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
   ret = PIOc_inq_varid_impl(ncid, name, varidp);
 
 #if SPIO_ENABLE_API_TRACING
+  tr.set_var_id(ncid, *varidp);
   tr.add_rval("*varidp", (varidp) ? (*varidp) : -1);
 #endif
   return ret;
@@ -42,6 +43,9 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
     add_rval("*nattsp", (nattsp) ? (*nattsp) : 0);
 
   if(ndimsp && (*ndimsp > 0) && dimidsp){
+    for(int i=0; i<*ndimsp; i++){
+      tr.set_dim_id(ncid, dimidsp[i]);
+    }
     tr.add_rval("*dimidsp", dimidsp, *ndimsp);
   }
 #endif
@@ -148,6 +152,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype,  int ndims,
   ret = PIOc_def_var_impl(ncid, name, xtype,  ndims, dimidsp, varidp);
 
 #if SPIO_ENABLE_API_TRACING
+  tr.set_var_id(ncid, *varidp);
   tr.add_rval("*varidp", (varidp) ? (*varidp) : -1);
 #endif
   return ret;
