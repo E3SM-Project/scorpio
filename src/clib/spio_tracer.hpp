@@ -99,11 +99,11 @@ namespace SPIO_Util{
         void log_func_call_exit(void );
     };
 
-    SPIO_Util::Logger::MPI_logger<std::ofstream> &get_iosys_trace_logger(int iosysid, int mpi_rank);
-    SPIO_Util::Logger::MPI_logger<std::ofstream> &get_iosys_trace_mdata_logger(int iosysid, int mpi_rank);
+    std::string get_trace_log_fname(int iosysid, int mpi_wrank);
+
+    SPIO_Util::Logger::MPI_logger<std::ofstream> &get_iosys_trace_logger(int iosysid, int mpi_wrank);
     SPIO_Util::Logger::MPI_logger<std::ofstream> &get_file_trace_logger(int fh, int mpi_rank);
     void finalize_iosys_trace_logger(std::string iosys_key);
-    void finalize_iosys_trace_mdata_logger(std::string iosys_key);
     //void finalize_file_trace_logger(int fh);
   } // namespace Tracer
 } // namespace SPIO_Util
