@@ -314,7 +314,7 @@ endif()
 # Min versions of libraries required
 set (MPE_MIN_VER_REQD "2.4.8")
 set (NETCDF_C_MIN_VER_REQD "4.4.0")
-set (NETCDF_FORTRAN_MIN_VER_REQD "4.4.0")
+set (NETCDF_FORTRAN_MIN_VER_REQD "4.5.0")
 set (PNETCDF_MIN_VER_REQD "1.8.1")
 set (ADIOS_MIN_VER_REQD "2.9.0")
 
