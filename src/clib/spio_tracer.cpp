@@ -240,7 +240,9 @@ static inline std::string get_trace_log_header(int iosysid, int mpi_rank)
 
   std::string mdata_info = std::string("Trace Mdata file : ") + SPIO_Util::Tracer::get_trace_mdata_fname(iosysid, mpi_rank) + "\n";
 
-  std::string hdr = banner + spio_trace_log_info + iosys_info + rank_info + mdata_info + banner;
+  std::string decomp_info = std::string("I/O Decomp file : ") + SPIO_Util::Tracer::get_trace_decomp_fname(iosysid, mpi_rank) + "\n";
+
+  std::string hdr = banner + spio_trace_log_info + iosys_info + rank_info + mdata_info + decomp_info + banner;
 
   return hdr;
 }
