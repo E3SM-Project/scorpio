@@ -105,7 +105,6 @@ namespace SPIO_Util{
         std::map<int, Iosysid_info> iosysid_infos_;
     };
 
-    std::string get_trace_decomp_fname(int iosysid, int mpi_wrank);
     std::string get_trace_mdata_fname(int iosysid, int mpi_wrank);
 
     std::string get_mpi_comm_info(MPI_Comm comm);

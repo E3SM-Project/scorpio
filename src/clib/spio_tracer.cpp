@@ -14,6 +14,7 @@
 #include "mpi.h"
 #include "spio_tracer.hpp"
 #include "spio_tracer_mdata.hpp"
+#include "spio_tracer_decomp.hpp"
 #include "spio_logger.hpp"
 
 namespace SPIO_Util{
@@ -25,9 +26,9 @@ namespace SPIO_Util{
     }
 
     /* static member defn */
-    const MPI_Comm Timed_func_call_tracer::PIO_DEFAULT_COMM = MPI_COMM_WORLD;
     const std::string Timed_func_call_tracer::NULL_PTR = "NULL";
     int Timed_func_call_tracer::gfunc_id_ = 0;
+
   } // namespace Tracer
 } // namespace SPIO_Util
 
@@ -130,6 +131,7 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
 {
   if(iosysid_ != INVALID_IOSYSID){
     GVars::tracer_mdata_.add_ioid(iosysid_);
+    SPIO_Util::Tracer::trace_decomp(iosysid_, wrank_, decomp_id, map, sz);
   }
 
   return *this;
@@ -184,6 +186,7 @@ SPIO_Util::Tracer::Timed_func_call_tracer::~Timed_func_call_tracer()
     SPIO_Util::Tracer::finalize_iosys_trace_logger(std::to_string(PIO_DEFAULT));
 
     SPIO_Util::Tracer::finalize_iosys_trace_mdata_logger(iosys_trace_key_);
+    SPIO_Util::Tracer::finalize_trace_decomp(iosysid_);
     needs_finalize_ = false;
   }
 }
@@ -259,7 +262,7 @@ SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace
     const int MPI_ROOT_PROC = 0;
     int ret = MPI_SUCCESS, rank = -1;
 
-    MPI_Comm comm = SPIO_Util::Tracer::Timed_func_call_tracer::PIO_DEFAULT_COMM;
+    MPI_Comm comm = SPIO_Util::Tracer::PIO_DEFAULT_COMM;
 
     if(iosysid != PIO_DEFAULT){
       iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
