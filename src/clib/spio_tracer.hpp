@@ -19,9 +19,6 @@ namespace SPIO_Util{
     /* A Timed single function call tracer */
     class Timed_func_call_tracer{
       public:
-        /* MPI Comm for default I/O system, PIO_DEFAULT */
-        static const MPI_Comm PIO_DEFAULT_COMM;
-
         Timed_func_call_tracer(const std::string &func_name);
         /* Set the id of PIO I/O system associated with this tracer */
         Timed_func_call_tracer &set_iosys_id(int iosysid);
@@ -102,6 +99,9 @@ namespace SPIO_Util{
 
         void log_func_call_exit(void );
     };
+
+    /* MPI Comm for default I/O system, PIO_DEFAULT */
+    static const MPI_Comm PIO_DEFAULT_COMM = MPI_COMM_WORLD;
 
     std::string get_trace_log_fname(int iosysid, int mpi_wrank);
 
