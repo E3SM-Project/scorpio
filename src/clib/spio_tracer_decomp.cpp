@@ -190,6 +190,13 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::log_decomp(int ioid, con
 
   ret = ncmpi_iput_vara_longlong(ncid_, decomp_varid, &(gmap_sz_start[1]), &mapsz_off, static_cast<const long long *> (map), NULL);
   assert(ret == NC_NOERR);
+
+  /* FIXME: Ideally we just need to do one wait all during finalize. But PnetCDF, 1.12.3, crashes with too many pending reqs, so
+   * to be safe wait after each write. We could also wait after some specific number of writes (or based on buffered data in
+   * a process)
+   */
+  ret = ncmpi_wait_all(ncid_, NC_REQ_ALL, NULL, NULL);
+  assert(ret == MPI_SUCCESS);
 }
 
 void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::finalize(void )
