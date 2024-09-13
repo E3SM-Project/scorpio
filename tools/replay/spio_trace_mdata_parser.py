@@ -206,16 +206,6 @@ class SPIOTraceMDataParser:
             logger.info("Parsing trace meta-data log file :\"{}\"".format(self.trace_mdata_log_fname))
             self._parse_log_header()
 
-        """
-        mdata_key_parsers = {
-            "MPI_COMM_WORLD": lambda self, val: self._trace_mdata.wrank, self._trace_mdata.wsz = re.findall(r"\d+", val),
-            "MPI_COMM": lambda self, val: self._trace_mdata.comm_rank, self._trace_mdata.comm_sz = re.findall(r"\d+", val),
-            "MPI_PROC_MAP": lambda self, val: None,
-            "MPI_PROC_MAP COLOR": lambda self, val: self._trace_mdata.comm_map_color = re.match(r"[\d,]+", val).group(1),
-            "MPI_PROC_MAP KEY": lambda self, val: self._trace_mdata.comm_map_color = re.match(r"[\d,]+", val).group(1),
-            "I/O System Info": lambda self, val: self._iosys_info = val
-        }
-        """
         mdata_key_parsers = {
             "MPI_COMM_WORLD": (lambda self, val: self._trace_mdata.set_wcomm_info(val)),
             "MPI_COMM": (lambda self, val: self._trace_mdata.set_comm_info(val)),
@@ -234,10 +224,12 @@ class SPIOTraceMDataParser:
                 mdata_key_parsers[toks[0].strip()](self, toks[1].strip())
             line = self._trace_mdata_log_file.readline()
 
-        logger.debug("Trace Meta-data: {}".format(self._trace_mdata))
+        logger.info("Trace Meta-data: {}".format(self._trace_mdata))
         self._is_mdata_parsed = True
+        self._trace_mdata_log_file.close()
 
-    def initialize(self):
+    # FIXME: Direct initialization is not currently supported
+    def _initialize(self):
         """
         Initializes the meta-data log parser by reading the meta-data log header
         """
