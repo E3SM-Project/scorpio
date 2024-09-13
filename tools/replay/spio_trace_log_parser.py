@@ -15,6 +15,9 @@ import os, sys, logging
 import glob, re
 
 import spio_trace_mdata_parser
+import spio_trace_log_transform
+import spio_vm
+import spio_iosys
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +46,10 @@ class SPIOTraceLogParser:
 
     """
     def __init__(self, spio_src_dir, spio_install_dir, spio_trace_dir, spio_replay_tool_src_dir):
-        self.spio_src_dir = spio_src_dir.strip()
-        self.spio_install_dir = spio_install_dir.strip()
-        self.spio_trace_dir = spio_trace_dir.strip()
-        self.spio_replay_tool_src_dir = spio_replay_tool_src_dir.strip()
+        self.spio_src_dir = os.path.expanduser(spio_src_dir.strip())
+        self.spio_install_dir = os.path.expanduser(spio_install_dir.strip())
+        self.spio_trace_dir = os.path.expanduser(spio_trace_dir.strip())
+        self.spio_replay_tool_src_dir = os.path.expanduser(spio_replay_tool_src_dir.strip())
 
     def _parse_log_header(self, fname, file):
         """
@@ -146,12 +149,7 @@ class SPIOTraceLogParser:
 
         return SPIOTraceLogHeaderInfo(ver, iosysid, wrank, trace_mdata_fname, trace_decomp_fname)
 
-    def _parse_log(self, fname, file):
-        """
-        Parses the I/O trace log. The log file needs to be opened and the header needs to be
-        processed using _parse_log_header() before passing the file handle to this function
-        """
-
+    # FIXME: Do we need this function to be part of the parser?
     def parse_log_and_generate_tool(self):
         """
         Parses the spio_trace_dir to look for I/O trace and I/O trace meta-data logs and generates
@@ -162,11 +160,46 @@ class SPIOTraceLogParser:
         # FIXME: Do we need to recursively search the user trace log dir
         trace_logs = glob.glob("{}/{}".format(self.spio_trace_dir,trace_log_regex), recursive=False)
         logger.info("Found {} trace logs in \"{}\"".format(len(trace_logs), self.spio_trace_dir))
+
+        # Read the template source file contents
+        iosys_src_template_fname = "{}/{}".format(self.spio_src_dir, "tools/replay/src_templates/iosys_trace_template.cpp")
+        iosys_src_template_file = open(iosys_src_template_fname, "r")
+        iosys_src_template = iosys_src_template_file.read()
+        iosys_src_template_file.close()
+
+        iosys = []
+        iosys_src_files = []
+        trace_log_files = []
         for trace_log in trace_logs:
+            # Open trace log and read header
             trace_log_file = open(trace_log, "r")
             hdr_info = self._parse_log_header(trace_log, trace_log_file)
             mdata_fname = "{}/{}".format(self.spio_trace_dir, hdr_info.trace_mdata_fname)
             mdata_parser = spio_trace_mdata_parser.SPIOTraceMDataParser(mdata_fname)
             trace_mdata = mdata_parser.get_mdata()
-            print("DBG: {}".format(trace_mdata))
-            self._parse_log(trace_log, trace_log_file)
+
+            # Create log2src transformer and use it to create the src file (the initial contents)
+            # from the soure templates
+            log_to_src_transformer = spio_trace_log_transform.SPIOTraceLogToSrcTransformer(trace_mdata)
+            iosys_src_fname = "{}/{}_{}.cpp".format(self.spio_replay_tool_src_dir, "iosys_trace", hdr_info.iosysid)
+
+            # Open output cpp source file
+            iosys_src_file = open(iosys_src_fname, "w")
+
+            # Transform the source template and write to output cpp source file
+            iosys_src_file.write(log_to_src_transformer.transform(iosys_src_template))
+
+            iosys_src_files.append(iosys_src_file)
+            trace_log_files.append(trace_log_file)
+
+            iosys.append(spio_iosys.SPIOIOSys(hdr_info.iosysid, trace_log_file, iosys_src_file, trace_mdata))
+
+        # Create a Virtual Machine to "execute" the instructions
+        vm = spio_vm.SPIOVM(iosys)
+        vm.execute()
+
+        for iosys_src_file in iosys_src_files:
+            iosys_src_file.close()
+
+        for trace_log_file in trace_log_files:
+            trace_log_file.close()
