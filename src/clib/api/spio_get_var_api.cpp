@@ -26,7 +26,7 @@ int PIOc_get_var_text(int ncid, int varid, char *buf)
 #endif
   ret = PIOc_get_var_text_impl(ncid, varid, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   //tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_var_sz(ncid, varid));
   tr.add_rval("*buf", (buf) ? buf : "");
 #endif
@@ -43,7 +43,7 @@ int PIOc_get_var_schar(int ncid, int varid, signed char *buf)
 #endif
   ret = PIOc_get_var_schar_impl(ncid, varid, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_var_sz(ncid, varid));
 #endif
   return ret;
@@ -59,7 +59,7 @@ int PIOc_get_var_short(int ncid, int varid, short *buf)
 #endif
   ret = PIOc_get_var_short_impl(ncid, varid, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_var_sz(ncid, varid));
 #endif
   return ret;
@@ -75,7 +75,7 @@ int PIOc_get_var_int(int ncid, int varid, int *buf)
 #endif
   ret = PIOc_get_var_int_impl(ncid, varid, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_var_sz(ncid, varid));
 #endif
   return ret;
@@ -91,7 +91,7 @@ int PIOc_get_var_long(int ncid, int varid, long *buf)
 #endif
   ret = PIOc_get_var_long_impl(ncid, varid, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_var_sz(ncid, varid));
 #endif
   return ret;
@@ -107,7 +107,7 @@ int PIOc_get_var_float(int ncid, int varid, float *buf)
 #endif
   ret = PIOc_get_var_float_impl(ncid, varid, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_var_sz(ncid, varid));
 #endif
   return ret;
@@ -123,7 +123,7 @@ int PIOc_get_var_double(int ncid, int varid, double *buf)
 #endif
   ret = PIOc_get_var_double_impl(ncid, varid, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_var_sz(ncid, varid));
 #endif
   return ret;
@@ -139,7 +139,7 @@ int PIOc_get_var_uchar(int ncid, int varid, unsigned char *buf)
 #endif
   ret = PIOc_get_var_uchar_impl(ncid, varid, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_var_sz(ncid, varid));
 #endif
   return ret;
@@ -155,7 +155,7 @@ int PIOc_get_var_ushort(int ncid, int varid, unsigned short *buf)
 #endif
   ret = PIOc_get_var_ushort_impl(ncid, varid, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_var_sz(ncid, varid));
 #endif
   return ret;
@@ -171,7 +171,7 @@ int PIOc_get_var_uint(int ncid, int varid, unsigned int *buf)
 #endif
   ret = PIOc_get_var_uint_impl(ncid, varid, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_var_sz(ncid, varid));
 #endif
   return ret;
@@ -187,7 +187,7 @@ int PIOc_get_var_longlong(int ncid, int varid, long long *buf)
 #endif
   ret = PIOc_get_var_longlong_impl(ncid, varid, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_var_sz(ncid, varid));
 #endif
   return ret;
@@ -203,7 +203,7 @@ int PIOc_get_var_ulonglong(int ncid, int varid, unsigned long long *buf)
 #endif
   ret = PIOc_get_var_ulonglong_impl(ncid, varid, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_var_sz(ncid, varid));
 #endif
   return ret;
