@@ -32,6 +32,14 @@ extern "C"{
 void PIOc_warn(int iosysid, int ncid, const char *fname, int line, const char *uwarn_msg);
 int PIOc_error(int iosysid, int ncid, int err_num, const char *fname, int line, const char *uerr_msg);
 
+#ifdef TIMING_INTERNAL
+/* GPTL does not export this function via the header file. So adding the func decl here for
+ * portability acorss multiple versions of GPTL
+ * FIXME: Modify all versions of GPTL that we use to export this function
+ */
+extern int GPTLis_initialized (void);
+#endif
+
 #if defined(__cplusplus)
 }
 #endif
@@ -697,13 +705,16 @@ void pio_finalize_logging(void)
  * Initialize GPTL timer library, if needed
  * The library is only initialized if the timing is internal
  */
+/* Indicate if GPTL was initialized inside the library */
+static bool GPTL_was_init_in_lib = false;
 void pio_init_gptl(void )
 {
 #ifdef TIMING_INTERNAL
     pio_timer_ref_cnt += 1;
-    if(pio_timer_ref_cnt == 1)
+    if((pio_timer_ref_cnt == 1) && (!GPTLis_initialized()))
     {
         GPTLinitialize();
+        GPTL_was_init_in_lib = true;
     }
 #endif
 }
@@ -716,7 +727,7 @@ void pio_finalize_gptl(void)
 {
 #ifdef TIMING_INTERNAL
     pio_timer_ref_cnt -= 1;
-    if(pio_timer_ref_cnt == 0)
+    if((pio_timer_ref_cnt == 0) && (GPTL_was_init_in_lib))
     {
         GPTLfinalize();
     }
