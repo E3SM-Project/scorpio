@@ -167,8 +167,18 @@ class SPIOTraceLogParser:
         iosys_src_template = iosys_src_template_file.read()
         iosys_src_template_file.close()
 
+        # Read the template header file contents
+        iosys_hdr_template_fname = "{}/{}".format(self.spio_src_dir, "tools/replay/src_templates/iosys_trace_template.hpp")
+        iosys_hdr_template_file = open(iosys_hdr_template_fname, "r")
+        iosys_hdr_template = iosys_hdr_template_file.read()
+        iosys_hdr_template_file.close()
+
+        # Driver source template transformer
+        driver_log_to_src_transformer = spio_trace_log_transform.SPIODriverLogToSrcTransformer()
+
         iosys = []
         iosys_src_files = []
+        iosys_hdr_files = []
         trace_log_files = []
         for trace_log in trace_logs:
             # Open trace log and read header
@@ -180,26 +190,62 @@ class SPIOTraceLogParser:
 
             # Create log2src transformer and use it to create the src file (the initial contents)
             # from the soure templates
-            log_to_src_transformer = spio_trace_log_transform.SPIOTraceLogToSrcTransformer(trace_mdata)
-            iosys_src_fname = "{}/{}_{}.cpp".format(self.spio_replay_tool_src_dir, "iosys_trace", hdr_info.iosysid)
+            log_to_src_transformer = spio_trace_log_transform.SPIOIOSysTraceLogToSrcTransformer(trace_mdata)
+            iosys_src_fname = "{}/{}_{}.cpp".format(self.spio_replay_tool_src_dir, "spio_replay_iosys_trace", hdr_info.iosysid)
+            iosys_hdr_bname = "{}_{}.hpp".format("spio_replay_iosys_trace", hdr_info.iosysid)
+            iosys_hdr_fname = "{}/{}".format(self.spio_replay_tool_src_dir, iosys_hdr_bname)
+            driver_log_to_src_transformer.append_transform_tok("__IOSYS_HEADER_INCLUDES__", log_to_src_transformer.get_include_decl(iosys_hdr_bname))
 
-            # Open output cpp source file
+            # Open output cpp source file & hpp header file
             iosys_src_file = open(iosys_src_fname, "w")
+            iosys_hdr_file = open(iosys_hdr_fname, "w")
 
             # Transform the source template and write to output cpp source file
             iosys_src_file.write(log_to_src_transformer.transform(iosys_src_template))
 
             iosys_src_files.append(iosys_src_file)
+            iosys_hdr_files.append(iosys_hdr_file)
             trace_log_files.append(trace_log_file)
 
-            iosys.append(spio_iosys.SPIOIOSys(hdr_info.iosysid, trace_log_file, iosys_src_file, trace_mdata))
+            iosys.append(spio_iosys.SPIOIOSys(hdr_info.iosysid, trace_log_file, iosys_src_file, iosys_hdr_file, trace_mdata))
 
         # Create a Virtual Machine to "execute" the instructions
         vm = spio_vm.SPIOVM(iosys)
         vm.execute()
 
+        # Read the driver source & header file templates and create the driver sources
+        # Create the driver source
+        driver_src_template_fname = "{}/{}".format(self.spio_src_dir, "tools/replay/src_templates/driver_template.cpp")
+        driver_src_template_file = open(driver_src_template_fname, "r")
+        driver_src_template = driver_src_template_file.read()
+        driver_src_template_file.close()
+
+        driver_src_fname = "{}/{}.cpp".format(self.spio_replay_tool_src_dir, "spio_replay_driver")
+        driver_src_file = open(driver_src_fname, "w")
+        driver_src_file.write(driver_log_to_src_transformer.transform(driver_src_template))
+        driver_src_file.close()
+
+        # Create the driver header
+        driver_hdr_template_fname = "{}/{}".format(self.spio_src_dir, "tools/replay/src_templates/driver_template.hpp")
+        driver_hdr_template_file = open(driver_hdr_template_fname, "r")
+        driver_hdr_template = driver_hdr_template_file.read()
+        driver_hdr_template_file.close()
+
+        driver_hdr_fname = "{}/{}.hpp".format(self.spio_replay_tool_src_dir, "spio_replay_driver")
+        driver_hdr_file = open(driver_hdr_fname, "w")
+        driver_hdr_file.write(driver_log_to_src_transformer.transform(driver_hdr_template))
+        driver_hdr_file.close()
+
+        # Write the I/O system header files
+        for sys in iosys:
+            sys.iosys_hdr_file.write(sys.log_to_src_transformer.transform(iosys_hdr_template))
+
+        # Close source/header files
         for iosys_src_file in iosys_src_files:
             iosys_src_file.close()
+
+        for iosys_hdr_file in iosys_hdr_files:
+            iosys_hdr_file.close()
 
         for trace_log_file in trace_log_files:
             trace_log_file.close()
