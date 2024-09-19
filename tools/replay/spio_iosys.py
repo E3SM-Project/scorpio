@@ -16,13 +16,14 @@ class SPIOIOSys:
     """
     Class to capture details of the I/O system
     """
-    def __init__(self, iosysid, trace_log_file, iosys_src_file, trace_mdata):
+    def __init__(self, iosysid, trace_log_file, iosys_src_file, iosys_hdr_file, trace_mdata):
         self.iosysid = iosysid
         self.trace_mdata = trace_mdata
         self.comm_map_color = re.split(r"\D+", trace_mdata.comm_map_color)
         self.trace_log_file = trace_log_file
         self.iosys_src_file = iosys_src_file
-        self.log_to_src_transformer = spio_trace_log_transform.SPIOTraceLogToSrcTransformer(trace_mdata)
+        self.iosys_hdr_file = iosys_hdr_file
+        self.log_to_src_transformer = spio_trace_log_transform.SPIOIOSysTraceLogToSrcTransformer(trace_mdata)
         self.exec_engine = SPIOIOSysExecEngine(self)
         self.instruction_stream = SPIOIOSysInstructionStream(trace_log_file, self.log_to_src_transformer)
         self.run_phase = 0
@@ -58,6 +59,7 @@ def iosys_default_state_transition_cb(spio_iosys):
 def iosys_ready_to_run_cb(spio_iosys):
     # Start writing the run phase method
     spio_iosys.iosys_src_file.write(spio_iosys.log_to_src_transformer.transform(spio_iosys.log_to_src_transformer.get_iosys_run_method_prefix()))
+    spio_iosys.log_to_src_transformer.append_transform_tok("__IOSYS_RUN_FUNC_DECLS__", spio_iosys.log_to_src_transformer.transform(spio_iosys.log_to_src_transformer.get_iosys_run_method_decl()))
 
 def iosys_run_to_quiescent_cb(spio_iosys):
     # End this run phase
