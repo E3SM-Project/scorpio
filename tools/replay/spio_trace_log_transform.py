@@ -14,23 +14,16 @@ import spio_trace_mdata_parser
 
 logger = logging.getLogger(__name__)
 
-class SPIOTraceLogToSrcTransformer:
+class SPIOLogToSrcTransformer:
     """
     SCORPIO I/O trace log to source transformer
     """
-    def __init__(self, trace_mdata): 
-        self._trace_mdata = trace_mdata
+    def __init__(self): 
         self._is_initialized = False
         self._trace_mdata_rep_toks = []
         self._rep_toks = {}
 
     def initialize(self):
-        self._trace_mdata_rep_toks.append(("__IOSYSID__", str(self._trace_mdata.iosysid)))
-        self._trace_mdata_rep_toks.append(("__MPI_PROC_MAP_COLORS__", self._trace_mdata.comm_map_color))
-        self._trace_mdata_rep_toks.append(("__MPI_PROC_MAP_KEYS__", self._trace_mdata.comm_map_key))
-
-        self._rep_toks["__PHASE__"] = str(0)
-
         self._is_initialized = True
 
     def transform(self, log):
@@ -46,10 +39,66 @@ class SPIOTraceLogToSrcTransformer:
         return log
 
     def add_transform_tok(self, tok, val):
+        if(not self._is_initialized):
+            self.initialize()
+
         self._rep_toks[tok] = val
+
+    def append_transform_tok(self, tok, aval):
+        if(not self._is_initialized):
+            self.initialize()
+
+        self._rep_toks[tok] += aval
+
+class SPIODriverLogToSrcTransformer(SPIOLogToSrcTransformer):
+    """
+    SCORPIO I/O trace log to source transformer for I/O systems
+    """
+    def __init__(self): 
+        SPIOLogToSrcTransformer.__init__(self)
+
+    def initialize(self):
+        SPIOLogToSrcTransformer.initialize(self)
+        self._rep_toks["__IOSYS_HEADER_INCLUDES__"] = "\n"
+        self._rep_toks["__DRIVER_RUN_SEQUENCE__"] = "\n"
+        self._is_initialized = True
+
+class SPIOIOSysTraceLogToSrcTransformer(SPIOLogToSrcTransformer):
+    """
+    SCORPIO I/O trace log to source transformer for I/O systems
+    """
+    def __init__(self, trace_mdata): 
+        SPIOLogToSrcTransformer.__init__(self)
+        self._trace_mdata = trace_mdata
+
+    def initialize(self):
+        SPIOLogToSrcTransformer.initialize(self)
+        self._trace_mdata_rep_toks.append(("__IOSYSID__", str(self._trace_mdata.iosysid)))
+        self._trace_mdata_rep_toks.append(("__MPI_PROC_MAP_COLORS__", self._trace_mdata.comm_map_color))
+        self._trace_mdata_rep_toks.append(("__MPI_PROC_MAP_KEYS__", self._trace_mdata.comm_map_key))
+
+        #self._trace_mdata_rep_toks.append(("__IOSYS_INIT_FUNC_DECLS__", ""))
+        #self._trace_mdata_rep_toks.append(("__IOSYS_FINALIZE_FUNC_DECLS__", ""))
+        self._rep_toks["__IOSYS_RUN_FUNC_DECLS__"] = ""
+
+        self._rep_toks["__PHASE__"] = str(0)
+
+        self._is_initialized = True
+
+    def get_iosys_init_method_decl(self):
+        return "\nvoid iosys_init_{}(void );\n".format("__IOSYSID__")
+
+    def get_iosys_finalizxe_method_decl(self):
+        return "\nvoid iosys_finalize_{}(void );\n".format("__IOSYSID__")
+
+    def get_iosys_run_method_decl(self):
+        return "\nvoid iosys_run_{}_phase{}(void );\n".format("__IOSYSID__", "__PHASE__")
 
     def get_iosys_run_method_prefix(self):
         return "\nvoid iosys_run_{}_phase{}(void )\n{{\n".format("__IOSYSID__", "__PHASE__")
 
     def get_iosys_run_method_suffix(self):
         return "\n}"
+
+    def get_include_decl(self, fname):
+        return "#include \"{}\";\n".format(fname)
