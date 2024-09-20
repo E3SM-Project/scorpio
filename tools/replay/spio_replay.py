@@ -94,6 +94,9 @@ def _main_func(description):
 ###############################################################################
 
     ret = 0
+    banner = "================================================="
+    print("{}".format(banner + "\n" + "\tSCORPIO REPLAY TOOL GENERATOR\n" + banner + "\n"))
+
     # Setup logging
     logging.basicConfig(filename="spio_replay_py.log", level=logging.INFO)
     logger.info(spio_replay_tool_banner)
@@ -107,20 +110,25 @@ def _main_func(description):
     spio_replay_tool_build_dir = spio_replay_tool_dir
     
     # Parse the trace log files and generate replay tool source
+    print("Parsing SCORPIO Trace log files in \"{}\"".format(spio_trace_dir));
     logger.info("Parsing SCORPIO Trace log files in \"{}\"".format(spio_trace_dir));
     parser = spio_trace_log_parser.SPIOTraceLogParser(spio_src_dir, spio_install_dir, spio_trace_dir, spio_replay_tool_src_dir)
     parser.parse_log_and_generate_tool()
 
     # Build replay tool
+    print("Building SCORPIO Replay tool (source files at \"{}\")".format(spio_replay_tool_src_dir));
     logger.info("Building SCORPIO Replay tool (source files at \"{}\")".format(spio_replay_tool_src_dir));
     builder = spio_replay_tool_builder.SPIOReplayToolBuilder(spio_src_dir, spio_build_dir, spio_install_dir, spio_trace_dir, spio_replay_tool_src_dir, spio_replay_tool_build_dir)
     ret = builder.build()
 
     if ret == 0:
+        print("Successfully finished parsing trace logs and building replay tool. Replay tool, spio_replay.exe, is available at \"{}\"".format(spio_replay_tool_build_dir))
         logger.info("Successfully finished parsing trace logs and building replay tool. Replay tool, spio_replay.exe, is available at \"{}\"".format(spio_replay_tool_build_dir))
     else:
+        print("Building replay tool failed, see build logs in \"{}\"".format(spio_replay_tool_build_dir))
         logger.error("Building replay tool failed, see build logs in \"{}\"".format(spio_replay_tool_build_dir))
 
+    print("{}".format(banner + "\n"))
     sys.exit(ret)
 
 if __name__ == "__main__":
