@@ -12,7 +12,7 @@ Note: All trace logs in a directory are assumed to belong to a single run of the
 """
 
 import os, sys, logging
-import glob, re
+import glob, re, shutil
 
 import spio_trace_mdata_parser
 import spio_trace_log_transform
@@ -46,10 +46,10 @@ class SPIOTraceLogParser:
 
     """
     def __init__(self, spio_src_dir, spio_install_dir, spio_trace_dir, spio_replay_tool_src_dir):
-        self.spio_src_dir = os.path.expanduser(spio_src_dir.strip())
-        self.spio_install_dir = os.path.expanduser(spio_install_dir.strip())
-        self.spio_trace_dir = os.path.expanduser(spio_trace_dir.strip())
-        self.spio_replay_tool_src_dir = os.path.expanduser(spio_replay_tool_src_dir.strip())
+        self.spio_src_dir = spio_src_dir
+        self.spio_install_dir = spio_install_dir
+        self.spio_trace_dir = spio_trace_dir
+        self.spio_replay_tool_src_dir = spio_replay_tool_src_dir
 
     def _parse_log_header(self, fname, file):
         """
@@ -239,6 +239,14 @@ class SPIOTraceLogParser:
         # Write the I/O system header files
         for sys in iosys:
             sys.iosys_hdr_file.write(sys.log_to_src_transformer.transform(iosys_hdr_template))
+
+        # Copy the CMake build script
+        replay_tool_cmake_file = self.spio_src_dir + "/tools/replay/src_templates/CMakeLists.txt"
+        if not os.path.exists(replay_tool_cmake_file):
+            logger.error("Unable to find the SCORPIO Replay tool CMake file in SCORPIO source directory :(Could not find \"{}\")".format(replay_tool_cmake_file))
+            raise RuntimeError("Unable to find the SCORPIO Replay tool CMake file in SCORPIO source directory :(Could not find \"{}\")".format(replay_tool_cmake_file))
+
+        shutil.copy(replay_tool_cmake_file, self.spio_replay_tool_src_dir)
 
         # Close source/header files
         for iosys_src_file in iosys_src_files:
