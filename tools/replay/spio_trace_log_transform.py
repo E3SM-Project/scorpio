@@ -101,4 +101,4 @@ class SPIOIOSysTraceLogToSrcTransformer(SPIOLogToSrcTransformer):
         return "\n}"
 
     def get_include_decl(self, fname):
-        return "#include \"{}\";\n".format(fname)
+        return "#include \"{}\"\n".format(fname)
