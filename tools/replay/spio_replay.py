@@ -113,7 +113,7 @@ def _main_func(description):
 
     # Build replay tool
     logger.info("Building SCORPIO Replay tool (source files at \"{}\")".format(spio_replay_tool_src_dir));
-    builder = spio_replay_tool_builder.SPIOReplayToolBuilder(spio_src_dir, spio_install_dir, spio_trace_dir, spio_replay_tool_src_dir, spio_replay_tool_build_dir)
+    builder = spio_replay_tool_builder.SPIOReplayToolBuilder(spio_src_dir, spio_build_dir, spio_install_dir, spio_trace_dir, spio_replay_tool_src_dir, spio_replay_tool_build_dir)
     ret = builder.build()
 
     if ret == 0:
