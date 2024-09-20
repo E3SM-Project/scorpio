@@ -43,20 +43,32 @@ def parse_command_line(args, description):
                 formatter_class=argparse.ArgumentDefaultsHelpFormatter
               )
 
+    cwd = os.getcwd()
+
     parser.add_argument("--scorpio-src-dir",
                         metavar="scorpio_src_dir",
-                        default=".",
+                        default=cwd,
                         help="Source directory for the SCORPIO library")
+
+    parser.add_argument("--scorpio-build-dir",
+                        metavar="scorpio_build_dir",
+                        default=cwd,
+                        help="Build directory for the SCORPIO library")
 
     parser.add_argument("--scorpio-install-dir",
                         metavar="scorpio_install_dir",
-                        default=".",
+                        default=cwd,
                         help="Install directory for the SCORPIO library")
 
     parser.add_argument("--trace-log-dir",
                         metavar="trace_log_dir",
-                        default=".",
+                        default=cwd,
                         help="Directory containing SCORPIO trace log files")
+
+    parser.add_argument("--replay-tool-dir",
+                        metavar="replay_tool_dir",
+                        default=cwd,
+                        help="Directory to store replay tool source/exe")
 
     parser.add_argument("-v", "--verbose",
                         action="store_true",
@@ -68,10 +80,14 @@ def parse_command_line(args, description):
 
     args = parser.parse_args(args[1:])
 
-    if args.trace_log_dir is not None:
-        os.chdir(args.trace_log_dir)
+    if args.trace_log_dir.strip() is not None:
+        os.chdir(os.path.expanduser(args.trace_log_dir.strip()))
 
-    return args.scorpio_src_dir, args.scorpio_install_dir, args.trace_log_dir
+    return os.path.expanduser(args.scorpio_src_dir.strip()),\
+            os.path.expanduser(args.scorpio_build_dir.strip()),\
+            os.path.expanduser(args.scorpio_install_dir.strip()),\
+            os.path.expanduser(args.trace_log_dir.strip()),\
+            os.path.expanduser(args.replay_tool_dir.strip())
 
 ###############################################################################
 def _main_func(description):
@@ -86,9 +102,9 @@ def _main_func(description):
     logger.info("Parsing command line args...")
     sys.argv.extend([] if "ARGS_FOR_SPIO_REPLAY_SCRIPT" not in os.environ else os.environ["ARGS_FOR_SPIO_REPLAY_SCRIPT"].split())
 
-    spio_src_dir, spio_install_dir, spio_trace_dir = parse_command_line(sys.argv, description)
-    spio_replay_tool_src_dir = spio_trace_dir
-    spio_replay_tool_build_dir = spio_trace_dir
+    spio_src_dir, spio_build_dir, spio_install_dir, spio_trace_dir, spio_replay_tool_dir = parse_command_line(sys.argv, description)
+    spio_replay_tool_src_dir = spio_replay_tool_dir
+    spio_replay_tool_build_dir = spio_replay_tool_dir
     
     # Parse the trace log files and generate replay tool source
     logger.info("Parsing SCORPIO Trace log files in \"{}\"".format(spio_trace_dir));
