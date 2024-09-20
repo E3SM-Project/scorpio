@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <cassert>
 #include "mpi.h"
 
 #include "spio_replay_iosys_trace___IOSYSID__.hpp"
@@ -35,6 +36,8 @@ int iosys_init___IOSYSID__(void )
 
 int iosys_finalize___IOSYSID__(void )
 {
+  int ret = MPI_SUCCESS;
+
   ret = MPI_Comm_free(&(gvars___IOSYSID__::iosys_comm));
   assert(ret == MPI_SUCCESS);
 
