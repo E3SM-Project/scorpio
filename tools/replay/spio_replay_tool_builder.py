@@ -89,6 +89,7 @@ class SPIOReplayToolBuilder:
                 logger.error(cmake_ret.stdout)
                 logger.error(cmake_ret.stderr)
                 logger.error(banner)
+            ret = cmake_ret.returncode
 
         # Build replay tool
         if cmake_ret.returncode == 0:
@@ -107,5 +108,6 @@ class SPIOReplayToolBuilder:
                     logger.error(make_ret.stdout)
                     logger.error(make_ret.stderr)
                     logger.error(banner)
+                ret = make_ret.returncode
 
         return ret
