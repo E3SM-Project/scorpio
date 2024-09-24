@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <functional>
 #include <cassert>
 #include "mpi.h"
 
@@ -7,6 +8,7 @@
 
 namespace gvars___IOSYSID__{
   static MPI_Comm iosys_comm = MPI_COMM_NULL;
+  static bool is_proc_in_iosys = false;
 }
 
 int iosys_init___IOSYSID__(void )
@@ -26,6 +28,10 @@ int iosys_init___IOSYSID__(void )
 
   assert(map_colors.size() == sz);
   assert(map_keys.size() == sz);
+
+  if(map_colors[rank] >= 0){
+    gvars___IOSYSID__::is_proc_in_iosys = true;
+  }
 
   ret = MPI_Comm_split(MPI_COMM_WORLD, map_colors[rank], map_keys[rank],
           &(gvars___IOSYSID__::iosys_comm));

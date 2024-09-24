@@ -84,7 +84,7 @@ class SPIOReplayToolBuilder:
                 logger.info(cmake_ret.stdout)
                 logger.info(banner)
             else:
-                logger.error("Configure FAILED... see configure_replay_tool.log")
+                logger.error("Configure FAILED... see configure_replay_tool.log for more information")
                 logger.error(banner)
                 logger.error(cmake_ret.stdout)
                 logger.error(cmake_ret.stderr)
@@ -102,7 +102,7 @@ class SPIOReplayToolBuilder:
                     logger.info(make_ret.stdout)
                     logger.info(banner)
                 else:
-                    logger.error("Build FAILED... see make_replay_tool.log")
+                    logger.error("Build FAILED... see make_replay_tool.log for more information")
                     logger.error(banner)
                     logger.error(make_ret.stdout)
                     logger.error(make_ret.stderr)
