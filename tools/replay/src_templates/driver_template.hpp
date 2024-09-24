@@ -7,11 +7,10 @@ __IOSYS_HEADER_INCLUDES__
 
 namespace spio_replay_driver{
 
-class iosys{
-public:
+struct iosys{
   std::function<int(void)> init;
   std::function<int(void)> finalize;
-  std::function<void(void)> run;
+  std::function<int(int)> run;
   int phase;
   std::string info;
 };
