@@ -18,6 +18,8 @@ class SPIOVM:
         self.iosys = iosys
         for sys in self.iosys:
             sys.exec_engine.init(self.iosys)
+        self.iosys_instr_sequence = []
+        self.iosys_run_sequence = []
 
     def execute(self):
         INF_QTIME = -1.0
@@ -29,15 +31,16 @@ class SPIOVM:
         iosys_exec_cur_instr = []
         iosys_exec_ninstr = [0] * len(self.iosys)
         iosys_exec_total_qtimes = [INF_QTIME] * len(self.iosys)
+        clock_tic = 0
 
         for sys in self.iosys:
             logger.debug("Starting execution on iosys (iosysid={})".format(sys.iosysid))
-            sys.exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.INIT)
+            sys.exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.INIT, clock_tic)
             start_time, end_time, instr = 0.0, 0.0, ""
             if sys.instruction_stream.fetch():
                 start_time, end_time, instr = sys.instruction_stream.decode()
             else:
-                sys.exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.FINALIZE)
+                sys.exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.FINALIZE, clock_tic)
                 niosys -= 1
             iosys_exec_tstamps.append((float(start_time), float(end_time)))
             iosys_exec_cur_instr.append(instr)
@@ -47,12 +50,15 @@ class SPIOVM:
         # Start running the 1st instruction on I/O systems that are ready
         for idx in iosys_sorted_idx:
             if self.iosys[idx].exec_engine.is_ready(self.iosys):
-                self.iosys[idx].exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.READY)
+                self.iosys[idx].exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.READY, clock_tic)
 
         for idx in iosys_sorted_idx:
             if self.iosys[idx].exec_engine.state == spio_iosys.SPIOIOSysExecEngineState.READY:
-                self.iosys[idx].exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.RUN)
-                self.iosys[idx].exec_engine.execute(iosys_exec_cur_instr[idx])
+                self.iosys[idx].exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.RUN, clock_tic)
+                self.iosys_instr_sequence.append(idx)
+                self.iosys_run_sequence.append(idx)
+                self.iosys[idx].exec_engine.execute(iosys_exec_cur_instr[idx], clock_tic)
+                clock_tic += 1
                 iosys_exec_ninstr[idx] += 1
 
         # Execute the rest of the instructions
@@ -65,7 +71,7 @@ class SPIOVM:
                     if sys.instruction_stream.fetch():
                         start_time, end_time, instr = sys.instruction_stream.decode()
                     else:
-                        sys.exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.FINALIZE)
+                        sys.exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.FINALIZE, clock_tic)
                         niosys -= 1
                 iosys_exec_current_tstamps.append((float(start_time), float(end_time)))
                 iosys_exec_cur_instr.append(instr)
@@ -89,7 +95,7 @@ class SPIOVM:
                     nqtimes = iosys_exec_ninstr[idx] - 1
                     if (nqtimes > 0) and (qtime > iosys_exec_total_qtimes[idx]/nqtimes * 10):
                         #print("DBG: Moving iosys (iosysid={}) to QUIESCENT (qtime = {}, avg_qtime={})".format(self.iosys[idx].iosysid, qtime, iosys_exec_total_qtimes[idx]/nqtimes * 10))
-                        sys.exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.QUIESCENT)
+                        sys.exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.QUIESCENT, clock_tic)
 
             iosys_exec_tstamps = iosys_exec_current_tstamps
 
@@ -97,11 +103,14 @@ class SPIOVM:
             for idx in iosys_sorted_idx:
                 if ((self.iosys[idx].exec_engine.state != spio_iosys.SPIOIOSysExecEngineState.RUN) and
                     self.iosys[idx].exec_engine.is_ready(self.iosys)):
-                    self.iosys[idx].exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.READY)
+                    self.iosys[idx].exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.READY, clock_tic)
 
             for idx in iosys_sorted_idx:
                 if self.iosys[idx].exec_engine.state == spio_iosys.SPIOIOSysExecEngineState.READY:
-                    self.iosys[idx].exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.RUN)
+                    self.iosys[idx].exec_engine.set_state(spio_iosys.SPIOIOSysExecEngineState.RUN, clock_tic)
+                    self.iosys_run_sequence.append(idx)
                 if self.iosys[idx].exec_engine.state == spio_iosys.SPIOIOSysExecEngineState.RUN:
-                    self.iosys[idx].exec_engine.execute(iosys_exec_cur_instr[idx])
+                    self.iosys_instr_sequence.append(idx)
+                    self.iosys[idx].exec_engine.execute(iosys_exec_cur_instr[idx], clock_tic)
+                    clock_tic += 1
                     iosys_exec_ninstr[idx] += 1

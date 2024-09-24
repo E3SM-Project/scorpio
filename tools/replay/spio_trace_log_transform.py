@@ -80,25 +80,51 @@ class SPIOIOSysTraceLogToSrcTransformer(SPIOLogToSrcTransformer):
         #self._trace_mdata_rep_toks.append(("__IOSYS_INIT_FUNC_DECLS__", ""))
         #self._trace_mdata_rep_toks.append(("__IOSYS_FINALIZE_FUNC_DECLS__", ""))
         self._rep_toks["__IOSYS_RUN_FUNC_DECLS__"] = ""
+        self._rep_toks["__IOSYS_RUN_PHASE_FUNCS__"] = ""
 
         self._rep_toks["__PHASE__"] = str(0)
 
         self._is_initialized = True
 
+    def get_iosys_init_method_name(self):
+        return "iosys_init_{}".format("__IOSYSID__")
+
     def get_iosys_init_method_decl(self):
-        return "\nvoid iosys_init_{}(void );\n".format("__IOSYSID__")
+        return "\nint iosys_init_{}(void );\n".format("__IOSYSID__")
+
+    def get_iosys_finalize_method_name(self):
+        return "iosys_finalize_{}".format("__IOSYSID__")
 
     def get_iosys_finalizxe_method_decl(self):
-        return "\nvoid iosys_finalize_{}(void );\n".format("__IOSYSID__")
+        return "\nint iosys_finalize_{}(void );\n".format("__IOSYSID__")
+
+    def get_iosys_run_method_name(self):
+        return "iosys_run_{}_phase{}".format("__IOSYSID__", "__PHASE__")
 
     def get_iosys_run_method_decl(self):
-        return "\nvoid iosys_run_{}_phase{}(void );\n".format("__IOSYSID__", "__PHASE__")
+        return "\nint iosys_run_{}_phase{}(void );".format("__IOSYSID__", "__PHASE__")
 
     def get_iosys_run_method_prefix(self):
-        return "\nvoid iosys_run_{}_phase{}(void )\n{{\n".format("__IOSYSID__", "__PHASE__")
+        return "\nint iosys_run_{}_phase{}(void )\n{{\n".format("__IOSYSID__", "__PHASE__")
 
     def get_iosys_run_method_suffix(self):
-        return "\n}"
+        return "\nreturn 0;\n}"
+
+    def get_iosys_run_method_with_phase_name(self):
+        return "iosys_run_{}".format("__IOSYSID__")
+
+    def get_iosys_run_method_with_phase(self):
+        return \
+"""
+int {}(int phase){{
+  static const std::vector<std::function<void (void)> > run_phases = {{ {} }};
+  assert((phase >= 0) && (phase < run_phases.size()));
+  if(gvars___IOSYSID__::is_proc_in_iosys){{
+    return run_phases[phase]();
+  }}
+  return 0;
+}}
+""".format(self.get_iosys_run_method_with_phase_name(), "__IOSYS_RUN_PHASE_FUNCS__")
 
     def get_include_decl(self, fname):
         return "#include \"{}\"\n".format(fname)

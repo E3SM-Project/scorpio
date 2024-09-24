@@ -12,6 +12,17 @@ import spio_trace_log_transform
 
 logger = logging.getLogger(__name__)
 
+class SPIOIOSysDriverInfo:
+    def __init__(self, init, finalize, run, phase, info):
+        self.init = init
+        self.finalize = finalize
+        self.run = run
+        self.phase = phase
+        self.info = "\"" + info + "\""
+    def __str__(self):
+        return "{" + self.init + "," + self.finalize +\
+                "," + self.run + "," + str(self.phase) + "," +  self.info + "}"
+
 class SPIOIOSys:
     """
     Class to capture details of the I/O system
@@ -27,6 +38,14 @@ class SPIOIOSys:
         self.exec_engine = SPIOIOSysExecEngine(self)
         self.instruction_stream = SPIOIOSysInstructionStream(trace_log_file, self.log_to_src_transformer)
         self.run_phase = 0
+        self.run_phase_funcs = []
+        self.run_sequence = []
+
+        self.driver_iosys_info = SPIOIOSysDriverInfo(self.log_to_src_transformer.transform(self.log_to_src_transformer.get_iosys_init_method_name()),\
+            self.log_to_src_transformer.transform(self.log_to_src_transformer.get_iosys_finalize_method_name()),\
+            self.log_to_src_transformer.transform(self.log_to_src_transformer.get_iosys_run_method_with_phase_name()),\
+            0,\
+            self.log_to_src_transformer.transform("I/O system for iosysid : __IOSYSID__"))
 
     def is_dependent(self, spio_iosys):
         if len(spio_iosys.comm_map_color) != len(self.comm_map_color):
@@ -53,28 +72,32 @@ class SPIOIOSysExecEngineState(Enum):
     QUIESCENT = 4
     FINALIZE = 5
 
-def iosys_default_state_transition_cb(spio_iosys):
+def iosys_default_state_transition_cb(spio_iosys, clock_tic):
     None
 
-def iosys_ready_to_run_cb(spio_iosys):
+def iosys_ready_to_run_cb(spio_iosys, clock_tic):
     # Start writing the run phase method
+    spio_iosys.run_sequence.append(clock_tic)
     spio_iosys.iosys_src_file.write(spio_iosys.log_to_src_transformer.transform(spio_iosys.log_to_src_transformer.get_iosys_run_method_prefix()))
     spio_iosys.log_to_src_transformer.append_transform_tok("__IOSYS_RUN_FUNC_DECLS__", spio_iosys.log_to_src_transformer.transform(spio_iosys.log_to_src_transformer.get_iosys_run_method_decl()))
+    spio_iosys.run_phase_funcs.append(spio_iosys.log_to_src_transformer.transform(spio_iosys.log_to_src_transformer.get_iosys_run_method_name()))
 
-def iosys_run_to_quiescent_cb(spio_iosys):
+def iosys_run_to_quiescent_cb(spio_iosys, clock_tic):
     # End this run phase
     spio_iosys.iosys_src_file.write(spio_iosys.log_to_src_transformer.transform(spio_iosys.log_to_src_transformer.get_iosys_run_method_suffix()))
     spio_iosys.run_phase += 1
     spio_iosys.log_to_src_transformer.add_transform_tok("__PHASE__", str(spio_iosys.run_phase))
 
-def iosys_quiescent_to_run_cb(spio_iosys):
+def iosys_quiescent_to_run_cb(spio_iosys, clock_tic):
     # FIXME: Do we need a quiescent to run cb?
     spio_iosys.iosys_src_file.write(spio_iosys.log_to_src_transformer.transform(spio_iosys.log_to_src_transformer.get_iosys_run_method_prefix()))
 
-def iosys_run_to_finalize_cb(spio_iosys):
+def iosys_run_to_finalize_cb(spio_iosys, clock_tic):
     spio_iosys.iosys_src_file.write(spio_iosys.log_to_src_transformer.transform(spio_iosys.log_to_src_transformer.get_iosys_run_method_suffix()))
+    spio_iosys.log_to_src_transformer.add_transform_tok("__IOSYS_RUN_PHASE_FUNCS__", ",".join(spio_iosys.run_phase_funcs))
+    spio_iosys.iosys_src_file.write(spio_iosys.log_to_src_transformer.transform(spio_iosys.log_to_src_transformer.get_iosys_run_method_with_phase()))
 
-def iosys_ready_to_finalize_cb(spio_iosys):
+def iosys_ready_to_finalize_cb(spio_iosys, clock_tic):
     iosys_run_to_finalize_cb(spio_iosys)
 
 class SPIOIOSysExecEngine:
@@ -87,6 +110,7 @@ class SPIOIOSysExecEngine:
         self._iosys_deps = []
         self.state = SPIOIOSysExecEngineState.INVALID
         self._is_init = False
+        self.clock_tic = 0
 
         # Set up the state transition callback matrix
         # Since function objects cannot be assigned to we have to do init this way (rather than assign defaults & set the needed funcs later)
@@ -127,7 +151,7 @@ class SPIOIOSysExecEngine:
 
         self._is_init = True
 
-    def set_state(self, exec_engine_state):
+    def set_state(self, exec_engine_state, clock_tic):
         if not self._is_init:
             raise RuntimeError("I/O system execution engine needs to be initialized")
 
@@ -135,7 +159,7 @@ class SPIOIOSysExecEngine:
             old_state = self.state
             self.state = exec_engine_state
             logger.debug("set_state({} -> {}), calling {}".format(old_state, self.state, self.transition_cb[old_state.value][self.state.value]))
-            self.transition_cb[old_state.value][self.state.value](self.my_iosys)
+            self.transition_cb[old_state.value][self.state.value](self.my_iosys, clock_tic)
 
     def is_ready(self, iosys):
         if not self._is_init:
@@ -153,11 +177,11 @@ class SPIOIOSysExecEngine:
         # Move back all dependent I/O systems in READY state to INIT
         for iosys_dep in self._iosys_deps[self._my_iosys_idx]:
             if iosys[iosys_dep].exec_engine.state == SPIOIOSysExecEngineState.READY:
-                iosys[iosys_dep].exec_engine.set_state(SPIOIOSysExecEngineState.INIT)
+                iosys[iosys_dep].exec_engine.set_state(SPIOIOSysExecEngineState.INIT, self.clock_tic)
 
         return True
 
-    def execute(self, instr):
+    def execute(self, instr, clock_tic):
         if not self._is_init:
             raise RuntimeError("I/O system execution engine needs to be initialized")
 
@@ -165,6 +189,7 @@ class SPIOIOSysExecEngine:
             raise RuntimeError("Trying to run instruction on an I/O system execution engine in the FINALIZE state")
 
         logger.debug("Executing instruction (on iosysid={}) : {}".format(self.my_iosys.iosysid, instr))
+        self.clock_tic = clock_tic
         self.my_iosys.iosys_src_file.write(self.my_iosys.log_to_src_transformer.transform(instr))
         self.my_iosys.instruction_stream.reset()
 
