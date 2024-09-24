@@ -214,6 +214,14 @@ class SPIOTraceLogParser:
         vm.execute()
 
         # Read the driver source & header file templates and create the driver sources
+        # Get the I/O sys info required by the driver
+        iosys_driver_info = []
+        for sys in iosys:
+            iosys_driver_info.append(str(sys.driver_iosys_info))
+
+        driver_log_to_src_transformer.add_transform_tok("__DRIVER_IOSYS_INFO__", ",".join(iosys_driver_info))
+        driver_log_to_src_transformer.add_transform_tok("__DRIVER_RUN_SEQUENCE__", ",".join(str(x) for x in vm.iosys_run_sequence))
+
         # Create the driver source
         driver_src_template_fname = "{}/{}".format(self.spio_src_dir, "tools/replay/src_templates/driver_template.cpp")
         driver_src_template_file = open(driver_src_template_fname, "r")
