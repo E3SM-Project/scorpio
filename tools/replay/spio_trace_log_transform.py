@@ -117,7 +117,7 @@ class SPIOIOSysTraceLogToSrcTransformer(SPIOLogToSrcTransformer):
         return \
 """
 int {}(int phase){{
-  static const std::vector<std::function<void (void)> > run_phases = {{ {} }};
+  static const std::vector<std::function<int (void)> > run_phases = {{ {} }};
   assert((phase >= 0) && (phase < run_phases.size()));
   if(gvars___IOSYSID__::is_proc_in_iosys){{
     return run_phases[phase]();

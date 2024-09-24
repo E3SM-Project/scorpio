@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     std::cout << tool_banner.c_str() << "\n";
   }
 
-  const std::vector<spio_replay_driver::iosys> iosys_infos = {__DRIVER_IOSYS_INFO__};
+  std::vector<spio_replay_driver::iosys> iosys_infos = {__DRIVER_IOSYS_INFO__};
   for(std::size_t i = 0; i < iosys_infos.size(); i++){
     int ret = iosys_infos[i].init();
     if(ret != 0){
@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 
   const std::vector<int> iosys_run_idx = {__DRIVER_RUN_SEQUENCE__};
   for(std::size_t i = 0; i < iosys_run_idx.size(); i++){
-    int ret = iosys_infos[i].run();
+    int ret = iosys_infos[i].run(iosys_infos[i].phase++);
     if(ret != 0){
       std::cerr << "ERROR: Error running I/O system : " << i
         << "(" << iosys_infos[i].info.c_str() << ")\n";
