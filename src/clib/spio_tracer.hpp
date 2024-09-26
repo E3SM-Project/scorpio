@@ -62,7 +62,7 @@ namespace SPIO_Util{
         int func_id_;
         const std::string func_name_;
         MPI_Comm mpi_comm_;
-        MPI_Comm wrank_;
+        int wrank_;
         int iosysid_;
         int fh_;
         bool is_io_proc_;
