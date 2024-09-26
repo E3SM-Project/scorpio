@@ -51,8 +51,8 @@ int PIOc_init_intercomm(int component_count, const MPI_Comm peer_comm,
     }
   }
   tr.add_arg("component_count", component_count).
-    add_arg("peer_comm", peer_comm).add_arg("ucomp_comms", ucomp_comms, component_count).
-    add_arg("uio_comm", uio_comm).add_arg("rearranger", rearranger).
+    add_mpi_arg("peer_comm", peer_comm).add_mpi_arg("ucomp_comms", ucomp_comms, component_count).
+    add_mpi_arg("uio_comm", uio_comm).add_arg("rearranger", rearranger).
     add_arg("*iosysidps", iosysidps);
 #endif
   ret = PIOc_init_intercomm_impl(component_count, peer_comm, ucomp_comms,
@@ -88,9 +88,9 @@ int PIOc_Init_Intercomm_from_F90(int component_count, int f90_peer_comm,
     }
   }
   tr.add_arg("component_count", component_count).
-    add_arg("f90_peer_comm", MPI_Comm_f2c(f90_peer_comm)).
-    add_arg("f90_comp_comms", ccomp_comms, component_count).
-    add_arg("f90_io_comm", MPI_Comm_f2c(f90_io_comm)).add_arg("rearranger", rearranger).
+    add_mpi_arg("f90_peer_comm", MPI_Comm_f2c(f90_peer_comm)).
+    add_mpi_arg("f90_comp_comms", ccomp_comms, component_count).
+    add_mpi_arg("f90_io_comm", MPI_Comm_f2c(f90_io_comm)).add_arg("rearranger", rearranger).
     add_arg("*iosysidps", iosysidps);
 #endif
   ret = PIOc_Init_Intercomm_from_F90_impl(component_count, f90_peer_comm,
@@ -127,7 +127,7 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_Init_Intracomm");
-  tr.add_arg("comp_comm", comp_comm).add_arg("num_iotasks", num_iotasks).
+  tr.add_mpi_arg("comp_comm", comp_comm).add_arg("num_iotasks", num_iotasks).
     add_arg("stride", stride).add_arg("base", base).add_arg("rearr", rearr).
     add_arg("*iosysidp", iosysidp);
 #endif
@@ -148,7 +148,7 @@ int PIOc_Init_Intracomm_from_F90(int f90_comp_comm,
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_Init_Intracomm_from_F90");
-  tr.add_arg("f90_comp_comm", MPI_Comm_f2c(f90_comp_comm)).
+  tr.add_mpi_arg("f90_comp_comm", MPI_Comm_f2c(f90_comp_comm)).
     add_arg("num_iotasks", num_iotasks).add_arg("stride", stride).
     add_arg("base", base).add_arg("rearr", rearr).
     add_arg("*rearr_opts", rearr_opts).add_arg("*iosysidp", iosysidp);
