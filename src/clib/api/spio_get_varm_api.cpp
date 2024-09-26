@@ -183,7 +183,7 @@ int PIOc_get_varm(int ncid, int varid, const PIO_Offset *start, const PIO_Offset
     add_arg("*start", start).add_arg("*count", count).
     add_arg("*stride", stride).add_arg("*imap", imap).add_arg("*buf", buf).
     add_arg("bufcount", static_cast<long long int>(bufcount)).
-    add_arg("buftype", static_cast<long long int>(buftype)).flush();
+    add_mpi_arg("buftype", buftype).flush();
 #endif
   return PIOc_get_varm_impl(ncid, varid, start, count, stride, imap, buf, bufcount, buftype);
 }
