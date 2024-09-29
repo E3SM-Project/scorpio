@@ -747,17 +747,30 @@ Decomposition adios2_ProcessOneDecomposition(adios2::Variable<T> &v_base,
         return Decomposition{BP2PIO_ERROR, BP2PIO_ERROR};
     }
 
-    std::vector<int> block_writer_cnt;
+    size_t block_list_size = block_list.size();
+    std::vector<std::vector<int> > block_writer_cnt_all(block_list_size);
+    const auto blk_blocks = bpReader.BlocksInfo(blk_var, time_step);
+    for (size_t i = 0; i < block_list_size; i++)
+        block_writer_cnt_all[i].resize(blk_blocks[i].Count[0]);
+
     try
     {
         GPTLstart("adios2pio:adios2_ProcessOneDecomposition:read_hotspot");
-        for (size_t i = 0; i < block_list.size(); i++)
+        for (size_t i = 0; i < block_list_size; i++)
         {
             blk_var.SetBlockSelection(i);
-            GPTLstart("adios2pio:adios2_ProcessOneDecomposition:bpReader_Get");
-            bpReader.Get(blk_var, block_writer_cnt, adios2::Mode::Sync);
-            GPTLstop("adios2pio:adios2_ProcessOneDecomposition:bpReader_Get");
-            for (int k = 0; k < block_writer_cnt[0]; k++) /* number of writers */
+            GPTLstart("adios2pio:adios2_ProcessOneDecomposition:bpReader_Get_Deferred");
+            bpReader.Get(blk_var, block_writer_cnt_all[i].data(), adios2::Mode::Deferred);
+            GPTLstop("adios2pio:adios2_ProcessOneDecomposition:bpReader_Get_Deferred");
+        }
+
+        GPTLstart("adios2pio:adios2_ProcessOneDecomposition:bpReader_PerformGets");
+        bpReader.PerformGets();
+        GPTLstop("adios2pio:adios2_ProcessOneDecomposition:bpReader_PerformGets");
+
+        for (size_t i = 0; i < block_list_size; i++)
+        {
+            for (int k = 0; k < block_writer_cnt_all[i][0]; k++) /* number of writers */
             {
                  int writer_id = block_list[i][k];
                  writer_block_id[writer_id] = 1;  /* block written out by writer_id */
@@ -1839,24 +1852,37 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
         return BP2PIO_ERROR;
     }
 
-    std::vector<int> block_writer_cnt;
+    size_t blk_blocks_size = blk_blocks.size();
+    std::vector<std::vector<int> > block_writer_cnt_all(blk_blocks_size);
+    for (size_t i = 0; i < blk_blocks_size; i++)
+        block_writer_cnt_all[i].resize(blk_blocks[i].Count[0]);
+
     int b_idx = 0, t_idx = 0;
     try
     {
         GPTLstart("adios2pio:adios2_ConvertVariableDarray:before_main_loop:read_hotspot");
-        for (size_t i = 0; i < block_list.size(); i++)
+        for (size_t i = 0; i < blk_blocks_size; i++)
+        {
+            blk_var.SetBlockSelection(i);
+            GPTLstart("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_Get_Deferred");
+            bpReader[0].Get(blk_var, block_writer_cnt_all[i].data(), adios2::Mode::Deferred);
+            GPTLstop("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_Get_Deferred");
+        }
+
+        GPTLstart("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_PerformGets");
+        bpReader[0].PerformGets();
+        GPTLstop("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_PerformGets");
+
+        size_t block_list_size = block_list.size();
+        for (size_t i = 0; i < block_list_size; i++)
         {
             t_idx = 0;
             /* num_data_block_writers may have been written out multiple times in an adios step */
             for (int ii = 0; ii < num_bp_blocks_per_group; ii++)
             {
-                blk_var.SetBlockSelection(b_idx);
-                GPTLstart("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_Get");
-                bpReader[0].Get(blk_var, block_writer_cnt, adios2::Mode::Sync);
-                GPTLstop("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_Get");
-                for (size_t j = 0; j < block_writer_cnt.size(); j++)
+                for (size_t j = 0; j < block_writer_cnt_all[b_idx].size(); j++)
                 {
-                    for (int k = 0; k < block_writer_cnt[j]; k++)
+                    for (int k = 0; k < block_writer_cnt_all[b_idx][j]; k++)
                     { /* number of writers at time step t_idx  */
                         int writer_id = block_list[i][k];
                         writer_block_id[writer_id][t_idx] = 1; /* block written out by writer_id at time step t_idx */
@@ -1955,13 +1981,18 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
                     if (bp_block_id >= 0)
                     {
                         v_base.SetBlockSelection(bp_block_id);
-                        GPTLstart("adios2pio:adios2_ConvertVariableDarray:main_loop:bpReader_Get");
-                        bpReader[0].Get(v_base, t_data + offset, adios2::Mode::Sync);
-                        GPTLstop("adios2pio:adios2_ConvertVariableDarray:main_loop:bpReader_Get");
+                        GPTLstart("adios2pio:adios2_ConvertVariableDarray:main_loop:bpReader_Get_Deferred");
+                        bpReader[0].Get(v_base, t_data + offset, adios2::Mode::Deferred);
+                        GPTLstop("adios2pio:adios2_ConvertVariableDarray:main_loop:bpReader_Get_Deferred");
                         offset += (vb_blocks[bp_block_id].Count[0]);
                     }
                 }
             }
+
+            GPTLstart("adios2pio:adios2_ConvertVariableDarray:main_loop:bpReader_PerformGets");
+            bpReader[0].PerformGets();
+            GPTLstop("adios2pio:adios2_ConvertVariableDarray:main_loop:bpReader_PerformGets");
+
             GPTLstop("adios2pio:adios2_ConvertVariableDarray:main_loop:read_hotspot");
 
             decomp_id = decomp_buffer[ts];
