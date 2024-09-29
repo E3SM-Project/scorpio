@@ -90,5 +90,11 @@ int spio_get_opt_pio_rearr(iosystem_desc_t *iosys, int local_decomp_maplen)
     }
   }
 
+  if (iosys->union_rank == 0)
+  {
+    printf("[DEBUG] Finding max I/O decomposition len = %d, selected opt_rearr = %d\n", max_maplen, opt_rearr);
+    fflush(stdout);
+  }
+
   return opt_rearr;
 }

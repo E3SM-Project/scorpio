@@ -13,7 +13,7 @@ static void init_user_options(spio_tool_utils::ArgParser &ap)
       .add_opt("idir", "Directory containing data output from PIO (in ADIOS format)")
       .add_opt("nc-file", "output file name after conversion")
       .add_opt("pio-format", "output PIO_IO_TYPE. Supported parameters: \"pnetcdf\",  \"netcdf\",  \"netcdf4c\",  \"netcdf4p\"")
-      .add_opt("rearr", "PIO rearranger. Supported parameters: \"subset\", \"box\". Default \"subset\".")
+      .add_opt("rearr", "PIO rearranger. Supported parameters: \"subset\", \"box\", \"any\". Default \"any\".")
       .add_opt("verbose", "Turn on verbose info messages");
 }
 
@@ -60,7 +60,7 @@ static int get_user_options(
               int &debug_lvl)
 {
     const std::string DEFAULT_PIO_FORMAT("pnetcdf");
-    const std::string DEFAULT_REARRANGER("subset");
+    const std::string DEFAULT_REARRANGER("any");
     debug_lvl = 0;
 
 #ifdef SPIO_NO_CXX_REGEX
