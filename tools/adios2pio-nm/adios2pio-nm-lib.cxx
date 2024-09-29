@@ -748,10 +748,17 @@ Decomposition adios2_ProcessOneDecomposition(adios2::Variable<T> &v_base,
     }
 
     size_t block_list_size = block_list.size();
-    std::vector<std::vector<int> > block_writer_cnt_all(block_list_size);
+    std::vector<size_t> block_offsets(block_list_size);
+
+    size_t total_size = 0;
     const auto blk_blocks = bpReader.BlocksInfo(blk_var, time_step);
     for (size_t i = 0; i < block_list_size; i++)
-        block_writer_cnt_all[i].resize(blk_blocks[i].Count[0]);
+    {
+        block_offsets[i] = total_size;
+        total_size += blk_blocks[i].Count[0];
+    }
+
+    std::vector<int> block_writer_cnt_all(total_size);
 
     try
     {
@@ -760,7 +767,7 @@ Decomposition adios2_ProcessOneDecomposition(adios2::Variable<T> &v_base,
         {
             blk_var.SetBlockSelection(i);
             GPTLstart("adios2pio:adios2_ProcessOneDecomposition:bpReader_Get_Deferred");
-            bpReader.Get(blk_var, block_writer_cnt_all[i].data(), adios2::Mode::Deferred);
+            bpReader.Get(blk_var, block_writer_cnt_all.data() + block_offsets[i], adios2::Mode::Deferred);
             GPTLstop("adios2pio:adios2_ProcessOneDecomposition:bpReader_Get_Deferred");
         }
 
@@ -770,7 +777,7 @@ Decomposition adios2_ProcessOneDecomposition(adios2::Variable<T> &v_base,
 
         for (size_t i = 0; i < block_list_size; i++)
         {
-            for (int k = 0; k < block_writer_cnt_all[i][0]; k++) /* number of writers */
+            for (int k = 0; k < block_writer_cnt_all[block_offsets[i]]; k++) /* number of writers */
             {
                  int writer_id = block_list[i][k];
                  writer_block_id[writer_id] = 1;  /* block written out by writer_id */
@@ -1853,9 +1860,16 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
     }
 
     size_t blk_blocks_size = blk_blocks.size();
-    std::vector<std::vector<int> > block_writer_cnt_all(blk_blocks_size);
+    std::vector<size_t> block_offsets(blk_blocks_size);
+
+    size_t total_size = 0;
     for (size_t i = 0; i < blk_blocks_size; i++)
-        block_writer_cnt_all[i].resize(blk_blocks[i].Count[0]);
+    {
+        block_offsets[i] = total_size;
+        total_size += blk_blocks[i].Count[0];
+    }
+
+    std::vector<int> block_writer_cnt_all(total_size);
 
     int b_idx = 0, t_idx = 0;
     try
@@ -1865,7 +1879,7 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
         {
             blk_var.SetBlockSelection(i);
             GPTLstart("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_Get_Deferred");
-            bpReader[0].Get(blk_var, block_writer_cnt_all[i].data(), adios2::Mode::Deferred);
+            bpReader[0].Get(blk_var, block_writer_cnt_all.data() + block_offsets[i], adios2::Mode::Deferred);
             GPTLstop("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_Get_Deferred");
         }
 
@@ -1880,9 +1894,9 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
             /* num_data_block_writers may have been written out multiple times in an adios step */
             for (int ii = 0; ii < num_bp_blocks_per_group; ii++)
             {
-                for (size_t j = 0; j < block_writer_cnt_all[b_idx].size(); j++)
+                for (size_t j = 0; j < blk_blocks[b_idx].Count[0]; j++)
                 {
-                    for (int k = 0; k < block_writer_cnt_all[b_idx][j]; k++)
+                    for (int k = 0; k < block_writer_cnt_all[block_offsets[b_idx] + j]; k++)
                     { /* number of writers at time step t_idx  */
                         int writer_id = block_list[i][k];
                         writer_block_id[writer_id][t_idx] = 1; /* block written out by writer_id at time step t_idx */
