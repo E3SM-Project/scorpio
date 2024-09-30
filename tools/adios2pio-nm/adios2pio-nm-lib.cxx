@@ -720,6 +720,7 @@ Decomposition adios2_ProcessOneDecomposition(adios2::Variable<T> &v_base,
     /* Sum the sizes of blocks assigned to this process */
     int ierr = BP2PIO_NOERR;
     int ret = PIO_NOERR;
+    int mpierr = MPI_SUCCESS;
 
     std::string v_type = bpIO.VariableType(varname);
     if (v_type.empty())
@@ -763,17 +764,27 @@ Decomposition adios2_ProcessOneDecomposition(adios2::Variable<T> &v_base,
     try
     {
         GPTLstart("adios2pio:adios2_ProcessOneDecomposition:read_hotspot");
-        for (size_t i = 0; i < block_list_size; i++)
+        if (mpirank == 0)
         {
-            blk_var.SetBlockSelection(i);
-            GPTLstart("adios2pio:adios2_ProcessOneDecomposition:bpReader_Get_Deferred");
-            bpReader.Get(blk_var, block_writer_cnt_all.data() + block_offsets[i], adios2::Mode::Deferred);
-            GPTLstop("adios2pio:adios2_ProcessOneDecomposition:bpReader_Get_Deferred");
+            for (size_t i = 0; i < block_list_size; i++)
+            {
+                blk_var.SetBlockSelection(i);
+                GPTLstart("adios2pio:adios2_ProcessOneDecomposition:bpReader_Get_Deferred");
+                bpReader.Get(blk_var, block_writer_cnt_all.data() + block_offsets[i], adios2::Mode::Deferred);
+                GPTLstop("adios2pio:adios2_ProcessOneDecomposition:bpReader_Get_Deferred");
+            }
+
+            GPTLstart("adios2pio:adios2_ProcessOneDecomposition:bpReader_PerformGets");
+            bpReader.PerformGets();
+            GPTLstop("adios2pio:adios2_ProcessOneDecomposition:bpReader_PerformGets");
         }
 
-        GPTLstart("adios2pio:adios2_ProcessOneDecomposition:bpReader_PerformGets");
-        bpReader.PerformGets();
-        GPTLstop("adios2pio:adios2_ProcessOneDecomposition:bpReader_PerformGets");
+        mpierr = MPI_Bcast(block_writer_cnt_all.data(), total_size, MPI_INT, 0, comm);
+        if (mpierr != MPI_SUCCESS)
+        {
+            fprintf(stderr, "Bcasting the number of decomposition block writers failed, mpierr = %d\n", mpierr);
+            return Decomposition{BP2PIO_ERROR, BP2PIO_ERROR};
+        }
 
         for (size_t i = 0; i < block_list_size; i++)
         {
@@ -1729,6 +1740,7 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
 {
     int ierr = BP2PIO_NOERR;
     int ret = PIO_NOERR;
+    int mpierr = MPI_SUCCESS;
 
     /* Different decompositions at different frames */
     int  decomp_id, frame_id, fillval_exist;
@@ -1875,17 +1887,27 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
     try
     {
         GPTLstart("adios2pio:adios2_ConvertVariableDarray:before_main_loop:read_hotspot");
-        for (size_t i = 0; i < blk_blocks_size; i++)
+        if (mpirank == 0)
         {
-            blk_var.SetBlockSelection(i);
-            GPTLstart("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_Get_Deferred");
-            bpReader[0].Get(blk_var, block_writer_cnt_all.data() + block_offsets[i], adios2::Mode::Deferred);
-            GPTLstop("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_Get_Deferred");
+            for (size_t i = 0; i < blk_blocks_size; i++)
+            {
+                blk_var.SetBlockSelection(i);
+                GPTLstart("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_Get_Deferred");
+                bpReader[0].Get(blk_var, block_writer_cnt_all.data() + block_offsets[i], adios2::Mode::Deferred);
+                GPTLstop("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_Get_Deferred");
+            }
+
+            GPTLstart("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_PerformGets");
+            bpReader[0].PerformGets();
+            GPTLstop("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_PerformGets");
         }
 
-        GPTLstart("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_PerformGets");
-        bpReader[0].PerformGets();
-        GPTLstop("adios2pio:adios2_ConvertVariableDarray:before_main_loop:bpReader_PerformGets");
+        mpierr = MPI_Bcast(block_writer_cnt_all.data(), total_size, MPI_INT, 0, comm);
+        if (mpierr != MPI_SUCCESS)
+        {
+            fprintf(stderr, "Bcasting the number of data block writers failed, mpierr = %d\n", mpierr);
+            return BP2PIO_ERROR;
+        }
 
         size_t block_list_size = block_list.size();
         for (size_t i = 0; i < block_list_size; i++)
