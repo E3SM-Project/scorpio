@@ -32,6 +32,7 @@
 #endif
 #include <assert.h>
 #include "spio_ltimer.h"
+#include "pio_types.hpp"
 
 #if defined(__cplusplus)
 extern "C" {
