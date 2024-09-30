@@ -848,8 +848,8 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
  * @returns 0 on success, error code otherwise.
  * @author Jim Edwards
  */
-int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
-                      void *rbuf, int nvars)
+int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file,
+                      const void *sbuf, void *rbuf, int nvars)
 {
     int ntasks;       /* Number of tasks in communicator. */
     int niotasks;     /* Number of IO tasks. */
@@ -2785,7 +2785,7 @@ void performance_tune_rearranger(iosystem_desc_t *ios, io_desc_t *iodesc)
     if ((mpierr = MPI_Barrier(mycomm)))
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
     GPTLstamp(&wall[0], &usr[0], &sys[0]);
-    rearrange_comp2io(ios, iodesc, cbuf, ibuf, 1);
+    rearrange_comp2io(ios, iodesc, file, cbuf, ibuf, 1);
     rearrange_io2comp(ios, iodesc, ibuf, cbuf);
     GPTLstamp(&wall[1], &usr[1], &sys[1]);
     mintime = wall[1]-wall[0];

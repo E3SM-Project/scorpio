@@ -336,6 +336,43 @@ typedef struct mtimer_info *mtimer_t;
 /* Forward decl of hash map used for ADIOS reads */
 struct spio_hmap;
 
+/* Fwd declaration to use back pointer to var_desc_t in viobuf_cache */
+struct var_desc_t;
+
+/** The viobuf_cache is used to cache the rearranged data for the
+ * variable. The iobuf inside the cache is freed when the data
+ * is written out.
+ */
+typedef struct viobuf_cache
+{
+    /* Pointer to user buffer, ubuf points to internal PIO
+     * buffer that caches the user data
+     */
+    void *ubuf;
+    size_t ubuf_sz;
+    /* Pointer to buffer containing the rearranged data */
+    void *iobuf;
+    size_t iobuf_sz;
+    /* Pointer to fillvalue for this iobuf */
+    void *fillvalue;
+    size_t fillvalue_sz;
+    /* Variable record/frame number corresponding to this
+     * buffer.
+     * Note: Multiple frames for a variable can be cached
+     * at a time in a list of viobuf_cache s
+     */
+    int rec_num;
+    /* Any outstanding request associated with this cache */
+    /* Used to keep track of a write request for the iobuf */
+    int req;
+    /* Back pointer to the var_desc that contains this cache */
+    struct var_desc_t *vdesc;
+    /* The next iobuf cache for this variable, each iobuf
+     * cache corresponds to a record/frame of the variable
+     */
+    struct viobuf_cache *next;
+} viobuf_cache_t;
+
 /**
  * Variable description structure.
  */
@@ -370,6 +407,11 @@ typedef struct var_desc_t
 
     /** Number of requests bending with pnetcdf. */
     int nreqs;
+
+    /** Data buffers (to store rearranged data) for this var */
+    /** Data buffers are stored in a singly linked list */
+    viobuf_cache_t *viobuf_lhead;
+    viobuf_cache_t *viobuf_ltail;
 
     /* Holds the fill value of this var. */
     void *fillvalue;
@@ -639,6 +681,42 @@ typedef struct io_desc_t
     struct io_desc_t *next;
 } io_desc_t;
 
+/**
+ * PIO asynchronous operation types
+ */
+typedef enum pio_async_op_type
+{
+    PIO_ASYNC_INVALID_OP = 0,
+    PIO_ASYNC_REARR_OP,
+    PIO_ASYNC_PNETCDF_WRITE_OP,
+    PIO_ASYNC_FILE_WRITE_OPS,
+    PIO_ASYNC_NUM_OP_TYPES
+} pio_async_op_type_t;
+
+/**
+ * PIO asynchronous op
+ */
+typedef struct pio_async_op
+{
+    pio_async_op_type_t op_type;
+    void *pdata;
+    /* Blocking wait function for this async op
+     * param 1 : A user defined data pointer
+     * return : PIO_NOERR on success, pio error code on failure
+     */
+    int (*wait)(void *);
+    /* Non-blocking function for making progress on this async op
+     * param 1 : A user defined data pointer
+     * param 2 : Pointer to a flag that is set to true if async op
+     * is complete, false otherwise
+     * return : PIO_NOERR on success, pio error code on failure
+     */
+    int (*poke)(void *, int *);
+    /* Free function for user defined pdata */
+    void (*free)(void *);
+    struct pio_async_op *next;
+} pio_async_op_t;
+
 /* Forward decl for I/O file summary stats info */
 struct spio_io_fstats_summary;
 
@@ -787,6 +865,12 @@ typedef struct iosystem_desc_t
 
     /** I/O statistics associated with this I/O system */
     struct spio_io_fstats_summary *io_fstats;
+
+    /* Number of pending async operations on this iosystem */
+    int nasync_pend_ops;
+
+    /* List of pending async operations on this iosystem */
+    pio_async_op_t *async_pend_ops;
 
     /** Pointer to the next iosystem_desc_t in the list. */
     struct iosystem_desc_t *next;
@@ -1182,6 +1266,19 @@ typedef struct file_desc_t
 
     /** I/O statistics associated with this file */
     struct spio_io_fstats_summary *io_fstats;
+
+    /* Number of pending async operations on this file */
+    int nasync_pend_ops;
+
+    /* List of pending async operations on this file */
+    pio_async_op_t *async_pend_ops;
+
+    /** Total number of pending ops on this file, including
+      * nasync_pend_ops. In the case where nasync_pend_ops == 0
+      * npend_ops shows any other pending ops (e.g. non-blocking
+      * write done of rearranged data, still need to wait 
+      * on it) */
+    int npend_ops;
 
     /** Pointer to the next file_desc_t in the list of open files. */
     struct file_desc_t *next;
