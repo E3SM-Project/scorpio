@@ -3,7 +3,7 @@
 
 #include "pio_config.h"
 #include "pio.h"
-//#include "pio_internal.h"
+#include "pio_internal.h"
 
 #if defined(__cplusplus)
 extern "C" {
