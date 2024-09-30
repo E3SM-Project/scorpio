@@ -72,7 +72,7 @@ int test_decomp1(int iosysid, int my_rank, MPI_Comm test_comm)
 
     /* The compdof array contains a mapping for this task into the
      * global data array. */
-    if (!(compdof = malloc(elements_per_pe * sizeof(PIO_Offset))))
+    if (!(compdof = (PIO_Offset *) malloc(elements_per_pe * sizeof(PIO_Offset))))
         return PIO_ENOMEM;
     for (int i = 0; i < elements_per_pe; i++)
         compdof[i] = my_rank * elements_per_pe + i + 1;

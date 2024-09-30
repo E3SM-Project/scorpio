@@ -129,8 +129,8 @@ int test_setup(MPI_Comm comm, int rank, int sz,
 
   assert((comm != MPI_COMM_NULL) && (rank >= 0) && (sz > 0) && pios && pfile);
 
-  *pios = calloc(1, sizeof(iosystem_desc_t));
-  *pfile = calloc(1, sizeof(file_desc_t));
+  *pios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t));
+  *pfile = (file_desc_t *) calloc(1, sizeof(file_desc_t));
 
   iosystem_desc_t *ios = *pios;
   file_desc_t *file = *pfile;

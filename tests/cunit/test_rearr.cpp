@@ -415,12 +415,12 @@ int test_determine_fill(MPI_Comm test_comm)
     int ret;
 
     /* Initialize ios. */
-    if (!(ios = calloc(1, sizeof(iosystem_desc_t))))
+    if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
         return PIO_ENOMEM;
     ios->union_comm = test_comm;
 
     /* Set up iodesc for test. */
-    if (!(iodesc = calloc(1, sizeof(io_desc_t))))
+    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
         return PIO_ENOMEM;
     iodesc->ndims = 1;
     iodesc->rearranger = PIO_REARR_SUBSET;
@@ -548,11 +548,11 @@ int test_define_iodesc_datatypes()
 
         /* Allocate space for arrays in iodesc that will be filled in
          * define_iodesc_datatypes(). */
-        if (!(iodesc.rcount = malloc(iodesc.nrecvs * sizeof(int))))
+        if (!(iodesc.rcount = (int *) malloc(iodesc.nrecvs * sizeof(int))))
             return PIO_ENOMEM;
-        if (!(iodesc.rfrom = malloc(iodesc.nrecvs * sizeof(int))))
+        if (!(iodesc.rfrom = (int *) malloc(iodesc.nrecvs * sizeof(int))))
             return PIO_ENOMEM;
-        if (!(iodesc.rindex = malloc(1 * sizeof(PIO_Offset))))
+        if (!(iodesc.rindex = (PIO_Offset *) malloc(1 * sizeof(PIO_Offset))))
             return PIO_ENOMEM;
         iodesc.rindex[0] = 0;
         iodesc.rcount[0] = 1;
@@ -562,9 +562,9 @@ int test_define_iodesc_datatypes()
         /* The two rearrangers create a different number of send types. */
         int num_send_types = iodesc.rearranger == PIO_REARR_BOX ? ios.num_iotasks : 1;
 
-        if (!(iodesc.sindex = malloc(num_send_types * sizeof(PIO_Offset))))
+        if (!(iodesc.sindex = (PIO_Offset *) malloc(num_send_types * sizeof(PIO_Offset))))
             return PIO_ENOMEM;
-        if (!(iodesc.scount = malloc(num_send_types * sizeof(int))))
+        if (!(iodesc.scount = (int *) malloc(num_send_types * sizeof(int))))
             return PIO_ENOMEM;
         for (int st = 0; st < num_send_types; st++)
         {
@@ -608,7 +608,7 @@ int test_compute_counts(MPI_Comm test_comm, int my_rank)
     int ret;
 
     /* Initialize ios. */
-    if (!(ios = calloc(1, sizeof(iosystem_desc_t))))
+    if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
         return PIO_ENOMEM;
 
     ios->num_iotasks = TARGET_NTASKS;
@@ -617,17 +617,17 @@ int test_compute_counts(MPI_Comm test_comm, int my_rank)
     ios->ioproc = 1;
     ios->compproc = 1;
     ios->union_comm = test_comm;
-    if (!(ios->ioranks = malloc(TARGET_NTASKS * sizeof(int))))
+    if (!(ios->ioranks = (int *) malloc(TARGET_NTASKS * sizeof(int))))
         return PIO_ENOMEM;
     for (int t = 0; t < TARGET_NTASKS; t++)
         ios->ioranks[t] = t;
-    if (!(ios->compranks = calloc(ios->num_comptasks, sizeof(int))))
+    if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for comp ranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
         ios->compranks[i] = i;
 
     /* Initialize iodesc. */
-    if (!(iodesc = calloc(1, sizeof(io_desc_t))))
+    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
         return PIO_ENOMEM;
     iodesc->rearranger = PIO_REARR_BOX;
     iodesc->ndof = TARGET_NTASKS;
@@ -700,11 +700,11 @@ int test_box_rearrange_create(MPI_Comm test_comm, int my_rank)
     int ret;
 
     /* Allocate IO system info struct for this test. */
-    if (!(ios = calloc(1, sizeof(iosystem_desc_t))))
+    if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
         return PIO_ENOMEM;
 
     /* Allocate IO desc struct for this test. */
-    if (!(iodesc = calloc(1, sizeof(io_desc_t))))
+    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
         return PIO_ENOMEM;
 
     /* Default rearranger options. */
@@ -724,11 +724,11 @@ int test_box_rearrange_create(MPI_Comm test_comm, int my_rank)
     ios->num_iotasks = 4;
     ios->num_comptasks = 4;
     ios->num_uniontasks = 4;
-    if (!(ios->ioranks = calloc(ios->num_iotasks, sizeof(int))))
+    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
         ios->ioranks[i] = i;
-    if (!(ios->compranks = calloc(ios->num_comptasks, sizeof(int))))
+    if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
         ios->compranks[i] = i;
@@ -815,11 +815,11 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
     int ret;
 
     /* Allocate IO system info struct for this test. */
-    if (!(ios = calloc(1, sizeof(iosystem_desc_t))))
+    if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
         return PIO_ENOMEM;
 
     /* Allocate IO desc struct for this test. */
-    if (!(iodesc = calloc(1, sizeof(io_desc_t))))
+    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
         return PIO_ENOMEM;
 
     /* Default rearranger options. */
@@ -842,11 +842,11 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
     ios->num_iotasks = 4;
     ios->num_comptasks = 4;
     ios->num_uniontasks = 4;
-    if (!(ios->ioranks = calloc(ios->num_iotasks, sizeof(int))))
+    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
         ios->ioranks[i] = i;
-    if (!(ios->compranks = calloc(ios->num_comptasks, sizeof(int))))
+    if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
         ios->compranks[i] = i;
@@ -931,11 +931,11 @@ int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
     int ret;
 
     /* Allocate IO system info struct for this test. */
-    if (!(ios = calloc(1, sizeof(iosystem_desc_t))))
+    if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
         return PIO_ENOMEM;
 
     /* Allocate IO desc struct for this test. */
-    if (!(iodesc = calloc(1, sizeof(io_desc_t))))
+    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
         return PIO_ENOMEM;
 
     /* Default rearranger options. */
@@ -958,11 +958,11 @@ int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
     ios->num_iotasks = TARGET_NTASKS;
     ios->num_comptasks = TARGET_NTASKS;
     ios->num_uniontasks = TARGET_NTASKS;
-    if (!(ios->ioranks = calloc(ios->num_iotasks, sizeof(int))))
+    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
     for (int i = 0; i < ios->num_iotasks; i++)
         ios->ioranks[i] = i;
-    if (!(ios->compranks = calloc(ios->num_comptasks, sizeof(int))))
+    if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < ios->num_comptasks; i++)
         ios->compranks[i] = i;
@@ -1017,11 +1017,11 @@ int test_default_subset_partition(MPI_Comm test_comm, int my_rank)
     int ret;
 
     /* Allocate IO system info struct for this test. */
-    if (!(ios = calloc(1, sizeof(iosystem_desc_t))))
+    if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
         return PIO_ENOMEM;
 
     /* Allocate IO desc struct for this test. */
-    if (!(iodesc = calloc(1, sizeof(io_desc_t))))
+    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
         return PIO_ENOMEM;
 
     ios->ioproc = 1;
@@ -1065,20 +1065,20 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
     int ret;
 
     /* Allocate some space for data. */
-    if (!(sbuf = calloc(4, sizeof(int))))
+    if (!(sbuf = (int *) calloc(4, sizeof(int))))
         return PIO_ENOMEM;
-    if (!(rbuf = calloc(4, sizeof(int))))
+    if (!(rbuf = (int *) calloc(4, sizeof(int))))
         return PIO_ENOMEM;
 
     /* Allocate IO system info struct for this test. */
-    if (!(ios = calloc(1, sizeof(iosystem_desc_t))))
+    if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
         return PIO_ENOMEM;
 
     /* Allocate IO desc struct for this test. */
-    if (!(iodesc = calloc(1, sizeof(io_desc_t))))
+    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
         return PIO_ENOMEM;
 
-    if (!(file = calloc(1, sizeof(file_desc_t))))
+    if (!(file = (file_desc_t *) calloc(1, sizeof(file_desc_t))))
         return PIO_ENOMEM;
 
     ios->ioproc = 1;
@@ -1117,11 +1117,11 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
     /* Set up the IO task info for the test. */
     ios->union_rank = my_rank;
     ios->num_comptasks = 4;
-    if (!(ios->ioranks = calloc(ios->num_iotasks, sizeof(int))))
+    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
         ios->ioranks[i] = i;
-    if (!(ios->compranks = calloc(ios->num_comptasks, sizeof(int))))
+    if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
         ios->compranks[i] = i;
@@ -1196,17 +1196,17 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
     int ret;
 
     /* Allocate some space for data. */
-    if (!(sbuf = calloc(4, sizeof(int))))
+    if (!(sbuf = (int *) calloc(4, sizeof(int))))
         return PIO_ENOMEM;
-    if (!(rbuf = calloc(4, sizeof(int))))
+    if (!(rbuf = (int *) calloc(4, sizeof(int))))
         return PIO_ENOMEM;
 
     /* Allocate IO system info struct for this test. */
-    if (!(ios = calloc(1, sizeof(iosystem_desc_t))))
+    if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
         return PIO_ENOMEM;
 
     /* Allocate IO desc struct for this test. */
-    if (!(iodesc = calloc(1, sizeof(io_desc_t))))
+    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
         return PIO_ENOMEM;
 
     ios->ioproc = 1;
@@ -1246,11 +1246,11 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
     ios->num_iotasks = 4;
     ios->num_comptasks = 4;
     ios->num_uniontasks = 4;
-    if (!(ios->ioranks = calloc(ios->num_iotasks, sizeof(int))))
+    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
         ios->ioranks[i] = i;
-    if (!(ios->compranks = calloc(ios->num_comptasks, sizeof(int))))
+    if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
         ios->compranks[i] = i;
