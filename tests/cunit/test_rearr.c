@@ -1009,6 +1009,7 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
 {
     iosystem_desc_t *ios;
     io_desc_t *iodesc;
+    file_desc_t *file;
     void *sbuf = NULL;
     void *rbuf = NULL;
     int nvars = 1;
@@ -1034,6 +1035,9 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
     if (!(iodesc = calloc(1, sizeof(io_desc_t))))
         return PIO_ENOMEM;
 
+    if (!(file = calloc(1, sizeof(file_desc_t))))
+        return PIO_ENOMEM;
+
     ios->ioproc = 1;
     ios->compproc = 1;
     ios->io_rank = my_rank;
@@ -1048,6 +1052,9 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
     iodesc->nrecvs = 1; /* Number of types created. */
     iodesc->mpitype = MPI_INT;
     iodesc->stype = NULL; /* Array of MPI types will be created here. */
+
+    file->iosystem = ios;
+    file->fh = -1;
 
     /* The two rearrangers create a different number of send types. */
     int num_send_types = iodesc->rearranger == PIO_REARR_BOX ? ios->num_iotasks : 1;
@@ -1090,7 +1097,7 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
         return ret;
 
     /* Run the function to test. */
-    if ((ret = rearrange_comp2io(ios, iodesc, sbuf, rbuf, nvars)))
+    if ((ret = rearrange_comp2io(ios, iodesc, file, sbuf, rbuf, nvars)))
         return ret;
     printf("returned from rearrange_comp2io\n");
 
