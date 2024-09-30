@@ -466,6 +466,102 @@ int pio_swapm(const void *sendbuf, const int *sendcounts, const int *sdispls, co
 }
 
 /**
+ * Non-blocking wait on swapm request
+ * @param p User swapm request (the request passed to pio_swapm() call)
+ * @param flag Pointer to a flag that holds the status of the user request.
+ * The flag is 0 if the request is pending and 1 if the request is completed
+ * @returns PIO_NOERR on success, a pio error code otherwise
+ * - Similar to MPI_Testall(), makes progress on all requests
+ */
+int pio_swapm_iwait(void *p, int *flag)
+{
+    pio_swapm_req *ureq = (pio_swapm_req *)p;
+    int mpierr;
+
+    assert((ureq != NULL) && (flag != NULL));
+    *flag = 1;
+    if(ureq->nrcvids != 0)
+    {
+        mpierr = MPI_Testall(ureq->nrcvids, ureq->rcvids, flag, MPI_STATUSES_IGNORE);
+        if(mpierr != MPI_SUCCESS)
+        {
+            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
+        }
+
+        if(*flag == 1)
+        {
+            free(ureq->rcvids);
+            ureq->nrcvids = 0;
+        }
+    }
+    if(ureq->nsndids != 0)
+    {
+        mpierr = MPI_Testall(ureq->nsndids, ureq->sndids, flag, MPI_STATUSES_IGNORE);
+        if(mpierr != MPI_SUCCESS)
+        {
+            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
+        }
+
+        if(*flag == 1)
+        {
+            free(ureq->sndids);
+            ureq->nsndids = 0;
+        }
+    }
+    return PIO_NOERR;
+}
+
+/**
+ * Blocking wait on user swapm request
+ * @param p User swapm request (the request passed to pio_swapm() call)
+ * @returns PIO_NOERR on success, a pio error code otherwise
+ * - Similar to MPI_Waitall(), waits for the request to complete
+ */
+int pio_swapm_wait(void *p)
+{
+    pio_swapm_req *ureq = (pio_swapm_req *)p;
+    int mpierr;
+
+    assert(ureq != NULL);
+    if(ureq->nrcvids != 0)
+    {
+        mpierr = MPI_Waitall(ureq->nrcvids, ureq->rcvids, MPI_STATUSES_IGNORE);
+        if(mpierr != MPI_SUCCESS)
+        {
+            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
+        }
+
+        ureq->nrcvids = 0;
+    }
+    if(ureq->nsndids != 0)
+    {
+        mpierr = MPI_Waitall(ureq->nsndids, ureq->sndids, MPI_STATUSES_IGNORE);
+        if(mpierr != MPI_SUCCESS)
+        {
+            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
+        }
+
+        ureq->nsndids = 0;
+    }
+    return PIO_NOERR;
+}
+
+/*
+ * Free a pio swapm user request
+ * @param p pointer to the pio swapm user request
+ */
+void pio_swapm_req_free(void *p)
+{
+    pio_swapm_req *ureq = (pio_swapm_req *)p;
+    if(ureq != NULL)
+    {
+        free(ureq->rcvids);
+        free(ureq->sndids);
+        free(ureq);
+    }
+}
+
+/**
  * Provides the functionality of MPI_Gatherv with flow control
  * options. This function is not currently used, but we hope it will
  * be useful in future optimizations.
