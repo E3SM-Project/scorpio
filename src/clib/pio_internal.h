@@ -70,6 +70,16 @@ extern "C" {
         bool isend;
     } pio_swapm_defaults;
 
+    /** swapm request */
+    typedef struct pio_swapm_req
+    {
+        MPI_Request *rcvids;
+        int nrcvids;
+
+        MPI_Request *sndids;
+        int nsndids;
+    } pio_swapm_req;
+
     /* Handle an error in the PIO library. */
 #ifdef __GNUC__
     /* Specify that pio_err() uses printf style formatting. This
@@ -128,6 +138,9 @@ extern "C" {
     int openfile_int(int iosysid, int *ncidp, int *iotype, const char *filename,
                      int mode, int retry);
 
+    /* Close the file ("hard close") */
+    int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file, bool sync_with_ioprocs);
+
     iosystem_desc_t *pio_get_iosystem_from_id(int iosysid);
     int pio_add_to_iosystem_list(iosystem_desc_t *ios, MPI_Comm comm);
 
@@ -180,6 +193,15 @@ extern "C" {
                   void *recvbuf, const int *recvcounts, const int *rdispls, const MPI_Datatype *recvtypes,
                   MPI_Comm comm, const rearr_comm_fc_opt_t *fc);
 
+    /* Non blocking wait for pio swapm user request */
+    int pio_swapm_iwait(void *p, int *flag);
+
+    /* Blocking wait for pio swapm user request */
+    int pio_swapm_wait(void *p);
+
+    /* Free a pio swapm request */
+    void pio_swapm_req_free(void *p);
+
     void PIO_Offset_size(MPI_Datatype *dtype, int *tsize);
     PIO_Offset GCDblocksize(int arrlen, const PIO_Offset *arr_in);
 
@@ -228,8 +250,8 @@ extern "C" {
     int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf, void *rbuf);
 
     /* Move data from compute tasks to IO tasks. */
-    int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf, void *rbuf,
-                          int nvars);
+    int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file,
+                          const void *sbuf, void *rbuf, int nvars);
 
     /* Allocate and initialize storage for decomposition information. */
     int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims, io_desc_t **iodesc);
