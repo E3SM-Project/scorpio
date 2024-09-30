@@ -104,7 +104,7 @@ int test_no_async2(int my_rank, int num_flavors, int *flavor, MPI_Comm test_comm
 
     /* Describe the decomposition. This is a 0-based array, so don't add 1! */
     elements_per_pe = x_dim_len * y_dim_len / target_ntasks;
-    if (!(compdof = malloc(elements_per_pe * sizeof(PIO_Offset))))
+    if (!(compdof = (PIO_Offset *) malloc(elements_per_pe * sizeof(PIO_Offset))))
         return PIO_ENOMEM;
     for (int i = 0; i < elements_per_pe; i++)
         compdof[i] = my_rank * elements_per_pe + i;

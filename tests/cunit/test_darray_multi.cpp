@@ -275,7 +275,7 @@ int test_darray(int iosysid, int ioid, int num_flavors, int *flavor, int my_rank
 
                 /* Write the data with the _multi function. */
                 if ((ret = PIOc_write_darray_multi(ncid, varid, ioid, NVAR, arraylen, test_data, frame,
-                                                   fillvalue, flushtodisk)))
+                                                   (const void **)&fillvalue, flushtodisk)))
                     ERR(ret);
 
                 /* Close the netCDF file. */

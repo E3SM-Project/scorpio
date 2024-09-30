@@ -97,7 +97,7 @@ int create_decomposition(int ntasks, int my_rank, int iosysid, int dim1_len, int
     elements_per_pe = dim1_len / ntasks;
 
     /* Allocate space for the decomposition array. */
-    if (!(compdof = malloc(elements_per_pe * sizeof(PIO_Offset))))
+    if (!(compdof = (PIO_Offset *) malloc(elements_per_pe * sizeof(PIO_Offset))))
         return PIO_ENOMEM;
 
     /* Describe the decomposition. The new init_decomp uses a 0-based
@@ -464,24 +464,24 @@ int check_error_strings(int my_rank, int num_tries, int *errcode,
     int ret;
 
     /* Try each test code. */
-    for (int try = 0; try < num_tries; try++)
+    for (int i = 0; i < num_tries; i++)
     {
         char errstr[PIO_MAX_NAME + 1];
 
         /* Get the error string for this errcode. */
-        if ((ret = PIOc_strerror(errcode[try], errstr, PIO_MAX_NAME)))
+        if ((ret = PIOc_strerror(errcode[i], errstr, PIO_MAX_NAME)))
             return ret;
 
-        printf("%d for errcode = %d message = %s\n", my_rank, errcode[try], errstr);
+        printf("%d for errcode = %d message = %s\n", my_rank, errcode[i], errstr);
 
         /* Check that it was as expected. */
-        if (strncmp(errstr, expected[try], strlen(expected[try])))
+        if (strncmp(errstr, expected[i], strlen(expected[i])))
         {
-            printf("%d expected %s got %s\n", my_rank, expected[try], errstr);
+            printf("%d expected %s got %s\n", my_rank, expected[i], errstr);
             return ERR_AWFUL;
         }
         if (!my_rank)
-            printf("%d errcode = %d passed\n", my_rank, errcode[try]);
+            printf("%d errcode = %d passed\n", my_rank, errcode[i]);
     }
 
     return PIO_NOERR;
