@@ -180,27 +180,27 @@ int test_darray(int iosysid, int ioid, int num_flavors, int *flavor, int my_rank
 
                     /* These will not work. */
                     if (PIOc_write_darray_multi(ncid + TEST_VAL_42, &varid, ioid, 1, arraylen, test_data, &frame,
-                                                fillvalue, flushtodisk) != PIO_EBADID)
+                                                (const void **) &fillvalue, flushtodisk) != PIO_EBADID)
                         ERR(ERR_WRONG);
                     if (PIOc_write_darray_multi(ncid, NULL, ioid, 1, arraylen, test_data, &frame,
-                                                fillvalue, flushtodisk) != PIO_EINVAL)
+                                                (const void **) &fillvalue, flushtodisk) != PIO_EINVAL)
                         ERR(ERR_WRONG);
                     if (PIOc_write_darray_multi(ncid, &varid, ioid + TEST_VAL_42, 1, arraylen, test_data, &frame,
-                                                fillvalue, flushtodisk) != PIO_EBADID)
+                                                (const void **) &fillvalue, flushtodisk) != PIO_EBADID)
                         ERR(ERR_WRONG);
                     if (PIOc_write_darray_multi(ncid, &varid, ioid, -1, arraylen, test_data, &frame,
-                                                fillvalue, flushtodisk) != PIO_EINVAL)
+                                                (const void **) &fillvalue, flushtodisk) != PIO_EINVAL)
                         ERR(ERR_WRONG);
                     /* if (PIOc_write_darray_multi(ncid, &varid, ioid, 1, arraylen, test_data, NULL, */
-                    /*                             fillvalue, flushtodisk) != PIO_EINVAL) */
+                    /*                             &fillvalue, flushtodisk) != PIO_EINVAL) */
                     /*     ERR(ERR_WRONG); */
                     if (PIOc_write_darray_multi(ncid, &varid_big, ioid, 1, arraylen, test_data, &frame,
-                                                fillvalue, flushtodisk) != PIO_EINVAL)
+                                                (const void **) &fillvalue, flushtodisk) != PIO_EINVAL)
                         ERR(ERR_WRONG);
                 
                     /* Write the data with the _multi function. */
                     if ((ret = PIOc_write_darray_multi(ncid, &varid, ioid, 1, arraylen, test_data, &frame,
-                                                       fillvalue, flushtodisk)))
+                                                       (const void **) &fillvalue, flushtodisk)))
                         ERR(ret);
                 }
 
@@ -259,7 +259,7 @@ int test_darray(int iosysid, int ioid, int num_flavors, int *flavor, int my_rank
                 else
                 {
                     if (PIOc_write_darray_multi(ncid2, &varid, ioid, 1, arraylen, test_data, &frame,
-                                                fillvalue, flushtodisk) != PIO_EPERM)
+                                                (const void **) &fillvalue, flushtodisk) != PIO_EPERM)
                         ERR(ERR_WRONG);
                 }
         

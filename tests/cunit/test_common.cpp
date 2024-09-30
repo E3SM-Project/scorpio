@@ -1149,7 +1149,7 @@ int create_decomposition_2d(int ntasks, int my_rank, int iosysid, int *dim_len_2
     elements_per_pe = dim_len_2d[0] * dim_len_2d[1] / ntasks;
 
     /* Allocate space for the decomposition array. */
-    if (!(compdof = malloc(elements_per_pe * sizeof(PIO_Offset))))
+    if (!(compdof = (PIO_Offset *) malloc(elements_per_pe * sizeof(PIO_Offset))))
         return PIO_ENOMEM;
 
     /* Describe the decomposition. This is a 1-based array, so add 1! */
