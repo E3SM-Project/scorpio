@@ -33,15 +33,21 @@ set (pio_api_src
   api/spio_put_varm_api.cpp
   api/spio_put_vars_api.cpp)
 
-
-# Add sources for libpioc.a
-add_library (pioc ${pio_api_src}
+# PIO lib source
+set (pio_lib_src
   topology.cpp pio_mpi_timer.cpp pio_timer.cpp pio_file.cpp
   pioc_support.cpp pio_lists.cpp pio_print.cpp
   pioc.cpp pioc_sc.cpp pio_spmd.cpp pio_rearrange.cpp pio_nc4.cpp bget.cpp
   pio_nc.cpp pio_put_nc.cpp pio_get_nc.cpp pio_getput_int.cpp pio_msg.cpp pio_varm.cpp
   pio_darray.cpp pio_darray_int.cpp spio_hash.cpp pio_sdecomps_regex.cpp spio_io_summary.cpp
   spio_ltimer.cpp spio_serializer.cpp spio_file_mvcache.cpp spio_tracer.cpp spio_rearrange_any.cpp)
+
+if(PIO_USE_ASYNC_WR_THREAD)
+  list(APPEND pio_lib_src spio_async_tpool.cpp spio_async_utils.cpp)
+endif()
+
+# Add sources for libpioc.a
+add_library (pioc ${pio_api_src} ${pio_lib_src})
 
 #==============================================================================
 #  FIND EXTERNAL LIBRARIES/DEPENDENCIES

@@ -384,7 +384,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     }
 
     /* Move data from compute to IO tasks. */
-    if ((ierr = rearrange_comp2io(ios, iodesc, array, mv_iobuf, nvars)))
+    if ((ierr = rearrange_comp2io(ios, iodesc, file, array, mv_iobuf, nvars)))
     {
         GPTLstop("PIO:PIOc_write_darray_multi");
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
