@@ -100,7 +100,7 @@ int check_file(MPI_Comm comm, int iosysid, int format, int ncid, char *filename,
 
     /* Check the attribute. Null terminating byte deliberately ignored
      * to match fortran code. */
-    if (!(att_data = malloc(strlen(filename) * sizeof(char))))
+    if (!(att_data = (char *) malloc(strlen(filename) * sizeof(char))))
         return PIO_ENOMEM;
     if ((ret = PIOc_get_att(ncid, varid, attname, att_data)))
         return ret;

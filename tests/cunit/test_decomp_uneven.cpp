@@ -61,7 +61,7 @@ int create_decomposition_3d(int ntasks, int my_rank, int iosysid, int *dim_len,
     printf("%d elements_per_pe = %lld remainder = %lld\n", my_rank, elements_per_pe, remainder);
 
     /* Allocate space for the decomposition array. */
-    if (!(compdof = malloc(elements_per_pe * sizeof(PIO_Offset))))
+    if (!(compdof = (PIO_Offset *)malloc(elements_per_pe * sizeof(PIO_Offset))))
         return PIO_ENOMEM;
 
     /* Describe the decomposition. */
