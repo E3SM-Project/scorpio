@@ -445,6 +445,28 @@ static int sync_file(int ncid)
     return PIO_NOERR;
 }
 
+/* Close the file ("hard close")
+ * @param ios: Pointer to the iosystem_desc
+ * @param file: Pointer to the file_desc for the file
+ * @returns PIO_NOERR for success, a pio error code otherwise
+ */
+int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
+      bool sync_with_ioprocs)
+{
+  assert(0);
+}
+
+/* "Soft close" the file
+ * The function assumes that only writes are pending on this file
+ * @param ios: Pointer to the iosystem_desc
+ * @param file: Pointer to the file_desc for the file
+ * @returns PIO_NOERR for success, a pio error code otherwise
+ */
+int PIO_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
+{
+  assert(0);
+}
+
 /**
  * Close a file previously opened with PIO.
  *
