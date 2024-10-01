@@ -753,7 +753,9 @@ Decomposition adios2_ProcessOneDecomposition(adios2::Variable<T> &v_base,
         for (size_t i = 0; i < block_list.size(); i++)
         {
             blk_var.SetBlockSelection(i);
+            GPTLstart("adios2pio:adios2_ProcessOneDecomposition:blk_var_Get_Sync");
             bpReader.Get(blk_var, block_writer_cnt, adios2::Mode::Sync);
+            GPTLstop("adios2pio:adios2_ProcessOneDecomposition:blk_var_Get_Sync");
             for (int k = 0; k < block_writer_cnt[0]; k++) /* number of writers */
             {
                  int writer_id = block_list[i][k];
@@ -821,7 +823,9 @@ Decomposition adios2_ProcessOneDecomposition(adios2::Variable<T> &v_base,
                 if (bp_block_id >= 0)
                 {
                     v_base.SetBlockSelection(bp_block_id);
+                    GPTLstart("adios2pio:adios2_ProcessOneDecomposition:v_base_Get_Sync");
                     bpReader.Get(v_base, v_data, adios2::Mode::Sync);
+                    GPTLstop("adios2pio:adios2_ProcessOneDecomposition:v_base_Get_Sync");
                     d_out.insert(d_out.end(), v_data.begin(), v_data.end());
                 }
             }
@@ -1160,7 +1164,9 @@ void ProcessDimensions(adios2::IO &bpIO, adios2::Engine &bpReader, int ncid,
                     std::vector<T> dimval; \
                     try \
                     { \
+                        GPTLstart("adios2pio:ProcessDimensions:v_base_Get_Sync"); \
                         bpReader.Get(v_base, dimval, adios2::Mode::Sync); \
+                        GPTLstop("adios2pio:ProcessDimensions:v_base_Get_Sync"); \
                     } \
                     catch (const std::exception &e) \
                     { \
@@ -1395,7 +1401,9 @@ int adios2_ConvertVariablePutVar(adios2::Variable<T> &v_base,
         std::vector<T> v_value;
         try
         {
+            GPTLstart("adios2pio:adios2_ConvertVariablePutVar:v_base_Get_Sync");
             bpReader.Get(v_base, v_value, adios2::Mode::Sync);
+            GPTLstop("adios2pio:adios2_ConvertVariablePutVar:v_base_Get_Sync");
         }
         catch (const std::exception &e)
         {
@@ -1436,7 +1444,9 @@ int adios2_ConvertVariablePutVar(adios2::Variable<T> &v_base,
             {
                 std::vector<T> v_data;
                 v_base.SetBlockSelection(ii);
+                GPTLstart("adios2pio:adios2_ConvertVariablePutVar:v_base_Get_Sync");
                 bpReader.Get(v_base, v_data, adios2::Mode::Sync);
+                GPTLstop("adios2pio:adios2_ConvertVariablePutVar:v_base_Get_Sync");
 
                 int64_t *pio_var_startp, *pio_var_countp;
                 char *data_buf;
@@ -1595,7 +1605,9 @@ int adios2_ConvertVariableTimedPutVar(adios2::Variable<T> &v_base,
 
                 std::vector<T> v_data;
                 v_base.SetBlockSelection(ts);
+                GPTLstart("adios2pio:adios2_ConvertVariableTimedPutVar:v_base_Get_Sync");
                 bpReader.Get(v_base, v_data, adios2::Mode::Sync);
+                GPTLstop("adios2pio:adios2_ConvertVariableTimedPutVar:v_base_Get_Sync");
 
                 int64_t *pio_var_startp, *pio_var_countp;
                 char *data_buf;
@@ -1752,7 +1764,9 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
         for (size_t i = 0; i < vb_blocks.size(); i++)
         {
             frameid_var.SetBlockSelection(i);
+            GPTLstart("adios2pio:adios2_ConvertVariableDarray:frameid_var_Get_Sync");
             bpReader[0].Get(frameid_var, frame_buffer+tmp_idx, adios2::Mode::Sync);
+            GPTLstop("adios2pio:adios2_ConvertVariableDarray:frameid_var_Get_Sync");
             tmp_idx += vb_blocks[i].Count[0];
         }
 
@@ -1770,7 +1784,9 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
         for (size_t i = 0; i < db_blocks.size(); i++)
         {
             decompid_var.SetBlockSelection(i);
+            GPTLstart("adios2pio:adios2_ConvertVariableDarray:decompid_var_Get_Sync");
             bpReader[0].Get(decompid_var, decomp_buffer + tmp_idx, adios2::Mode::Sync);
+            GPTLstop("adios2pio:adios2_ConvertVariableDarray:decompid_var_Get_Sync");
             tmp_idx += db_blocks[i].Count[0];
         }
 
@@ -1788,7 +1804,9 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
             for (size_t i = 0; i < fb_blocks.size(); i++)
             {
                 fillval_var.SetBlockSelection(i);
+                GPTLstart("adios2pio:adios2_ConvertVariableDarray:fillval_var_Get_Sync");
                 bpReader[0].Get(fillval_var, fb_tmp, adios2::Mode::Sync);
+                GPTLstop("adios2pio:adios2_ConvertVariableDarray:fillval_var_Get_Sync");
                 fb_tmp_size = fb_tmp.size() * sizeof(T);
                 memcpy(fillval_buffer + tmp_idx, fb_tmp.data(), fb_tmp_size);
                 tmp_idx += fb_tmp_size;
@@ -1846,7 +1864,9 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
             for (int ii = 0; ii < num_bp_blocks_per_group; ii++)
             {
                 blk_var.SetBlockSelection(b_idx);
+                GPTLstart("adios2pio:adios2_ConvertVariableDarray:blk_var_Get_Sync");
                 bpReader[0].Get(blk_var, block_writer_cnt, adios2::Mode::Sync);
+                GPTLstop("adios2pio:adios2_ConvertVariableDarray:blk_var_Get_Sync");
                 for (size_t j = 0; j < block_writer_cnt.size(); j++)
                 {
                     for (int k = 0; k < block_writer_cnt[j]; k++)
@@ -1946,7 +1966,9 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
                     if (bp_block_id >= 0)
                     {
                         v_base.SetBlockSelection(bp_block_id);
+                        GPTLstart("adios2pio:adios2_ConvertVariableDarray:v_base_Get_Sync");
                         bpReader[0].Get(v_base, t_data + offset, adios2::Mode::Sync);
+                        GPTLstop("adios2pio:adios2_ConvertVariableDarray:v_base_Get_Sync");
                         offset += (vb_blocks[bp_block_id].Count[0]);
                     }
                 }
@@ -2225,6 +2247,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
 
     try
     {
+        GPTLstart("adios2pio:ConvertBPFile");
         t1 = MPI_Wtime();
 
         /* Allocate IO and Engine and open BP4 file */
@@ -2245,7 +2268,9 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         adios2::Variable<int> bpNProc = bpIO[0].InquireVariable<int>("/__pio__/info/nproc");
         if (bpNProc)
         {
+            GPTLstart("adios2pio:ConvertBPFile:bpNProc_Get_Sync");
             bpReader[0].Get(bpNProc, &n_bp_writers, adios2::Mode::Sync);
+            GPTLstop("adios2pio:ConvertBPFile:bpNProc_Get_Sync");
         }
         else
         {
@@ -2257,7 +2282,9 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         adios2::Variable<int> bpDecompStored = bpIO[0].InquireVariable<int>("/__pio__/info/decomp_stored");
         if (bpDecompStored)
         {
+            GPTLstart("adios2pio:ConvertBPFile:bpDecompStored_Get_Sync");
             bpReader[0].Get(bpDecompStored, &decomp_stored_flag, adios2::Mode::Sync);
+            GPTLstop("adios2pio:ConvertBPFile:bpDecompStored_Get_Sync");
             assert(decomp_stored_flag == 0 || decomp_stored_flag == 1);
         }
         else
@@ -2283,7 +2310,9 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
             for (size_t i = 0; i < v_blocks.size(); i++)
             {
                 blockProcs.SetBlockSelection(i);
+                GPTLstart("adios2pio:ConvertBPFile:blockProcs_Get_Sync");
                 bpReader[0].Get(blockProcs, &block_procs[i], adios2::Mode::Sync);
+                GPTLstop("adios2pio:ConvertBPFile:blockProcs_Get_Sync");
             }
         }
         else
@@ -2301,7 +2330,9 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
             for (size_t i = 0; i < v_blocks.size(); i++)
             {
                 blockList.SetBlockSelection(i);
+                GPTLstart("adios2pio:ConvertBPFile:blockList_Get_Sync");
                 bpReader[0].Get(blockList, block_list[i], adios2::Mode::Sync);
+                GPTLstop("adios2pio:ConvertBPFile:blockList_Get_Sync");
             }
         }
         else
@@ -2313,7 +2344,9 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         t_loop += (MPI_Wtime() - t1_loop);
 
         int io_proc;
+        GPTLstart("adios2pio:ConvertBPFile:CreateIOProcessGroup");
         ierr = CreateIOProcessGroup(w_comm, w_nproc, w_mpirank, block_procs, &comm, &mpirank, &nproc, &io_proc);
+        GPTLstop("adios2pio:ConvertBPFile:CreateIOProcessGroup");
         if (ierr != BP2PIO_NOERR)
             return ierr;
 
@@ -2497,6 +2530,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
                  << " at " << __func__ << ":" << __LINE__ << endl;
             ierr = BP2PIO_ERROR;
         }
+        GPTLstop("adios2pio:ConvertBPFile");
 
         ret = PIOc_finalize(iosysid);
         if (ret != PIO_NOERR)
