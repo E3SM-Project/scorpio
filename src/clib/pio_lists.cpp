@@ -2,23 +2,33 @@
  * @file
  * PIO list functions.
  */
+#include <map>
+#include <stdexcept>
+#include <cstring>
+#include <cstdio>
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
 #ifdef PIO_MICRO_TIMING
 #include "pio_timer.h"
 #endif
-#include <string.h>
-#include <stdio.h>
 #include "spio_file_mvcache.h"
 #include "spio_io_summary.h"
 #include "spio_hash.h"
 
-static io_desc_t *pio_iodesc_list = NULL;
-static io_desc_t *current_iodesc = NULL;
-static iosystem_desc_t *pio_iosystem_list = NULL;
-static file_desc_t *pio_file_list = NULL;
-static file_desc_t *current_file = NULL;
+namespace SPIO_Util{
+  namespace SPIO_Lists{
+    namespace GVars{
+      std::map<int, io_desc_t *> pio_iodesc_list;
+      std::map<int, iosystem_desc_t *> pio_iosystem_list;
+      std::map<int, file_desc_t *> pio_file_list;
+    }
+  }
+}
+
+/* Arbitrary start ids for structures */
+const int PIO_FILE_START_ID = 16;
+const int PIO_IOSYSTEM_START_ID = 2048;
 
 /** 
  * Add a new entry to the global list of open files.
@@ -26,174 +36,141 @@ static file_desc_t *current_file = NULL;
  * This function guarantees that files (id of the
  * files) are unique across the comm provided
  *
- * @param file pointer to the file_desc_t struct for the new file.
+ * @param file Pointer to the file_desc_t struct for the file.
  * @param comm MPI Communicator across which the files
  * need to be unique
  * @returns The id for the file added to the list
  */
-#define PIO_FILE_START_ID 16
 int pio_add_to_file_list(file_desc_t *file, MPI_Comm comm)
 {
-    /* Using an arbitrary start id for file ids helps
-     * in debugging, to distinguish between ids assigned
-     * to different structures in the code
-     * Also note that NetCDF ids start at 4, PnetCDF ids
-     * start at 0 and NetCDF4 ids start at 65xxx
-     */
-    static int pio_file_next_id = PIO_FILE_START_ID;
-    file_desc_t *cfile;
+  static int pio_file_next_id = PIO_FILE_START_ID;
 
-    assert(file);
+  assert(file);
+  LOG((2, "pio_add_to_file_list file = %p", file));
 
-    if(comm != MPI_COMM_NULL)
-    {
-        int tmp_id = pio_file_next_id;
-        int mpierr = MPI_Allreduce(&tmp_id, &pio_file_next_id, 1, MPI_INT, MPI_MAX, comm);
-        assert(mpierr == MPI_SUCCESS);
-    }
-    file->pio_ncid = pio_file_next_id;
-    pio_file_next_id++;
-    /* This file will be at the end of the list, and have no next. */
-    file->next = NULL;
+  if(comm != MPI_COMM_NULL){
+    int tmp_id = pio_file_next_id;
+    int mpierr = MPI_Allreduce(&tmp_id, &pio_file_next_id, 1, MPI_INT, MPI_MAX, comm);
+    assert(mpierr == MPI_SUCCESS);
+  }
+  file->pio_ncid = pio_file_next_id;
+  pio_file_next_id++;
 
-    /* Get a pointer to the global list of files. */
-    cfile = pio_file_list;
+  SPIO_Util::SPIO_Lists::GVars::pio_file_list.insert({file->pio_ncid, file});
+  LOG((2, "file %p (%s, pio_ncid=%d) added to list",
+      file, pio_get_fname_from_file(file), file->pio_ncid));
 
-    /* Keep a global pointer to the current file. */
-    current_file = file;
-
-    /* If there is nothing in the list, then file will be the first
-     * entry. Otherwise, move to end of the list. */
-    if (!cfile)
-        pio_file_list = file;
-    else
-    {
-        while (cfile->next)
-            cfile = cfile->next;
-        cfile->next = file;
-    }
-
-    return file->pio_ncid;
+  return file->pio_ncid;
 }
 
 /** 
- * Given ncid, find the file_desc_t data for an open file. The ncid
- * used is the interally generated pio_ncid.
+ * Get the file structure (file_desc_t) associated with the file id
  *
- * @param ncid the PIO assigned ncid of the open file.
- * @param cfile1 pointer to a pointer to a file_desc_t. The pointer
- * will get a copy of the pointer to the file info.
+ * @param ncid The file id associated with the file being looked up
+ * @param pfile Pointer to the file structure pointer to contain the
+ * returned file structure pointer
  *
  * @returns 0 for success, error code otherwise.
- * @author Ed Hartnett
  */
-int pio_get_file(int ncid, file_desc_t **cfile1)
+int pio_get_file(int ncid, file_desc_t **pfile)
 {
-    file_desc_t *cfile = NULL;
+  LOG((2, "pio_get_file ncid = %d", ncid));
 
-    LOG((2, "pio_get_file ncid = %d", ncid));
+  file_desc_t *file = NULL;
 
-    /* Caller must provide this. */
-    if (!cfile1)
-        return PIO_EINVAL;
+  if(ncid == PIO_GLOBAL){
+    /* Don't handle error, return a pio_err(), here since this function is called for
+     * PIO_GLOBAL and in that case is handled by the caller */
+    return PIO_EBADID;
+  }
 
-    /* Find the file pointer. */
-    if (current_file && current_file->pio_ncid == ncid)
-        cfile = current_file;
-    else
-        for (cfile = pio_file_list; cfile; cfile = cfile->next)
-            if (cfile->pio_ncid == ncid)
-            {
-                current_file = cfile;
-                break;
-            }
+  try{
+    file = SPIO_Util::SPIO_Lists::GVars::pio_file_list.at(ncid);  
+  } catch(const std::out_of_range &e){
+    return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
+                    "Searching for file (ncid=%d) in internal file list failed. Invalid file id provided", ncid);
+  }
 
-    /* If not found, return error. */
-    if (!cfile)
-        return PIO_EBADID;
+  if(pfile){
+    assert(file && file->iosystem && iotype_is_valid(file->iotype));
+    *pfile = file;
+  }
 
-    /* We depend on every file having a pointer to the iosystem. */
-    if (!cfile->iosystem)
-        return PIO_EINVAL;
+  return PIO_NOERR;
+}
 
-    /* Let's just ensure we have a valid IO type. */
-    pioassert(iotype_is_valid(cfile->iotype), "invalid IO type", __FILE__, __LINE__);
+/** 
+ * Free a file structure (file_desc_t)
+ *
+ * @param file Pointer to the file structure (file_desc_t)
+ * associated with the file
+ * @returns 0 for success, error code otherwise
+ */
+int pio_free_file(file_desc_t *file)
+{
+  assert(file);
 
-    /* Copy pointer to file info. */
-    *cfile1 = cfile;
+  LOG((2, "pio_free_file(%s, ncid=%d)", pio_get_fname_from_file(file), file->pio_ncid));
+  /* Free any fill values that were allocated. */
+  for (int v = 0; v < PIO_MAX_VARS; v++){
+    if (file->varlist[v].fillvalue){
+      free(file->varlist[v].fillvalue);
+    }
+#ifdef PIO_MICRO_TIMING
+    mtimer_destroy(&(file->varlist[v].rd_mtimer));
+    mtimer_destroy(&(file->varlist[v].rd_rearr_mtimer));
+    mtimer_destroy(&(file->varlist[v].wr_mtimer));
+    mtimer_destroy(&(file->varlist[v].wr_rearr_mtimer));
+#endif
+  }
 
-    return PIO_NOERR;
+  free(file->unlim_dimids);
+  free(file->io_fstats);
+  spio_file_mvcache_finalize(file);
+
+#ifdef _ADIOS2
+  if (file->cache_data_blocks != NULL){
+    /* This call also frees file->cache_data_blocks */
+    file->cache_data_blocks->free(file->cache_data_blocks);
+  }
+
+  if (file->cache_block_sizes != NULL){
+    /* This call also frees file->cache_block_sizes */
+    file->cache_block_sizes->free(file->cache_block_sizes);
+  }
+
+  if (file->cache_darray_info != NULL){
+    /* This call also frees file->cache_darray_info */
+    file->cache_darray_info->free(file->cache_darray_info);
+  }
+#endif
+
+  /* Free the memory used for this file. */
+  free(file);
+  
+  return PIO_NOERR;
 }
 
 /** 
  * Delete a file from the list of open files.
+ * Note: The file is deleted from the list & freed
  *
- * @param ncid ID of file to delete from list
+ * @param ncid The file id associated with the file to be deleted
  * @returns 0 for success, error code otherwise
- * @author Jim Edwards, Ed Hartnett
  */
 int pio_delete_file_from_list(int ncid)
 {
-    file_desc_t *cfile, *pfile = NULL;
+  LOG((2, "pio_delete_file_from_list(ncid=%d)", ncid));
+  std::map<int, file_desc_t *>::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_file_list.find(ncid);
+  if(iter == SPIO_Util::SPIO_Lists::GVars::pio_file_list.end()){
+    return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
+                    "Deleting file (ncid=%d) from internal list failed. Invalid file id provided", ncid);
+  }
 
-    /* Look through list of open files. */
-    for (cfile = pio_file_list; cfile; cfile = cfile->next)
-    {
-        if (cfile->pio_ncid == ncid)
-        {
-            if (!pfile)
-                pio_file_list = cfile->next;
-            else
-                pfile->next = cfile->next;
+  file_desc_t *file = (*iter).second;
+  SPIO_Util::SPIO_Lists::GVars::pio_file_list.erase(iter);
 
-            if (current_file == cfile)
-                current_file = pfile;
-
-            /* Free any fill values that were allocated. */
-            for (int v = 0; v < PIO_MAX_VARS; v++)
-            {
-                if (cfile->varlist[v].fillvalue)
-                    free(cfile->varlist[v].fillvalue);
-#ifdef PIO_MICRO_TIMING
-                mtimer_destroy(&(cfile->varlist[v].rd_mtimer));
-                mtimer_destroy(&(cfile->varlist[v].rd_rearr_mtimer));
-                mtimer_destroy(&(cfile->varlist[v].wr_mtimer));
-                mtimer_destroy(&(cfile->varlist[v].wr_rearr_mtimer));
-#endif
-            }
-
-            free(cfile->unlim_dimids);
-            free(cfile->io_fstats);
-            spio_file_mvcache_finalize(cfile);
-            /* Free the memory used for this file. */
-#ifdef _ADIOS2
-            if (cfile->cache_data_blocks != NULL)
-            {
-                /* This call also frees cfile->cache_data_blocks */
-                cfile->cache_data_blocks->free(cfile->cache_data_blocks);
-            }
-
-            if (cfile->cache_block_sizes != NULL)
-            {
-                /* This call also frees cfile->cache_block_sizes */
-                cfile->cache_block_sizes->free(cfile->cache_block_sizes);
-            }
-
-            if (cfile->cache_darray_info != NULL)
-            {
-                /* This call also frees cfile->cache_darray_info */
-                cfile->cache_darray_info->free(cfile->cache_darray_info);
-            }
-#endif
-            free(cfile);
-            
-            return PIO_NOERR;
-        }
-        pfile = cfile;
-    }
-
-    /* No file was found. */
-    return PIO_EBADID;
+  return pio_free_file(file);
 }
 
 /** Print I/O stats for all files in the iosystem
@@ -211,239 +188,182 @@ int pio_delete_file_from_list(int ncid)
  */
 int spio_write_all_file_iostats(iosystem_desc_t *iosysp)
 {
-    int ret = PIO_NOERR;
-    for(file_desc_t *pf = pio_file_list; pf; pf = pf->next)
-    {
-        if(pf->iosystem == iosysp)
-        {
-            assert(pf->iosystem->iosysid == iosysp->iosysid);
-            ret = spio_write_file_io_summary(pf);
-            if(ret != PIO_NOERR)
-            {
-                return ret;
-            }
-        }
+  for(std::map<int, file_desc_t *>::iterator iter =
+        SPIO_Util::SPIO_Lists::GVars::pio_file_list.begin();
+      iter != SPIO_Util::SPIO_Lists::GVars::pio_file_list.end(); ++iter){
+    if(iter->second->iosystem == iosysp){
+      assert(iter->second->iosystem->iosysid == iosysp->iosysid);
+      return spio_write_file_io_summary(iter->second);
     }
-    return ret;
+  }
+  return PIO_NOERR;
 }
 
 /** 
- * Delete iosystem info from list.
+ * Delete iosystem (iosytem_desc_t) from the global list of
+ * available iosystems
  *
- * @param piosysid the iosysid to delete
+ * @param iosysid The id of the iosystem to delete
  * @returns 0 on success, error code otherwise
- * @author Jim Edwards
  */
-int pio_delete_iosystem_from_list(int piosysid)
+int pio_delete_iosystem_from_list(int iosysid)
 {
-    iosystem_desc_t *ciosystem, *piosystem = NULL;
-
-    LOG((1, "pio_delete_iosystem_from_list piosysid = %d", piosysid));
-
-    for (ciosystem = pio_iosystem_list; ciosystem; ciosystem = ciosystem->next)
-    {
-        LOG((3, "ciosystem->iosysid = %d", ciosystem->iosysid));
-        if (ciosystem->iosysid == piosysid)
-        {
-            if (piosystem == NULL)
-                pio_iosystem_list = ciosystem->next;
-            else
-                piosystem->next = ciosystem->next;
-            free(ciosystem);
-            return PIO_NOERR;
-        }
-        piosystem = ciosystem;
-    }
-    return PIO_EBADID;
+  LOG((2, "pio_delete_iosystem_from_list(iosysid=%d)", iosysid));
+  std::map<int, iosystem_desc_t *>::iterator iter =
+                                SPIO_Util::SPIO_Lists::GVars::pio_iosystem_list.find(iosysid);
+  if(iter != SPIO_Util::SPIO_Lists::GVars::pio_iosystem_list.end()){
+    iosystem_desc_t *iosys = (*iter).second;
+    free(iosys);
+    SPIO_Util::SPIO_Lists::GVars::pio_iosystem_list.erase(iter);
+  }
+  else{
+    return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
+                    "Deleting iosystem (iosysid=%d) from the internal global list failed. Invalid iosystem id provided", iosysid);
+  }
+  return PIO_NOERR;
 }
 
 /**
- * Add iosystem info to a global list.
+ * Add iosystem (iosystem_desc_t) to a global list.
  * This function guarantees that iosystems (ioid of the
  * iosystems) are unique across the comm provided
  *
- * @param ios pointer to the iosystem_desc_t info to add.
+ * @param ios Pointer to the iosystem info (iosystem_desc_t)
+ * to add to the list.
  * @param comm MPI Communicator across which the iosystems
  * need to be unique
- * @returns the id of the newly added iosystem.
+ * @returns The id of the newly added iosystem.
  */
-#define PIO_IOSYSTEM_START_ID 2048
 int pio_add_to_iosystem_list(iosystem_desc_t *ios, MPI_Comm comm)
 {
-    /* Using an arbitrary start id for iosystem ids helps
-     * in debugging, to distinguish between ids assigned
-     * to different structures in the code
-     */
-    static int pio_iosystem_next_ioid = PIO_IOSYSTEM_START_ID;
-    iosystem_desc_t *cios;
+  static int pio_iosystem_next_ioid = PIO_IOSYSTEM_START_ID;
 
-    assert(ios);
+  assert(ios);
+  LOG((2, "pio_add_to_iosystem_list(ios=%p)", ios));
 
-    if(comm != MPI_COMM_NULL)
-    {
-        int tmp_id = pio_iosystem_next_ioid;
-        int mpierr = MPI_Allreduce(&tmp_id, &pio_iosystem_next_ioid, 1, MPI_INT, MPI_MAX, comm);
-        assert(mpierr == MPI_SUCCESS);
-    }
-    ios->iosysid = pio_iosystem_next_ioid;
-    pio_iosystem_next_ioid += 1;
+  if(comm != MPI_COMM_NULL){
+    int tmp_id = pio_iosystem_next_ioid;
+    int mpierr = MPI_Allreduce(&tmp_id, &pio_iosystem_next_ioid, 1,
+                                MPI_INT, MPI_MAX, comm);
+    assert(mpierr == MPI_SUCCESS);
+  }
+  ios->iosysid = pio_iosystem_next_ioid;
+  pio_iosystem_next_ioid++;
 
-    ios->next = NULL;
-    cios = pio_iosystem_list;
-    if (!cios)
-        pio_iosystem_list = ios;
-    else
-    {
-        while (cios->next)
-        {
-            cios = cios->next;
-        }
-        cios->next = ios;
-    }
+  SPIO_Util::SPIO_Lists::GVars::pio_iosystem_list.insert({ios->iosysid, ios});
+  LOG((2, "iosystem %p (iosysid=%d) added to the global list", ios, ios->iosysid));
 
-    return ios->iosysid;
+  return ios->iosysid;
 }
 
 /** 
- * Get iosystem info from list.
+ * Get iosystem info (iosystem_desc_t) from the global list of available
+ * iosystems.
  *
- * @param iosysid id of the iosystem
+ * @param iosysid The id of the iosystem to lookup
  * @returns pointer to iosystem_desc_t, or NULL if not found.
- * @author Jim Edwards
  */
 iosystem_desc_t *pio_get_iosystem_from_id(int iosysid)
 {
-    iosystem_desc_t *ciosystem;
+  LOG((2, "pio_get_iosystem_from_id(iosysid=%d)", iosysid));
 
-    LOG((2, "pio_get_iosystem_from_id iosysid = %d", iosysid));
+  iosystem_desc_t *ios = NULL;
+  try{
+    ios = SPIO_Util::SPIO_Lists::GVars::pio_iosystem_list.at(iosysid);  
+  } catch(const std::out_of_range &e){
+    LOG((1, "Finding iosytem corresponding to iosysid = %d failed. Invalid iosystem id provided", iosysid));
+  }
 
-    for (ciosystem = pio_iosystem_list; ciosystem; ciosystem = ciosystem->next)
-        if (ciosystem->iosysid == iosysid)
-            return ciosystem;
-
-    return NULL;
+  return ios;
 }
 
 /** 
- * Count the number of open iosystems.
+ * Get the number of open/available/valid iosystems.
  *
- * @param niosysid pointer that will get the number of open iosystems.
+ * @param niosysid Pointer to integer that will receive the number of
+ * valid iosystems
  * @returns 0 for success.
- * @author Jim Edwards
  */
-int pio_num_iosystem(int *niosysid)
+int pio_num_iosystem(int *niosys)
 {
-    int count = 0;
+  assert(niosys);
 
-    /* Count the elements in the list. */
-    for (iosystem_desc_t *c = pio_iosystem_list; c; c = c->next)
-        count++;
+  *niosys = static_cast<int>(SPIO_Util::SPIO_Lists::GVars::pio_iosystem_list.size());
 
-    /* Return count to caller via pointer. */
-    if (niosysid)
-        *niosysid = count;
-
-    return PIO_NOERR;
+  return PIO_NOERR;
 }
 
 /** 
- * Add an iodesc to a global list.
+ * Add an I/O descriptor (io_desc_t) to the global
+ * list of valid iodescs.
  * This function guarantees that iodescs (id of the
  * iodescs) are unique across the comm provided
  *
- * @param io_desc_t pointer to data to add to list.
+ * @param io_desc_t Pointer to the I/O descriptor (io_desc_t)
+ * to add to the list
  * @param comm MPI Communicator across which the iosystems
  * need to be unique
  * @returns the ioid of the newly added iodesc.
  */
 int pio_add_to_iodesc_list(io_desc_t *iodesc, MPI_Comm comm)
 {
-    /* Using an arbitrary start id for iodesc ids helps
-     * in debugging, to distinguish between ids assigned
-     * to different structures in the code
-     */
-    static int pio_iodesc_next_id = PIO_IODESC_START_ID;
-    io_desc_t *ciodesc = pio_iodesc_list;
+  static int pio_iodesc_next_id = PIO_IODESC_START_ID;
 
-    if(comm != MPI_COMM_NULL)
-    {
-        int tmp_id = pio_iodesc_next_id;
-        int mpierr = MPI_Allreduce(&tmp_id, &pio_iodesc_next_id, 1, MPI_INT, MPI_MAX, comm);
-        assert(mpierr == MPI_SUCCESS);
-    }
-    iodesc->ioid = pio_iodesc_next_id;
-    pio_iodesc_next_id++;
-    iodesc->next = NULL;
+  assert(iodesc);
+  LOG((2, "pio_add_to_iodesc_list(iodesc=%p)", iodesc));
 
-    /* Add to the global list */
-    if (pio_iodesc_list == NULL)
-        pio_iodesc_list = iodesc;
-    else
-    {
-        /* pio_desc_list has atleast one node */
-        while(ciodesc->next)
-        {
-            ciodesc = ciodesc->next;
-        }
-        ciodesc->next = iodesc;
-    }
-    current_iodesc = iodesc;
+  if(comm != MPI_COMM_NULL){
+    int tmp_id = pio_iodesc_next_id;
+    int mpierr = MPI_Allreduce(&tmp_id, &pio_iodesc_next_id, 1, MPI_INT, MPI_MAX, comm);
+    assert(mpierr == MPI_SUCCESS);
+  }
+  iodesc->ioid = pio_iodesc_next_id;
+  pio_iodesc_next_id++;
 
-    return iodesc->ioid;
+  SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.insert({iodesc->ioid, iodesc});
+  LOG((2, "Added iodesc %p (ioid=%d) to the global list", iodesc, iodesc->ioid));
+  return iodesc->ioid;
 }
 
 /** 
- * Get an iodesc.
+ * Get the I/O descriptor (io_desc_t) associated with a I/O descriptor id.
  *
- * @param ioid ID of iodesc to get.
- * @returns pointer to the iodesc struc.
- * @author Jim Edwards
+ * @param ioid The id of the I/O descriptor (io_desc_t) to lookup
+ * @returns Pointer to the I/O descriptor (io_desc_t) associated with the id
  */
 io_desc_t *pio_get_iodesc_from_id(int ioid)
 {
-    io_desc_t *ciodesc = NULL;
+  LOG((2, "pio_get_iodesc_from_id(ioid=%d)", ioid));
 
-    /* Do we already have a pointer to it? */
-    if (current_iodesc && current_iodesc->ioid == ioid)
-        return current_iodesc;
+  io_desc_t *iodesc = NULL;
+  try{
+    iodesc = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.at(ioid);  
+  } catch(const std::out_of_range &e){
+    LOG((1, "Finding I/O descriptor corresponding to ioid = %d failed. Invalid I/O descriptor id provided", ioid));
+  }
 
-    /* Find the decomposition in the list. */
-    for (ciodesc = pio_iodesc_list; ciodesc; ciodesc = ciodesc->next)
-        if (ciodesc->ioid == ioid)
-        {
-            current_iodesc = ciodesc;
-            break;
-        }
-
-    return ciodesc;
+  return iodesc;
 }
 
 /** 
- * Delete an iodesc.
+ * Delete a I/O descriptor from the global list of valid I/O descriptors
  *
- * @param ioid ID of iodesc to delete.
+ * @param ioid The id of the I/O descriptor (io_desc_t) to delete
  * @returns 0 on success, error code otherwise.
- * @author Jim Edwards
+ * @author Jayesh Krishna
  */
 int pio_delete_iodesc_from_list(int ioid)
 {
-    io_desc_t *ciodesc, *piodesc = NULL;
-
-    for (ciodesc = pio_iodesc_list; ciodesc; ciodesc = ciodesc->next)
-    {
-        if (ciodesc->ioid == ioid)
-        {
-            if (piodesc == NULL)
-                pio_iodesc_list = ciodesc->next;
-            else
-                piodesc->next = ciodesc->next;
-
-            if (current_iodesc == ciodesc)
-                current_iodesc = pio_iodesc_list;
-            free(ciodesc);
-            return PIO_NOERR;
-        }
-        piodesc = ciodesc;
-    }
-    return PIO_EBADID;
+  LOG((2, "pio_delete_iodesc_from_list(ioid=%d)", ioid));
+  std::map<int, io_desc_t *>::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.find(ioid);
+  if(iter != SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.end()){
+    io_desc_t *iodesc = (*iter).second;
+    free(iodesc);
+    SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.erase(iter);
+  }
+  else{
+    return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
+                  "Deleting I/O descriptor info (ioid=%d) from internal global list failed. Invalid I/O descriptor id provided", ioid);
+  }
+  return PIO_NOERR;
 }
