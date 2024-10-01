@@ -2369,7 +2369,11 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         /* Assign blocks to reader processes */
         std::vector<int> local_proc_blocks = FindProcessBlockGroupAssignments(block_procs, mpirank, nproc, comm);
 
-        int rearr_type = (rearr == "box")? PIO_REARR_BOX : PIO_REARR_SUBSET;
+        int rearr_type = PIO_REARR_ANY;
+        if (rearr == "box")
+            rearr_type = PIO_REARR_BOX;
+        else if (rearr == "subset")
+            rearr_type = PIO_REARR_SUBSET;
         iosysid = InitPIO(comm, mpirank, nproc, rearr_type);
         if (iosysid == BP2PIO_ERROR)
         {
