@@ -34,7 +34,7 @@ static int debug_out = 0;
 #define BP2PIO_ERROR -600
 #define BP2PIO_ENOMEM -601
 
-#define DECOMP_CACHE_MAX_SIZE 5
+#define DECOMP_CACHE_MAX_SIZE 64
 
 #define ERROR_CHECK_RETURN(ierr, err_val, err_cnt, comm) \
     err_val = 0; \
