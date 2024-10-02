@@ -720,6 +720,7 @@ Decomposition adios2_ProcessOneDecomposition(adios2::Variable<T> &v_base,
     /* Sum the sizes of blocks assigned to this process */
     int ierr = BP2PIO_NOERR;
     int ret = PIO_NOERR;
+    int mpierr = MPI_SUCCESS;
 
     std::string v_type = bpIO.VariableType(varname);
     if (v_type.empty())
@@ -747,16 +748,47 @@ Decomposition adios2_ProcessOneDecomposition(adios2::Variable<T> &v_base,
         return Decomposition{BP2PIO_ERROR, BP2PIO_ERROR};
     }
 
-    std::vector<int> block_writer_cnt;
+    const auto blk_blocks = bpReader.BlocksInfo(blk_var, time_step);
+    size_t blk_blocks_size = blk_blocks.size();
+    size_t block_list_size = block_list.size();
+    assert(block_list_size <= blk_blocks_size);
+
+    std::vector<size_t> block_offsets(blk_blocks_size);
+    size_t total_size = 0;
+    for (size_t i = 0; i < blk_blocks_size; i++)
+    {
+        block_offsets[i] = total_size;
+        total_size += blk_blocks[i].Count[0];
+    }
+
+    std::vector<int> block_writer_cnt_all(total_size);
     try
     {
-        for (size_t i = 0; i < block_list.size(); i++)
+        if (mpirank == 0)
         {
-            blk_var.SetBlockSelection(i);
-            GPTLstart("adios2pio:adios2_ProcessOneDecomposition:blk_var_Get_Sync");
-            bpReader.Get(blk_var, block_writer_cnt, adios2::Mode::Sync);
-            GPTLstop("adios2pio:adios2_ProcessOneDecomposition:blk_var_Get_Sync");
-            for (int k = 0; k < block_writer_cnt[0]; k++) /* number of writers */
+            for (size_t i = 0; i < blk_blocks_size; i++)
+            {
+                blk_var.SetBlockSelection(i);
+                GPTLstart("adios2pio:adios2_ProcessOneDecomposition:blk_var_Get_Deferred");
+                bpReader.Get(blk_var, block_writer_cnt_all.data() + block_offsets[i], adios2::Mode::Deferred);
+                GPTLstop("adios2pio:adios2_ProcessOneDecomposition:blk_var_Get_Deferred");
+            }
+
+            GPTLstart("adios2pio:adios2_ProcessOneDecomposition:blk_var_PerformGets");
+            bpReader.PerformGets();
+            GPTLstop("adios2pio:adios2_ProcessOneDecomposition:blk_var_PerformGets");
+        }
+
+        mpierr = MPI_Bcast(block_writer_cnt_all.data(), total_size, MPI_INT, 0, comm);
+        if (mpierr != MPI_SUCCESS)
+        {
+            fprintf(stderr, "Bcasting /__pio__/track/num_decomp_block_writers failed, mpierr = %d\n", mpierr);
+            return Decomposition{BP2PIO_ERROR, BP2PIO_ERROR};
+        }
+
+        for (size_t i = 0; i < block_list_size; i++)
+        {
+            for (int k = 0; k < block_writer_cnt_all[block_offsets[i]]; k++) /* number of writers */
             {
                  int writer_id = block_list[i][k];
                  writer_block_id[writer_id] = 1;  /* block written out by writer_id */
@@ -1717,6 +1749,7 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
 {
     int ierr = BP2PIO_NOERR;
     int ret = PIO_NOERR;
+    int mpierr = MPI_SUCCESS;
 
     /* Different decompositions at different frames */
     int  decomp_id, frame_id, fillval_exist;
@@ -1846,30 +1879,59 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
     }
 
     const auto blk_blocks = bpReader[0].BlocksInfo(blk_var, time_step);
-    int num_bp_blocks_per_group = blk_blocks.size() / block_list.size();
-    if ((num_bp_blocks_per_group*block_list.size()) != blk_blocks.size())
+    size_t blk_blocks_size = blk_blocks.size();
+    size_t block_list_size = block_list.size();
+    assert(block_list_size <= blk_blocks_size);
+    int num_bp_blocks_per_group = blk_blocks_size / block_list_size;
+    if ((num_bp_blocks_per_group*block_list_size) != blk_blocks_size)
     {
-        fprintf(stderr, "ERROR: #blocks: %lu !=  #written: %lu\n", num_bp_blocks_per_group * block_list.size(), blk_blocks.size());
+        fprintf(stderr, "ERROR: #blocks: %lu !=  #written: %lu\n", num_bp_blocks_per_group * block_list_size, blk_blocks_size);
         return BP2PIO_ERROR;
     }
 
-    std::vector<int> block_writer_cnt;
+    std::vector<size_t> block_offsets(blk_blocks_size);
+    size_t total_size = 0;
+    for (size_t i = 0; i < blk_blocks_size; i++)
+    {
+        block_offsets[i] = total_size;
+        total_size += blk_blocks[i].Count[0];
+    }
+
+    std::vector<int> block_writer_cnt_all(total_size);
     int b_idx = 0, t_idx = 0;
     try
     {
-        for (size_t i = 0; i < block_list.size(); i++)
+        if (mpirank == 0)
+        {
+            for (size_t i = 0; i < blk_blocks_size; i++)
+            {
+                blk_var.SetBlockSelection(i);
+                GPTLstart("adios2pio:adios2_ConvertVariableDarray:blk_var_Get_Deferred");
+                bpReader[0].Get(blk_var, block_writer_cnt_all.data() + block_offsets[i], adios2::Mode::Deferred);
+                GPTLstop("adios2pio:adios2_ConvertVariableDarray:blk_var_Get_Deferred");
+            }
+
+            GPTLstart("adios2pio:adios2_ConvertVariableDarray:blk_var_PerformGets");
+            bpReader[0].PerformGets();
+            GPTLstop("adios2pio:adios2_ConvertVariableDarray:blk_var_PerformGets");
+        }
+
+        mpierr = MPI_Bcast(block_writer_cnt_all.data(), total_size, MPI_INT, 0, comm);
+        if (mpierr != MPI_SUCCESS)
+        {
+            fprintf(stderr, "Bcasting /__pio__/track/num_data_block_writers failed, mpierr = %d\n", mpierr);
+            return BP2PIO_ERROR;
+        }
+
+        for (size_t i = 0; i < block_list_size; i++)
         {
             t_idx = 0;
             /* num_data_block_writers may have been written out multiple times in an adios step */
             for (int ii = 0; ii < num_bp_blocks_per_group; ii++)
             {
-                blk_var.SetBlockSelection(b_idx);
-                GPTLstart("adios2pio:adios2_ConvertVariableDarray:blk_var_Get_Sync");
-                bpReader[0].Get(blk_var, block_writer_cnt, adios2::Mode::Sync);
-                GPTLstop("adios2pio:adios2_ConvertVariableDarray:blk_var_Get_Sync");
-                for (size_t j = 0; j < block_writer_cnt.size(); j++)
+                for (size_t j = 0; j < blk_blocks[b_idx].Count[0]; j++)
                 {
-                    for (int k = 0; k < block_writer_cnt[j]; k++)
+                    for (int k = 0; k < block_writer_cnt_all[block_offsets[b_idx] + j]; k++)
                     { /* number of writers at time step t_idx  */
                         int writer_id = block_list[i][k];
                         writer_block_id[writer_id][t_idx] = 1; /* block written out by writer_id at time step t_idx */
@@ -1966,13 +2028,17 @@ int adios2_ConvertVariableDarray(adios2::Variable<T> &v_base,
                     if (bp_block_id >= 0)
                     {
                         v_base.SetBlockSelection(bp_block_id);
-                        GPTLstart("adios2pio:adios2_ConvertVariableDarray:v_base_Get_Sync");
-                        bpReader[0].Get(v_base, t_data + offset, adios2::Mode::Sync);
-                        GPTLstop("adios2pio:adios2_ConvertVariableDarray:v_base_Get_Sync");
+                        GPTLstart("adios2pio:adios2_ConvertVariableDarray:v_base_Get_Deferred");
+                        bpReader[0].Get(v_base, t_data + offset, adios2::Mode::Deferred);
+                        GPTLstop("adios2pio:adios2_ConvertVariableDarray:v_base_Get_Deferred");
                         offset += (vb_blocks[bp_block_id].Count[0]);
                     }
                 }
             }
+
+            GPTLstart("adios2pio:adios2_ConvertVariableDarray:v_base_PerformGets");
+            bpReader[0].PerformGets();
+            GPTLstop("adios2pio:adios2_ConvertVariableDarray:v_base_PerformGets");
 
             decomp_id = decomp_buffer[ts];
             frame_id  = frame_buffer[ts];
@@ -2208,6 +2274,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
     int n_bp_writers;
     int decomp_stored_flag = -1;
     int ret = PIO_NOERR;
+    int mpierr = MPI_SUCCESS;
     int iosysid;
 
     /* MPI communicators. comm will be used to separate I/O nodes later */
@@ -2306,13 +2373,29 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         if (blockProcs)
         {
             const auto v_blocks = bpReader[0].BlocksInfo(blockProcs, time_step);
-            block_procs.resize(v_blocks.size());
-            for (size_t i = 0; i < v_blocks.size(); i++)
+            size_t v_blocks_size = v_blocks.size();
+            block_procs.resize(v_blocks_size);
+
+            if (w_mpirank == 0)
             {
-                blockProcs.SetBlockSelection(i);
-                GPTLstart("adios2pio:ConvertBPFile:blockProcs_Get_Sync");
-                bpReader[0].Get(blockProcs, &block_procs[i], adios2::Mode::Sync);
-                GPTLstop("adios2pio:ConvertBPFile:blockProcs_Get_Sync");
+                for (size_t i = 0; i < v_blocks_size; i++)
+                {
+                    blockProcs.SetBlockSelection(i);
+                    GPTLstart("adios2pio:ConvertBPFile:blockProcs_Get_Deferred");
+                    bpReader[0].Get(blockProcs, &block_procs[i], adios2::Mode::Deferred);
+                    GPTLstop("adios2pio:ConvertBPFile:blockProcs_Get_Deferred");
+                }
+
+                GPTLstart("adios2pio:ConvertBPFile:blockProcs_PerformGets");
+                bpReader[0].PerformGets();
+                GPTLstop("adios2pio:ConvertBPFile:blockProcs_PerformGets");
+            }
+
+            mpierr = MPI_Bcast(block_procs.data(), v_blocks_size, MPI_INT, 0, w_comm);
+            if (mpierr != MPI_SUCCESS)
+            {
+                fprintf(stderr, "Bcasting /__pio__/info/block_nprocs failed, mpierr = %d\n", mpierr);
+                return BP2PIO_ERROR;
             }
         }
         else
@@ -2323,17 +2406,49 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
 
         std::vector<std::vector<int> > block_list;
         adios2::Variable<int> blockList = bpIO[0].InquireVariable<int>("/__pio__/info/block_list");
-        if (blockProcs)
+        if (blockList)
         {
             const auto v_blocks = bpReader[0].BlocksInfo(blockList, time_step);
-            block_list.resize(v_blocks.size());
-            for (size_t i = 0; i < v_blocks.size(); i++)
+            size_t v_blocks_size = v_blocks.size();
+            block_list.resize(v_blocks_size);
+
+            std::vector<size_t> block_offsets(v_blocks_size);
+            size_t total_size = 0;
+            for (size_t i = 0; i < v_blocks_size; i++)
             {
-                blockList.SetBlockSelection(i);
-                GPTLstart("adios2pio:ConvertBPFile:blockList_Get_Sync");
-                bpReader[0].Get(blockList, block_list[i], adios2::Mode::Sync);
-                GPTLstop("adios2pio:ConvertBPFile:blockList_Get_Sync");
+                block_offsets[i] = total_size;
+                total_size += v_blocks[i].Count[0];
+                block_list[i].resize(v_blocks[i].Count[0]);
             }
+
+            std::vector<int> block_list_all(total_size);
+
+            if (w_mpirank == 0)
+            {
+                for (size_t i = 0; i < v_blocks_size; i++)
+                {
+                    blockList.SetBlockSelection(i);
+                    GPTLstart("adios2pio:ConvertBPFile:blockList_Get_Deferred");
+                    bpReader[0].Get(blockList, block_list_all.data() + block_offsets[i], adios2::Mode::Deferred);
+                    GPTLstop("adios2pio:ConvertBPFile:blockList_Get_Deferred");
+                }
+
+                GPTLstart("adios2pio:ConvertBPFile:blockList_PerformGets");
+                bpReader[0].PerformGets();
+                GPTLstop("adios2pio:ConvertBPFile:blockList_PerformGets");
+            }
+
+            mpierr = MPI_Bcast(block_list_all.data(), total_size, MPI_INT, 0, w_comm);
+            if (mpierr != MPI_SUCCESS)
+            {
+                fprintf(stderr, "Bcasting /__pio__/info/block_list failed, mpierr = %d\n", mpierr);
+                return BP2PIO_ERROR;
+            }
+
+            for (size_t i = 0; i < v_blocks_size; i++)
+                std::copy(block_list_all.begin() + block_offsets[i],
+                          block_list_all.begin() + block_offsets[i] + v_blocks[i].Count[0],
+                          block_list[i].begin());
         }
         else
         {
