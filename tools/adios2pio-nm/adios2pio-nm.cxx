@@ -124,11 +124,17 @@ static int get_user_options(
 
 int main(int argc, char *argv[])
 {
-    int ret = 0;
+    int ret = 0, rank = 0;
 
     MPI_Init(&argc, &argv);
 
     MPI_Comm comm_in = MPI_COMM_WORLD;
+
+    ret = MPI_Comm_rank(comm_in, &rank);
+    if (ret != MPI_SUCCESS)
+    {
+        return ret;
+    }
 
     spio_tool_utils::ArgParser ap(comm_in);
 
@@ -148,11 +154,9 @@ int main(int argc, char *argv[])
     }
 
 #ifdef SPIO_ENABLE_GPTL_TIMING
-#ifdef SPIO_ENABLE_GPTL_TIMING_INTERNAL
     /* Initialize the GPTL timing library. */
     if ((ret = GPTLinitialize()))
         return ret;
-#endif
 #endif
 
     SetDebugOutput(debug_lvl);
@@ -168,11 +172,19 @@ int main(int argc, char *argv[])
     MPI_Barrier(comm_in);
 
 #ifdef SPIO_ENABLE_GPTL_TIMING
-#ifdef SPIO_ENABLE_GPTL_TIMING_INTERNAL
+    /* Write the GPTL summary/rank_0 output */
+    std::string summary_file("spioconvtoolrwgptlsummaryinfo0wrank.dat");
+    GPTLpr_summary_file(comm_in, summary_file.c_str());
+
+    if(rank == 0)
+    {
+        std::string rank0_file("spioconvtoolrwgptlinfo0wrank.dat");
+        GPTLpr_file(rank0_file.c_str());
+    }
+
     /* Finalize the GPTL timing library. */
     if ((ret = GPTLfinalize()))
         return ret;
-#endif
 #endif
 
     MPI_Finalize();
