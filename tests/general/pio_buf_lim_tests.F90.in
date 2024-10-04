@@ -33,6 +33,8 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_wr_buf_limit_zero
   implicit none
   integer, parameter :: VEC_LOCAL_SZ = 7
   integer(kind=pio_offset_kind), parameter :: PIO_BUFFER_SZ_ZERO = 0
+  integer(kind=pio_offset_kind), parameter :: PIO_BUFFER_SZ_NEG = -1
+  integer(kind=pio_offset_kind) :: cur_buf_sz_limit
   type(var_desc_t)  :: pio_var
   type(file_desc_t) :: pio_file
   character(len=PIO_TF_MAX_STR_LEN) :: filename
@@ -75,6 +77,11 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_wr_buf_limit_zero
     PIO_TF_CHECK_ERR(ierr, "Failed to end redef mode : " // trim(filename))
 
     call pio_set_buffer_size_limit(PIO_BUFFER_SZ_ZERO)
+
+    ! Query the current buffer size limit by passing a negative value for the
+    ! new limit, which will be ignored by pio_set_buffer_size_limit
+    call pio_set_buffer_size_limit(PIO_BUFFER_SZ_NEG, prev_limit=cur_buf_sz_limit)
+    PIO_TF_PASSERT(cur_buf_sz_limit == PIO_BUFFER_SZ_ZERO, "Current buffer size limit should equal the previously set zero limit")
 
     ! Write the variable out
     call PIO_write_darray(pio_file, pio_var, iodesc, wbuf, ierr)

@@ -126,3 +126,8 @@ if (DEFINED ENV{ENABLE_HDF5})
         endif ()
     endif ()
 endif ()
+
+# If USE_FORTRAN_LEGACY_LIB environment variable is set, then use the legacy Fortran library
+if (DEFINED ENV{USE_FORTRAN_LEGACY_LIB})
+    set (CTEST_CONFIGURE_OPTIONS "${CTEST_CONFIGURE_OPTIONS} -DPIO_USE_FORTRAN_LEGACY_LIB=ON")
+endif ()
