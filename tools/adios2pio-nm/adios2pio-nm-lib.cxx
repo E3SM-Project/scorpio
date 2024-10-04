@@ -2282,6 +2282,8 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
     int w_mpirank, mpirank;
     int w_nproc, nproc;
 
+    GPTLstart("adios2pio:ConvertBPFile");
+
     w_comm = comm_in;
     MPI_Comm_set_errhandler(w_comm, MPI_ERRORS_RETURN);
     MPI_Comm_rank(w_comm, &w_mpirank);
@@ -2314,7 +2316,6 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
 
     try
     {
-        GPTLstart("adios2pio:ConvertBPFile");
         t1 = MPI_Wtime();
 
         /* Allocate IO and Engine and open BP4 file */
@@ -2649,7 +2650,6 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
                  << " at " << __func__ << ":" << __LINE__ << endl;
             ierr = BP2PIO_ERROR;
         }
-        GPTLstop("adios2pio:ConvertBPFile");
 
         ret = PIOc_finalize(iosysid);
         if (ret != PIO_NOERR)
@@ -2675,6 +2675,8 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
     MPI_Comm_free(&comm);
 
     MPI_Barrier(w_comm);
+
+    GPTLstop("adios2pio:ConvertBPFile");
 
     if (ierr != BP2PIO_NOERR)
         return ierr;

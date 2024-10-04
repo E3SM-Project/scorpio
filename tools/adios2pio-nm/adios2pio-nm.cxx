@@ -159,6 +159,8 @@ int main(int argc, char *argv[])
         return ret;
 #endif
 
+    GPTLstart("adios2pio:main");
+
     SetDebugOutput(debug_lvl);
     MPI_Barrier(comm_in);
     if (idir.size() == 0)
@@ -170,6 +172,8 @@ int main(int argc, char *argv[])
         ret = MConvertBPToNC(idir, piotype, rearr, comm_in);
     }
     MPI_Barrier(comm_in);
+
+    GPTLstop("adios2pio:main");
 
 #ifdef SPIO_ENABLE_GPTL_TIMING
     /* Write the GPTL summary/rank_0 output */
