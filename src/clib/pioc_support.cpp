@@ -707,6 +707,11 @@ void pio_finalize_logging(void)
  */
 /* Indicate if GPTL was initialized inside the library */
 static bool GPTL_was_init_in_lib = false;
+bool spio_gptl_was_init_in_lib(void )
+{
+  return GPTL_was_init_in_lib;
+}
+
 void pio_init_gptl(void )
 {
 #ifdef TIMING_INTERNAL
@@ -727,7 +732,7 @@ void pio_finalize_gptl(void)
 {
 #ifdef TIMING_INTERNAL
     pio_timer_ref_cnt -= 1;
-    if((pio_timer_ref_cnt == 0) && (GPTL_was_init_in_lib))
+    if((pio_timer_ref_cnt == 0) && (spio_gptl_was_init_in_lib()))
     {
         GPTLfinalize();
     }

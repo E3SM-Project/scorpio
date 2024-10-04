@@ -13,7 +13,7 @@ static void init_user_options(spio_tool_utils::ArgParser &ap)
       .add_opt("idir", "Directory containing data output from PIO (in ADIOS format)")
       .add_opt("nc-file", "output file name after conversion")
       .add_opt("pio-format", "output PIO_IO_TYPE. Supported parameters: \"pnetcdf\",  \"netcdf\",  \"netcdf4c\",  \"netcdf4p\"")
-      .add_opt("rearr", "PIO rearranger. Supported parameters: \"subset\", \"box\". Default \"subset\".")
+      .add_opt("rearr", "PIO rearranger. Supported parameters: \"subset\", \"box\", \"any\". Default \"any\".")
       .add_opt("verbose", "Turn on verbose info messages");
 }
 
@@ -60,7 +60,7 @@ static int get_user_options(
               int &debug_lvl)
 {
     const std::string DEFAULT_PIO_FORMAT("pnetcdf");
-    const std::string DEFAULT_REARRANGER("subset");
+    const std::string DEFAULT_REARRANGER("any");
     debug_lvl = 0;
 
 #ifdef SPIO_NO_CXX_REGEX
@@ -124,11 +124,17 @@ static int get_user_options(
 
 int main(int argc, char *argv[])
 {
-    int ret = 0;
+    int ret = 0, rank = 0;
 
     MPI_Init(&argc, &argv);
 
     MPI_Comm comm_in = MPI_COMM_WORLD;
+
+    ret = MPI_Comm_rank(comm_in, &rank);
+    if (ret != MPI_SUCCESS)
+    {
+        return ret;
+    }
 
     spio_tool_utils::ArgParser ap(comm_in);
 
@@ -148,12 +154,12 @@ int main(int argc, char *argv[])
     }
 
 #ifdef SPIO_ENABLE_GPTL_TIMING
-#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
     /* Initialize the GPTL timing library. */
     if ((ret = GPTLinitialize()))
         return ret;
 #endif
-#endif
+
+    GPTLstart("adios2pio:main");
 
     SetDebugOutput(debug_lvl);
     MPI_Barrier(comm_in);
@@ -167,12 +173,22 @@ int main(int argc, char *argv[])
     }
     MPI_Barrier(comm_in);
 
+    GPTLstop("adios2pio:main");
+
 #ifdef SPIO_ENABLE_GPTL_TIMING
-#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
+    /* Write the GPTL summary/rank_0 output */
+    std::string summary_file("spioconvtoolrwgptlsummaryinfo0wrank.dat");
+    GPTLpr_summary_file(comm_in, summary_file.c_str());
+
+    if(rank == 0)
+    {
+        std::string rank0_file("spioconvtoolrwgptlinfo0wrank.dat");
+        GPTLpr_file(rank0_file.c_str());
+    }
+
     /* Finalize the GPTL timing library. */
     if ((ret = GPTLfinalize()))
         return ret;
-#endif
 #endif
 
     MPI_Finalize();

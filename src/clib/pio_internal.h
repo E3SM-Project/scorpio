@@ -347,6 +347,7 @@ extern "C" {
     void pio_finalize_logging(void );
 
     /* Initialize and finalize GPTL timers. */
+    bool spio_gptl_was_init_in_lib(void );
     void pio_init_gptl(void);
     void pio_finalize_gptl(void );
 

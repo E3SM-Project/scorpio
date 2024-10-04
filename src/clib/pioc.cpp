@@ -1776,17 +1776,19 @@ int PIOc_finalize_impl(int iosysid)
     GPTLstop("PIO:PIOc_finalize");
 #ifdef TIMING
 #ifdef TIMING_INTERNAL
-    if(ios->io_comm != MPI_COMM_NULL)
-    {
-        snprintf(gptl_iolog_fname, PIO_MAX_NAME, "piorwgptlioinfo%010dwrank.dat", ios->ioroot);
-        GPTLpr_summary_file(ios->io_comm, gptl_iolog_fname);
-        LOG((2, "Finished writing gptl io proc summary"));
-    }
-    snprintf(gptl_log_fname, PIO_MAX_NAME, "piorwgptlinfo%010dwrank.dat", ios->ioroot);
-    if(ios->io_rank == 0)
-    {
-        GPTLpr_file(gptl_log_fname);
-        LOG((2, "Finished writing gptl summary"));
+    if(spio_gptl_was_init_in_lib()){
+      if(ios->io_comm != MPI_COMM_NULL)
+      {
+          snprintf(gptl_iolog_fname, PIO_MAX_NAME, "piorwgptlioinfo%010dwrank.dat", ios->ioroot);
+          GPTLpr_summary_file(ios->io_comm, gptl_iolog_fname);
+          LOG((2, "Finished writing gptl io proc summary"));
+      }
+      snprintf(gptl_log_fname, PIO_MAX_NAME, "piorwgptlinfo%010dwrank.dat", ios->ioroot);
+      if(ios->io_rank == 0)
+      {
+          GPTLpr_file(gptl_log_fname);
+          LOG((2, "Finished writing gptl summary"));
+      }
     }
     pio_finalize_gptl();
 #endif
