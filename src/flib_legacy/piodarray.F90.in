@@ -93,8 +93,9 @@ end interface
 
 contains
 
-  subroutine pio_set_buffer_size_limit(limit)
+  subroutine pio_set_buffer_size_limit(limit, prev_limit)
     integer(PIO_OFFSET_KIND), intent(in) :: limit
+    integer(PIO_OFFSET_KIND), intent(out), optional :: prev_limit
     integer(PIO_OFFSET_KIND) :: oldval
     interface
        integer(C_LONG_LONG) function PIOc_set_buffer_size_limit(limit) &
@@ -103,10 +104,10 @@ contains
          integer(C_LONG_LONG), value :: limit
        end function PIOc_set_buffer_size_limit
     end interface
-    if(limit<0) then
-       call piodie(__PIO_FILE__,__LINE__,' bad value to buffer_size_limit: ',int(limit))
-    end if
     oldval = PIOc_set_buffer_size_limit(limit)
+    if(present(prev_limit)) then
+       prev_limit = oldval
+    end if
 
   end subroutine pio_set_buffer_size_limit
 
