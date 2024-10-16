@@ -49,7 +49,7 @@ PIO_Offset PIOc_set_buffer_size_limit_impl(PIO_Offset limit)
     PIO_Offset oldsize = pio_buffer_size_limit;
 
     /* If the user passed a valid size, use it. */
-    if (limit > 0)
+    if (limit >= 0)
         pio_buffer_size_limit = limit;
 
     return oldsize;

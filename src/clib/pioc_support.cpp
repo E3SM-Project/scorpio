@@ -3411,7 +3411,18 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 
             ierr = ncmpi_create(ios->io_comm, filename, file->mode, ios->info, &file->fh);
             if (!ierr)
-                ierr = ncmpi_buffer_attach(file->fh, pio_buffer_size_limit);
+            {
+                /* When using buffered put APIs in PnetCDF, we must explicitly specify the size of the internal buffer.
+                   To avoid potential failures, we ensure a minimum buffer size (16 MiB) when pio_buffer_size_limit is
+                   0 or too small. If pio_buffer_size_limit is set to 0, this workaround prevents a direct failure of
+                   the ncmpi_buffer_attach call (NULL buffer error). Additionally, if pio_buffer_size_limit is too small,
+                   using the larger minimum size reduces the likelihood of potential NC_EINSUFFBUF errors. As recommended
+                   by PnetCDF documentation, users should make sure that the internal buffer size is sufficiently large
+                   for buffered put operations.
+                 */
+                const PIO_Offset min_bufsize = 16777216; /* Minimum buffer size (16 MiB) for buffered put APIs in PnetCDF */
+                ierr = ncmpi_buffer_attach(file->fh, (pio_buffer_size_limit > min_bufsize)? pio_buffer_size_limit : min_bufsize);
+            }
             break;
 #endif
 #ifdef _HDF5
@@ -4998,7 +5009,12 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
             {
                 if (ios->iomaster == MPI_ROOT)
                     LOG((2, "%d Setting IO buffer %ld", __LINE__, pio_buffer_size_limit));
-                ierr = ncmpi_buffer_attach(file->fh, pio_buffer_size_limit);
+
+                /* Please refer to a previous related comment for why we ensure a minimum buffer size (16 MiB) for
+                   buffered put APIs in PnetCDF.
+                 */
+                const PIO_Offset min_bufsize = 16777216; /* Minimum buffer size (16 MiB) for buffered put APIs in PnetCDF */
+                ierr = ncmpi_buffer_attach(file->fh, (pio_buffer_size_limit > min_bufsize)? pio_buffer_size_limit : min_bufsize);
             }
             LOG((2, "ncmpi_open(%s) : fd = %d", filename, file->fh));
             break;
