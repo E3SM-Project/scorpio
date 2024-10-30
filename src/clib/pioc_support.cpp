@@ -540,6 +540,66 @@ int end_adios2_step(file_desc_t *file, iosystem_desc_t *ios)
 
     return PIO_NOERR;
 }
+
+adios2_variable* spio_define_adios2_variable(iosystem_desc_t *ios, file_desc_t *file, adios2_io *io,
+                                             const char *name, const adios2_type type, const size_t ndims,
+                                             const size_t *shape, const size_t *start, const size_t *count,
+                                             const adios2_constant_dims constant_dims)
+{
+    /* Define the variable in ADIOS2 */
+    adios2_variable* variable = adios2_define_variable(io, name, type, ndims, shape, start, count, constant_dims);
+
+#ifdef _SPIO_ADIOS_USE_COMPRESSION
+    assert(ios != NULL && file != NULL);
+    /* Skip compression for scalar variables (ndims == 0), see https://github.com/ornladios/ADIOS2/issues/4390 */
+    /* FIXME: Consider adding a new IO type, PIO_IOTYPE_ADIOSC, and use it as a condition for applying compression */
+    if (variable != NULL && ios->compression_operator != NULL && ndims > 0 /* && file->iotype == PIO_IOTYPE_ADIOSC */)
+    {
+        size_t operation_index = 0;
+        adios2_error adiosErr = adios2_error_none;
+
+        #if defined(ADIOS2_HAVE_BLOSC2)
+        /* Add a compression operation (Blosc2) to this variable */
+        adiosErr = adios2_add_operation(&operation_index, variable, ios->compression_operator, "compressor", "zstd"); /* Compressor type (e.g., zstd) */
+        if (adiosErr != adios2_error_none)
+        {
+            pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                    "Failed to add Blosc2 compression operation (compressor=zstd) to variable %s (adios2_error=%s)",
+                    name, convert_adios2_error_to_string(adiosErr));
+        }
+
+        /* Compression level is an integer between 0 (no compression) and 9 (more compression, more memory consumption) inclusive */
+        adiosErr = adios2_set_operation_parameter(variable, operation_index, "clevel", "5");
+        if (adiosErr != adios2_error_none)
+        {
+            pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                    "Failed to set Blosc2 compression level (clevel=5) for variable %s (adios2_error=%s)",
+                    name, convert_adios2_error_to_string(adiosErr));
+        }
+
+        /* Shuffle option (BLOSC_SHUFFLE/BLOSC_NOSHUFFLE/BLOSC_BITSHUFFLE) */
+        adiosErr = adios2_set_operation_parameter(variable, operation_index, "doshuffle", "BLOSC_BITSHUFFLE");
+        if (adiosErr != adios2_error_none)
+        {
+            pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                    "Failed to set Blosc2 shuffle (doshuffle=BLOSC_BITSHUFFLE) for variable %s (adios2_error=%s)",
+                    name, convert_adios2_error_to_string(adiosErr));
+        }
+        #elif defined(ADIOS2_HAVE_BZIP2)
+        /* Add a compression operation (BZip2) to this variable */
+        adiosErr = adios2_add_operation(&operation_index, variable, ios->compression_operator, "", "");
+        if (adiosErr != adios2_error_none)
+        {
+            pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                    "Failed to add BZip2 compression operation to variable %s (adios2_error=%s)",
+                    name, convert_adios2_error_to_string(adiosErr));
+        }
+        #endif
+    }
+#endif /* _SPIO_ADIOS_USE_COMPRESSION */
+
+    return variable;
+}
 #endif /* _ADIOS2 */
 
 /**
