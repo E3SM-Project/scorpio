@@ -3134,10 +3134,10 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                 adios2_variable *variableH = adios2_inquire_variable(file->ioH, "/__pio__/info/nproc");
                 if (variableH == NULL)
                 {
-                    variableH = adios2_define_variable(file->ioH,
-                                                       "/__pio__/info/nproc", adios2_type_int32_t,
-                                                       0, NULL, NULL, NULL,
-                                                       adios2_constant_dims_true);
+                    variableH = spio_define_adios2_variable(ios, file, file->ioH,
+                                                            "/__pio__/info/nproc", adios2_type_int32_t,
+                                                            0, NULL, NULL, NULL,
+                                                            adios2_constant_dims_true);
                     if (variableH == NULL)
                     {
                         spio_ltimer_stop(file->io_fstats->wr_timer_name);
@@ -3161,10 +3161,10 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                 variableH = adios2_inquire_variable(file->ioH, "/__pio__/info/decomp_stored");
                 if (variableH == NULL)
                 {
-                    variableH = adios2_define_variable(file->ioH,
-                                                       "/__pio__/info/decomp_stored", adios2_type_int32_t,
-                                                       0, NULL, NULL, NULL,
-                                                       adios2_constant_dims_true);
+                    variableH = spio_define_adios2_variable(ios, file, file->ioH,
+                                                            "/__pio__/info/decomp_stored", adios2_type_int32_t,
+                                                            0, NULL, NULL, NULL,
+                                                            adios2_constant_dims_true);
                     if (variableH == NULL)
                     {
                         spio_ltimer_stop(file->io_fstats->wr_timer_name);
@@ -3195,10 +3195,10 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                 adios2_variable *variableH_blocks = adios2_inquire_variable(file->ioH, "/__pio__/info/block_nprocs");
                 if (variableH_blocks == NULL)
                 {
-                    variableH_blocks = adios2_define_variable(file->ioH,
-                                                              "/__pio__/info/block_nprocs", adios2_type_int32_t,
-                                                              0, NULL, NULL, NULL,
-                                                              adios2_constant_dims_true);
+                    variableH_blocks = spio_define_adios2_variable(ios, file, file->ioH,
+                                                                   "/__pio__/info/block_nprocs", adios2_type_int32_t,
+                                                                   0, NULL, NULL, NULL,
+                                                                   adios2_constant_dims_true);
                     if (variableH_blocks == NULL)
                     {
                         spio_ltimer_stop(file->io_fstats->wr_timer_name);
@@ -3224,10 +3224,10 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                 if (variableH_list == NULL)
                 {
                     size_t v_count = file->block_nprocs;
-                    variableH_list = adios2_define_variable(file->ioH,
-                                                            "/__pio__/info/block_list", adios2_type_int32_t,
-                                                            1, NULL, NULL, &v_count,
-                                                            adios2_constant_dims_true);
+                    variableH_list = spio_define_adios2_variable(ios, file, file->ioH,
+                                                                 "/__pio__/info/block_list", adios2_type_int32_t,
+                                                                 1, NULL, NULL, &v_count,
+                                                                 adios2_constant_dims_true);
                     if (variableH_list == NULL)
                     {
                         spio_ltimer_stop(file->io_fstats->wr_timer_name);

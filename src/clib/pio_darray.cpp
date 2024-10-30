@@ -1075,9 +1075,9 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
         variableH = adios2_inquire_variable(file->ioH, name);
         if (variableH == NULL)
         {
-            variableH = adios2_define_variable(file->ioH, name, type,
-                                               1, NULL, NULL, &av_count,
-                                               adios2_constant_dims_false);
+            variableH = spio_define_adios2_variable(file->iosystem, file, file->ioH, name, type,
+                                                    1, NULL, NULL, &av_count,
+                                                    adios2_constant_dims_false);
             if (variableH == NULL)
             {
                 return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1095,9 +1095,9 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
             num_decomp_block_writers_varid = adios2_inquire_variable(file->ioH, name_varid);
             if (num_decomp_block_writers_varid == NULL)
             {
-                num_decomp_block_writers_varid = adios2_define_variable(file->ioH, name_varid, adios2_type_int32_t,
-                                                                        1, NULL, NULL, &av_count,
-                                                                        adios2_constant_dims_true);
+                num_decomp_block_writers_varid = spio_define_adios2_variable(file->iosystem, file, file->ioH, name_varid, adios2_type_int32_t,
+                                                                             1, NULL, NULL, &av_count,
+                                                                             adios2_constant_dims_true);
                 if (num_decomp_block_writers_varid == NULL)
                 {
                     return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1260,9 +1260,9 @@ static int define_adios_darray(file_desc_t *file, adios_var_desc_t *av, int inp_
     char vname[PIO_MAX_NAME];
     assert((strlen("/__pio__/var/") + strlen(av->name)) < PIO_MAX_NAME);
     snprintf(vname, PIO_MAX_NAME, "/__pio__/var/%s", av->name);
-    av->adios_varid = adios2_define_variable(file->ioH, vname, atype,
-                                             1, NULL, NULL, &av_count,
-                                             adios2_constant_dims_false);
+    av->adios_varid = spio_define_adios2_variable(file->iosystem, file, file->ioH, vname, atype,
+                                                  1, NULL, NULL, &av_count,
+                                                  adios2_constant_dims_false);
     if (av->adios_varid == NULL)
     {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1280,9 +1280,9 @@ static int define_adios_darray(file_desc_t *file, adios_var_desc_t *av, int inp_
         av->decomp_varid = adios2_inquire_variable(file->ioH, name_varid);
         if (av->decomp_varid == NULL)
         {
-            av->decomp_varid = adios2_define_variable(file->ioH, name_varid, adios2_type_int32_t,
-                                                      1, NULL, NULL, &av_count,
-                                                      adios2_constant_dims_false);
+            av->decomp_varid = spio_define_adios2_variable(file->iosystem, file, file->ioH, name_varid, adios2_type_int32_t,
+                                                           1, NULL, NULL, &av_count,
+                                                           adios2_constant_dims_false);
             if (av->decomp_varid == NULL)
             {
                 return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1308,9 +1308,9 @@ static int define_adios_darray(file_desc_t *file, adios_var_desc_t *av, int inp_
         av->frame_varid = adios2_inquire_variable(file->ioH, name_varid);
         if (av->frame_varid == NULL)
         {
-            av->frame_varid = adios2_define_variable(file->ioH, name_varid, adios2_type_int32_t,
-                                                     1, NULL, NULL, &av_count,
-                                                     adios2_constant_dims_false);
+            av->frame_varid = spio_define_adios2_variable(file->iosystem, file, file->ioH, name_varid, adios2_type_int32_t,
+                                                          1, NULL, NULL, &av_count,
+                                                          adios2_constant_dims_false);
             if (av->frame_varid == NULL)
             {
                 return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1336,9 +1336,9 @@ static int define_adios_darray(file_desc_t *file, adios_var_desc_t *av, int inp_
         av->fillval_varid = adios2_inquire_variable(file->ioH, name_varid);
         if (av->fillval_varid == NULL)
         {
-            av->fillval_varid = adios2_define_variable(file->ioH, name_varid, atype,
-                                                       1, NULL, NULL, &av_count,
-                                                       adios2_constant_dims_false);
+            av->fillval_varid = spio_define_adios2_variable(file->iosystem, file, file->ioH, name_varid, atype,
+                                                            1, NULL, NULL, &av_count,
+                                                            adios2_constant_dims_false);
             if (av->fillval_varid == NULL)
             {
                 return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1366,9 +1366,9 @@ static int define_adios_darray(file_desc_t *file, adios_var_desc_t *av, int inp_
         av->num_block_writers_varid = adios2_inquire_variable(file->ioH, name_varid);
         if (av->num_block_writers_varid == NULL)
         {
-            av->num_block_writers_varid = adios2_define_variable(file->ioH, name_varid, adios2_type_int32_t,
-                                                                 1, NULL, NULL, &av_count,
-                                                                 adios2_constant_dims_false);
+            av->num_block_writers_varid = spio_define_adios2_variable(file->iosystem, file, file->ioH, name_varid, adios2_type_int32_t,
+                                                                      1, NULL, NULL, &av_count,
+                                                                      adios2_constant_dims_false);
             if (av->num_block_writers_varid == NULL)
             {
                 return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
