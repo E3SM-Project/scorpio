@@ -21,12 +21,13 @@ namespace SPIO_Util{
 
       class Decomp_nc_logger{
         public:
-          Decomp_nc_logger() : iosysid_(INVALID_IOSYSID), wrank_(INVALID_MPI_RANK), wsz_(INVALID_MPI_SIZE), comm_(MPI_COMM_NULL), comm_rank_(INVALID_MPI_RANK), comm_sz_(INVALID_MPI_SIZE), ncid_(INVALID_NCID) {}
-          Decomp_nc_logger(int iosysid) : iosysid_(iosysid), wrank_(INVALID_MPI_RANK), wsz_(INVALID_MPI_SIZE), comm_(MPI_COMM_NULL), comm_rank_(INVALID_MPI_RANK), comm_sz_(INVALID_MPI_SIZE), ncid_(INVALID_NCID) {}
-          Decomp_nc_logger(int iosysid, const std::string &name) : iosysid_(iosysid), wrank_(INVALID_MPI_RANK), wsz_(INVALID_MPI_SIZE), comm_(MPI_COMM_NULL), comm_rank_(INVALID_MPI_RANK), comm_sz_(INVALID_MPI_SIZE), fname_(name), ncid_(INVALID_NCID) {}
+          Decomp_nc_logger() : iosysid_(INVALID_IOSYSID), comm_(MPI_COMM_NULL), comm_rank_(INVALID_MPI_RANK), comm_sz_(INVALID_MPI_SIZE), ncid_(INVALID_NCID) {}
+          Decomp_nc_logger(int iosysid) : iosysid_(iosysid), comm_(MPI_COMM_NULL), comm_rank_(INVALID_MPI_RANK), comm_sz_(INVALID_MPI_SIZE), ncid_(INVALID_NCID) {}
+          Decomp_nc_logger(int iosysid, const std::string &name) : iosysid_(iosysid), comm_(MPI_COMM_NULL), comm_rank_(INVALID_MPI_RANK), comm_sz_(INVALID_MPI_SIZE), fname_(name), ncid_(INVALID_NCID) {}
           void init();
           Decomp_nc_logger &set_iosysid(int iosysid);
           void log_decomp(int ioid, const PIO_Offset *map, int mapsz);
+          std::string get_log_fname(void ){ return fname_; }
           void finalize(void );
         private:
           static const int INVALID_NCID = -1;
@@ -35,8 +36,6 @@ namespace SPIO_Util{
           static const int INVALID_IOSYSID = -2;
 
           int iosysid_;
-          int wrank_;
-          int wsz_;
           MPI_Comm comm_;
           int comm_rank_;
           int comm_sz_;
@@ -47,39 +46,17 @@ namespace SPIO_Util{
            *  decomp1_global_sz, decomp1_start, decomp1_count, ...}
            */
           std::vector<long long> gsz_start_count_for_saved_decomps_;
-          std::map<int, int> dim_sz_to_id_;
+          std::map<PIO_Offset, int> dim_sz_to_id_;
 
-          int get_dim_id(int dimsz){
-            int dimid = INVALID_NCID, ret = 0;
-            static int dimid_idx = 0;
-
-            std::map<int, int>::iterator dim_id_iter = dim_sz_to_id_.find(dimsz);
-            if(dim_id_iter == dim_sz_to_id_.end()){
-              assert(ncid_ != INVALID_NCID);
-
-              ret = ncmpi_redef(ncid_);
-              assert(ret == NC_NOERR);
-
-              std::string dimid_name = std::string("dimid_") + std::to_string(dimid_idx++);
-
-              ret = ncmpi_def_dim(ncid_, dimid_name.c_str(), dimsz, &dimid);
-              assert(ret == NC_NOERR);
-
-              dim_sz_to_id_[dimsz] = dimid;
-
-              ret = ncmpi_enddef(ncid_);
-              assert(ret == NC_NOERR);
-            }
-            else{
-              dimid = dim_id_iter->second;
-            }
-            return dimid;
-          }
+          static int uniq_dimid_idx_;
+          int get_dim_id(PIO_Offset dimsz);
+          std::string get_trace_decomp_tmp_fname(int iosysid, MPI_Comm comm, int comm_rank, int mpi_wrank);
       };
 
     } // namespace DecompUtils
 
     std::string get_trace_decomp_fname(int iosysid, int mpi_wrank);
+    Decomp_Utils::Decomp_nc_logger &get_trace_decomp_logger(int iosysid, int mpi_wrank);
     void trace_decomp(int iosysid, int mpi_wrank, int ioid, const PIO_Offset *map, int mapsz);
     void finalize_trace_decomp(int iosysid);
 
