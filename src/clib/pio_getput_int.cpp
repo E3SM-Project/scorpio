@@ -2756,9 +2756,9 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 av->adios_varid = adios2_inquire_variable(file->ioH, vname);
                 if (av->adios_varid == NULL)
                 {
-                    av->adios_varid = adios2_define_variable(file->ioH, vname, av->adios_type,
-                                                             0, NULL, NULL, NULL,
-                                                             adios2_constant_dims_false);
+                    av->adios_varid = spio_define_adios2_variable(ios, file, file->ioH, vname, av->adios_type,
+                                                                  0, NULL, NULL, NULL,
+                                                                  adios2_constant_dims_false);
                     if (av->adios_varid == NULL)
                     {
                         GPTLstop("PIO:spio_put_vars_tc");
@@ -2881,9 +2881,9 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 av->adios_varid = adios2_inquire_variable(file->ioH, vname);
                 if (av->adios_varid == NULL)
                 {
-                    av->adios_varid = adios2_define_variable(file->ioH, vname, adios2_type_uint8_t,
-                                                             1, NULL, NULL, &av_size,
-                                                             adios2_constant_dims_false);
+                    av->adios_varid = spio_define_adios2_variable(ios, file, file->ioH, vname, adios2_type_uint8_t,
+                                                                  1, NULL, NULL, &av_size,
+                                                                  adios2_constant_dims_false);
                     if (av->adios_varid == NULL)
                     {
                         GPTLstop("PIO:spio_put_vars_tc");

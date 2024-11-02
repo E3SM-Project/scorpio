@@ -654,10 +654,10 @@ int PIOc_closefile_impl(int ncid)
                     adios2_variable *variableH = adios2_inquire_variable(file->ioH, "/__pio__/info/testing");
                     if (variableH == NULL)
                     {
-                        variableH = adios2_define_variable(file->ioH,
-                                                           "/__pio__/info/testing", adios2_type_int32_t,
-                                                           0, NULL, NULL, NULL,
-                                                           adios2_constant_dims_true);
+                        variableH = spio_define_adios2_variable(ios, file, file->ioH,
+                                                                "/__pio__/info/testing", adios2_type_int32_t,
+                                                                0, NULL, NULL, NULL,
+                                                                adios2_constant_dims_true);
                         if (variableH == NULL)
                         {
                             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
