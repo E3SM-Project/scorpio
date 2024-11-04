@@ -135,7 +135,7 @@ int PIOc_createfile_impl(int iosysid, int *ncidp, const int *iotype, const char 
 
     GPTLstart("PIO:PIOc_createfile");
     GPTLstart("PIO:write_total");
-    if (*iotype == PIO_IOTYPE_ADIOS)
+    if ((*iotype == PIO_IOTYPE_ADIOS) || (*iotype == PIO_IOTYPE_ADIOSC))
     {
         GPTLstart("PIO:PIOc_createfile_adios");
         GPTLstart("PIO:write_total_adios");
@@ -146,7 +146,7 @@ int PIOc_createfile_impl(int iosysid, int *ncidp, const int *iotype, const char 
     {
         GPTLstop("PIO:PIOc_createfile");
         GPTLstop("PIO:write_total");
-        if (*iotype == PIO_IOTYPE_ADIOS)
+        if ((*iotype == PIO_IOTYPE_ADIOS) || (*iotype == PIO_IOTYPE_ADIOSC))
         {
             GPTLstop("PIO:PIOc_createfile_adios");
             GPTLstop("PIO:write_total_adios");
@@ -165,7 +165,7 @@ int PIOc_createfile_impl(int iosysid, int *ncidp, const int *iotype, const char 
         GPTLstop("PIO:write_total");
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        if (*iotype == PIO_IOTYPE_ADIOS)
+        if ((*iotype == PIO_IOTYPE_ADIOS) || (*iotype == PIO_IOTYPE_ADIOSC))
         {
             GPTLstop("PIO:PIOc_createfile_adios");
             GPTLstop("PIO:write_total_adios");
@@ -188,7 +188,7 @@ int PIOc_createfile_impl(int iosysid, int *ncidp, const int *iotype, const char 
         {
             GPTLstop("PIO:PIOc_createfile");
             GPTLstop("PIO:write_total");
-            if (*iotype == PIO_IOTYPE_ADIOS)
+            if ((*iotype == PIO_IOTYPE_ADIOS) || (*iotype == PIO_IOTYPE_ADIOSC))
             {
                 GPTLstop("PIO:PIOc_createfile_adios");
                 GPTLstop("PIO:write_total_adios");
@@ -204,7 +204,7 @@ int PIOc_createfile_impl(int iosysid, int *ncidp, const int *iotype, const char 
     GPTLstop("PIO:write_total");
     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-    if (*iotype == PIO_IOTYPE_ADIOS)
+    if ((*iotype == PIO_IOTYPE_ADIOS) || (*iotype == PIO_IOTYPE_ADIOSC))
     {
         GPTLstop("PIO:PIOc_createfile_adios");
         GPTLstop("PIO:write_total_adios");
@@ -290,7 +290,7 @@ static int sync_file(int ncid)
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
 #ifdef _ADIOS2
-    if (file->iotype == PIO_IOTYPE_ADIOS)
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
         if (file->mode & PIO_WRITE)
         {
@@ -468,7 +468,7 @@ int PIOc_closefile_impl(int ncid)
     ios = file->iosystem;
     assert(ios);
 
-    if (file->iotype == PIO_IOTYPE_ADIOS)
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
         GPTLstart("PIO:PIOc_closefile_adios");
 
@@ -499,7 +499,7 @@ int PIOc_closefile_impl(int ncid)
             sync_file(ncid);
         }
 
-    if (file->iotype == PIO_IOTYPE_ADIOS)
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
 #ifndef _ADIOS_BP2NC_TEST
         if (file->mode & PIO_WRITE)
@@ -533,7 +533,7 @@ int PIOc_closefile_impl(int ncid)
         PIO_SEND_ASYNC_MSG(ios, msg, &ierr, ncid);
         if(ierr != PIO_NOERR)
         {
-            if (file->iotype == PIO_IOTYPE_ADIOS)
+            if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             {
                 GPTLstop("PIO:PIOc_closefile_adios");
 
@@ -572,7 +572,7 @@ int PIOc_closefile_impl(int ncid)
 
     /* ADIOS: assume all procs are also IO tasks */
 #ifdef _ADIOS2
-    if (file->iotype == PIO_IOTYPE_ADIOS)
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
         adios2_error adiosErr = adios2_error_none;
 
@@ -585,7 +585,7 @@ int PIOc_closefile_impl(int ncid)
                 ierr = begin_adios2_step(file, NULL);
                 if (ierr != PIO_NOERR)
                 {
-                    if (file->iotype == PIO_IOTYPE_ADIOS)
+                    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
                     {
                         GPTLstop("PIO:PIOc_closefile_adios");
                         GPTLstop("PIO:write_total_adios");
@@ -619,7 +619,7 @@ int PIOc_closefile_impl(int ncid)
                         attributeH = adios2_define_attribute(file->ioH, "/__pio__/fillmode", adios2_type_int32_t, &file->fillmode);
                         if (attributeH == NULL)
                         {
-                            if (file->iotype == PIO_IOTYPE_ADIOS)
+                            if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
                             {
                                 GPTLstop("PIO:PIOc_closefile_adios");
                                 GPTLstop("PIO:write_total_adios");
@@ -680,7 +680,7 @@ int PIOc_closefile_impl(int ncid)
                 GPTLstop("end_adios2_step_PIOc_closefile");
                 if (ierr != PIO_NOERR)
                 {
-                    if (file->iotype == PIO_IOTYPE_ADIOS)
+                    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
                     {
                         GPTLstop("PIO:PIOc_closefile_adios");
                         GPTLstop("PIO:write_total_adios");
@@ -709,7 +709,7 @@ int PIOc_closefile_impl(int ncid)
                 adiosErr = adios2_close(file->engineH);
                 if (adiosErr != adios2_error_none)
                 {
-                    if (file->iotype == PIO_IOTYPE_ADIOS)
+                    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
                     {
                         GPTLstop("PIO:PIOc_closefile_adios");
                         GPTLstop("PIO:write_total_adios");
@@ -911,7 +911,7 @@ int PIOc_closefile_impl(int ncid)
             LOG((1, "DONE CONVERTING: %s", file->filename));
             if (ierr != PIO_NOERR)
             {
-                if (file->iotype == PIO_IOTYPE_ADIOS)
+                if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
                 {
                     GPTLstop("PIO:PIOc_closefile_adios");
                     GPTLstop("PIO:write_total_adios");
@@ -941,7 +941,7 @@ int PIOc_closefile_impl(int ncid)
             file->filename = NULL;
         }
 
-        if (file->iotype == PIO_IOTYPE_ADIOS)
+        if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
         {
             GPTLstop("PIO:PIOc_closefile_adios");
 
@@ -983,7 +983,7 @@ int PIOc_closefile_impl(int ncid)
     }
 #endif
 
-    assert(file->iotype != PIO_IOTYPE_ADIOS);
+    assert((file->iotype != PIO_IOTYPE_ADIOS) && (file->iotype != PIO_IOTYPE_ADIOSC));
 
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
@@ -1239,7 +1239,7 @@ int PIOc_sync_impl(int ncid)
     if (file->mode & PIO_WRITE)
     {
         GPTLstart("PIO:write_total");
-        if (file->iotype == PIO_IOTYPE_ADIOS)
+        if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             GPTLstart("PIO:write_total_adios");
     }
 
@@ -1248,7 +1248,7 @@ int PIOc_sync_impl(int ncid)
     if (file->mode & PIO_WRITE)
     {
         GPTLstop("PIO:write_total");
-        if (file->iotype == PIO_IOTYPE_ADIOS)
+        if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             GPTLstop("PIO:write_total_adios");
     }
 
