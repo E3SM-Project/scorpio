@@ -1373,6 +1373,27 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
             GPTLstop("PIO:PIOc_Init_Intracomm");
             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
         }
+
+    #ifdef _SPIO_ADIOS_USE_COMPRESSION
+        /* adios2_define_operator defines an adios2 supported operator by its type. Returns: handler (success) or NULL (failure) */
+        #if defined(ADIOS2_HAVE_BLOSC2)
+        /* Prefer Blosc2 for data compression due to its performance benefits over BZip2 */
+        ios->compression_operator = adios2_define_operator(ios->adiosH, "Blosc2Lossless", "blosc");
+        #elif defined(ADIOS2_HAVE_BZIP2)
+        /* Fall back to BZip2 if Blosc2 is not available */
+        ios->compression_operator = adios2_define_operator(ios->adiosH, "BZip2Lossless", "bzip2");
+        #else
+        /* No supported compression operators are available */
+        ios->compression_operator = NULL;
+        #endif
+
+        /* Check if a valid compression operator was defined; if not, warn the user */
+        if (ios->compression_operator == NULL)
+        {
+            printf("PIO: WARNING: Failed to define an adios2 supported compression operator (e.g., Blosc2, BZip2), "
+                   "or no supported compression operators are available. Data compression will be disabled.\n");
+        }
+    #endif
     }
 
     ios->adios_readerH = adios2_init_mpi(ios->union_comm);

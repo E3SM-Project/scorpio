@@ -773,6 +773,10 @@ typedef struct iosystem_desc_t
     /* Block merging setup */
     MPI_Comm block_comm;
     int block_myrank, block_nprocs;
+    #ifdef _SPIO_ADIOS_USE_COMPRESSION
+    /* ADIOS operator for applying a specific compression method (e.g., Blosc2, BZip2) */
+    adios2_operator* compression_operator;
+    #endif
 #endif
 
     /** I/O statistics associated with this I/O system */

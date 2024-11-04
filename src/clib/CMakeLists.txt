@@ -323,6 +323,12 @@ if (ADIOS_NO_DECOMPS)
     PUBLIC _SPIO_ADIOS_NO_DECOMPS)
 endif ()
 
+if (ADIOS_USE_COMPRESSION)
+  message(STATUS "Applying data compression to ADIOS BP files to reduce disk usage")
+  target_compile_definitions (pioc
+    PUBLIC _SPIO_ADIOS_USE_COMPRESSION)
+endif ()
+
 if (PIO_ENABLE_API_TRACING)
   message(STATUS "Enabling API tracing")
   set(ENABLE_API_TRACING 1)

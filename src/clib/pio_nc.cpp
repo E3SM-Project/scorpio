@@ -3114,9 +3114,9 @@ int PIOc_def_dim_impl(int ncid, const char *name, PIO_Offset len, int *idp)
             variableH = adios2_inquire_variable(file->ioH, dimname);
             if (variableH == NULL)
             {
-                variableH = adios2_define_variable(file->ioH, dimname, adios2_type_uint64_t,
-                                                   0, NULL, NULL, NULL,
-                                                   adios2_constant_dims_false);
+                variableH = spio_define_adios2_variable(ios, file, file->ioH, dimname, adios2_type_uint64_t,
+                                                        0, NULL, NULL, NULL,
+                                                        adios2_constant_dims_false);
                 if (variableH == NULL)
                 {
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);

@@ -398,6 +398,11 @@ extern "C" {
     unsigned long get_adios2_io_cnt();
     int begin_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
     int end_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
+    /* Helper function to define an ADIOS variable with optional data compression */
+    adios2_variable* spio_define_adios2_variable(iosystem_desc_t *ios, file_desc_t *file, adios2_io *io,
+                                                 const char *name, const adios2_type type, const size_t ndims,
+                                                 const size_t *shape, const size_t *start, const size_t *count,
+                                                 const adios2_constant_dims constant_dims);
 #endif
 
 #ifdef _HDF5
