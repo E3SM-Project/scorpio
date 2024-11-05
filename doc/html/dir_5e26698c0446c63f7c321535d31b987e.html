@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.9.1"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>SCORPIO: pio_openfile</title>
+<title>SCORPIO: piof.dir Directory Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -23,7 +23,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">SCORPIO
-   &#160;<span id="projectnumber">1.4.3</span>
+   &#160;<span id="projectnumber">1.4.4</span>
    </div>
   </td>
  </tr>
@@ -47,7 +47,6 @@ $(function() {
 });
 /* @license-end */</script>
 <div id="main-nav"></div>
-</div><!-- top -->
 <!-- window showing the filter options -->
 <div id="MSearchSelectWindow"
      onmouseover="return searchBox.OnSearchSelectShow()"
@@ -62,50 +61,20 @@ $(function() {
 </iframe>
 </div>
 
+<div id="nav-path" class="navpath">
+  <ul>
+<li class="navelem"><a class="el" href="dir_f6cbad128ea30c8b08f5863b137a9217.html">src</a></li><li class="navelem"><a class="el" href="dir_80b6f43e938beae7cf309b2a9c72ea3a.html">flib</a></li><li class="navelem"><a class="el" href="dir_31f0ba7069b7882f84244d01d9a81e97.html">CMakeFiles</a></li><li class="navelem"><a class="el" href="dir_5e26698c0446c63f7c321535d31b987e.html">piof.dir</a></li>  </ul>
+</div>
+</div><!-- top -->
 <div class="header">
   <div class="headertitle">
-<div class="title">pio_openfile</div>  </div>
+<div class="title">piof.dir Directory Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
-
-<p>Open an existing file.  
-</p>
-<p>Open an existing file. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">iosys</td><td>The handle to the I/O system. IO system descriptor structure. This structure contains the general IO subsystem data and MPI structure </td></tr>
-    <tr><td class="paramdir">[out]</td><td class="paramname">file</td><td>The handle to the opened file is returned via this arg.</td></tr>
-  </table>
-  </dd>
-</dl>
-<p>File descriptor structure. This structure holds information associated with each open file </p><dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">iotype</td><td>The I/O type to use to open the file. The library can modify the I/O type when retrying with other I/O types (when the user specified I/O type fails). If a different I/O type is used by the library this argument is updated accordingly. An integer parameter which controls the iotype.<ul>
-<li>PIO_iotype_pnetcdf : parallel read/write of pNetCDF files (netcdf3)</li>
-</ul>
-</td></tr>
-  </table>
-  </dd>
-</dl>
-<ul>
-<li>PIO_iotype_netcdf : serial read/write of NetCDF files using 'base_node' (netcdf3)</li>
-<li>PIO_iotype_netcdf4c : parallel read/serial write of NetCDF4 (HDF5) files with data compression</li>
-<li>PIO_iotype_netcdf4p : parallel read/write of NETCDF4 (HDF5) files</li>
-<li>PIO_iotype_adios : parallel write of ADIOS files with subset rearrangement only</li>
-<li>PIO_iotype_hdf5 : parallel write of HDF5 files <dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">fname</td><td>The name of the file to be opened </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">mode</td><td>(Optional) The file access mode.</td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="section return"><dt>Returns</dt><dd>: The error return code; ierr != PIO_noerr indicates an error. (see <a class="el" href="group___p_i_o__seterrorhandling.html">PIO_seterrorhandling</a> ) </dd></dl>
-</li>
-</ul>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Thu Jul 25 2024 11:57:47 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Tue Nov 5 2024 15:30:55 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>
