@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['llen_1456',['llen',['../structio__desc__t.html#aa774744b15b0eced2af33da10a8ed3c4',1,'io_desc_t']]],
-  ['loffset_1457',['loffset',['../structio__region.html#a65ba5fd34f21987d9c07cfb9e264b159',1,'io_region']]]
+  ['llen_1450',['llen',['../structio__desc__t.html#aa774744b15b0eced2af33da10a8ed3c4',1,'io_desc_t']]],
+  ['loffset_1451',['loffset',['../structio__region.html#a65ba5fd34f21987d9c07cfb9e264b159',1,'io_region']]]
 ];
