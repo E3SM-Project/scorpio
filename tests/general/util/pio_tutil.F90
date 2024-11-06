@@ -334,6 +334,11 @@ CONTAINS
 #ifdef _ADIOS2
       ! adios
       num_iotypes = num_iotypes + 1
+#ifdef _SPIO_ADIOS_USE_COMPRESSION
+      ! adiosc
+      num_iotypes = num_iotypes + 1
+#endif
+
 #endif
 #ifdef _HDF5
       ! hdf5
@@ -351,12 +356,20 @@ CONTAINS
       iotype_descs(i) = "PNETCDF"
       i = i + 1
 #endif
+
 #ifdef _ADIOS2
       ! adios
       iotypes(i) = PIO_iotype_adios
       iotype_descs(i) = "ADIOS"
       i = i + 1
+#ifdef _SPIO_ADIOS_USE_COMPRESSION
+      ! adiosc
+      iotypes(i) = PIO_iotype_adiosc
+      iotype_descs(i) = "ADIOSC"
+      i = i + 1
 #endif
+#endif
+
 #ifdef _HDF5
       ! hdf5
       iotypes(i) = PIO_iotype_hdf5
@@ -448,10 +461,17 @@ CONTAINS
       ! pnetcdf
       num_iotypes = num_iotypes + 1
 #endif
+
 #ifndef _ADIOS2
-      ! adios
+      ! adios, adiosc
+      num_iotypes = num_iotypes + 2
+#else
+#ifndef _SPIO_ADIOS_USE_COMPRESSION
+      ! adiosc
       num_iotypes = num_iotypes + 1
 #endif
+#endif
+
 #ifndef _HDF5
       ! hdf5
       num_iotypes = num_iotypes + 1
@@ -483,12 +503,25 @@ CONTAINS
       iotype_descs(i) = "PNETCDF"
       i = i + 1
 #endif
+
 #ifndef _ADIOS2
       ! adios
       iotypes(i) = PIO_iotype_adios
       iotype_descs(i) = "ADIOS"
       i = i + 1
+      ! adiosc
+      iotypes(i) = PIO_iotype_adiosc
+      iotype_descs(i) = "ADIOSC"
+      i = i + 1
+#else
+#ifndef _SPIO_ADIOS_USE_COMPRESSION
+      ! adiosc
+      iotypes(i) = PIO_iotype_adiosc
+      iotype_descs(i) = "ADIOSC"
+      i = i + 1
 #endif
+#endif
+
 #ifndef _HDF5
       ! hdf5
       iotypes(i) = PIO_iotype_hdf5
@@ -527,6 +560,10 @@ CONTAINS
 #ifdef _ADIOS2
       ! adios
       num_iotypes = num_iotypes + 1
+#ifdef _SPIO_ADIOS_USE_COMPRESSION
+      ! adiosc
+      num_iotypes = num_iotypes + 1
+#endif
 #endif
 #ifdef _HDF5
       ! hdf5
@@ -549,6 +586,12 @@ CONTAINS
       iotypes(i) = PIO_iotype_adios
       iotype_descs(i) = "ADIOS"
       i = i + 1
+#ifdef _SPIO_ADIOS_USE_COMPRESSION
+      ! adiosc
+      iotypes(i) = PIO_iotype_adiosc
+      iotype_descs(i) = "ADIOSC"
+      i = i + 1
+#endif
 #endif
 #ifdef _HDF5
       ! hdf5
@@ -606,8 +649,13 @@ CONTAINS
       num_iotypes = num_iotypes + 1
 #endif
 #ifndef _ADIOS2
-      ! adios
+      ! adios, adiosc
+      num_iotypes = num_iotypes + 2
+#else
+#ifndef _SPIO_ADIOS_USE_COMPRESSION
+      ! adiosc
       num_iotypes = num_iotypes + 1
+#endif
 #endif
 #ifndef _HDF5
       ! hdf5
@@ -619,12 +667,25 @@ CONTAINS
     ALLOCATE(iotype_descs(num_iotypes))
 
     i = 1
+
 #ifndef _ADIOS2
       ! adios
       iotypes(i) = PIO_iotype_adios
       iotype_descs(i) = "ADIOS"
       i = i + 1
+      ! adiosc
+      iotypes(i) = PIO_iotype_adiosc
+      iotype_descs(i) = "ADIOSC"
+      i = i + 1
+#else
+#ifndef _SPIO_ADIOS_USE_COMPRESSION
+      ! adiosc
+      iotypes(i) = PIO_iotype_adiosc
+      iotype_descs(i) = "ADIOSC"
+      i = i + 1
 #endif
+#endif
+
 #ifndef _HDF5
       ! adios
       iotypes(i) = PIO_iotype_hdf5
@@ -1299,6 +1360,11 @@ CONTAINS
         (str == "adios") .OR.&
         (str == "ADIOS")) THEN
       PIO_TF_Iotype_from_str = PIO_IOTYPE_ADIOS
+    ELSE IF((str == "PIO_IOTYPE_ADIOSC") .OR.&
+        (str == "pio_iotype_adiosc") .OR.&
+        (str == "adiosc") .OR.&
+        (str == "ADIOSC")) THEN
+      PIO_TF_Iotype_from_str = PIO_IOTYPE_ADIOSC
     ELSE IF((str == "PIO_IOTYPE_HDF5") .OR.&
         (str == "pio_iotype_hdf5") .OR.&
         (str == "hdf5") .OR.&

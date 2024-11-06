@@ -272,7 +272,7 @@ int PIOc_setframe_impl(int ncid, int varid, int frame)
 
 #ifdef _ADIOS2
     /* Add end_step here. Check for frame value of the ncid. */
-    if (file->iotype == PIO_IOTYPE_ADIOS)
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
         GPTLstart("PIOc_setframe_adios2");
         if (file->adios_io_process == 1)
