@@ -1161,11 +1161,6 @@ int PIOc_deletefile_impl(int iosysid, const char *filename)
 
         if (!mpierr && ios->io_rank == 0)
         {
-#ifdef _NETCDF
-             ierr = nc_delete(filename);
-#else /* Assume that _PNETCDF is defined. */
-             ierr = ncmpi_delete(filename, MPI_INFO_NULL);
-#endif
 #ifdef _ADIOS2
             /* Append ".bp" to filename for the corresponding ADIOS BP filename */
             static const char adios_bp_filename_extn[] = ".bp";
@@ -1186,6 +1181,15 @@ int PIOc_deletefile_impl(int iosysid, const char *filename)
                 spio_remove_directory(adios_bp_filename);
             }
             free(adios_bp_filename);
+
+            /* Delete the file (for ADIOS BP files, delete the symlink file) */
+            ierr = unlink(filename);
+#elif defined(_PNETCDF)
+            ierr = ncmpi_delete(filename, MPI_INFO_NULL);
+#elif defined(_NETCDF)
+            ierr = nc_delete(filename);
+#else
+            ierr = unlink(filename);
 #endif
         }
 
