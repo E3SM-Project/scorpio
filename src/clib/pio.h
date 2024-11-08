@@ -1195,8 +1195,11 @@ enum PIO_IOTYPE
     /** ADIOS parallel */
     PIO_IOTYPE_ADIOS = 5,
 
+    /** ADIOS parallel with compression */
+    PIO_IOTYPE_ADIOSC = 6,
+
     /** HDF5 parallel */
-    PIO_IOTYPE_HDF5 = 6
+    PIO_IOTYPE_HDF5 = 7
 };
 
 /**

@@ -552,8 +552,7 @@ adios2_variable* spio_define_adios2_variable(iosystem_desc_t *ios, file_desc_t *
 #ifdef _SPIO_ADIOS_USE_COMPRESSION
     assert(ios != NULL && file != NULL);
     /* Skip compression for scalar variables (ndims == 0), see https://github.com/ornladios/ADIOS2/issues/4390 */
-    /* FIXME: Consider adding a new IO type, PIO_IOTYPE_ADIOSC, and use it as a condition for applying compression */
-    if (variable != NULL && ios->compression_operator != NULL && ndims > 0 /* && file->iotype == PIO_IOTYPE_ADIOSC */)
+    if (variable != NULL && ios->compression_operator != NULL && ndims > 0 && (file->iotype == PIO_IOTYPE_ADIOSC))
     {
         size_t operation_index = 0;
         adios2_error adiosErr = adios2_error_none;
@@ -2787,7 +2786,9 @@ int PIO_get_avail_iotypes(char *buf, size_t sz)
 
 #ifdef _ADIOS2
     assert(sz > 0);
-    snprintf(cbuf, sz, ", %s (%d)", pio_iotype_to_string(PIO_IOTYPE_ADIOS), PIO_IOTYPE_ADIOS);
+    snprintf(cbuf, sz, ", %s (%d), %s (%d)",
+              pio_iotype_to_string(PIO_IOTYPE_ADIOS), PIO_IOTYPE_ADIOS,
+              pio_iotype_to_string(PIO_IOTYPE_ADIOSC), PIO_IOTYPE_ADIOSC);
     sz = max_sz - strlen(buf);
     cbuf = buf + strlen(buf);
 #endif
@@ -2998,7 +2999,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
         return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
     }
 
-    if (file->iotype == PIO_IOTYPE_ADIOS)
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
         LOG((2, "Calling adios_open mode = %d", file->mode));
 
@@ -3497,7 +3498,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     if ((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->ioroot, ios->union_comm)))
     {
 #ifdef _ADIOS2
-        if (file->iotype == PIO_IOTYPE_ADIOS)
+        if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
         {
             if (file->filename != NULL)
             {
@@ -3518,7 +3519,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     if (ierr != PIO_NOERR)
     {
 #ifdef _ADIOS2
-        if (file->iotype == PIO_IOTYPE_ADIOS)
+        if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
         {
             if (file->filename != NULL)
             {
@@ -4522,7 +4523,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 
     file->iotype = *iotype;
 #ifdef _ADIOS2
-    if (file->iotype == PIO_IOTYPE_ADIOS)
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
         if (file->mode & PIO_WRITE)
         {
@@ -4756,7 +4757,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
     }
 
 #ifdef _ADIOS2
-    if (file->iotype == PIO_IOTYPE_ADIOS)
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
         /* Get available variables and set structures. Restrict to the first step only */
         adios2_step_status status;
@@ -5081,6 +5082,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #endif
 #ifdef _ADIOS2
         case PIO_IOTYPE_ADIOS:
+        case PIO_IOTYPE_ADIOSC:
             break; /* This case has been handled above */
 #endif
         default:
@@ -5228,7 +5230,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
          filename, file->pio_ncid, file->fh, ierr));
 
     /* Set ncid to ADIOS attributes */
-    if (file->iotype == PIO_IOTYPE_ADIOS)
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
 #ifdef _ADIOS2
         for (int i = 0; i < file->num_attrs; i++)
@@ -5490,7 +5492,7 @@ int spio_change_def(int ncid, int is_enddef)
         }
 #endif /* _PNETCDF */
 #ifdef _NETCDF
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_HDF5 && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC && file->iotype != PIO_IOTYPE_HDF5 && file->do_io)
         {
             if (is_enddef)
             {
@@ -5591,7 +5593,7 @@ int iotype_is_valid(int iotype)
 #endif /* _PNETCDF */
 
 #ifdef _ADIOS2
-    if (iotype == PIO_IOTYPE_ADIOS)
+    if ((iotype == PIO_IOTYPE_ADIOS) || (iotype == PIO_IOTYPE_ADIOSC))
         ret++;
 #endif
 

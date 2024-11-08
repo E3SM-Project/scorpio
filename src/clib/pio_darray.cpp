@@ -2022,7 +2022,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
     spio_ltimer_start(ios->io_fstats->wr_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
 
-    if (file->iotype == PIO_IOTYPE_ADIOS)
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
         GPTLstart("PIO:PIOc_write_darray_adios");
         GPTLstart("PIO:write_total_adios");
@@ -2043,7 +2043,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        if (file->iotype == PIO_IOTYPE_ADIOS)
+        if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
         {
             GPTLstop("PIO:PIOc_write_darray_adios");
             GPTLstop("PIO:write_total_adios");
@@ -2061,7 +2061,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        if (file->iotype == PIO_IOTYPE_ADIOS)
+        if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
         {
             GPTLstop("PIO:PIOc_write_darray_adios");
             GPTLstop("PIO:write_total_adios");
@@ -2082,7 +2082,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        if (file->iotype == PIO_IOTYPE_ADIOS)
+        if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
         {
             GPTLstop("PIO:PIOc_write_darray_adios");
             GPTLstop("PIO:write_total_adios");
@@ -2114,7 +2114,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->wr_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            if (file->iotype == PIO_IOTYPE_ADIOS)
+            if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             {
                 GPTLstop("PIO:PIOc_write_darray_adios");
                 GPTLstop("PIO:write_total_adios");
@@ -2191,7 +2191,7 @@ if (file->iotype != PIO_IOTYPE_HDF5)
         {
             GPTLstop("PIO:PIOc_write_darray");
             GPTLstop("PIO:write_total");
-            if (file->iotype == PIO_IOTYPE_ADIOS)
+            if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             {
                 GPTLstop("PIO:PIOc_write_darray_adios");
                 GPTLstop("PIO:write_total_adios");
@@ -2219,7 +2219,7 @@ if (file->iotype != PIO_IOTYPE_HDF5)
     LOG((3, "wmb->ioid = %d wmb->recordvar = %d", wmb->ioid, wmb->recordvar));
 
 #ifdef _ADIOS2
-    if (file->iotype == PIO_IOTYPE_ADIOS)
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
         ierr = PIO_NOERR;
         ierr = PIOc_write_darray_adios(file, varid, ioid, iodesc, arraylen, array, fillvalue);
@@ -3578,7 +3578,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
               "unknown rearranger", __FILE__, __LINE__);
 
     /* Get var description. */
-    if (file->iotype == PIO_IOTYPE_ADIOS)
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
 #ifdef _ADIOS2
         vdesc_adios2 = &(file->adios_vars[varid]);
@@ -3597,7 +3597,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
 
         /* Find out PIO data type of var. */
-        if (file->iotype == PIO_IOTYPE_ADIOS)
+        if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
         {
 #ifdef _ADIOS2
             assert(vdesc_adios2->nc_type != PIO_NAT);
@@ -3620,7 +3620,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
         }
 
         /* Find out length of type. */
-        if (file->iotype == PIO_IOTYPE_ADIOS)
+        if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
         {
 #ifdef _ADIOS2
             if (vdesc_adios2->adios_type_size == 0)
@@ -3649,7 +3649,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
         spio_ltimer_start(file->io_fstats->tot_timer_name);
     }
 
-    if (file->iotype == PIO_IOTYPE_ADIOS)
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
 #ifdef _ADIOS2
         ios->io_fstats->rb += vdesc_adios2->adios_type_size * iodesc->llen;
@@ -3698,7 +3698,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
    else
        rlen = iodesc->llen;
 
-   if (file->iotype == PIO_IOTYPE_ADIOS)
+   if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
        rlen = 0;
 
     if(!ios->async || !ios->ioproc)
@@ -3822,6 +3822,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
             break;
 #ifdef _ADIOS2
         case PIO_IOTYPE_ADIOS:
+        case PIO_IOTYPE_ADIOSC:
             GPTLstart("PIO:PIOc_read_darray_adios");
             if ((ierr = PIOc_read_darray_adios(file, fndims, iodesc, varid, array)))
             {
