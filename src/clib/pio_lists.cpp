@@ -21,6 +21,10 @@ namespace SPIO_Util{
     namespace GVars{
       std::map<int, io_desc_t *> pio_iodesc_list;
       std::map<int, iosystem_desc_t *> pio_iosystem_list;
+      /* This list is independent of the I/O system because users only provide the
+       * file id during a call - hence instead of deducing the I/O system that the file
+       * belongs to, the file list is separate from the I/O system (list)
+       */
       std::map<int, file_desc_t *> pio_file_list;
     }
   }
@@ -199,6 +203,21 @@ int spio_write_all_file_iostats(iosystem_desc_t *iosysp)
   return PIO_NOERR;
 }
 
+static int finalize_file_list(void )
+{
+  /* No valid I/O systems, clear out the file list */
+  for(std::map<int, file_desc_t *>::iterator fiter =
+          SPIO_Util::SPIO_Lists::GVars::pio_file_list.begin();
+        fiter != SPIO_Util::SPIO_Lists::GVars::pio_file_list.end(); ++fiter){
+    file_desc_t *file = (*fiter).second;
+    pio_free_file(file);
+  }
+
+  SPIO_Util::SPIO_Lists::GVars::pio_file_list.clear();
+
+  return PIO_NOERR;
+}
+
 /** 
  * Delete iosystem (iosytem_desc_t) from the global list of
  * available iosystems
@@ -215,6 +234,12 @@ int pio_delete_iosystem_from_list(int iosysid)
     iosystem_desc_t *iosys = (*iter).second;
     free(iosys);
     SPIO_Util::SPIO_Lists::GVars::pio_iosystem_list.erase(iter);
+    if(SPIO_Util::SPIO_Lists::GVars::pio_iosystem_list.size() == 0){
+      /* Unfortunately in some cases not all procs cleanup the files as needed
+       * e.g. PIO_RETURN_ERROR + non-I/O procs on a create file call
+       */
+      return finalize_file_list();
+    }
   }
   else{
     return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
