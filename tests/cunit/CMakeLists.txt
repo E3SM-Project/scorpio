@@ -104,10 +104,18 @@ add_spio_executable (test_spio_ltimer TRUE "" test_spio_ltimer.cpp)
 add_spio_executable (test_spio_serializer TRUE "" test_spio_serializer.cpp)
 add_spio_executable (test_spio_tree TRUE "" test_spio_tree.cpp)
 add_spio_executable (test_spio_file_mvcache TRUE "" test_spio_file_mvcache.cpp)
+add_spio_executable (test_spio_rearr_utils_gather TRUE "" test_spio_rearr_utils_gather.cpp)
+add_spio_executable (test_spio_rearr_utils_scatter TRUE "" test_spio_rearr_utils_scatter.cpp)
+add_spio_executable (test_spio_rearr_utils_alltoall TRUE "" test_spio_rearr_utils_alltoall.cpp)
+add_spio_executable (test_spio_rearr_contig TRUE "" test_spio_rearr_contig.cpp)
+add_spio_executable (test_spio_rearr_contig_nvars TRUE "" test_spio_rearr_contig_nvars.cpp)
 add_spio_executable (test_sdecomp_regex TRUE "" test_sdecomp_regex.cpp test_common.cpp)
 add_spio_executable(test_req_block_wait TRUE "" test_req_block_wait.cpp test_common.cpp)
 add_dependencies (tests test_spmd test_spio_ltimer test_spio_serializer test_spio_tree
-                  test_spio_file_mvcache test_sdecomp_regex test_req_block_wait)
+                  test_spio_file_mvcache test_spio_rearr_utils_gather
+                  test_spio_rearr_utils_scatter test_spio_rearr_utils_alltoall
+                  test_spio_rearr_contig test_spio_rearr_contig_nvars
+                  test_sdecomp_regex test_req_block_wait)
 
 if(PIO_USE_ASYNC_WR_THREAD)
   add_spio_executable (test_mtq TRUE "" test_async_mtq.cpp test_common.cpp)
@@ -115,6 +123,8 @@ if(PIO_USE_ASYNC_WR_THREAD)
   add_spio_executable (test_mtq_pool TRUE "" test_async_tpool.cpp test_common.cpp)
   add_dependencies(tests test_mtq test_mtq_signal test_mtq_pool)
 endif()
+
+set (SPIO_TEST_MAX_NPROCS 4)
 
 # Test Timeout in seconds.
 if (PIO_VALGRIND_CHECK)
@@ -162,6 +172,36 @@ else ()
     EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_req_block_wait
     NUMPROCS 4
     TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_rearr_utils_gather${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_utils_gather
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_rearr_utils_scatter${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_utils_scatter
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_rearr_utils_alltoall${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_utils_alltoall
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_rearr_contig${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_contig
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_rearr_contig_nvars${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_contig_nvars
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
   add_mpi_test(test_spmd
     EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spmd
     NUMPROCS ${AT_LEAST_FOUR_TASKS}
