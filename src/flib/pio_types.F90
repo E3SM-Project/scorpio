@@ -155,6 +155,7 @@ module pio_types
     integer(i4), public, parameter :: PIO_rearr_box =  1
     integer(i4), public, parameter :: PIO_rearr_subset =  2
     integer(i4), public, parameter :: PIO_rearr_any =  3
+    integer(i4), public, parameter :: PIO_rearr_contig =  4
 
 !>
 !! @public
