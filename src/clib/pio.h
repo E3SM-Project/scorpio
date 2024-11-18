@@ -447,7 +447,10 @@ enum PIO_REARRANGERS
     PIO_REARR_SUBSET = 2,
 
     /** Let the library choose the rearranger. */
-    PIO_REARR_ANY = 3
+    PIO_REARR_ANY = 3,
+
+    /** Contig rearranger (data aggregation + contiguous data) */
+    PIO_REARR_CONTIG = 4,
 };
 
 /**
