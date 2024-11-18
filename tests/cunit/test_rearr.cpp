@@ -1172,6 +1172,7 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
     free(ior1);
     free(ios->ioranks);
     free(ios->compranks);
+    free(file);
     free(iodesc);
     free(ios);
     free(sbuf);
