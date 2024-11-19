@@ -17,6 +17,9 @@
 #include "pio_sdecomps_regex.h"
 #include "spio_io_summary.h"
 #include "spio_rearrange_any.h"
+#include "spio_ltimer.h"
+#include "spio_ltimer_utils.hpp"
+#include "spio_gptl_utils.hpp"
 
 /* Include headers for HDF5 compression filters */
 #if PIO_USE_HDF5
@@ -690,25 +693,22 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function calls. */
     int ierr;              /* Return code. */
 
-    GPTLstart("PIO:PIOc_initdecomp");
+    SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_initdecomp");
     LOG((1, "PIOc_InitDecomp iosysid = %d pio_type = %d ndims = %d maplen = %d",
          iosysid, pio_type, ndims, maplen));
 
     /* Get IO system info. */
     if (!(ios = pio_get_iosystem_from_id(iosysid)))
     {
-        GPTLstop("PIO:PIOc_initdecomp");
         return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
                         "Initializing the PIO decomposition failed. Invalid io system id (%d) provided. Could not find an iosystem associated with the id", iosysid);
     }
     assert(ios);
-    spio_ltimer_start(ios->io_fstats->tot_timer_name);
+    SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper ios_fstats_tot_timer(ios->io_fstats->tot_timer_name);
 
     /* Caller must provide these. */
     if (!gdimlen || !compmap || !ioidp)
     {
-        GPTLstop("PIO:PIOc_initdecomp");
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
                         "Initializing the PIO decomposition failed. Invalid pointers (NULL) to gdimlen(%s) or compmap(%s) or ioidp (%s) provided", (gdimlen) ? "not NULL" : "NULL", (compmap) ? "not NULL" : "NULL", (ioidp) ? "not NULL" : "NULL");
     }
@@ -717,8 +717,6 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
     for (int i = 0; i < ndims; i++)
         if (gdimlen[i] <= 0)
         {
-            GPTLstop("PIO:PIOc_initdecomp");
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
                             "Initializing the PIO decomposition failed. Invalid value for global dimension lengths provided. The global length of dimension %d is provided as %d (expected > 0)", i, gdimlen[i]);
         }
@@ -743,8 +741,6 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
         }
         if(!amsg_iostart || !amsg_iocount)
         {
-            GPTLstop("PIO:PIOc_initdecomp");
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Initializing the PIO decomposition failed. Out of memory allocating %lld bytes for start array and %lld bytes for count array for sending asynchronous message, PIO_MSG_INITDECOMP_DOF, on iosystem (iosysid=%d)", (unsigned long long) (ndims * sizeof(PIO_Offset)), (unsigned long long) (ndims * sizeof(PIO_Offset)), ios->iosysid);
         }
@@ -771,8 +767,6 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
      * iodesc. */
     if ((ierr = malloc_iodesc(ios, pio_type, ndims, &iodesc)))
     {
-        GPTLstop("PIO:PIOc_initdecomp");
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                         "Initializing the PIO decomposition failed. Out of memory allocating memory for I/O descriptor");
     }
@@ -783,8 +777,6 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
     /* Remember the map. */
     if (!(iodesc->map = (PIO_Offset *) malloc(sizeof(PIO_Offset) * maplen)))
     {
-        GPTLstop("PIO:PIOc_initdecomp");
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "Initializing the PIO decomposition failed. Out of memory allocating %lld bytes to store I/O decomposition map", (unsigned long long) (sizeof(PIO_Offset) * maplen));
     }
@@ -794,8 +786,6 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
     /* Remember the dim sizes. */
     if (!(iodesc->dimlen = (int *)malloc(sizeof(int) * ndims)))
     {
-        GPTLstop("PIO:PIOc_initdecomp");
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "Initializing the PIO decomposition failed. Out of memory allocating %lld bytes for dimension sizes in the I/O decomposition map", (unsigned long long) (sizeof(int) * ndims));
     }
@@ -840,8 +830,6 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
         if ((ierr = subset_rearrange_create(ios, maplen, (PIO_Offset *)compmap, gdimlen,
                                             ndims, iodesc)))
         {
-            GPTLstop("PIO:PIOc_initdecomp");
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                             "Initializing the PIO decomposition failed. Error creating the SUBSET rearranger");
         }
@@ -870,8 +858,6 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
                                              ios->io_rank, iodesc->firstregion->start,
                                              iodesc->firstregion->count, &iodesc->num_aiotasks)))
                 {
-                    GPTLstop("PIO:PIOc_initdecomp");
-                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                                     "Initializing the PIO decomposition failed. Internal error calculating start/count for the decomposition");
                 }
@@ -880,8 +866,6 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
             /* Compute the max io buffer size needed for an iodesc. */
             if ((ierr = compute_maxIObuffersize(ios->io_comm, iodesc)))
             {
-                GPTLstop("PIO:PIOc_initdecomp");
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                                 "Initializing the PIO decomposition failed. Internal error computing max io buffer size needed for the decomposition");
             }
@@ -894,8 +878,6 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
         if ((mpierr = MPI_Bcast(&(iodesc->num_aiotasks), 1, MPI_INT, ios->ioroot,
                                 ios->my_comm)))
         {
-            GPTLstop("PIO:PIOc_initdecomp");
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
         }
         LOG((3, "iodesc->num_aiotasks = %d", iodesc->num_aiotasks));
@@ -904,8 +886,6 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
         if (iodesc->rearranger == PIO_REARR_BOX)
             if ((ierr = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc)))
             {
-                GPTLstop("PIO:PIOc_initdecomp");
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                                 "Error initializing the PIO decomposition. Error creating the BOX rearranger");
             }
@@ -932,8 +912,6 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
         ierr = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME, "piodecomp", ".dat");
         if(ierr != PIO_NOERR)
         {
-            GPTLstop("PIO:PIOc_initdecomp");
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                             "Initializing the PIO decomposition failed. Creating a unique file name for saving the decomposition failed");
         }
@@ -973,8 +951,6 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
      * PERFTUNE is set. */
     performance_tune_rearranger(ios, iodesc);
 
-    GPTLstop("PIO:PIOc_initdecomp");
-    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     return PIO_NOERR;
 }
 
@@ -1290,7 +1266,7 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     pio_init_gptl();
 #endif
 #endif
-    GPTLstart("PIO:PIOc_Init_Intracomm");
+    SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_Init_Intracomm");
     /* Turn on the logging system. */
     pio_init_logging();
 
@@ -1302,7 +1278,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     ret = mtimer_init(PIO_MICRO_MPI_WTIME_ROOT);
     if(ret != PIO_NOERR)
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
                         "PIO Init failed, initializing PIO micro timers failed (ret=%d)", ret);
     }
@@ -1311,7 +1286,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     /* Find the number of computation tasks. */
     if ((mpierr = MPI_Comm_size(comp_comm, &num_comptasks)))
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
     }
 
@@ -1322,7 +1296,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
         base < 0 || base >= num_comptasks ||
         stride * (num_iotasks - 1) >= num_comptasks)
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
                         "PIO Init failed. Invalid arguments provided. Pointer to iosysid is %s (expected not NULL), num_iotasks=%d (expected >= 1 && <= num_comptasks, %d), stride = %d (expected >= 1), base = %d (expected >= 0 && < num_comptasks, %d), stride * (num_iotasks - 1) = %d (expected < num_comptasks, %d)", (iosysidp) ? "not NULL" : "NULL", num_iotasks, num_comptasks, stride, base, num_comptasks, stride * (num_iotasks - 1), num_comptasks);
     }
@@ -1333,7 +1306,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     /* Allocate memory for the iosystem info. */
     if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "PIO Init failed. Out of memory allocating %lld bytes for I/O system descriptor", (unsigned long long) sizeof(iosystem_desc_t));
     }
@@ -1362,7 +1334,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     /* Copy the computation communicator into union_comm. */
     if ((mpierr = MPI_Comm_dup(comp_comm, &ios->union_comm)))
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
     }
 
@@ -1373,7 +1344,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     ret = init_adios_comm(ios);
     if (ret != PIO_NOERR)
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
     }
 
@@ -1382,7 +1352,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
         ios->adiosH = adios2_init_mpi(ios->adios_comm);
         if (ios->adiosH == NULL)
         {
-            GPTLstop("PIO:PIOc_Init_Intracomm");
             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
         }
 
@@ -1451,7 +1420,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     ios->adios_readerH = adios2_init_mpi(ios->union_comm);
     if (ios->adios_readerH == NULL)
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS (for read) failed");
     }
 #endif
@@ -1496,7 +1464,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     /* Copy the computation communicator into comp_comm. */
     if ((mpierr = MPI_Comm_dup(comp_comm, &ios->comp_comm)))
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
     }
     LOG((2, "union_comm = %d comp_comm = %d", ios->union_comm, ios->comp_comm));
@@ -1507,7 +1474,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     /* Find MPI rank in comp_comm communicator. */
     if ((mpierr = MPI_Comm_rank(ios->comp_comm, &ios->comp_rank)))
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
     }
 
@@ -1518,7 +1484,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
      * for computation. */
     if (!(ios->compranks = (int *)calloc(ios->num_comptasks, sizeof(int))))
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "PIO Init failed. Out of memory allocating %lld bytes for array of compute process ranks in the I/O descriptor", (unsigned long long) (ios->num_comptasks * sizeof(int)));
     }
@@ -1534,7 +1499,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
      * for IO. */
     if (!(ios->ioranks = (int *)calloc(ios->num_iotasks, sizeof(int))))
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "PIO Init failed. Out of memory allocating %lld bytes for array of I/O process ranks in the I/O descriptor", (unsigned long long) (ios->num_iotasks * sizeof(int)));
     }
@@ -1557,7 +1521,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     /* Create a group for the computation tasks. */
     if ((mpierr = MPI_Comm_group(ios->comp_comm, &ios->compgroup)))
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
     }
 
@@ -1565,14 +1528,12 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     if ((mpierr = MPI_Group_incl(ios->compgroup, ios->num_iotasks, ios->ioranks,
                                  &ios->iogroup)))
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
     }
 
     /* Create an MPI communicator for the IO tasks. */
     if ((mpierr = MPI_Comm_create(ios->comp_comm, ios->iogroup, &ios->io_comm)))
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
     }
 
@@ -1583,7 +1544,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     {
         if ((mpierr = MPI_Comm_rank(ios->io_comm, &ios->io_rank)))
         {
-            GPTLstop("PIO:PIOc_Init_Intracomm");
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
         }
     }
@@ -1604,7 +1564,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     /* Allocate buffer space for compute nodes. */
     if ((ret = compute_buffer_init(ios)))
     {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "PIO Init failed. Internal error allocating buffer space on compute processes to cache user data");
     }
@@ -1623,7 +1582,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
 
     LOG((2, "Init_Intracomm complete iosysid = %d", *iosysidp));
 
-    GPTLstop("PIO:PIOc_Init_Intracomm");
     return PIO_NOERR;
 }
 
@@ -1697,12 +1655,11 @@ int PIOc_set_hint_impl(int iosysid, const char *hint, const char *hintval)
                         "Setting PIO hints failed. Invalid io system id (%d) provided", iosysid);
     }
     assert(ios);
-    spio_ltimer_start(ios->io_fstats->tot_timer_name);
+    SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper ios_fstats_tot_timer(ios->io_fstats->tot_timer_name);
 
     /* User must provide these. */
     if (!hint || !hintval)
     {
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
                         "Setting PIO hints failed. Invalid pointers (NULL) to hint (%s) or hintval (%s) provided", (hint) ? "not NULL" : "NULL", (hintval) ? "not NULL" : "NULL");
     }
@@ -1714,7 +1671,6 @@ int PIOc_set_hint_impl(int iosysid, const char *hint, const char *hintval)
         if ((mpierr = MPI_Info_create(&ios->info)))
         {
             LOG((1, "ERROR: Setting PIO hints failed. Creating MPI Info object failed (mpierr = %d)", mpierr));
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
         }
 
@@ -1723,11 +1679,9 @@ int PIOc_set_hint_impl(int iosysid, const char *hint, const char *hintval)
         if ((mpierr = MPI_Info_set(ios->info, hint, hintval)))
         {
             LOG((1, "ERROR: Setting PIO hints failed. Settnig MPI hints using info object failed (mpierr = %d)", mpierr));
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
         }
 
-    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     return PIO_NOERR;
 }
 
@@ -1750,14 +1704,13 @@ int PIOc_finalize_impl(int iosysid)
     char gptl_log_fname[PIO_MAX_NAME];
 #endif
 
-    GPTLstart("PIO:PIOc_finalize");
+    SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_finalize");
     LOG((1, "PIOc_finalize iosysid = %d MPI_COMM_NULL = %d", iosysid,
          MPI_COMM_NULL));
 
     /* Find the IO system information. */
     if (!(ios = pio_get_iosystem_from_id(iosysid)))
     {
-        GPTLstop("PIO:PIOc_finalize");
         return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
                         "PIO Finalize failed. Invalid iosystem id (%d) provided", iosysid);
     }
@@ -1777,8 +1730,6 @@ int PIOc_finalize_impl(int iosysid)
         PIO_SEND_ASYNC_MSG(ios, msg, &ierr, iosysid);
         if(ierr != PIO_NOERR)
         {
-            GPTLstop("PIO:PIOc_finalize");
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                             "PIO Finalize failed on iosytem (%d). Error sending async msg for PIO_MSG_FINALIZE", iosysid);
         }
@@ -1815,7 +1766,6 @@ int PIOc_finalize_impl(int iosysid)
     /* Learn the number of open IO systems. */
     if ((ierr = pio_num_iosystem(&niosysid)))
     {
-        GPTLstop("PIO:PIOc_finalize");
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                         "PIO Finalize failed on iosystem (%d). Unable to get the number of open I/O systems", iosysid);
     }
@@ -1859,7 +1809,6 @@ int PIOc_finalize_impl(int iosysid)
         adios2_error adiosErr = adios2_finalize(ios->adiosH);
         if (adiosErr != adios2_error_none)
         {
-            GPTLstop("PIO:PIOc_finalize");
             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)",
                            convert_adios2_error_to_string(adiosErr), iosysid);
         }
@@ -1871,7 +1820,6 @@ int PIOc_finalize_impl(int iosysid)
         adios2_error adiosErr = adios2_finalize(ios->adios_readerH);
         if (adiosErr != adios2_error_none)
         {
-            GPTLstop("PIO:PIOc_finalize");
             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Finalizing ADIOS (for read) failed (adios2_error=%s) on iosystem (%d)",
                            convert_adios2_error_to_string(adiosErr), iosysid);
         }
@@ -1895,7 +1843,6 @@ int PIOc_finalize_impl(int iosysid)
     pio_finalize_logging();
 
     LOG((2, "PIOc_finalize completed successfully"));
-    GPTLstop("PIO:PIOc_finalize");
 #ifdef TIMING
 #ifdef TIMING_INTERNAL
     if(spio_gptl_was_init_in_lib()){
@@ -2113,13 +2060,12 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     pio_init_gptl();
 #endif
 #endif
-    GPTLstart("PIO:PIOc_init_async");
+    SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_init_async");
 
     /* Check input parameters. */
     if (num_io_procs < 1 || component_count < 1 || !num_procs_per_comp || !iosysidp ||
         (rearranger != PIO_REARR_BOX && rearranger != PIO_REARR_SUBSET))
     {
-        GPTLstop("PIO:PIOc_init_async");
         return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
                         "PIO Init (async) failed. Invalid arguments provided, num_io_procs=%d (expected >= 1), component_count=%d (expected >= 1), num_procs_per_comp is %s (expected not NULL), iosysidp is %s (expected not NULL), rearranger=%s (expected PIO_REARR_BOX or PIO_REARR_SUBSET)", num_io_procs, component_count, (num_procs_per_comp) ? "not NULL" : "NULL", (iosysidp) ? "not NULL" : "NULL", (rearranger == PIO_REARR_BOX) ? "PIO_REARR_BOX" : ((rearranger == PIO_REARR_SUBSET) ? "PIO_REARR_SUBSET" : "UNKNOWN REARRANGER"));
     }
@@ -2127,7 +2073,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     /* Temporarily limit to one computational component. */
     if (component_count > 1)
     {
-        GPTLstop("PIO:PIOc_init_async");
         return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
                         "PIO Init (async) failed. Currently only one computational component is supported, and %d computation components were specified", component_count);
     }
@@ -2145,7 +2090,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     ret = mtimer_init(PIO_MICRO_MPI_WTIME_ROOT);
     if(ret != PIO_NOERR)
     {
-        GPTLstop("PIO:PIOc_init_async");
         return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
                         "PIO Init (async) failed. Initializing micro timers failed");
     }
@@ -2157,7 +2101,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         LOG((3, "calculating processors for IO component"));
         if (!(io_proc_list_buf = (int *) malloc(num_io_procs * sizeof(int))))
         {
-            GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "PIO Init (async) failed. Out of memory.");
         }
@@ -2180,7 +2123,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         /* Allocate space for array of arrays. */
         if (!(proc_list_buf = (int **)malloc((component_count) * sizeof(int *))))
         {
-            GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "PIO Init (async) failed. Out of memory");
         }
@@ -2193,7 +2135,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
             /* Allocate space for each array. */
             if (!(proc_list_buf[cmp] = (int *)malloc(num_procs_per_comp[cmp] * sizeof(int))))
             {
-                GPTLstop("PIO:PIOc_init_async");
                 return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                                 "PIO Init (async) failed. Out of memory");
             }
@@ -2214,7 +2155,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     /* Get rank of this task in world. */
     if ((ret = MPI_Comm_rank(world, &my_rank)))
     {
-        GPTLstop("PIO:PIOc_init_async");
         return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
     }
 
@@ -2232,7 +2172,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     {
         if (!(iosys[cmp1] = (iosystem_desc_t *)calloc(1, sizeof(iosystem_desc_t))))
         {
-            GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "PIO Init (async) failed. Out of memory");
         }
@@ -2249,7 +2188,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     if ((ret = MPI_Comm_group(world, &world_group)))
     {
         LOG((1, "ERROR: PIO Init (async failed). Getting MPI group associated with world failed"));
-        GPTLstop("PIO:PIOc_init_async");
         return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
     }
     LOG((3, "world group created\n"));
@@ -2271,7 +2209,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     if ((ret = MPI_Group_incl(world_group, num_io_procs, my_io_proc_list, &io_group)))
     {
         LOG((1, "ERROR: PIO Init (async) failed. Creating MPI group for IO component failed"));
-        GPTLstop("PIO:PIOc_init_async");
         return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
     }
     LOG((3, "created IO group - io_group = %d MPI_GROUP_EMPTY = %d", io_group, MPI_GROUP_EMPTY));
@@ -2280,7 +2217,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     if ((ret = MPI_Comm_create(world, io_group, &io_comm)))
     {
         LOG((1, "ERROR: PIO Init (async) failed. Creating shared MPI Comm for IO component failed"));
-        GPTLstop("PIO:PIOc_init_async");
         return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
     }
     LOG((3, "created io comm io_comm = %d", io_comm));
@@ -2292,7 +2228,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         if (in_io)
             if ((mpierr = MPI_Comm_dup(io_comm, user_io_comm)))
             {
-                GPTLstop("PIO:PIOc_init_async");
                 return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
             }
     }
@@ -2304,7 +2239,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         LOG((3, "about to get io rank"));
         if ((ret = MPI_Comm_rank(io_comm, &io_rank)))
         {
-            GPTLstop("PIO:PIOc_init_async");
             return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
         }
         iomaster = !io_rank ? MPI_ROOT : MPI_PROC_NULL;
@@ -2357,7 +2291,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         if ((ret = MPI_Group_incl(world_group, num_procs_per_comp[cmp], my_proc_list[cmp],
                                   &group[cmp])))
         {
-            GPTLstop("PIO:PIOc_init_async");
             return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
         }
         LOG((3, "created component MPI group - group[%d] = %d", cmp, group[cmp]));
@@ -2384,7 +2317,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         /* Allocate space for computation task ranks. */
         if (!(my_iosys->compranks = (int *)calloc(my_iosys->num_comptasks, sizeof(int))))
         {
-            GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "PIO Init (async) failed. Out of memory");
         }
@@ -2397,7 +2329,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         if ((ret = MPI_Group_incl(world_group, nprocs_union, proc_list_union, &union_group[cmp])))
         {
             LOG((1, "ERROR: PIO Init (async) failed. Creating union group failed"));
-            GPTLstop("PIO:PIOc_init_async");
             return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
         }
         LOG((3, "created union MPI_group - union_group[%d] = %d with %d procs", cmp,
@@ -2425,7 +2356,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         LOG((3, "creating intracomm cmp = %d from group[%d] = %d", cmp, cmp, group[cmp]));
         if ((ret = MPI_Comm_create(world, group[cmp], &my_iosys->comp_comm)))
         {
-            GPTLstop("PIO:PIOc_init_async");
             return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
         }
 
@@ -2435,14 +2365,12 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
             if (user_comp_comm)
                 if ((mpierr = MPI_Comm_dup(my_iosys->comp_comm, &user_comp_comm[cmp])))
                 {
-                    GPTLstop("PIO:PIOc_init_async");
                     return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
                 }
 
             /* Get the rank in this comp comm. */
             if ((ret = MPI_Comm_rank(my_iosys->comp_comm, &my_iosys->comp_rank)))
             {
-                GPTLstop("PIO:PIOc_init_async");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
@@ -2463,7 +2391,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
             LOG((3, "making a dup of io_comm = %d io_rank = %d", io_comm, io_rank));
             if ((ret = MPI_Comm_dup(io_comm, &my_iosys->io_comm)))
             {
-                GPTLstop("PIO:PIOc_init_async");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
             LOG((3, "dup of io_comm = %d io_rank = %d", my_iosys->io_comm, io_rank));
@@ -2477,7 +2404,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
          * for IO. */
         if (!(my_iosys->ioranks = (int *) calloc(my_iosys->num_iotasks, sizeof(int))))
         {
-            GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "PIO Init (async) failed. Out of memory");
         }
@@ -2494,13 +2420,11 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
              * and one of the computation components. */
             if ((ret = MPI_Comm_create(world, union_group[cmp], &my_iosys->union_comm)))
             {
-                GPTLstop("PIO:PIOc_init_async");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
             if ((ret = MPI_Comm_rank(my_iosys->union_comm, &my_iosys->union_rank)))
             {
-                GPTLstop("PIO:PIOc_init_async");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
@@ -2518,7 +2442,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
                 if ((ret = MPI_Intercomm_create(my_iosys->io_comm, 0, my_iosys->union_comm,
                                                 my_proc_list[cmp][0], 0, &my_iosys->intercomm)))
                 {
-                    GPTLstop("PIO:PIOc_init_async");
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
             }
@@ -2530,7 +2453,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
                 if ((ret = MPI_Intercomm_create(my_iosys->comp_comm, 0, my_iosys->union_comm,
                                                 my_io_proc_list[0], 0, &my_iosys->intercomm)))
                 {
-                    GPTLstop("PIO:PIOc_init_async");
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
             }
@@ -2561,7 +2483,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     ret = init_async_msgs_sign();
     if(ret != PIO_NOERR)
     {
-        GPTLstop("PIO:PIOc_init_async");
         return pio_err(NULL, NULL, ret, __FILE__, __LINE__,
                         "PIO Init (async) failed. Initializing async message signatures failed");
     }
@@ -2575,7 +2496,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
              io_rank, component_count));
         if ((ret = pio_msg_handler2(io_rank, component_count, iosys, io_comm)))
         {
-            GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, ret, __FILE__, __LINE__,
                             "Error processing I/O message");
         }
@@ -2589,7 +2509,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     if (in_io)
         if ((mpierr = MPI_Comm_free(&io_comm)))
         {
-            GPTLstop("PIO:PIOc_init_async");
             return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
         }
 
@@ -2603,7 +2522,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     /* Free MPI groups. */
     if ((ret = MPI_Group_free(&io_group)))
     {
-        GPTLstop("PIO:PIOc_init_async");
         return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
     }
 
@@ -2611,24 +2529,20 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     {
         if ((ret = MPI_Group_free(&group[cmp])))
         {
-            GPTLstop("PIO:PIOc_init_async");
             return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
         }
         if ((ret = MPI_Group_free(&union_group[cmp])))
         {
-            GPTLstop("PIO:PIOc_init_async");
             return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
         }
     }
 
     if ((ret = MPI_Group_free(&world_group)))
     {
-        GPTLstop("PIO:PIOc_init_async");
         return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
     }
 
     LOG((2, "successfully done with PIO_Init_Async"));
-    GPTLstop("PIO:PIOc_init_async");
     return PIO_NOERR;
 }
 
@@ -2687,13 +2601,12 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
     pio_init_gptl();
 #endif
 #endif
-    GPTLstart("PIO:PIOc_init_intercomm");
+    SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_init_intercomm");
     assert((component_count > 0) && ucomp_comms && iosysidps);
     if((component_count <= 0) || (ucomp_comms == NULL) ||
         ((rearranger != PIO_REARR_BOX) && (rearranger != PIO_REARR_SUBSET)) ||
         (iosysidps == NULL))
     {
-        GPTLstop("PIO:PIOc_init_intercomm");
         return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
                         "PIO Init (async) failed. Invalid arguments provided, component_count=%d (expected > 0), ucomp_comms is %s (expected not NULL), rearranger=%s (expected PIO_REARR_BOX or PIO_REARR_SUBSET), iosysidps is %s (expected not NULL)", component_count, (ucomp_comms) ? "not NULL" : "NULL", (rearranger == PIO_REARR_BOX) ? "PIO_REARR_BOX" : ((rearranger == PIO_REARR_SUBSET) ? "PIO_REARR_SUBSET" : "UNKNOWN REARRANGER"), (iosysidps) ? "not NULL" : "NULL");
     }
@@ -2710,7 +2623,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
     ret = mtimer_init(PIO_MICRO_MPI_WTIME_ROOT);
     if(ret != PIO_NOERR)
     {
-        GPTLstop("PIO:PIOc_init_intercomm");
         return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
                         "PIO Init (async) failed. Initializing micro timers failed");
     }
@@ -2729,7 +2641,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 ret = MPI_Comm_dup(ucomp_comms[i], &(comp_comms[i]));
                 if(ret != MPI_SUCCESS)
                 {
-                    GPTLstop("PIO:PIOc_init_intercomm");
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
             }
@@ -2737,7 +2648,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
     }
     else
     {
-        GPTLstop("PIO:PIOc_init_intercomm");
         return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "PIO Init (async) failed. Out of memory allocating %lld bytes for storing MPI communicators for the different asynchronous components", (unsigned long long) (component_count * sizeof(MPI_Comm)));
     }
@@ -2751,7 +2661,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
         iosys[i] = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t));
         if(!iosys[i])
         {
-            GPTLstop("PIO:PIOc_init_intercomm");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "PIO init (async) failed. Out of memory allocating %lld bytes for storing I/O system descriptor for component %d", (unsigned long long) sizeof(iosystem_desc_t), i);
         }
@@ -2823,7 +2732,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             if(ret != MPI_SUCCESS)
             {
                 LOG((1, "PIO Init (async) failed. Duping user I/O comm failed"));
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
         }
@@ -2855,14 +2763,12 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             ret = MPI_Comm_rank(io_comm, &(iosys[i]->io_rank));
             if(ret != MPI_SUCCESS)
             {
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
             ret = MPI_Comm_size(io_comm, &(iosys[i]->num_iotasks));
             if(ret != MPI_SUCCESS)
             {
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
@@ -2873,7 +2779,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             ret = MPI_Comm_rank(peer_comm, &io_grank);
             if(ret != MPI_SUCCESS)
             {
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
             /* Find the io leader for intercomm */
@@ -2893,7 +2798,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             if(ret != MPI_SUCCESS)
             {
                 LOG((1, "PIO Init (async) failed. Finding I/O leader failed"));
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
@@ -2903,7 +2807,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             if(ret != MPI_SUCCESS)
             {
                 LOG((1, "PIO Init (async) failed. Finding Comp leader failed"));
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
@@ -2912,7 +2815,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             if(ret != MPI_SUCCESS)
             {
                 LOG((1, "PIO Init (async) failed. Creating an intercomm between I/O comm and Comp comms failed"));
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
@@ -2926,14 +2828,12 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             if(ret != MPI_SUCCESS)
             {
                 LOG((1, "PIO Init (async) failed. Merging intercomm between I/O comm and Comp comms failed"));
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
             ret = MPI_Comm_size(iosys[i]->union_comm, &(iosys[i]->num_uniontasks));
             if(ret != MPI_SUCCESS)
             {
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
@@ -2941,7 +2841,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             ret = MPI_Comm_rank(iosys[i]->union_comm, &(iosys[i]->union_rank));
             if(ret != MPI_SUCCESS)
             {
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
@@ -2956,7 +2855,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             iosys[i]->ioranks = (int *)malloc(iosys[i]->num_iotasks * sizeof(int));
             if(!(iosys[i]->ioranks))
             {
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                                 "PIO Init (async) failed. Out of memory allocating %lld bytes to store ranks of I/O processes for component %d", (unsigned long long) (iosys[i]->num_iotasks * sizeof(int)), i);
             }
@@ -2968,7 +2866,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             iosys[i]->compranks = (int *)malloc(iosys[i]->num_comptasks * sizeof(int));
             if(!(iosys[i]->compranks))
             {
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                                 "PIO Init (async) failed. Out of memory allocating %lld bytes to store ranks of compute processes for component %d", (unsigned long long) (iosys[i]->num_comptasks * sizeof(int)), i);
             }
@@ -2982,7 +2879,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             if(ret != MPI_SUCCESS)
             {
                 LOG((1, "PIO Init (async) failed. Unable to get process group for the union comm"));
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
@@ -2990,7 +2886,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             if(ret != MPI_SUCCESS)
             {
                 LOG((1, "PIO Init (async) failed. Unable to find procs in comp group"));
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
@@ -2998,7 +2893,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             if(ret != MPI_SUCCESS)
             {
                 LOG((1, "PIO Init (async) failed. Unable to find procs in I/O group"));
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
@@ -3025,20 +2919,17 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 ret = MPI_Comm_rank(comp_comms[i], &(iosys[i]->comp_rank));
                 if(ret != MPI_SUCCESS)
                 {
-                    GPTLstop("PIO:PIOc_init_intercomm");
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
                 ret = MPI_Comm_size(comp_comms[i], &(iosys[i]->num_comptasks));
                 if(ret != MPI_SUCCESS)
                 {
-                    GPTLstop("PIO:PIOc_init_intercomm");
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
 
                 ret = MPI_Comm_rank(peer_comm, &comp_grank);
                 if(ret != MPI_SUCCESS)
                 {
-                    GPTLstop("PIO:PIOc_init_intercomm");
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
 
@@ -3059,7 +2950,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             if(ret != MPI_SUCCESS)
             {
                 LOG((1, "PIO Init (async) failed. Finding I/O leader failed"));
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
@@ -3069,7 +2959,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             if(ret != MPI_SUCCESS)
             {
                 LOG((1, "PIO Init (async) failed. Finding Comp leader failed"));
-                GPTLstop("PIO:PIOc_init_intercomm");
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
@@ -3080,7 +2969,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 if(ret != MPI_SUCCESS)
                 {
                     LOG((1, "PIO Init (async) failed. Creating intercomm between I/O comm and Comp comms failed"));
-                    GPTLstop("PIO:PIOc_init_intercomm");
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
 
@@ -3094,21 +2982,18 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 if(ret != MPI_SUCCESS)
                 {
                     LOG((1, "PIO Init (async) failed. Merging intercomm between I/O comm and Comp comms failed"));
-                    GPTLstop("PIO:PIOc_init_intercomm");
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
 
                 ret = MPI_Comm_size(iosys[i]->union_comm, &(iosys[i]->num_uniontasks));
                 if(ret != MPI_SUCCESS)
                 {
-                    GPTLstop("PIO:PIOc_init_intercomm");
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
 
                 ret = MPI_Comm_rank(iosys[i]->union_comm, &(iosys[i]->union_rank));
                 if(ret != MPI_SUCCESS)
                 {
-                    GPTLstop("PIO:PIOc_init_intercomm");
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
 
@@ -3123,7 +3008,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 iosys[i]->ioranks = (int *)malloc(iosys[i]->num_iotasks * sizeof(int));
                 if(!(iosys[i]->ioranks))
                 {
-                    GPTLstop("PIO:PIOc_init_intercomm");
                     return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                                     "PIO Init (async) failed. Out of memory allocating %lld bytes to store ranks of I/O processes for component %d", (unsigned long long) (iosys[i]->num_iotasks * sizeof(int)), i);
                 }
@@ -3135,7 +3019,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 iosys[i]->compranks = (int *)malloc(iosys[i]->num_comptasks * sizeof(int));
                 if(!(iosys[i]->compranks))
                 {
-                    GPTLstop("PIO:PIOc_init_intercomm");
                     return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                                     "PIO Init (async) failed. Out of memory allocating %lld bytes to store ranks of compute processes for component %d", (unsigned long long) (iosys[i]->num_comptasks * sizeof(int)), i);
                 }
@@ -3149,7 +3032,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 if(ret != MPI_SUCCESS)
                 {
                     LOG((1, "PIO Init (async) failed. Finding MPI process group for union comm failed"));
-                    GPTLstop("PIO:PIOc_init_intercomm");
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
 
@@ -3157,7 +3039,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 if(ret != MPI_SUCCESS)
                 {
                     LOG((1, "PIO Init (async) failed. Finding MPI processes in comp group failed"));
-                    GPTLstop("PIO:PIOc_init_intercomm");
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
 
@@ -3165,7 +3046,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 if(ret != MPI_SUCCESS)
                 {
                     LOG((1, "PIO Init (async) failed. Finding MPI processes in io group failed"));
-                    GPTLstop("PIO:PIOc_init_intercomm");
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
 
@@ -3204,7 +3084,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
     ret = init_async_msgs_sign();
     if(ret != PIO_NOERR)
     {
-        GPTLstop("PIO:PIOc_init_intercomm");
         return pio_err(NULL, NULL, ret, __FILE__, __LINE__,
                         "PIO Init (async) failed. Initializing asynchronous message signatures failed");
     }
@@ -3228,7 +3107,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
         ret = create_async_service_msg_comm(uio_comm, &msg_comm);
         if(ret != PIO_NOERR)
         {
-            GPTLstop("PIO:PIOc_init_intercomm");
             return pio_err(NULL, NULL, ret, __FILE__, __LINE__,
                             "PIO Init (async) failed. Creating an MPI comm for asynchronous messages failed");
         }
@@ -3236,7 +3114,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
         ret = MPI_Comm_rank(msg_comm, &rank);
         if(ret != MPI_SUCCESS)
         {
-            GPTLstop("PIO:PIOc_init_intercomm");
             return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
         }
 
@@ -3245,7 +3122,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
         ret = pio_msg_handler2(rank, component_count, iosys, msg_comm);
         if(ret != PIO_NOERR)
         {
-            GPTLstop("PIO:PIOc_init_intercomm");
             return pio_err(NULL, NULL, ret, __FILE__, __LINE__,
                             "PIO Init (async) failed. Error processing asynchronous messages");
             LOG((2, "Returned from pio_msg_handler2(), Msg handler failed, ret = %d", ret));
@@ -3253,7 +3129,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
         LOG((2, "Returned from pio_msg_handler2() ret = %d", ret));
     }
 
-    GPTLstop("PIO:PIOc_init_intercomm");
     return PIO_NOERR;
 }
 
