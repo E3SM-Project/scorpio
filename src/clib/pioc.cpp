@@ -698,105 +698,99 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
          iosysid, pio_type, ndims, maplen));
 
     /* Get IO system info. */
-    if (!(ios = pio_get_iosystem_from_id(iosysid)))
-    {
-        return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
-                        "Initializing the PIO decomposition failed. Invalid io system id (%d) provided. Could not find an iosystem associated with the id", iosysid);
+    if(!(ios = pio_get_iosystem_from_id(iosysid))){
+      return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
+                      "Initializing the PIO decomposition failed. Invalid io system id (%d) provided. Could not find an iosystem associated with the id", iosysid);
     }
     assert(ios);
     SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper ios_fstats_tot_timer(ios->io_fstats->tot_timer_name);
 
     /* Caller must provide these. */
-    if (!gdimlen || !compmap || !ioidp)
-    {
-        return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
-                        "Initializing the PIO decomposition failed. Invalid pointers (NULL) to gdimlen(%s) or compmap(%s) or ioidp (%s) provided", (gdimlen) ? "not NULL" : "NULL", (compmap) ? "not NULL" : "NULL", (ioidp) ? "not NULL" : "NULL");
+    if(!gdimlen || !compmap || !ioidp){
+      return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
+                      "Initializing the PIO decomposition failed. Invalid pointers (NULL) to gdimlen(%s) or compmap(%s) or ioidp (%s) provided", (gdimlen) ? "not NULL" : "NULL", (compmap) ? "not NULL" : "NULL", (ioidp) ? "not NULL" : "NULL");
     }
 
     /* Check the dim lengths. */
-    for (int i = 0; i < ndims; i++)
-        if (gdimlen[i] <= 0)
-        {
-            return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
-                            "Initializing the PIO decomposition failed. Invalid value for global dimension lengths provided. The global length of dimension %d is provided as %d (expected > 0)", i, gdimlen[i]);
-        }
+    for(int i = 0; i < ndims; i++){
+      if(gdimlen[i] <= 0){
+        return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
+                        "Initializing the PIO decomposition failed. Invalid value for global dimension lengths provided. The global length of dimension %d is provided as %d (expected > 0)", i, gdimlen[i]);
+      }
+    }
 
     /* If async is in use, and this is not an IO task, bcast the parameters. */
-    if (ios->async)
-    {
-        int msg = PIO_MSG_INITDECOMP_DOF; /* Message for async notification. */
-        char rearranger_present = rearranger ? true : false;
-        int amsg_rearranger = (rearranger) ? (*rearranger) : 0;
-        char iostart_present = iostart ? true : false;
-        char iocount_present = iocount ? true : false;
-        PIO_Offset *amsg_iostart = NULL, *amsg_iocount = NULL;
+    if(ios->async){
+      int msg = PIO_MSG_INITDECOMP_DOF; /* Message for async notification. */
+      char rearranger_present = rearranger ? true : false;
+      int amsg_rearranger = (rearranger) ? (*rearranger) : 0;
+      char iostart_present = iostart ? true : false;
+      char iocount_present = iocount ? true : false;
+      PIO_Offset *amsg_iostart = NULL, *amsg_iocount = NULL;
 
-        if(!iostart_present)
-        {
-            amsg_iostart = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset));
-        }
-        if(!iocount_present)
-        {
-            amsg_iocount = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset));
-        }
-        if(!amsg_iostart || !amsg_iocount)
-        {
-            return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Initializing the PIO decomposition failed. Out of memory allocating %lld bytes for start array and %lld bytes for count array for sending asynchronous message, PIO_MSG_INITDECOMP_DOF, on iosystem (iosysid=%d)", (unsigned long long) (ndims * sizeof(PIO_Offset)), (unsigned long long) (ndims * sizeof(PIO_Offset)), ios->iosysid);
-        }
+      if(!iostart_present){
+          amsg_iostart = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset));
+      }
+      if(!iocount_present){
+          amsg_iocount = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset));
+      }
+      if(!amsg_iostart || !amsg_iocount){
+        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Initializing the PIO decomposition failed. Out of memory allocating %lld bytes for start array and %lld bytes for count array for sending asynchronous message, PIO_MSG_INITDECOMP_DOF, on iosystem (iosysid=%d)", (unsigned long long) (ndims * sizeof(PIO_Offset)), (unsigned long long) (ndims * sizeof(PIO_Offset)), ios->iosysid);
+      }
 
-        PIO_SEND_ASYNC_MSG(ios, msg, &ierr, iosysid, pio_type, ndims,
-            gdimlen, maplen, compmap, rearranger_present, amsg_rearranger,
-            iostart_present, ndims,
-            (iostart_present) ? iostart : amsg_iostart,
-            iocount_present, ndims,
-            (iocount_present) ? iocount : amsg_iocount);
+      PIO_SEND_ASYNC_MSG(ios, msg, &ierr, iosysid, pio_type, ndims,
+          gdimlen, maplen, compmap, rearranger_present, amsg_rearranger,
+          iostart_present, ndims,
+          (iostart_present) ? iostart : amsg_iostart,
+          iocount_present, ndims,
+          (iocount_present) ? iocount : amsg_iocount);
 
-        if(!iostart_present)
-        {
-            free(amsg_iostart);
-        }
-        if(!iocount_present)
-        {
-            free(amsg_iocount);
-        }
+      if(!iostart_present){
+        free(amsg_iostart);
+      }
+      if(!iocount_present){
+        free(amsg_iocount);
+      }
     }
 
     /* Allocate space for the iodesc info. This also allocates the
      * first region and copies the rearranger opts into this
      * iodesc. */
-    if ((ierr = malloc_iodesc(ios, pio_type, ndims, &iodesc)))
-    {
-        return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                        "Initializing the PIO decomposition failed. Out of memory allocating memory for I/O descriptor");
+    if((ierr = malloc_iodesc(ios, pio_type, ndims, &iodesc))){
+      return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                      "Initializing the PIO decomposition failed. Out of memory allocating memory for I/O descriptor");
     }
 
     /* Remember the maplen. */
     iodesc->maplen = maplen;
 
     /* Remember the map. */
-    if (!(iodesc->map = (PIO_Offset *) malloc(sizeof(PIO_Offset) * maplen)))
-    {
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Initializing the PIO decomposition failed. Out of memory allocating %lld bytes to store I/O decomposition map", (unsigned long long) (sizeof(PIO_Offset) * maplen));
+    if(!(iodesc->map = (PIO_Offset *) malloc(sizeof(PIO_Offset) * maplen))){
+      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Initializing the PIO decomposition failed. Out of memory allocating %lld bytes to store I/O decomposition map", (unsigned long long) (sizeof(PIO_Offset) * maplen));
     }
-    for (int m = 0; m < maplen; m++)
-        iodesc->map[m] = compmap[m];
+    for(int m = 0; m < maplen; m++){
+      iodesc->map[m] = compmap[m];
+    }
 
     /* Remember the dim sizes. */
-    if (!(iodesc->dimlen = (int *)malloc(sizeof(int) * ndims)))
-    {
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Initializing the PIO decomposition failed. Out of memory allocating %lld bytes for dimension sizes in the I/O decomposition map", (unsigned long long) (sizeof(int) * ndims));
+    if(!(iodesc->dimlen = (int *)malloc(sizeof(int) * ndims))){
+      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Initializing the PIO decomposition failed. Out of memory allocating %lld bytes for dimension sizes in the I/O decomposition map", (unsigned long long) (sizeof(int) * ndims));
     }
-    for (int d = 0; d < ndims; d++)
-        iodesc->dimlen[d] = gdimlen[d];
+
+    for(int d = 0; d < ndims; d++){
+      iodesc->dimlen[d] = gdimlen[d];
+    }
 
     /* Set the rearranger. */
-    if (!rearranger)
-        iodesc->rearranger = ios->default_rearranger;
-    else
-        iodesc->rearranger = *rearranger;
+    if(!rearranger){
+      iodesc->rearranger = ios->default_rearranger;
+    }
+    else{
+      iodesc->rearranger = *rearranger;
+    }
     LOG((2, "iodesc->rearranger = %d", iodesc->rearranger));
 
     /* In scenarios involving ultra-high resolution E3SM/SCREAM cases,
@@ -816,79 +810,67 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
      * potentially negating the benefits of reduced initialization time
      * associated with this approach.
      */
-    if (iodesc->rearranger == PIO_REARR_ANY)
-    {
-        iodesc->rearranger = spio_get_opt_pio_rearr(ios, maplen);
+    if(iodesc->rearranger == PIO_REARR_ANY){
+      iodesc->rearranger = spio_get_opt_pio_rearr(ios, maplen);
     }
 
     /* Is this the subset rearranger? */
-    if (iodesc->rearranger == PIO_REARR_SUBSET)
-    {
-        iodesc->num_aiotasks = ios->num_iotasks;
-        LOG((2, "creating subset rearranger iodesc->num_aiotasks = %d",
-             iodesc->num_aiotasks));
-        if ((ierr = subset_rearrange_create(ios, maplen, (PIO_Offset *)compmap, gdimlen,
-                                            ndims, iodesc)))
-        {
-            return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                            "Initializing the PIO decomposition failed. Error creating the SUBSET rearranger");
-        }
+    if(iodesc->rearranger == PIO_REARR_SUBSET){
+      iodesc->num_aiotasks = ios->num_iotasks;
+      LOG((2, "creating subset rearranger iodesc->num_aiotasks = %d",
+           iodesc->num_aiotasks));
+      if((ierr = subset_rearrange_create(ios, maplen, (PIO_Offset *)compmap, gdimlen,
+                                          ndims, iodesc))){
+        return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                        "Initializing the PIO decomposition failed. Error creating the SUBSET rearranger");
+      }
     }
-    else /* box rearranger */
-    {
-        if (ios->ioproc)
-        {
-            /*  Unless the user specifies the start and count for each
-             *  IO task compute it. */
-            if (iostart && iocount)
-            {
-                LOG((3, "iostart and iocount provided"));
-                for (int i = 0; i < ndims; i++)
-                {
-                    iodesc->firstregion->start[i] = iostart[i];
-                    iodesc->firstregion->count[i] = iocount[i];
-                }
-                iodesc->num_aiotasks = ios->num_iotasks;
-            }
-            else
-            {
-                /* Compute start and count values for each io task. */
-                LOG((2, "about to call CalcStartandCount pio_type = %d ndims = %d", pio_type, ndims));
-                if ((ierr = CalcStartandCount(pio_type, ndims, gdimlen, ios->num_iotasks,
-                                             ios->io_rank, iodesc->firstregion->start,
-                                             iodesc->firstregion->count, &iodesc->num_aiotasks)))
-                {
-                    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                                    "Initializing the PIO decomposition failed. Internal error calculating start/count for the decomposition");
-                }
-            }
-
-            /* Compute the max io buffer size needed for an iodesc. */
-            if ((ierr = compute_maxIObuffersize(ios->io_comm, iodesc)))
-            {
-                return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                                "Initializing the PIO decomposition failed. Internal error computing max io buffer size needed for the decomposition");
-            }
-            LOG((3, "compute_maxIObuffersize called iodesc->maxiobuflen = %d",
-                 iodesc->maxiobuflen));
+    else{ /* box rearranger */
+      if(ios->ioproc){
+        /*  Unless the user specifies the start and count for each
+         *  IO task compute it. */
+        if(iostart && iocount){
+          LOG((3, "iostart and iocount provided"));
+          for(int i = 0; i < ndims; i++){
+            iodesc->firstregion->start[i] = iostart[i];
+            iodesc->firstregion->count[i] = iocount[i];
+          }
+          iodesc->num_aiotasks = ios->num_iotasks;
+        }
+        else{
+          /* Compute start and count values for each io task. */
+          LOG((2, "about to call CalcStartandCount pio_type = %d ndims = %d", pio_type, ndims));
+          if((ierr = CalcStartandCount(pio_type, ndims, gdimlen, ios->num_iotasks,
+                                       ios->io_rank, iodesc->firstregion->start,
+                                       iodesc->firstregion->count, &iodesc->num_aiotasks))){
+            return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                            "Initializing the PIO decomposition failed. Internal error calculating start/count for the decomposition");
+          }
         }
 
-        /* Depending on array size and io-blocksize the actual number
-         * of io tasks used may vary. */
-        if ((mpierr = MPI_Bcast(&(iodesc->num_aiotasks), 1, MPI_INT, ios->ioroot,
-                                ios->my_comm)))
-        {
-            return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+        /* Compute the max io buffer size needed for an iodesc. */
+        if((ierr = compute_maxIObuffersize(ios->io_comm, iodesc))){
+          return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                          "Initializing the PIO decomposition failed. Internal error computing max io buffer size needed for the decomposition");
         }
-        LOG((3, "iodesc->num_aiotasks = %d", iodesc->num_aiotasks));
+        LOG((3, "compute_maxIObuffersize called iodesc->maxiobuflen = %d", iodesc->maxiobuflen));
+      }
 
-        /* Compute the communications pattern for this decomposition. */
-        if (iodesc->rearranger == PIO_REARR_BOX)
-            if ((ierr = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc)))
-            {
-                return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                                "Error initializing the PIO decomposition. Error creating the BOX rearranger");
-            }
+      /* Depending on array size and io-blocksize the actual number
+       * of io tasks used may vary. */
+      if((mpierr = MPI_Bcast(&(iodesc->num_aiotasks), 1, MPI_INT, ios->ioroot,
+                              ios->my_comm))){
+        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+      }
+      LOG((3, "iodesc->num_aiotasks = %d", iodesc->num_aiotasks));
+
+      /* Compute the communications pattern for this decomposition. */
+      if(iodesc->rearranger == PIO_REARR_BOX){
+        if((ierr = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc))){
+          return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                          "Error initializing the PIO decomposition. Error creating the BOX rearranger");
+        }
+      }
     }
 
     /* Add this IO description to the list. */
@@ -896,28 +878,25 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
 #ifdef _ADIOS2
     comm = ios->union_comm;
 #endif
-    if(ios->async)
-    {
-        /* For asynchronous I/O service, the iodescs (iodesc ids) need to
-         * be unique across the union_comm (union of I/O and compute comms)
-         */
-        comm = ios->union_comm;
+    if(ios->async){
+      /* For asynchronous I/O service, the iodescs (iodesc ids) need to
+       * be unique across the union_comm (union of I/O and compute comms)
+       */
+      comm = ios->union_comm;
     }
     *ioidp = pio_add_to_iodesc_list(iodesc, comm);
 
 #if PIO_SAVE_DECOMPS
-    if(pio_save_decomps_regex_match(*ioidp, NULL, NULL))
-    {
-        char filename[PIO_MAX_NAME];
-        ierr = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME, "piodecomp", ".dat");
-        if(ierr != PIO_NOERR)
-        {
-            return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                            "Initializing the PIO decomposition failed. Creating a unique file name for saving the decomposition failed");
-        }
-        LOG((2, "Saving decomp map to %s", filename));
-        PIOc_writemap_impl(filename, *ioidp, ndims, gdimlen, maplen, (PIO_Offset *)compmap, ios->my_comm);
-        iodesc->is_saved = true;
+    if(pio_save_decomps_regex_match(*ioidp, NULL, NULL)){
+      char filename[PIO_MAX_NAME];
+      ierr = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME, "piodecomp", ".dat");
+      if(ierr != PIO_NOERR){
+        return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                        "Initializing the PIO decomposition failed. Creating a unique file name for saving the decomposition failed");
+      }
+      LOG((2, "Saving decomp map to %s", filename));
+      PIOc_writemap_impl(filename, *ioidp, ndims, gdimlen, maplen, (PIO_Offset *)compmap, ios->my_comm);
+      iodesc->is_saved = true;
     }
 #endif
 
@@ -928,22 +907,22 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
          iodesc->ioid, iodesc->nrecvs, iodesc->ndof, iodesc->ndims, iodesc->num_aiotasks,
          iodesc->rearranger, iodesc->maxregions, iodesc->needsfill, iodesc->llen,
          iodesc->maxiobuflen));
-    if (ios->ioproc)
-    {
-        if (iodesc->rearranger == PIO_REARR_SUBSET)
-        {
-            for (int j = 0; j < iodesc->llen; j++)
-                LOG((3, "rindex[%d] = %lld", j, iodesc->rindex[j]));
+    if(ios->ioproc){
+      if(iodesc->rearranger == PIO_REARR_SUBSET){
+          for(int j = 0; j < iodesc->llen; j++){
+            LOG((3, "rindex[%d] = %lld", j, iodesc->rindex[j]));
+          }
+      }
+      else{
+        int totalrecv = 0;
+        for(int j = 0; j < iodesc->nrecvs; j++){
+          totalrecv += iodesc->rcount[j];
         }
-        else
-        {
-            int totalrecv = 0;
-            for (int j = 0; j < iodesc->nrecvs; j++)
-                totalrecv += iodesc->rcount[j];
 
-            for (int j = 0; j < totalrecv; j++)
-                LOG((3, "rindex[%d] = %lld", j, iodesc->rindex[j]));
+        for(int j = 0; j < totalrecv; j++){
+          LOG((3, "rindex[%d] = %lld", j, iodesc->rindex[j]));
         }
+      }
     }
 #endif /* PIO_ENABLE_LOGGING */            
 
