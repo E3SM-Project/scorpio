@@ -1703,24 +1703,21 @@ int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims,
     LOG((1, "malloc_iodesc piotype = %d ndims = %d", piotype, ndims));
 
     /* Get the MPI type corresponding with the PIO type. */
-    if ((ret = find_mpi_type(piotype, &mpi_type, NULL)))
-    {
-        return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                        "Internal error while allocating memory for iodesc. Unable to find MPI type corresponding to PIO type (%d)", piotype);
+    if((ret = find_mpi_type(piotype, &mpi_type, NULL))){
+      return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                      "Internal error while allocating memory for iodesc. Unable to find MPI type corresponding to PIO type (%d)", piotype);
     }
 
     /* What is the size of the pio type? */
-    if ((ret = spio_pnetcdf_inq_type(0, piotype, NULL, &type_size)))
-    {
-        return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                        "Internal error while allocating memory for iodesc. Finding the size of PIO type (%d) failed", piotype);
+    if((ret = spio_pnetcdf_inq_type(0, piotype, NULL, &type_size))){
+      return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                      "Internal error while allocating memory for iodesc. Finding the size of PIO type (%d) failed", piotype);
     }
 
     /* Allocate space for the io_desc_t struct. */
-    if (!(*iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
-    {
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Internal error while allocating memory for iodesc. Out of memory allocating %lld bytes for the I/O descriptor", (unsigned long long) sizeof(io_desc_t));
+    if(!(*iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t)))){
+      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Internal error while allocating memory for iodesc. Out of memory allocating %lld bytes for the I/O descriptor", (unsigned long long) sizeof(io_desc_t));
     }
 
     /* Remember the pio type and its size. */
@@ -1731,8 +1728,9 @@ int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims,
     (*iodesc)->mpitype = mpi_type;
 
     /* Get the size of the type. */
-    if ((mpierr = MPI_Type_size((*iodesc)->mpitype, &(*iodesc)->mpitype_size)))
-        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    if((mpierr = MPI_Type_size((*iodesc)->mpitype, &(*iodesc)->mpitype_size))){
+      return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
 
     /* Initialize some values in the struct. */
     (*iodesc)->maxregions = 1;
@@ -1740,10 +1738,9 @@ int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims,
     (*iodesc)->ndims = ndims;
 
     /* Allocate space for, and initialize, the first region. */
-    if ((ret = alloc_region2(ios, ndims, &((*iodesc)->firstregion))))
-    {
-        return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                        "Internal error while allocating memory for iodesc. Allocating memory for 1st region failed. Out of memory allocating memory for I/O region in the I/O descriptor");
+    if((ret = alloc_region2(ios, ndims, &((*iodesc)->firstregion)))){
+      return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                      "Internal error while allocating memory for iodesc. Allocating memory for 1st region failed. Out of memory allocating memory for I/O region in the I/O descriptor");
     }
 
     /* Set the swap memory settings to defaults for this IO system. */
