@@ -253,7 +253,7 @@ extern "C" {
                           const void *sbuf, void *rbuf, int nvars);
 
     /* Allocate and initialize storage for decomposition information. */
-    int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims, io_desc_t **iodesc);
+    int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims, int maplen, io_desc_t **iodesc);
     void performance_tune_rearranger(iosystem_desc_t *ios, io_desc_t *iodesc);
 
     /* Flush contents of multi-buffer to disk. */
