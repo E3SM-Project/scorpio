@@ -1639,7 +1639,7 @@ int test_malloc_iodesc2(int iosysid, int my_rank)
     for (int t = 0; t < num_types; t++)
     {
 
-        if ((ret = malloc_iodesc(ios, test_type[t], 1, &iodesc)))
+        if ((ret = malloc_iodesc(ios, test_type[t], 1, 1, &iodesc)))
             return ret;
         if (iodesc->mpitype != mpi_type[t])
             return ERR_WRONG;
