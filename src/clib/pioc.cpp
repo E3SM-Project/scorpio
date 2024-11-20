@@ -32,6 +32,7 @@
 #include "blosc2_filter.h"
 #endif
 #endif
+#include <algorithm>
 
 bool fortran_order = false;
 
@@ -682,11 +683,10 @@ int pio_create_uniq_str(iosystem_desc_t *ios, io_desc_t *iodesc, char *str, int 
  * iostarts are generated.
  * @returns 0 on success, error code otherwise
  * @ingroup PIO_initdecomp
- * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimlen, int maplen,
-                    const PIO_Offset *compmap, int *ioidp, const int *rearranger,
-                    const PIO_Offset *iostart, const PIO_Offset *iocount)
+static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, int maplen,
+                      const PIO_Offset *compmap, int *ioidp, const int *rearranger,
+                      const PIO_Offset *iostart, const PIO_Offset *iocount, bool map_zero_based=false)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     io_desc_t *iodesc;     /* The IO description. */
@@ -762,16 +762,6 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
                       "Initializing the PIO decomposition failed. Out of memory allocating memory for I/O descriptor (ndims = %d, maplen = %d)", ndims, maplen);
     }
 
-    /* Remember the map. */
-    for(int m = 0; m < maplen; m++){
-      iodesc->map[m] = compmap[m];
-    }
-
-    /* Remember the dim sizes. */
-    for(int d = 0; d < ndims; d++){
-      iodesc->dimlen[d] = gdimlen[d];
-    }
-
     /* Set the rearranger. */
     if(!rearranger){
       iodesc->rearranger = ios->default_rearranger;
@@ -801,6 +791,31 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
     if(iodesc->rearranger == PIO_REARR_ANY){
       iodesc->rearranger = spio_get_opt_pio_rearr(ios, maplen);
     }
+
+    /* Cache the local decomposition map */
+    if(map_zero_based){
+      /* BOX and SUBSET rearrangers expect map to the 1-based */
+      if((iodesc->rearranger == PIO_REARR_BOX) || (iodesc->rearranger == PIO_REARR_SUBSET)){
+        std::transform(compmap, compmap + maplen, iodesc->map,
+          [](PIO_Offset off) { return off + 1; });
+      }
+      else{
+        std::copy(compmap, compmap + maplen, iodesc->map);
+      }
+    }
+    else{
+      /* CONTIG rearranger expects map to be 0-based */
+      if(iodesc->rearranger == PIO_REARR_CONTIG){
+        std::transform(compmap, compmap + maplen, iodesc->map,
+          [](PIO_Offset off) { return off - 1; });
+      }
+      else{
+        std::copy(compmap, compmap + maplen, iodesc->map);
+      }
+    }
+
+    /* Cache the dimension lengths */
+    std::copy(gdimlen, gdimlen + ndims, iodesc->dimlen);
 
     /* Is this the subset rearranger? */
     if(iodesc->rearranger == PIO_REARR_SUBSET){
@@ -926,6 +941,56 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
  * decomposition describes how the data will be distributed between
  * tasks.
  *
+ * Internally, this function will:
+ * <ul>
+ * <li>Allocate and initialize an iodesc struct for this
+ * decomposition. (This also allocates an io_region struct for the
+ * first region.)
+ * <li>(Box rearranger only) If iostart or iocount are NULL, call
+ * CalcStartandCount() to determine starts/counts. Then call
+ * compute_maxIObuffersize() to compute the max IO buffer size needed.
+ * <li>Create the rearranger.
+ * <li>Assign an ioid and add this decomposition to the list of open
+ * decompositions.
+ * </ul>
+ *
+ * @param iosysid the IO system ID.
+ * @param pio_type the basic PIO data type used.
+ * @param ndims the number of dimensions in the variable, not
+ * including the unlimited dimension.
+ * @param gdimlen an array length ndims with the sizes of the global
+ * dimensions.
+ * @param maplen the local length of the compmap array.
+ * @param compmap a 1 based array of offsets into the array record on
+ * file. A 0 in this array indicates a value which should not be
+ * transfered.
+ * @param ioidp pointer that will get the io description ID.
+ * @param rearranger pointer to the rearranger to be used for this
+ * decomp or NULL to use the default.
+ * @param iostart An array of start values for block cyclic
+ * decompositions for the SUBSET rearranger. Ignored if block
+ * rearranger is used. If NULL and SUBSET rearranger is used, the
+ * iostarts are generated.
+ * @param iocount An array of count values for block cyclic
+ * decompositions for the SUBSET rearranger. Ignored if block
+ * rearranger is used. If NULL and SUBSET rearranger is used, the
+ * iostarts are generated.
+ * @returns 0 on success, error code otherwise
+ * @ingroup PIO_initdecomp
+ */
+int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimlen, int maplen,
+                    const PIO_Offset *compmap, int *ioidp, const int *rearranger,
+                    const PIO_Offset *iostart, const PIO_Offset *iocount)
+{
+  return initdecomp(iosysid, pio_type, ndims, gdimlen, maplen,
+                    compmap, ioidp, rearranger, iostart, iocount);
+}
+
+/**
+ * Initialize the decomposition used with distributed arrays. The
+ * decomposition describes how the data will be distributed between
+ * tasks.
+ *
  * @param iosysid the IO system ID.
  * @param pio_type the basic PIO data type used.
  * @param ndims the number of dimensions in the variable, not
@@ -946,43 +1011,14 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
  * decompositions. If NULL ???
  * @returns 0 on success, error code otherwise
  * @ingroup PIO_initdecomp
- * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_init_decomp_impl(int iosysid, int pio_type, int ndims, const int *gdimlen, int maplen,
                      const PIO_Offset *compmap, int *ioidp, int rearranger,
                      const PIO_Offset *iostart, const PIO_Offset *iocount)
 {
-    PIO_Offset* compmap_1_based = (PIO_Offset*)calloc(maplen, sizeof(PIO_Offset));
-    if (compmap_1_based == NULL)
-    {
-        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                       "Initializing the decomposition used with distributed arrays failed. "
-                       "Out of memory allocating %lld bytes for one-based compmap",
-                       (unsigned long long) (maplen * sizeof(PIO_Offset)));
-    }
-
-    int *rearrangerp = NULL;
-
-    LOG((1, "PIOc_init_decomp iosysid = %d pio_type = %d ndims = %d maplen = %d",
-         iosysid, pio_type, ndims, maplen));
-
-    /* If the user specified a non-default rearranger, use it. */
-    if (rearranger)
-        rearrangerp = &rearranger;
-
-    /* Add 1 to all elements in compmap. */
-    for (int e = 0; e < maplen; e++)
-    {
-        LOG((3, "zero-based compmap[%d] = %d", e, compmap[e]));
-        compmap_1_based[e] = compmap[e] + 1;
-    }
-
-    /* Call the legacy version of the function. */
-    int ret = PIOc_InitDecomp_impl(iosysid, pio_type, ndims, gdimlen, maplen, compmap_1_based,
-                              ioidp, rearrangerp, iostart, iocount);
-
-    free(compmap_1_based);
-    return ret;
+  return initdecomp(iosysid, pio_type, ndims, gdimlen, maplen,
+                    compmap, ioidp, (rearranger) ? &rearranger : NULL,
+                    iostart, iocount, true);
 }
 
 /**
