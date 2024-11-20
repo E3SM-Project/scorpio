@@ -1685,10 +1685,11 @@ int find_mpi_type(int pio_type, MPI_Datatype *mpi_type, int *type_size)
  * handling.
  * @param piotype the PIO data type (ex. PIO_FLOAT, PIO_INT, etc.).
  * @param ndims the number of dimensions.
+ * @param maplen the length of the local decomposition map
  * @param iodesc pointer that gets the newly allocated io_desc_t.
  * @returns 0 for success, error code otherwise.
  */
-int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims,
+int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims, int maplen,
                   io_desc_t **iodesc)
 {
     MPI_Datatype mpi_type;
@@ -1735,12 +1736,25 @@ int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims,
     /* Initialize some values in the struct. */
     (*iodesc)->maxregions = 1;
     (*iodesc)->ioid = -1;
+    (*iodesc)->maplen = maplen;
     (*iodesc)->ndims = ndims;
 
     /* Allocate space for, and initialize, the first region. */
     if((ret = alloc_region2(ios, ndims, &((*iodesc)->firstregion)))){
       return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                       "Internal error while allocating memory for iodesc. Allocating memory for 1st region failed. Out of memory allocating memory for I/O region in the I/O descriptor");
+    }
+
+    /* Allocate memory for the local decomposition map */
+    if(!((*iodesc)->map = (PIO_Offset *) malloc(sizeof(PIO_Offset) * maplen))){
+      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Internal error while allocating memory (%lld bytes) to store I/O decomposition map", (unsigned long long) (sizeof(PIO_Offset) * maplen));
+    }
+
+    /* Allocate memory for storing the dimension lengths of variables that use this decomposition */
+    if(!((*iodesc)->dimlen = (int *)malloc(sizeof(int) * ndims))){
+      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Internal error while allocating memory (%lld bytes) for storing dimension sizes in the I/O decomposition map", (unsigned long long) (sizeof(int) * ndims));
     }
 
     /* Set the swap memory settings to defaults for this IO system. */
