@@ -345,6 +345,18 @@ endif ()
 # ADDING SOURCE & TOOLS
 #==============================================================================
 
+# Workaround for CMake 3.22.0+ regression on Cray systems (e.g., Frontier).
+# The regression breaks the existing FindMPI logic and causes MPI detection
+# to fail or hang inside subprojects.
+# This workaround adds an additional find_package(MPI) call at the root level
+# to restore MPI detection functionality in a subproject. The fix is temporary
+# but necessary until the issue is addressed in future CMake releases.
+if (DEFINED ENV{CRAYPE_VERSION})
+  if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.22.0")
+    find_package(MPI REQUIRED)
+  endif ()
+endif ()
+
 # Libraries
 add_subdirectory (src)
 
