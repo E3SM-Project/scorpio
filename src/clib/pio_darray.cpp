@@ -20,6 +20,7 @@
 #include "spio_hash.h"
 #include "spio_gptl_utils.hpp"
 #include "spio_ltimer_utils.hpp"
+#include "pio_rearr_contig.hpp"
 
 /* uint64_t definition */
 #ifdef _ADIOS2
@@ -166,7 +167,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
                     "Writing multiple variables to file (%s, ncid=%d) failed. Invalid arguments, invalid PIO decomposition id (%d) provided", pio_get_fname_from_file(file), ncid, ioid);
   }
-  pioassert(iodesc->rearranger == PIO_REARR_BOX || iodesc->rearranger == PIO_REARR_SUBSET,
+  pioassert(iodesc->rearranger == PIO_REARR_BOX || iodesc->rearranger == PIO_REARR_SUBSET || iodesc->rearranger == PIO_REARR_CONTIG,
             "unknown rearranger", __FILE__, __LINE__);
 
   /* Get a pointer to the variable info for the first variable. */
@@ -293,7 +294,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
 
     /* If fill values are desired, and we're using the BOX
      * rearranger, insert fill values. */
-    if(iodesc->needsfill && iodesc->rearranger == PIO_REARR_BOX){
+    if(iodesc->needsfill && ((iodesc->rearranger == PIO_REARR_BOX) || (iodesc->rearranger == PIO_REARR_CONTIG))){
       PIO_Offset localiobuflen = rlen / nvars;
       LOG((3, "inserting fill values iodesc->maxiobuflen = %lld, localiobuflen = %lld", iodesc->maxiobuflen, localiobuflen));
       for(int nv = 0; nv < nvars; nv++){
@@ -317,9 +318,16 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
   }
 
   /* Move data from compute to IO tasks. */
-  if((ierr = rearrange_comp2io(ios, iodesc, file, array, mv_iobuf, nvars))){
+  if(iodesc->rearranger == PIO_REARR_CONTIG){
+    ierr = iodesc->rearr->rearrange_comp2io(array, arraylen, mv_iobuf, rlen * iodesc->mpitype_size, nvars);
+  }
+  else{
+    ierr = rearrange_comp2io(ios, iodesc, file, array, mv_iobuf, nvars);
+  }
+  if(ierr != PIO_NOERR){
     return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                    "Writing multiple variables to file (%s, ncid=%d) failed. Error rearranging and moving data from compute tasks to I/O tasks", pio_get_fname_from_file(file), ncid);
+                    "Writing multiple variables to file (%s, ncid=%d) failed. Error rearranging and moving data from compute tasks to I/O tasks(rearranger = %d)",
+                    pio_get_fname_from_file(file), ncid, iodesc->rearranger);
   }
 
 #ifdef PIO_MICRO_TIMING
@@ -3404,7 +3412,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
     return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
                     "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed. Invalid arguments provided, I/O descriptor id (ioid=%d) is invalid", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
   }
-  pioassert(iodesc->rearranger == PIO_REARR_BOX || iodesc->rearranger == PIO_REARR_SUBSET,
+  pioassert(iodesc->rearranger == PIO_REARR_BOX || iodesc->rearranger == PIO_REARR_SUBSET || iodesc->rearranger == PIO_REARR_CONTIG,
             "unknown rearranger", __FILE__, __LINE__);
 
   /* Get var description. */
@@ -3623,9 +3631,15 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
   mtimer_start(file->varlist[varid].rd_rearr_mtimer);
 #endif
   /* Rearrange the data. */
-  if((ierr = rearrange_io2comp(ios, iodesc, iobuf, array))){
+  if(iodesc->rearranger == PIO_REARR_CONTIG){
+    ierr = iodesc->rearr->rearrange_io2comp(iobuf, rlen, array, iodesc->ndof * iodesc->mpitype_size, 1);
+  }
+  else{
+    ierr = rearrange_io2comp(ios, iodesc, iobuf, array);
+  }
+  if(ierr != PIO_NOERR){
     return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                     "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Rearranging data read in the I/O processes to compute processes failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                    "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Rearranging data read in the I/O processes to compute processes failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
   }
 
 #ifdef PIO_MICRO_TIMING

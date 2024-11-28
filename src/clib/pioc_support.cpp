@@ -23,6 +23,7 @@
 #include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
 #include "spio_hash.h"
+#include "pio_rearr_contig.hpp"
 
 #define VERSNO 2001
 
@@ -1816,6 +1817,11 @@ int PIOc_freedecomp_impl(int iosysid, int ioid)
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
         }
+
+    if(iodesc->rearr){
+      iodesc->rearr->finalize();
+      delete iodesc->rearr;
+    }
 
     ret = pio_delete_iodesc_from_list(ioid);
     if (ret != PIO_NOERR)
