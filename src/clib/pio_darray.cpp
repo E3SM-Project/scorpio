@@ -3369,302 +3369,279 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
 int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
                      void *array)
 {
-    iosystem_desc_t *ios;  /* Pointer to io system information. */
-    file_desc_t *file;     /* Pointer to file information. */
-    io_desc_t *iodesc;     /* Pointer to IO description information. */
-    var_desc_t *vdesc;     /* Info about the var being read. */
-    void *iobuf = NULL;    /* holds the data as read on the io node. */
-    size_t rlen = 0;       /* the length of data in iobuf. */
-    int ierr = PIO_NOERR, mpierr = MPI_SUCCESS;           /* Return code. */
-    int fndims = 0;
+  iosystem_desc_t *ios;  /* Pointer to io system information. */
+  file_desc_t *file;     /* Pointer to file information. */
+  io_desc_t *iodesc;     /* Pointer to IO description information. */
+  var_desc_t *vdesc;     /* Info about the var being read. */
+  void *iobuf = NULL;    /* holds the data as read on the io node. */
+  size_t rlen = 0;       /* the length of data in iobuf. */
+  int ierr = PIO_NOERR, mpierr = MPI_SUCCESS;           /* Return code. */
+  int fndims = 0;
 
 #ifdef _ADIOS2
-    adios_var_desc_t *vdesc_adios2; /* Info about the variable from the adios structure */
+  adios_var_desc_t *vdesc_adios2; /* Info about the variable from the adios structure */
 #endif
-    SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_read_darray");
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_read_darray");
 
-    /* Get the file info. */
-    if ((ierr = pio_get_file(ncid, &file)))
-    {
-        return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
-                        "Reading variable (varid=%d) failed. Invalid arguments provided, file id (ncid=%d) is invalid", varid, ncid);
-    }
-    assert(file);
-    ios = file->iosystem;
-    assert(ios);
+  /* Get the file info. */
+  if((ierr = pio_get_file(ncid, &file))){
+    return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
+                    "Reading variable (varid=%d) failed. Invalid arguments provided, file id (ncid=%d) is invalid", varid, ncid);
+  }
+  assert(file);
+  ios = file->iosystem;
+  assert(ios);
 
-    SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper ios_fstats_rd_timer(ios->io_fstats->rd_timer_name);
-    SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper ios_fstats_tot_timer(ios->io_fstats->tot_timer_name);
-    SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper file_fstats_rd_timer(file->io_fstats->rd_timer_name);
-    SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper file_fstats_tot_timer(file->io_fstats->tot_timer_name);
+  SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper ios_fstats_rd_timer(ios->io_fstats->rd_timer_name);
+  SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper ios_fstats_tot_timer(ios->io_fstats->tot_timer_name);
+  SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper file_fstats_rd_timer(file->io_fstats->rd_timer_name);
+  SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper file_fstats_tot_timer(file->io_fstats->tot_timer_name);
 
-    LOG((1, "PIOc_read_darray (ncid=%d (%s), varid=%d (%s)", ncid, pio_get_fname_from_file(file), varid, pio_get_vname_from_file(file, varid)));
+  LOG((1, "PIOc_read_darray (ncid=%d (%s), varid=%d (%s)", ncid, pio_get_fname_from_file(file), varid, pio_get_vname_from_file(file, varid)));
 
-    /* Get the iodesc. */
-    if (!(iodesc = pio_get_iodesc_from_id(ioid)))
-    {
-        return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
-                        "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed. Invalid arguments provided, I/O descriptor id (ioid=%d) is invalid", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
-    }
-    pioassert(iodesc->rearranger == PIO_REARR_BOX || iodesc->rearranger == PIO_REARR_SUBSET,
-              "unknown rearranger", __FILE__, __LINE__);
+  /* Get the iodesc. */
+  if(!(iodesc = pio_get_iodesc_from_id(ioid))){
+    return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
+                    "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed. Invalid arguments provided, I/O descriptor id (ioid=%d) is invalid", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
+  }
+  pioassert(iodesc->rearranger == PIO_REARR_BOX || iodesc->rearranger == PIO_REARR_SUBSET,
+            "unknown rearranger", __FILE__, __LINE__);
 
-    /* Get var description. */
-    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
-    {
+  /* Get var description. */
+  if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
 #ifdef _ADIOS2
-        vdesc_adios2 = &(file->adios_vars[varid]);
+    vdesc_adios2 = &(file->adios_vars[varid]);
+#endif
+  }
+  else{
+    vdesc = &(file->varlist[varid]);
+  }
+
+  /* Run these on all tasks if async is not in use, but only on
+   * non-IO tasks if async is in use. */
+  if(!ios->async || !ios->ioproc){
+    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+    /* Find out PIO data type of var. */
+    if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
+#ifdef _ADIOS2
+      assert(vdesc_adios2->nc_type != PIO_NAT);
+      vdesc_adios2->adios_type = spio_get_adios_type(vdesc_adios2->nc_type);
+      assert(vdesc_adios2->adios_type != adios2_type_unknown);
 #endif
     }
-    else
-        vdesc = &(file->varlist[varid]);
-
-    /* Run these on all tasks if async is not in use, but only on
-     * non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
-    {
-        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-
-        /* Find out PIO data type of var. */
-        if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
-        {
-#ifdef _ADIOS2
-            assert(vdesc_adios2->nc_type != PIO_NAT);
-            vdesc_adios2->adios_type = spio_get_adios_type(vdesc_adios2->nc_type);
-            assert(vdesc_adios2->adios_type != adios2_type_unknown);
-#endif
+    else{
+      if(vdesc->pio_type == PIO_NAT){
+        if((ierr = PIOc_inq_vartype_impl(ncid, varid, &vdesc->pio_type))){
+          return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                         "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
-        else
-        {
-            if (vdesc->pio_type == PIO_NAT)
-            {
-                if ((ierr = PIOc_inq_vartype_impl(ncid, varid, &vdesc->pio_type)))
-                {
-                    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-                }
-            }
-            assert(vdesc->pio_type != PIO_NAT);
-        }
-
-        /* Find out length of type. */
-        if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
-        {
-#ifdef _ADIOS2
-            if (vdesc_adios2->adios_type_size == 0)
-                vdesc_adios2->adios_type_size = get_adios2_type_size(vdesc_adios2->adios_type, NULL);
-            assert(vdesc_adios2->adios_type_size > 0);
-#endif
-        }
-        else
-        {
-            if (vdesc->type_size == 0)
-            {
-                if ((ierr = PIOc_inq_type_impl(ncid, vdesc->pio_type, NULL, &vdesc->type_size)))
-                {
-                    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type length failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-                }
-            }
-
-            assert(vdesc->type_size > 0);
-        }
-
-        spio_ltimer_start(ios->io_fstats->rd_timer_name);
-        spio_ltimer_start(ios->io_fstats->tot_timer_name);
-        spio_ltimer_start(file->io_fstats->rd_timer_name);
-        spio_ltimer_start(file->io_fstats->tot_timer_name);
+      }
+      assert(vdesc->pio_type != PIO_NAT);
     }
 
-    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
-    {
+    /* Find out length of type. */
+    if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
 #ifdef _ADIOS2
-        ios->io_fstats->rb += vdesc_adios2->adios_type_size * iodesc->llen;
-        file->io_fstats->rb += vdesc_adios2->adios_type_size * iodesc->llen;
+      if(vdesc_adios2->adios_type_size == 0){
+        vdesc_adios2->adios_type_size = get_adios2_type_size(vdesc_adios2->adios_type, NULL);
+      }
+      assert(vdesc_adios2->adios_type_size > 0);
 #endif
     }
-    else
-    {
-        ios->io_fstats->rb += vdesc->type_size * iodesc->llen;
-        file->io_fstats->rb += vdesc->type_size * iodesc->llen;
+    else{
+      if(vdesc->type_size == 0){
+        if((ierr = PIOc_inq_type_impl(ncid, vdesc->pio_type, NULL, &vdesc->type_size))){
+          return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                         "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type length failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+        }
+      }
+      assert(vdesc->type_size > 0);
     }
+
+    spio_ltimer_start(ios->io_fstats->rd_timer_name);
+    spio_ltimer_start(ios->io_fstats->tot_timer_name);
+    spio_ltimer_start(file->io_fstats->rd_timer_name);
+    spio_ltimer_start(file->io_fstats->tot_timer_name);
+  }
+
+  if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
+#ifdef _ADIOS2
+    ios->io_fstats->rb += vdesc_adios2->adios_type_size * iodesc->llen;
+    file->io_fstats->rb += vdesc_adios2->adios_type_size * iodesc->llen;
+#endif
+  }
+  else{
+    ios->io_fstats->rb += vdesc->type_size * iodesc->llen;
+    file->io_fstats->rb += vdesc->type_size * iodesc->llen;
+  }
 
 #ifdef PIO_MICRO_TIMING
-    mtimer_start(file->varlist[varid].rd_mtimer);
+  mtimer_start(file->varlist[varid].rd_mtimer);
 #endif
 
-    /* Run these on all tasks if async is not in use, but only on
-     * non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
-    {
-        /* Get the number of dims for this var. */
-        LOG((3, "about to call PIOc_inq_varndims varid = %d", varid));
-        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        ierr = PIOc_inq_varndims_impl(file->pio_ncid, varid, &fndims);
-        if(ierr != PIO_NOERR){
-            return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Inquiring number of variable dimensions failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-        }
-        spio_ltimer_start(ios->io_fstats->rd_timer_name);
-        spio_ltimer_start(ios->io_fstats->tot_timer_name);
-        spio_ltimer_start(file->io_fstats->rd_timer_name);
-        spio_ltimer_start(file->io_fstats->tot_timer_name);
-        LOG((3, "called PIOc_inq_varndims varid = %d fndims = %d", varid, fndims));
+  /* Run these on all tasks if async is not in use, but only on
+   * non-IO tasks if async is in use. */
+  if(!ios->async || !ios->ioproc){
+    /* Get the number of dims for this var. */
+    LOG((3, "about to call PIOc_inq_varndims varid = %d", varid));
+    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+    ierr = PIOc_inq_varndims_impl(file->pio_ncid, varid, &fndims);
+    if(ierr != PIO_NOERR){
+      return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                      "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Inquiring number of variable dimensions failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
     }
-    /* For netcdf serial reads we read some data to the io master
-     * node then send that data to a corresponding io node. The
-     * buffer size on io task 0 must be as large as the largest
-     * used to accommodate this serial io method (use iodesc->
-     * maxiobuflen to set it). */
-   if ((file->iotype == PIO_IOTYPE_NETCDF || file->iotype == PIO_IOTYPE_NETCDF4C) && ios->iomaster == MPI_ROOT)
-       rlen = iodesc->maxiobuflen;
-   else
-       rlen = iodesc->llen;
+    spio_ltimer_start(ios->io_fstats->rd_timer_name);
+    spio_ltimer_start(ios->io_fstats->tot_timer_name);
+    spio_ltimer_start(file->io_fstats->rd_timer_name);
+    spio_ltimer_start(file->io_fstats->tot_timer_name);
+    LOG((3, "called PIOc_inq_varndims varid = %d fndims = %d", varid, fndims));
+  }
 
-   if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
-       rlen = 0;
+  /* For netcdf serial reads we read some data to the io master
+   * node then send that data to a corresponding io node. The
+   * buffer size on io task 0 must be as large as the largest
+   * used to accommodate this serial io method (use iodesc->
+   * maxiobuflen to set it). */
+  if((file->iotype == PIO_IOTYPE_NETCDF || file->iotype == PIO_IOTYPE_NETCDF4C) && ios->iomaster == MPI_ROOT){
+    rlen = iodesc->maxiobuflen;
+  }
+  else{
+    rlen = iodesc->llen;
+  }
 
-    if(!ios->async || !ios->ioproc)
-    {
-        if(file->varlist[varid].vrsize == 0)
-        {
-            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->rd_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            ierr = calc_var_rec_sz(ncid, varid);
-            if(ierr != PIO_NOERR)
-            {
-                LOG((1, "Unable to calculate the variable record size"));
-            }
-            spio_ltimer_start(ios->io_fstats->rd_timer_name);
-            spio_ltimer_start(ios->io_fstats->tot_timer_name);
-            spio_ltimer_start(file->io_fstats->rd_timer_name);
-            spio_ltimer_start(file->io_fstats->tot_timer_name);
-        }
+  if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
+    rlen = 0;
+  }
+
+  if(!ios->async || !ios->ioproc){
+    if(file->varlist[varid].vrsize == 0){
+      spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+      spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+      spio_ltimer_stop(file->io_fstats->rd_timer_name);
+      spio_ltimer_stop(file->io_fstats->tot_timer_name);
+      ierr = calc_var_rec_sz(ncid, varid);
+      if(ierr != PIO_NOERR){
+        LOG((1, "Unable to calculate the variable record size"));
+      }
+      spio_ltimer_start(ios->io_fstats->rd_timer_name);
+      spio_ltimer_start(ios->io_fstats->tot_timer_name);
+      spio_ltimer_start(file->io_fstats->rd_timer_name);
+      spio_ltimer_start(file->io_fstats->tot_timer_name);
+    }
+  }
+
+  file->varlist[varid].rb_pend += file->varlist[varid].vrsize;
+  file->rb_pend += file->varlist[varid].vrsize;
+
+  /* Allocate a buffer for one record. */
+  if(ios->ioproc && rlen > 0){
+    if(!(iobuf = bget(iodesc->mpitype_size * rlen))){
+      return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Out of memory allocating space (%lld bytes) in I/O processes to read data from file (before rearrangement)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (iodesc->mpitype_size * rlen));
+    }
+  }
+
+  if(ios->async){
+    /* Send relevant args from compute procs to I/O procs */
+    int msg = PIO_MSG_READDARRAY;
+    
+    PIO_SEND_ASYNC_MSG(ios, msg, &ierr, ncid, varid, ioid);
+    if(ierr != PIO_NOERR){
+      return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                      "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Sending async message, PIO_MSG_READDARRAY, failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
     }
 
-    file->varlist[varid].rb_pend += file->varlist[varid].vrsize;
-    file->rb_pend += file->varlist[varid].vrsize;
-
-    /* Allocate a buffer for one record. */
-    if (ios->ioproc && rlen > 0)
-        if (!(iobuf = bget(iodesc->mpitype_size * rlen)))
-        {
-            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Out of memory allocating space (%lld bytes) in I/O processes to read data from file (before rearrangement)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (iodesc->mpitype_size * rlen));
-        }
-
-    if(ios->async)
-    {
-        /* Send relevant args from compute procs to I/O procs */
-        int msg = PIO_MSG_READDARRAY;
-        
-        PIO_SEND_ASYNC_MSG(ios, msg, &ierr, ncid, varid, ioid);
-        if(ierr != PIO_NOERR)
-        {
-            return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Sending async message, PIO_MSG_READDARRAY, failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-        }
-
-        /* Share results known only on computation tasks with IO tasks. */
-        mpierr = MPI_Bcast(&fndims, 1, MPI_INT, ios->comproot, ios->my_comm);
-        if(mpierr != MPI_SUCCESS)
-        {
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
-        }
-        LOG((3, "shared fndims = %d", fndims));
+    /* Share results known only on computation tasks with IO tasks. */
+    mpierr = MPI_Bcast(&fndims, 1, MPI_INT, ios->comproot, ios->my_comm);
+    if(mpierr != MPI_SUCCESS){
+      return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
     }
+    LOG((3, "shared fndims = %d", fndims));
+  }
 
 #if PIO_SAVE_DECOMPS
-    if(!(iodesc->is_saved) &&
-        pio_save_decomps_regex_match(ioid, file->fname, file->varlist[varid].vname))
-    {
-        char filename[PIO_MAX_NAME];
-        ierr = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME, "piodecomp", ".dat");
-        if(ierr != PIO_NOERR)
-        {
-            return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                            "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Saving the I/O decomposition (ioid=%d) failed, unable to create a unique file name for saving the decomposition", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
-        }
-        LOG((2, "Saving decomp map (read) to %s", filename));
-        PIOc_writemap_impl(filename, ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
-        iodesc->is_saved = true;
+  if(!(iodesc->is_saved) &&
+      pio_save_decomps_regex_match(ioid, file->fname, file->varlist[varid].vname)){
+    char filename[PIO_MAX_NAME];
+    ierr = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME, "piodecomp", ".dat");
+    if(ierr != PIO_NOERR){
+      return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                      "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Saving the I/O decomposition (ioid=%d) failed, unable to create a unique file name for saving the decomposition", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
     }
+    LOG((2, "Saving decomp map (read) to %s", filename));
+    PIOc_writemap_impl(filename, ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
+    iodesc->is_saved = true;
+  }
 #endif
-    /* Call the correct darray read function based on iotype. */
-    if(!ios->async || ios->ioproc)
-    {
-        switch (file->iotype)
-        {
-        case PIO_IOTYPE_NETCDF:
-        case PIO_IOTYPE_NETCDF4C:
-            if ((ierr = pio_read_darray_nc_serial(file, fndims, iodesc, varid, iobuf)))
-            {
-                return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Reading variable in serial (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
-            }
-            break;
-        case PIO_IOTYPE_PNETCDF:
-        case PIO_IOTYPE_NETCDF4P:
-            if ((ierr = pio_read_darray_nc(file, fndims, iodesc, varid, iobuf)))
-            {
-                return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Reading variable in parallel (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
-            }
-            break;
-#ifdef _ADIOS2
-        case PIO_IOTYPE_ADIOS:
-        case PIO_IOTYPE_ADIOSC:
-            GPTLstart("PIO:PIOc_read_darray_adios");
-            if ((ierr = PIOc_read_darray_adios(file, fndims, iodesc, varid, array)))
-            {
-                GPTLstop("PIO:PIOc_read_darray_adios");
-                return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
-                               "Reading variable in parallel failed",
-                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
-            }
-
+  /* Call the correct darray read function based on iotype. */
+  if(!ios->async || ios->ioproc){
+    switch (file->iotype){
+      case PIO_IOTYPE_NETCDF:
+      case PIO_IOTYPE_NETCDF4C:
+          if((ierr = pio_read_darray_nc_serial(file, fndims, iodesc, varid, iobuf))){
+            return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                            "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Reading variable in serial (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
+          }
+          break;
+      case PIO_IOTYPE_PNETCDF:
+      case PIO_IOTYPE_NETCDF4P:
+          if((ierr = pio_read_darray_nc(file, fndims, iodesc, varid, iobuf))){
+            return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                            "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Reading variable in parallel (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
+          }
+          break;
+  #ifdef _ADIOS2
+      case PIO_IOTYPE_ADIOS:
+      case PIO_IOTYPE_ADIOSC:
+          GPTLstart("PIO:PIOc_read_darray_adios");
+          if((ierr = PIOc_read_darray_adios(file, fndims, iodesc, varid, array))){
             GPTLstop("PIO:PIOc_read_darray_adios");
+            return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "Reading variable in parallel failed",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
+          }
 
-            return PIO_NOERR;
-#endif
-        default:
-            return pio_err(NULL, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
-                             "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Invalid iotype (%d) provided", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, file->iotype);
-        }
+          GPTLstop("PIO:PIOc_read_darray_adios");
+
+          return PIO_NOERR;
+  #endif
+      default:
+          return pio_err(NULL, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Invalid iotype (%d) provided", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, file->iotype);
     }
+  }
 
 #ifdef PIO_MICRO_TIMING
-    mtimer_start(file->varlist[varid].rd_rearr_mtimer);
+  mtimer_start(file->varlist[varid].rd_rearr_mtimer);
 #endif
-    /* Rearrange the data. */
-    if ((ierr = rearrange_io2comp(ios, iodesc, iobuf, array)))
-    {
-        return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                         "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Rearranging data read in the I/O processes to compute processes failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-    }
+  /* Rearrange the data. */
+  if((ierr = rearrange_io2comp(ios, iodesc, iobuf, array))){
+    return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                     "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Rearranging data read in the I/O processes to compute processes failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
 
 #ifdef PIO_MICRO_TIMING
-    mtimer_stop(file->varlist[varid].rd_rearr_mtimer, get_var_desc_str(ncid, varid, NULL));
+  mtimer_stop(file->varlist[varid].rd_rearr_mtimer, get_var_desc_str(ncid, varid, NULL));
 #endif
-    /* We don't use non-blocking reads */
-    file->varlist[varid].rb_pend = 0;
-    file->rb_pend = 0;
+  /* We don't use non-blocking reads */
+  file->varlist[varid].rb_pend = 0;
+  file->rb_pend = 0;
 
-    /* Free the buffer. */
-    if (rlen > 0)
-        brel(iobuf);
+  /* Free the buffer. */
+  if(rlen > 0){
+    brel(iobuf);
+  }
 
 #ifdef PIO_MICRO_TIMING
-    mtimer_stop(file->varlist[varid].rd_mtimer, get_var_desc_str(ncid, varid, NULL));
+  mtimer_stop(file->varlist[varid].rd_mtimer, get_var_desc_str(ncid, varid, NULL));
 #endif
-    return PIO_NOERR;
+  return PIO_NOERR;
 }
