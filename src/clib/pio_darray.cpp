@@ -3426,33 +3426,28 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 #ifdef _ADIOS2
     adios_var_desc_t *vdesc_adios2; /* Info about the variable from the adios structure */
 #endif
-    GPTLstart("PIO:PIOc_read_darray");
+    SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_read_darray");
+
     /* Get the file info. */
     if ((ierr = pio_get_file(ncid, &file)))
     {
-        GPTLstop("PIO:PIOc_read_darray");
         return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
                         "Reading variable (varid=%d) failed. Invalid arguments provided, file id (ncid=%d) is invalid", varid, ncid);
     }
     assert(file);
-    spio_ltimer_start(file->io_fstats->rd_timer_name);
-    spio_ltimer_start(file->io_fstats->tot_timer_name);
     ios = file->iosystem;
     assert(ios);
 
-    spio_ltimer_start(ios->io_fstats->rd_timer_name);
-    spio_ltimer_start(ios->io_fstats->tot_timer_name);
+    SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper ios_fstats_rd_timer(ios->io_fstats->rd_timer_name);
+    SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper ios_fstats_tot_timer(ios->io_fstats->tot_timer_name);
+    SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper file_fstats_rd_timer(file->io_fstats->rd_timer_name);
+    SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper file_fstats_tot_timer(file->io_fstats->tot_timer_name);
 
     LOG((1, "PIOc_read_darray (ncid=%d (%s), varid=%d (%s)", ncid, pio_get_fname_from_file(file), varid, pio_get_vname_from_file(file, varid)));
 
     /* Get the iodesc. */
     if (!(iodesc = pio_get_iodesc_from_id(ioid)))
     {
-        GPTLstop("PIO:PIOc_read_darray");
-        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-        spio_ltimer_stop(file->io_fstats->tot_timer_name);
         return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
                         "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed. Invalid arguments provided, I/O descriptor id (ioid=%d) is invalid", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
     }
@@ -3493,7 +3488,6 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
             {
                 if ((ierr = PIOc_inq_vartype_impl(ncid, varid, &vdesc->pio_type)))
                 {
-                    GPTLstop("PIO:PIOc_read_darray");
                     return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                                    "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
                 }
@@ -3516,7 +3510,6 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
             {
                 if ((ierr = PIOc_inq_type_impl(ncid, vdesc->pio_type, NULL, &vdesc->type_size)))
                 {
-                    GPTLstop("PIO:PIOc_read_darray");
                     return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                                    "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type length failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
                 }
@@ -3560,7 +3553,6 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         ierr = PIOc_inq_varndims_impl(file->pio_ncid, varid, &fndims);
         if(ierr != PIO_NOERR){
-            GPTLstop("PIO:PIOc_read_darray");
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
                             "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Inquiring number of variable dimensions failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
@@ -3610,11 +3602,6 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
     if (ios->ioproc && rlen > 0)
         if (!(iobuf = bget(iodesc->mpitype_size * rlen)))
         {
-            GPTLstop("PIO:PIOc_read_darray");
-            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->rd_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
                             "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Out of memory allocating space (%lld bytes) in I/O processes to read data from file (before rearrangement)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (iodesc->mpitype_size * rlen));
         }
@@ -3627,11 +3614,6 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
         PIO_SEND_ASYNC_MSG(ios, msg, &ierr, ncid, varid, ioid);
         if(ierr != PIO_NOERR)
         {
-            GPTLstop("PIO:PIOc_read_darray");
-            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->rd_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
                             "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Sending async message, PIO_MSG_READDARRAY, failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
@@ -3640,11 +3622,6 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
         mpierr = MPI_Bcast(&fndims, 1, MPI_INT, ios->comproot, ios->my_comm);
         if(mpierr != MPI_SUCCESS)
         {
-            GPTLstop("PIO:PIOc_read_darray");
-            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->rd_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
         LOG((3, "shared fndims = %d", fndims));
@@ -3658,11 +3635,6 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
         ierr = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME, "piodecomp", ".dat");
         if(ierr != PIO_NOERR)
         {
-            GPTLstop("PIO:PIOc_read_darray");
-            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->rd_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                             "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Saving the I/O decomposition (ioid=%d) failed, unable to create a unique file name for saving the decomposition", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
         }
@@ -3680,11 +3652,6 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
         case PIO_IOTYPE_NETCDF4C:
             if ((ierr = pio_read_darray_nc_serial(file, fndims, iodesc, varid, iobuf)))
             {
-                GPTLstop("PIO:PIOc_read_darray");
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
                 return pio_err(ios, file, ierr, __FILE__, __LINE__,
                                 "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Reading variable in serial (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
             }
@@ -3694,11 +3661,6 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
         case PIO_IOTYPE_NETCDF4P_NCZARR:
             if ((ierr = pio_read_darray_nc(file, fndims, iodesc, varid, iobuf)))
             {
-                GPTLstop("PIO:PIOc_read_darray");
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
                 return pio_err(ios, file, ierr, __FILE__, __LINE__,
                                 "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Reading variable in parallel (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
             }
@@ -3710,11 +3672,6 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
             if ((ierr = PIOc_read_darray_adios(file, fndims, iodesc, varid, array)))
             {
                 GPTLstop("PIO:PIOc_read_darray_adios");
-                GPTLstop("PIO:PIOc_read_darray");
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
                 return pio_err(ios, file, ierr, __FILE__, __LINE__,
                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
                                "Reading variable in parallel failed",
@@ -3722,20 +3679,10 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
             }
 
             GPTLstop("PIO:PIOc_read_darray_adios");
-            GPTLstop("PIO:PIOc_read_darray");
-            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->rd_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
 
             return PIO_NOERR;
 #endif
         default:
-            GPTLstop("PIO:PIOc_read_darray");
-            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->rd_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return pio_err(NULL, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
                              "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Invalid iotype (%d) provided", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, file->iotype);
         }
@@ -3747,11 +3694,6 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
     /* Rearrange the data. */
     if ((ierr = rearrange_io2comp(ios, iodesc, iobuf, array)))
     {
-        GPTLstop("PIO:PIOc_read_darray");
-        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-        spio_ltimer_stop(file->io_fstats->tot_timer_name);
         return pio_err(ios, file, ierr, __FILE__, __LINE__,
                          "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Rearranging data read in the I/O processes to compute processes failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
     }
@@ -3770,10 +3712,5 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 #ifdef PIO_MICRO_TIMING
     mtimer_stop(file->varlist[varid].rd_mtimer, get_var_desc_str(ncid, varid, NULL));
 #endif
-    GPTLstop("PIO:PIOc_read_darray");
-    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-    spio_ltimer_stop(file->io_fstats->rd_timer_name);
-    spio_ltimer_stop(file->io_fstats->tot_timer_name);
     return PIO_NOERR;
 }
