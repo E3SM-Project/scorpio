@@ -61,12 +61,66 @@ namespace SPIO{
           elem_mpi_type_sz_(0), agg_comm_(MPI_COMM_NULL), is_agg_root_(false),
           agg_comm_sz_(0), rearr_comm_(MPI_COMM_NULL), rearr_comm_sz_(0),
           rearr_comm_iochunk_sz_(0){}
+        /* Initialize the rearranger */
         int init(int pio_type, const PIO_Offset *compmap, std::size_t compmap_sz,
                   const int *gdimlen, int ndims, io_desc_t *iodesc);
+
+        bool is_init(void ) const{ return is_init_; }
+
+        /* Get decomp info */
+        std::size_t get_decomp_map_lsz(void ) const{
+          assert(is_init_);
+          return static_cast<std::size_t>(lcompmap_sz_);
+        }
+
+        std::size_t get_decomp_gsz(void ) const{
+          assert(is_init_);
+          return static_cast<std::size_t>(gdecomp_sz_);
+        }
+
+        /* Get rearrange info */
+        std::size_t get_rearrange_buf_sz(void ) const{
+          assert(is_init_ && ios_);
+          if(!ios_->ioproc){
+            return 0;
+          }
+
+          /* FIXME: Should we return the buffer size in bytes ? */
+          PIO_Offset iochunk = rearr_comm_iochunk_sz_;
+          if(rearr_comm_rank_ != (rearr_comm_sz_ - 1)){
+            return iochunk;
+          }
+          else{
+            /* The last I/O process gets the remaining data */
+            return (gdecomp_sz_ - rearr_comm_rank_ * iochunk);
+          }
+        }
+
+        std::pair<PIO_Offset, PIO_Offset> get_rearr_decomp_map_range(int iorank)
+        {
+          assert(gdecomp_sz_ > 0);
+          assert(rearr_comm_iochunk_sz_ > 0);
+
+          PIO_Offset iochunk = rearr_comm_iochunk_sz_;
+          PIO_Offset start = iorank * iochunk;
+          PIO_Offset end = start + iochunk;
+          if(iorank == (rearr_comm_sz_ - 1)){
+            end = gdecomp_sz_;
+          }
+          return std::make_pair(start, end);
+        }
+
+        std::pair<PIO_Offset, PIO_Offset> get_rearr_decomp_map_range(void )
+        {
+          return get_rearr_decomp_map_range(rearr_comm_rank_);
+        }
+
+        /* Rearrange data */
         int rearrange_comp2io(const void *sbuf, std::size_t sbuf_sz,
                               void *rbuf, std::size_t rbuf_sz, int nvars);
         int rearrange_io2comp(const void *sbuf, std::size_t sbuf_sz,
                               void *rbuf, std::size_t rbuf_sz, int nvars);
+        /* Finalize the rearranger */
         int finalize(void );
       private:
         bool is_init_;
@@ -120,20 +174,6 @@ namespace SPIO{
                               void *rbuf, std::size_t rbuf_sz, int nvars);
 
         int create_rearr_comm(void );
-        std::pair<PIO_Offset, PIO_Offset> get_rearr_decomp_map_range(int iorank)
-        {
-          assert(gdecomp_sz_ > 0);
-          assert(rearr_comm_iochunk_sz_ > 0);
-
-          PIO_Offset iochunk = rearr_comm_iochunk_sz_;
-          PIO_Offset start = iorank * iochunk;
-          PIO_Offset end = start + iochunk;
-          if(iorank == (rearr_comm_sz_ - 1)){
-            end = gdecomp_sz_; 
-          }
-          return std::make_pair(start, end);
-        }
-
         int get_rearr_toproc_map(const std::vector<PIO_Offset> &gcompmap,
               std::vector<int> &to_proc);
         int setup_data_rearr_info(std::vector<PIO_Offset> &gcompmap, std::vector<int> &to_proc,
