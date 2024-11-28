@@ -194,6 +194,13 @@ typedef struct io_region
     struct io_region *next;
 } io_region;
 
+
+namespace SPIO{
+  namespace DataRearr{
+    class Contig_rearr;
+  }
+}
+
 /**
  * IO descriptor structure.
  *
@@ -322,6 +329,9 @@ typedef struct io_desc_t
      */
     bool is_saved;
 #endif
+
+    /* FIXME: Once we have classes for subset/box this ptr should be to a base rearr class */
+    SPIO::DataRearr::Contig_rearr *rearr;
 
     /** Pointer to the next io_desc_t in the list. */
     struct io_desc_t *next;
