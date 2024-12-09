@@ -3025,10 +3025,12 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 
             if(file->adios_rank == 0)
             {
-                ierr = symlink(file->filename, filename);
+                char adios_bp_md_filename[PIO_MAX_NAME];
+                snprintf(adios_bp_md_filename, PIO_MAX_NAME, "%s%s", file->filename, "/md.0");
+                ierr = symlink(adios_bp_md_filename, filename);
                 if(ierr != 0)
                 {
-                    fprintf(stdout, "PIO: WARNING: Creating symlink for %s file failed, ierr = %d", file->filename, ierr);
+                    fprintf(stdout, "PIO: WARNING: Creating symlink for ADIOS BP mdata file (%s) failed, ierr = %d", adios_bp_md_filename, ierr);
                 }
             }
 
