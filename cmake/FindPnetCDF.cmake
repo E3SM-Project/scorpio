@@ -69,3 +69,6 @@ foreach (PNCDFcomp IN LISTS PnetCDF_FIND_VALID_COMPONENTS)
     endif ()
     
 endforeach ()
+
+# Handle QUIET/REQUIRED, and set <PKG>_FOUND if all required components were found
+find_package_handle_standard_args (PnetCDF HANDLE_COMPONENTS)
