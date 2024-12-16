@@ -19,6 +19,7 @@
 #ifdef _HDF5
 #include <sys/stat.h>
 #endif
+#include <string>
 #include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
 #include "spio_hash.h"
@@ -3113,10 +3114,11 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 
             if(file->adios_rank == 0)
             {
-                ierr = symlink(file->filename, filename);
+                const std::string adios_bp_md_filename(std::string(file->filename) + "/md.0");
+                ierr = symlink(adios_bp_md_filename.c_str(), filename);
                 if(ierr != 0)
                 {
-                    fprintf(stdout, "PIO: WARNING: Creating symlink for %s file failed, ierr = %d", file->filename, ierr);
+                    fprintf(stdout, "PIO: WARNING: Creating symlink for ADIOS BP mdata file (%s) failed, ierr = %d", adios_bp_md_filename.c_str(), ierr);
                 }
             }
 
