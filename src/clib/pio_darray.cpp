@@ -254,7 +254,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
         }
 
         /* Share results known only on computation tasks with IO tasks. */
-        if ((mpierr = MPI_Bcast(&fndims, 1, MPI_INT, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&fndims, 1, MPI_INT, ios->comproot, ios->my_comm, 3)))
         {
             GPTLstop("PIO:PIOc_write_darray_multi");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -3755,7 +3755,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
         }
 
         /* Share results known only on computation tasks with IO tasks. */
-        mpierr = MPI_Bcast(&fndims, 1, MPI_INT, ios->comproot, ios->my_comm);
+        mpierr = spio_MPI_Bcast(&fndims, 1, MPI_INT, ios->comproot, ios->my_comm, 6);
         if(mpierr != MPI_SUCCESS)
         {
             GPTLstop("PIO:PIOc_read_darray");

@@ -709,5 +709,6 @@ int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file);
 }
 #endif
 
+int spio_MPI_Bcast(void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm, int from);
 
 #endif /* __PIO_INTERNAL__ */

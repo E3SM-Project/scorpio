@@ -1076,7 +1076,7 @@ int check_netcdf(iosystem_desc_t *ios, file_desc_t *file, int status,
     }
 
     if(eh == PIO_BCAST_ERROR){
-        mpierr = MPI_Bcast(&status, 1, MPI_INT, ioroot, comm);
+        mpierr = spio_MPI_Bcast(&status, 1, MPI_INT, ioroot, comm, 128);
         if(mpierr != MPI_SUCCESS){
             return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
         }
@@ -1735,9 +1735,9 @@ int PIOc_readmap_impl(const char *file, int *ndims, int **gdims, PIO_Offset *fma
                             "Reading I/O decomposition from file (%s) failed. Corrupt/Invalid entries in file. Number of PEs = %d (expected >= 1 && <= npes, %d)", file, rnpes, npes);
         }
 
-        if ((mpierr = MPI_Bcast(&rnpes, 1, MPI_INT, 0, comm)))
+        if ((mpierr = spio_MPI_Bcast(&rnpes, 1, MPI_INT, 0, comm, 129)))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-        if ((mpierr = MPI_Bcast(ndims, 1, MPI_INT, 0, comm)))
+        if ((mpierr = spio_MPI_Bcast(ndims, 1, MPI_INT, 0, comm, 130)))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
         if (!(tdims = (int *) calloc(*ndims, sizeof(int))))
         {
@@ -1747,7 +1747,7 @@ int PIOc_readmap_impl(const char *file, int *ndims, int **gdims, PIO_Offset *fma
         for (int i = 0; i < *ndims; i++)
             fscanf(fp,"%d ", tdims + i);
 
-        if ((mpierr = MPI_Bcast(tdims, *ndims, MPI_INT, 0, comm)))
+        if ((mpierr = spio_MPI_Bcast(tdims, *ndims, MPI_INT, 0, comm, 131)))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
 
         for (int i = 0; i < rnpes; i++)
@@ -1784,16 +1784,16 @@ int PIOc_readmap_impl(const char *file, int *ndims, int **gdims, PIO_Offset *fma
     }
     else
     {
-        if ((mpierr = MPI_Bcast(&rnpes, 1, MPI_INT, 0, comm)))
+        if ((mpierr = spio_MPI_Bcast(&rnpes, 1, MPI_INT, 0, comm, 129)))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-        if ((mpierr = MPI_Bcast(ndims, 1, MPI_INT, 0, comm)))
+        if ((mpierr = spio_MPI_Bcast(ndims, 1, MPI_INT, 0, comm, 130)))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
         if (!(tdims = (int *) calloc(*ndims, sizeof(int))))
         {
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes for temp buffer to store dimension ids", file, (unsigned long long)((*ndims) * sizeof(int)));
         }
-        if ((mpierr = MPI_Bcast(tdims, *ndims, MPI_INT, 0, comm)))
+        if ((mpierr = spio_MPI_Bcast(tdims, *ndims, MPI_INT, 0, comm, 131)))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
 
         if (myrank < rnpes)
@@ -3497,7 +3497,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     }
 
     /* Broadcast mode to all tasks. */
-    if ((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->ioroot, ios->union_comm)))
+    if ((mpierr = spio_MPI_Bcast(&file->mode, 1, MPI_INT, ios->ioroot, ios->union_comm, 135)))
     {
 #ifdef _ADIOS2
         if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
@@ -5168,7 +5168,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
     }
 
     /* Broadcast open mode to all tasks. */
-    if ((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+    if ((mpierr = spio_MPI_Bcast(&file->mode, 1, MPI_INT, ios->ioroot, ios->my_comm, 137)))
     {
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -5182,7 +5182,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
     if (retry)
     {
         /* Broadcast IO type (might be switched on IO tasks) to all tasks. */
-        if ((mpierr = MPI_Bcast(&file->iotype, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&file->iotype, 1, MPI_INT, ios->ioroot, ios->my_comm, 138)))
         {
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -5937,8 +5937,8 @@ int calc_var_rec_sz(int ncid, int varid)
               * dimlen[i]; 
         }
     }
-    mpierr = MPI_Bcast(&(file->varlist[varid].vrsize), 1, MPI_OFFSET,
-                        ios->ioroot, ios->my_comm);
+    mpierr = spio_MPI_Bcast(&(file->varlist[varid].vrsize), 1, MPI_OFFSET,
+                        ios->ioroot, ios->my_comm, 139);
     if(mpierr != MPI_SUCCESS)
     {
         LOG((1, "Unable to bcast vrsize"));
@@ -7392,3 +7392,75 @@ int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file)
     return PIO_NOERR;
 }
 #endif
+
+#define TIMEOUT_SECONDS 5
+
+int spio_MPI_Bcast(void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm, int from)
+{
+    static int counter = 0;
+    int rank = -1, size = 0;
+
+    counter++;
+
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &size);
+
+    if (rank == 0)
+    {
+        for (int i = 1; i < size; i++)
+        {
+            MPI_Status status;
+            int recv_from = -1;
+            int flag = 0;
+            int loop_count = 0;
+
+            double start_time = MPI_Wtime();
+
+            while (1)
+            {
+                loop_count++;
+
+                /* Check if there is a message from rank i */
+                MPI_Iprobe(i, 0, comm, &flag, &status);
+
+                /* If a message is received, process it */
+                if (flag)
+                {
+                    MPI_Recv(&recv_from, 1, MPI_INT, i, 0, comm, &status);
+
+                    /* Calculate and print the time taken for the rank to respond */
+                    double elapsed_time = MPI_Wtime() - start_time;
+                    if (i == 1)
+                    {
+                        printf("DEBUG, counter = %d, rank %d responded after %d while loop(s) and %.6f seconds\n", counter, i, loop_count, elapsed_time);
+                        fflush(stdout);
+                    }
+
+                    /* Check if the 'from' value matches */
+                    if (recv_from != from)
+                    {
+                        printf("DEBUG, counter = %d, rank %d has a mismatched 'from' value: %d (expected %d)\n", counter, i, recv_from, from);
+                        fflush(stdout);
+                        MPI_Abort(comm, 1);
+                    }
+
+                    break;
+                }
+
+                /* Check if the timeout has been reached */
+                if (MPI_Wtime() - start_time > TIMEOUT_SECONDS)
+                {
+                    printf("DEBUG, counter = %d, rank %d did not participate in the communication within the timeout period.\n", counter, i);
+                    fflush(stdout);
+                    MPI_Abort(comm, 1); /* Abort if the rank doesn't respond within the timeout */
+                }
+            }
+        }
+    }
+    else
+        MPI_Send(&from, 1, MPI_INT, 0, 0, comm);
+
+    MPI_Barrier(comm);
+
+    return MPI_Bcast(buffer, count, datatype, root, comm);
+}
