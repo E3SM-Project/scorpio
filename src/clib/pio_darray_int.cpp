@@ -1821,8 +1821,8 @@ int get_file_req_blocks(file_desc_t *file,
 #ifdef PIO_ENABLE_SANITY_CHECKS
     /* Sanity check : All io ranks have the same number of reqs per file */
     int file_nreqs_root = file_nreqs;
-    mpierr = MPI_Bcast(&file_nreqs_root, 1, MPI_INT,
-              file->iosystem->ioroot, file->iosystem->io_comm);
+    mpierr = spio_MPI_Bcast(&file_nreqs_root, 1, MPI_INT,
+              file->iosystem->ioroot, file->iosystem->io_comm, 1);
     assert(mpierr == MPI_SUCCESS);
     assert(file_nreqs_root == file_nreqs);
 #endif
@@ -2000,8 +2000,8 @@ int get_file_req_blocks(file_desc_t *file,
      * Note that the last int in the buffer is the number of the blocks
      */
     *preq_block_ranges_sz = *nreq_blocks;
-    mpierr = MPI_Bcast(*preq_block_ranges, 2 * file_nreqs + 1, MPI_INT,
-              file->iosystem->ioroot, file->iosystem->io_comm);
+    mpierr = spio_MPI_Bcast(*preq_block_ranges, 2 * file_nreqs + 1, MPI_INT,
+              file->iosystem->ioroot, file->iosystem->io_comm, 2);
     if(mpierr != MPI_SUCCESS){
       return check_mpi(file->iosystem, file, mpierr, __FILE__, __LINE__);
     }

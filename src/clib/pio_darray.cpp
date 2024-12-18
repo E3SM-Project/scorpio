@@ -254,7 +254,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
         }
 
         /* Share results known only on computation tasks with IO tasks. */
-        if ((mpierr = MPI_Bcast(&fndims, 1, MPI_INT, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&fndims, 1, MPI_INT, ios->comproot, ios->my_comm, 3)))
         {
             GPTLstop("PIO:PIOc_write_darray_multi");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -1123,7 +1123,7 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
         }
     }
 
-    mpierr = MPI_Bcast(&can_merge_buffers, 1, MPI_INT, 0, file->block_comm);
+    mpierr = spio_MPI_Bcast(&can_merge_buffers, 1, MPI_INT, 0, file->block_comm, 4);
     if (mpierr != MPI_SUCCESS)
     {
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
@@ -1836,7 +1836,7 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
         }
     }
 
-    MPI_Bcast(&can_merge_buffers, 1, MPI_INT, 0, file->block_comm);
+    spio_MPI_Bcast(&can_merge_buffers, 1, MPI_INT, 0, file->block_comm, 5);
     if (can_merge_buffers != 1)
     {
         return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -3755,7 +3755,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
         }
 
         /* Share results known only on computation tasks with IO tasks. */
-        mpierr = MPI_Bcast(&fndims, 1, MPI_INT, ios->comproot, ios->my_comm);
+        mpierr = spio_MPI_Bcast(&fndims, 1, MPI_INT, ios->comproot, ios->my_comm, 6);
         if(mpierr != MPI_SUCCESS)
         {
             GPTLstop("PIO:PIOc_read_darray");

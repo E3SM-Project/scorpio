@@ -203,21 +203,21 @@ int PIOc_inq_var_deflate_impl(int ncid, int varid, int *shufflep, int *deflatep,
 
     /* Broadcast results to all tasks. */
     if (shufflep)
-        if ((mpierr = MPI_Bcast(shufflep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(shufflep, 1, MPI_INT, ios->ioroot, ios->my_comm, 100)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (deflatep)
-        if ((mpierr = MPI_Bcast(deflatep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(deflatep, 1, MPI_INT, ios->ioroot, ios->my_comm, 101)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (deflate_levelp)
-        if ((mpierr = MPI_Bcast(deflate_levelp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(deflate_levelp, 1, MPI_INT, ios->ioroot, ios->my_comm, 102)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -329,7 +329,7 @@ int PIOc_def_var_chunking_impl(int ncid, int varid, int storage, const PIO_Offse
         }
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
-        if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&ndims, 1, MPI_INT, ios->comproot, ios->my_comm, 103)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -463,7 +463,7 @@ int PIOc_inq_var_chunking_impl(int ncid, int varid, int *storagep, PIO_Offset *c
         }
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
-        if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&ndims, 1, MPI_INT, ios->comproot, ios->my_comm, 104)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -503,21 +503,21 @@ int PIOc_inq_var_chunking_impl(int ncid, int varid, int *storagep, PIO_Offset *c
     }
 
     /* Broadcast results to all tasks. */
-    if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+    if ((mpierr = spio_MPI_Bcast(&ndims, 1, MPI_INT, ios->ioroot, ios->my_comm, 105)))
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
     }
     if (storagep)
-        if ((mpierr = MPI_Bcast(storagep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(storagep, 1, MPI_INT, ios->ioroot, ios->my_comm, 106)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (chunksizesp)
-        if ((mpierr = MPI_Bcast(chunksizesp, ndims, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(chunksizesp, ndims, MPI_OFFSET, ios->ioroot, ios->my_comm, 107)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -699,7 +699,7 @@ int PIOc_inq_var_endian_impl(int ncid, int varid, int *endianp)
 
     /* Broadcast results to all tasks. */
     if (endianp)
-        if ((mpierr = MPI_Bcast(endianp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(endianp, 1, MPI_INT, ios->ioroot, ios->my_comm, 108)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -901,7 +901,7 @@ int PIOc_get_chunk_cache_impl(int iosysid, int iotype, PIO_Offset *sizep, PIO_Of
     if (sizep)
     {
         LOG((2, "bcasting size = %d ios->ioroot = %d", *sizep, ios->ioroot));
-        if ((mpierr = MPI_Bcast(sizep, 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(sizep, 1, MPI_OFFSET, ios->ioroot, ios->my_comm, 109)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
@@ -910,7 +910,7 @@ int PIOc_get_chunk_cache_impl(int iosysid, int iotype, PIO_Offset *sizep, PIO_Of
     }
     if (nelemsp)
     {
-        if ((mpierr = MPI_Bcast(nelemsp, 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(nelemsp, 1, MPI_OFFSET, ios->ioroot, ios->my_comm, 110)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
@@ -919,7 +919,7 @@ int PIOc_get_chunk_cache_impl(int iosysid, int iotype, PIO_Offset *sizep, PIO_Of
     }
     if (preemptionp)
     {
-        if ((mpierr = MPI_Bcast(preemptionp, 1, MPI_FLOAT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(preemptionp, 1, MPI_FLOAT, ios->ioroot, ios->my_comm, 111)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
@@ -1112,21 +1112,21 @@ int PIOc_get_var_chunk_cache_impl(int ncid, int varid, PIO_Offset *sizep, PIO_Of
 
     /* Broadcast results to all tasks. */
     if (sizep && !ierr)
-        if ((mpierr = MPI_Bcast(sizep, 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(sizep, 1, MPI_OFFSET, ios->ioroot, ios->my_comm, 112)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (nelemsp && !ierr)
-        if ((mpierr = MPI_Bcast(nelemsp, 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(nelemsp, 1, MPI_OFFSET, ios->ioroot, ios->my_comm, 113)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (preemptionp && !ierr)
-        if ((mpierr = MPI_Bcast(preemptionp, 1, MPI_FLOAT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(preemptionp, 1, MPI_FLOAT, ios->ioroot, ios->my_comm, 114)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);

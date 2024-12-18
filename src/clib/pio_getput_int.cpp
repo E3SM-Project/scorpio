@@ -161,7 +161,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         }
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
-        if ((mpierr = MPI_Bcast(&atttype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&atttype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm, 7)))
         {
             GPTLstop("PIO:spio_put_att_tc");
             GPTLstop("PIO:write_total");
@@ -176,7 +176,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             }
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
-        if ((mpierr = MPI_Bcast(&memtype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&memtype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm, 8)))
         {
             GPTLstop("PIO:spio_put_att_tc");
             GPTLstop("PIO:write_total");
@@ -668,7 +668,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
         LOG((2, "spio_get_att_tc bcast from comproot = %d attlen = %d atttype_len = %d", ios->comproot, attlen, atttype_len));
-        if ((mpierr = MPI_Bcast(&attlen, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&attlen, 1, MPI_OFFSET, ios->comproot, ios->my_comm, 9)))
         {
             GPTLstop("PIO:spio_get_att_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -677,7 +677,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
-        if ((mpierr = MPI_Bcast(&atttype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&atttype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm, 10)))
         {
             GPTLstop("PIO:spio_get_att_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -686,7 +686,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
-        if ((mpierr = MPI_Bcast(&memtype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&memtype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm, 11)))
         {
             GPTLstop("PIO:spio_get_att_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -946,8 +946,8 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 
     /* Broadcast results to all tasks. */
     LOG((2, "bcasting att values attlen = %d memtype_len = %d", attlen, memtype_len));
-    if ((mpierr = MPI_Bcast(ip, (int)attlen * memtype_len, MPI_BYTE, ios->ioroot,
-                            ios->my_comm)))
+    if ((mpierr = spio_MPI_Bcast(ip, (int)attlen * memtype_len, MPI_BYTE, ios->ioroot,
+                            ios->my_comm, 12)))
     {
         GPTLstop("PIO:spio_get_att_tc");
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -1163,7 +1163,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
-        if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&ndims, 1, MPI_INT, ios->comproot, ios->my_comm, 13)))
         {
             GPTLstop("PIO:spio_get_vars_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -1172,7 +1172,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
-        if ((mpierr = MPI_Bcast(&num_elem, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&num_elem, 1, MPI_OFFSET, ios->comproot, ios->my_comm, 14)))
         {
             GPTLstop("PIO:spio_get_vars_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -1181,7 +1181,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
-        if ((mpierr = MPI_Bcast(&typelen, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&typelen, 1, MPI_OFFSET, ios->comproot, ios->my_comm, 15)))
         {
             GPTLstop("PIO:spio_get_vars_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -1190,7 +1190,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
-        if ((mpierr = MPI_Bcast(&xtype, 1, MPI_INT, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&xtype, 1, MPI_INT, ios->comproot, ios->my_comm, 16)))
         {
             GPTLstop("PIO:spio_get_vars_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -2235,7 +2235,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     /* Send the data. */
     LOG((2, "spio_get_vars_tc bcasting data num_elem = %d typelen = %d ios->ioroot = %d", num_elem,
          typelen, ios->ioroot));
-    if ((mpierr = MPI_Bcast(buf, num_elem * typelen, MPI_BYTE, ios->ioroot, ios->my_comm)))
+    if ((mpierr = spio_MPI_Bcast(buf, num_elem * typelen, MPI_BYTE, ios->ioroot, ios->my_comm, 17)))
     {
         GPTLstop("PIO:spio_get_vars_tc");
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -2622,7 +2622,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
         /* Broadcast values currently only known on computation tasks to IO tasks. */
         LOG((2, "spio_put_vars_tc bcast from comproot"));
-        if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&ndims, 1, MPI_INT, ios->comproot, ios->my_comm, 18)))
         {
             GPTLstop("PIO:spio_put_vars_tc");
             GPTLstop("PIO:write_total");
@@ -2637,7 +2637,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             }
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
-        if ((mpierr = MPI_Bcast(&xtype, 1, MPI_INT, ios->comproot, ios->my_comm)))
+        if ((mpierr = spio_MPI_Bcast(&xtype, 1, MPI_INT, ios->comproot, ios->my_comm, 19)))
         {
             GPTLstop("PIO:spio_put_vars_tc");
             GPTLstop("PIO:write_total");
