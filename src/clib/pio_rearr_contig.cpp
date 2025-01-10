@@ -56,7 +56,7 @@ int SPIO::DataRearr::Contig_rearr::init(int pio_type,
   assert(ios_);
 
   lcompmap_sz_ = compmap_sz;
-  gdecomp_sz_ = std::accumulate(gdimlen, gdimlen + ndims, 0);
+  gdecomp_sz_ = std::accumulate(gdimlen, gdimlen + ndims, 1, std::multiplies<int>());
   
   elem_pio_type_ = pio_type;
   ret = find_mpi_type(elem_pio_type_, &elem_mpi_type_, &elem_mpi_type_sz_);
@@ -82,9 +82,12 @@ int SPIO::DataRearr::Contig_rearr::init(int pio_type,
   }
 
   /* Aggregate compmaps into the aggregating procs */
+  std::size_t non_fval_compmap_sz = 0;
   std::vector<PIO_Offset> aggcompmap;
+  std::vector<int> non_fval_compmap_counts, non_fval_compmap_displs;
   std::vector<int> aggcompmap_counts, aggcompmap_displs;
-  ret = aggregate_compmap(compmap, compmap_sz, aggcompmap, aggcompmap_counts, aggcompmap_displs);
+  ret = aggregate_compmap(compmap, compmap_sz, non_fval_compmap_sz, non_fval_compmap_counts, non_fval_compmap_displs,
+                          aggcompmap, aggcompmap_counts, aggcompmap_displs);
   if(ret != PIO_NOERR){
     return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
       "Internal error while initializing PIO_REARR_CONTIG. Unable to aggregate local compmaps (iosysid = %d)", ios_->iosysid);
@@ -99,7 +102,8 @@ int SPIO::DataRearr::Contig_rearr::init(int pio_type,
   }
 
   /* Set up the types and info required to aggregate data */
-  ret = setup_data_agg_info(compmap, compmap_sz, aggcompmap, aggcompmap_counts, aggcompmap_displs, to_proc);
+  ret = setup_data_agg_info(compmap, compmap_sz, non_fval_compmap_sz, non_fval_compmap_counts, non_fval_compmap_displs,
+                            aggcompmap, aggcompmap_counts, aggcompmap_displs, to_proc);
   if(ret != PIO_NOERR){
     return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
       "Internal error while initializing PIO_REARR_CONTIG. Unable to setup data aggregation (iosysid = %d)", ios_->iosysid);
@@ -166,12 +170,16 @@ int SPIO::DataRearr::Contig_rearr::aggregate_data(const void *sbuf, std::size_t 
   assert(is_init_);
 
   /* Gather data from compute processes in this aggregating comm to the aggregating/IO process */
-  MPI_Datatype agg_stype = agg_gs_info_.stype;
+  MPI_Datatype agg_stype_nvars = MPI_DATATYPE_NULL;
   std::vector<MPI_Datatype> agg_rtypes_nvars;
 
   /* FIXME: We need a better way to find this info out */
   std::size_t agg_data_nelems = agg_compmap_sorter_.size();
   assert(abuf_sz == nvars * agg_data_nelems * elem_mpi_type_sz_);
+
+//  std::cout << "DBG: sbuf[], abuf[] before gather :" << abuf_sz << "," << nvars << "," << elem_mpi_type_sz_ << ":" << std::flush;
+//  SPIO_Util::Dbg_Util::print_1dvec((int *)sbuf, (int *)((char *)sbuf + sbuf_sz * nvars));
+//  SPIO_Util::Dbg_Util::print_1dvec((int *)abuf, (int *)((char *)abuf + abuf_sz));
 
   if(nvars > 1){
     /* We are aggregating a block of variables */
@@ -196,17 +204,39 @@ int SPIO::DataRearr::Contig_rearr::aggregate_data(const void *sbuf, std::size_t 
         agg_rtypes_nvars.push_back(agg_rtype);
       }
     }
+    if(agg_gs_info_.stype != MPI_DATATYPE_NULL){
+      MPI_Aint stride_between_vars = static_cast<MPI_Aint>(sbuf_sz * elem_mpi_type_sz_);
+      ret = MPI_Type_hvector(nvars, 1, stride_between_vars, agg_gs_info_.stype, &agg_stype_nvars);
+      if(ret == MPI_SUCCESS){
+        ret = MPI_Type_commit(&agg_stype_nvars);
+      }
+      if(ret != MPI_SUCCESS){
+        return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
+          "Internal error while aggregating data from compute processes to aggregating processes (PIO_REARR_CONTIG). Unable to create vector types to send data for data aggregation (iosysid = %d)", ios_->iosysid);
+      }
+    }
   }
 
-  int scount = (agg_stype != MPI_DATATYPE_NULL) ? nvars : 0;
+  int scount = (agg_gs_info_.stype != MPI_DATATYPE_NULL) ? 1 : 0;
 
-  ret = SPIO_Util::Rearr_Util::gatherw(sbuf, scount, agg_stype,
+  ret = SPIO_Util::Rearr_Util::gatherw(sbuf, scount,
+          (nvars > 1) ? agg_stype_nvars : agg_gs_info_.stype,
           abuf, agg_gs_info_.rcounts, agg_data_byte_displs_,
           (nvars > 1) ? agg_rtypes_nvars : agg_gs_info_.rtypes,
           0, agg_comm_, NULL);
   if(ret != MPI_SUCCESS){
     return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
       "Internal error while aggregating data from compute processes to aggregating processes (PIO_REARR_CONTIG). Unable to gather data during data aggregation (iosysid = %d)", ios_->iosysid);
+  }
+
+//  if(is_agg_root_){
+//    std::cout << "DBG: sbuf[], abuf[] after gather :\n" << std::flush;
+//    SPIO_Util::Dbg_Util::print_1dvec((int *)sbuf, (int *)((char *)sbuf + sbuf_sz * nvars));
+//    SPIO_Util::Dbg_Util::print_1dvec((int *)abuf, (int *)((char *)abuf + abuf_sz));
+//  }
+
+  if(agg_stype_nvars != MPI_DATATYPE_NULL){
+    MPI_Type_free(&agg_stype_nvars);
   }
 
   for(std::size_t i = 0; i < agg_rtypes_nvars.size(); i++){
@@ -231,6 +261,7 @@ int SPIO::DataRearr::Contig_rearr::disperse_data(const void *abuf, std::size_t a
    * process from the compute processes, is now the type use to send/disperse data
    */
   MPI_Datatype dis_rtype = agg_gs_info_.stype;
+  MPI_Datatype dis_rtype_nvars = MPI_DATATYPE_NULL;
   std::vector<MPI_Datatype> dis_stypes_nvars;
 
   /* FIXME: We need a better way to find this info out */
@@ -260,18 +291,39 @@ int SPIO::DataRearr::Contig_rearr::disperse_data(const void *abuf, std::size_t a
         dis_stypes_nvars.push_back(dis_stype);
       }
     }
+    if(agg_gs_info_.stype != MPI_DATATYPE_NULL){
+      MPI_Aint stride_between_vars = static_cast<MPI_Aint>(abuf_sz * elem_mpi_type_sz_);
+      ret = MPI_Type_hvector(nvars, 1, stride_between_vars, agg_gs_info_.stype, &dis_rtype_nvars);
+      if(ret == MPI_SUCCESS){
+        ret = MPI_Type_commit(&dis_rtype_nvars);
+      }
+      if(ret != MPI_SUCCESS){
+        return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
+          "Internal error while dispersing data from aggregating processes to compute processes (PIO_REARR_CONTIG). Unable to create vector types to recv data for data dispersion (iosysid = %d)", ios_->iosysid);
+      }
+    }
   }
 
-  int rcount = (dis_rtype != MPI_DATATYPE_NULL) ? nvars : 0;
+  int rcount = (dis_rtype != MPI_DATATYPE_NULL) ? 1 : 0;
 
+  //std::cout << "DBG: abuf[], rbuf[] before final scatter:\n" << std::flush;
+  //SPIO_Util::Dbg_Util::print_1dvec((double *)abuf, (double *)((char *)abuf + abuf_sz));
+  //SPIO_Util::Dbg_Util::print_1dvec((double *)rbuf, (double *)((char *)rbuf + rbuf_sz));
   ret = SPIO_Util::Rearr_Util::scatterw(abuf, agg_gs_info_.rcounts,
           agg_data_byte_displs_,
           (nvars > 1) ? dis_stypes_nvars : agg_gs_info_.rtypes,
-          rbuf, rcount, dis_rtype,
+          rbuf, rcount,
+          (nvars > 1) ? dis_rtype_nvars : dis_rtype,
           0, agg_comm_, NULL);
   if(ret != MPI_SUCCESS){
     return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
       "Internal error while dispersing data from aggregating processes to compute processes (PIO_REARR_CONTIG). Unable to disperse/scatter data during data dispersion (iosysid = %d)", ios_->iosysid);
+  }
+
+  //std::cout << "DBG: rbuf[] after final scatter:\n" << std::flush;
+  //SPIO_Util::Dbg_Util::print_1dvec((double *)rbuf, (double *)((char *)rbuf + rbuf_sz));
+  if(dis_rtype_nvars != MPI_DATATYPE_NULL){
+    MPI_Type_free(&dis_rtype_nvars);
   }
 
   for(std::size_t i = 0; i < dis_stypes_nvars.size(); i++){
@@ -391,6 +443,9 @@ inline int SPIO::DataRearr::Contig_rearr::create_agg_comm(void )
 }
 
 int SPIO::DataRearr::Contig_rearr::aggregate_compmap(const PIO_Offset *lcompmap, std::size_t lcompmap_sz,
+                                                      std::size_t &non_fval_lcompmap_sz,
+                                                      std::vector<int> &non_fval_lcompmap_counts,
+                                                      std::vector<int> &non_fval_lcompmap_displs,
                                                       std::vector<PIO_Offset> &gcompmap,
                                                       std::vector<int> &gcompmap_counts,
                                                       std::vector<int> &gcompmap_displs)
@@ -404,8 +459,13 @@ int SPIO::DataRearr::Contig_rearr::aggregate_compmap(const PIO_Offset *lcompmap,
     gcompmap_displs.resize(agg_comm_sz_);
   }
 
-  int send_sz = static_cast<int>(lcompmap_sz);
-  ret = MPI_Gather(&send_sz, 1, MPI_INT, gcompmap_counts.data(), 1, MPI_INT, 0, agg_comm_);
+  // We only send/recv non-fillval elements & map values
+  get_non_fval_lcompmap_counts_displs(lcompmap, lcompmap_sz,
+                                      non_fval_lcompmap_sz, non_fval_lcompmap_counts, non_fval_lcompmap_displs);
+
+  //std::cout << "DBG: non_fval_lcompmap_sz = " << non_fval_lcompmap_sz << "\n" << std::flush;
+  int non_fval_lcompmap_sz_int = static_cast<int>(non_fval_lcompmap_sz);
+  ret = MPI_Gather(&non_fval_lcompmap_sz_int, 1, MPI_INT, gcompmap_counts.data(), 1, MPI_INT, 0, agg_comm_);
   if(ret != MPI_SUCCESS){
     return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
       "Internal error while initializing PIO_REARR_CONTIG. Unable to gather local compmap sizes (iosysid=%d)", ios_->iosysid);
@@ -424,7 +484,26 @@ int SPIO::DataRearr::Contig_rearr::aggregate_compmap(const PIO_Offset *lcompmap,
   }
 
   /* Gather local compmaps */
-  ret = MPI_Gatherv(lcompmap, lcompmap_sz, PIO_OFFSET,
+  MPI_Datatype non_fval_lcompmap_stype = MPI_DATATYPE_NULL;
+  int non_fval_lcompmap_scount = 0;
+  if(non_fval_lcompmap_sz > 0){
+    ret = MPI_Type_indexed(static_cast<int>(non_fval_lcompmap_counts.size()),
+                            non_fval_lcompmap_counts.data(), non_fval_lcompmap_displs.data(),
+                            PIO_OFFSET, &non_fval_lcompmap_stype);
+    if(ret == MPI_SUCCESS){
+      ret = MPI_Type_commit(&non_fval_lcompmap_stype);
+    }
+
+    if(ret != MPI_SUCCESS){
+      return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
+        "Internal error while initializing PIO_REARR_CONTIG. Unable to create/commit indexed type to send local compmaps (iosysid=%d)", ios_->iosysid);
+    }
+    non_fval_lcompmap_scount = 1;
+  }
+
+  // Some MPI implementations do not like MPI_DATATYPE_NULL even when count is 0
+  MPI_Datatype stype = (non_fval_lcompmap_stype != MPI_DATATYPE_NULL) ? non_fval_lcompmap_stype : MPI_CHAR;
+  ret = MPI_Gatherv(lcompmap, non_fval_lcompmap_scount, stype,
           gcompmap.data(), gcompmap_counts.data(), gcompmap_displs.data(), PIO_OFFSET,
           0, agg_comm_);
   if(ret != MPI_SUCCESS){
@@ -432,11 +511,60 @@ int SPIO::DataRearr::Contig_rearr::aggregate_compmap(const PIO_Offset *lcompmap,
       "Internal error while initializing PIO_REARR_CONTIG. Unable to gather local compmaps (iosysid=%d)", ios_->iosysid);
   }
 
+  if(non_fval_lcompmap_stype != MPI_DATATYPE_NULL){
+    MPI_Type_free(&non_fval_lcompmap_stype);
+  }
+
+//  std::cout << "DBG: Sent/Gathered lcompmap/gcompmap : " << std::flush;
+//  SPIO_Util::Dbg_Util::print_1dvec(lcompmap, lcompmap + lcompmap_sz);
+//  SPIO_Util::Dbg_Util::print_1dvec(gcompmap);
+
   return ret;
+}
+
+void SPIO::DataRearr::Contig_rearr::get_non_fval_lcompmap_counts_displs(const PIO_Offset *lcompmap,
+                                                                        std::size_t lcompmap_sz,
+                                                                        std::size_t &non_fval_lcompmap_sz,
+                                                                        std::vector<int> &non_fval_lcompmap_counts,
+                                                                        std::vector<int> &non_fval_lcompmap_displs)
+{
+  non_fval_lcompmap_sz = 0;
+  if((lcompmap_sz == 0) || (lcompmap == NULL)){
+    return;
+  }
+
+  /* Compmap values that are -1 indicate fillvalues, we do not aggregate/disperse these values */
+  const PIO_Offset FILLVAL = -1;
+  const int INVALID_DISP = -1;
+  /* The count and disp in lcompmap for the current range of non-fillvalues */
+  std::pair<int, int> non_fval_lcompmap_cur_range = {0, INVALID_DISP};
+  for(std::size_t i = 0; i < lcompmap_sz; i++){
+    if(lcompmap[i] != FILLVAL){
+      non_fval_lcompmap_sz++;
+      non_fval_lcompmap_cur_range.first++;
+      if(non_fval_lcompmap_cur_range.second == INVALID_DISP){
+        non_fval_lcompmap_cur_range.second = static_cast<int>(i);
+      }
+    }
+    else{
+      if(non_fval_lcompmap_cur_range.first > 0){
+        non_fval_lcompmap_counts.push_back(non_fval_lcompmap_cur_range.first);
+        non_fval_lcompmap_displs.push_back(non_fval_lcompmap_cur_range.second);
+      }
+      non_fval_lcompmap_cur_range = {0, INVALID_DISP};
+    }
+  }
+  if(non_fval_lcompmap_cur_range.first > 0){
+    non_fval_lcompmap_counts.push_back(non_fval_lcompmap_cur_range.first);
+    non_fval_lcompmap_displs.push_back(non_fval_lcompmap_cur_range.second);
+  }
 }
 
 int SPIO::DataRearr::Contig_rearr::setup_data_agg_info(const PIO_Offset *lcompmap,
                                                         std::size_t lcompmap_sz,
+                                                        std::size_t non_fval_lcompmap_sz,
+                                                        const std::vector<int> &non_fval_lcompmap_counts,
+                                                        const std::vector<int> &non_fval_lcompmap_displs,
                                                         const std::vector<PIO_Offset> &gcompmap,
                                                         const std::vector<int> &gcompmap_counts,
                                                         const std::vector<int> &gcompmap_displs,
@@ -449,17 +577,10 @@ int SPIO::DataRearr::Contig_rearr::setup_data_agg_info(const PIO_Offset *lcompma
    * aggregate/IO procs
    * Sending/receiving 1 contiguous array of lcompmap_sz length
    */
-  agg_gs_info_.stype = MPI_DATATYPE_NULL;
-  if(lcompmap_sz > 0){
-    ret = MPI_Type_contiguous(static_cast<int>(lcompmap_sz), elem_mpi_type_, &(agg_gs_info_.stype));
-    if(ret == MPI_SUCCESS){
-      ret = MPI_Type_commit(&(agg_gs_info_.stype));
-    }
-
-    if(ret != MPI_SUCCESS){
-      return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
-        "Internal error while initializing PIO_REARR_CONTIG. Unable to create/commit contiguous type (size=%d) on compute process for data aggregation (iosysid=%d)", static_cast<int>(lcompmap_sz), ios_->iosysid);
-    }
+  ret = init_agg_send_type(lcompmap, non_fval_lcompmap_sz, non_fval_lcompmap_counts, non_fval_lcompmap_displs);
+  if(ret != MPI_SUCCESS){
+    return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
+      "Internal error while initializing PIO_REARR_CONTIG. Unable to create/commit indexed type (local compmap size=%d, num of non-fillvals=%d) on compute process for data aggregation (iosysid=%d)", static_cast<int>(lcompmap_sz), static_cast<int>(non_fval_lcompmap_sz), ios_->iosysid);
   }
   
   if(!is_agg_root_){
@@ -502,11 +623,54 @@ int SPIO::DataRearr::Contig_rearr::setup_data_agg_info(const PIO_Offset *lcompma
   for(std::size_t i = 0; i < gcompmap_idx.size(); i++){
     agg_compmap_sorter_[gcompmap_idx[i]] = i;
   }
+  /*
+  for(std::size_t i = 0; i < gcompmap_idx.size(); i++){
+    if(gcompmap[gcompmap_idx[i]] == -1){
+      agg_compmap_sorter_skip_idx_end_ = i + 1;
+    }
+    else{
+      break;
+    }
+  }
+
+  std::cout << "DBG: agg_compmap_sorter_skip_idx_ : " << agg_compmap_sorter_skip_idx_end_ << "\n" << std::flush;
+  */
+//  std::cout << "DBG: agg_compmap_sorter_ : " << std::flush;
+//  SPIO_Util::Dbg_Util::print_1dvec(agg_compmap_sorter_);
 
   ret = init_agg_recv_types(gcompmap_counts, agg_compmap_sorter_);
   return ret;
 }
 
+int SPIO::DataRearr::Contig_rearr::init_agg_send_type(const PIO_Offset *lcompmap,
+                                                      std::size_t lcompmap_sz,
+                                                      const std::vector<int> &lcompmap_counts,
+                                                      const std::vector<int> &lcompmap_displs)
+{
+  int ret = PIO_NOERR;
+
+  assert(ios_);
+  /* Setup gather scatter info for sending/receiving data from compute procs to
+   * aggregate/IO procs
+   * Sending/receiving only non-fillval elements (hence using indexed type instead of a contiguous type)
+   */
+  agg_gs_info_.stype = MPI_DATATYPE_NULL;
+  if(lcompmap_sz > 0){
+    ret = MPI_Type_indexed(static_cast<int>(lcompmap_counts.size()), lcompmap_counts.data(), lcompmap_displs.data(),
+                            elem_mpi_type_, &(agg_gs_info_.stype));
+    if(ret == MPI_SUCCESS){
+      ret = MPI_Type_commit(&(agg_gs_info_.stype));
+    }
+
+    if(ret != MPI_SUCCESS){
+      return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
+        "Internal error while initializing PIO_REARR_CONTIG. Unable to create/commit indexed type on compute process for data aggregation (iosysid=%d)", ios_->iosysid);
+    }
+  }
+
+  return ret;
+}
+  
 int SPIO::DataRearr::Contig_rearr::init_agg_recv_types(const std::vector<int> &gcompmap_counts,
       const std::vector<std::size_t> &compmap_sorter)
 {
@@ -614,9 +778,21 @@ int SPIO::DataRearr::Contig_rearr::get_rearr_toproc_map(const std::vector<PIO_Of
   to_proc.resize(gcompmap.size());
   for(std::size_t i = 0; i < gcompmap.size(); i++){
     /* Note: The last rearranger proc gets the leftover gcompmap range */
+    assert(gcompmap[i] >= 0);
     to_proc[i] = std::min(static_cast<int>(gcompmap[i]/rearr_comm_iochunk_sz_), rearr_comm_sz_ - 1);
+    /*
+    if(gcompmap[i] >= 0){
+      to_proc[i] = std::min(static_cast<int>(gcompmap[i]/rearr_comm_iochunk_sz_), rearr_comm_sz_ - 1);
+    }
+    else{
+      to_proc[i] = -1;
+    }
+    */
   }
 
+  //std::cout << "DBG: gcompmap/to_proc : \n" << std::flush;
+  //SPIO_Util::Dbg_Util::print_1dvec(gcompmap);
+  //SPIO_Util::Dbg_Util::print_1dvec(to_proc);
   return ret;
 }
 
@@ -900,6 +1076,10 @@ int SPIO::DataRearr::Contig_rearr::rearrange_data(const void *sbuf, std::size_t 
   std::size_t agg_data_nelems = agg_compmap_sorter_.size();
   //assert(abuf_sz == nvars * agg_data_nelems * elem_mpi_type_sz_);
 
+  //std::cout << "DBG: sbuf[], rbuf[] before rearrange :\n" << std::flush;
+  //SPIO_Util::Dbg_Util::print_1dvec((int *)sbuf, (int *)((char *)sbuf + sbuf_sz));
+  //SPIO_Util::Dbg_Util::print_1dvec((int *)rbuf, (int *)((char *)rbuf + rbuf_sz));
+
   if(nvars > 1){
     /* We are rearranging a block of variables */
     /* The stride between each block - data for each variable
@@ -979,6 +1159,10 @@ int SPIO::DataRearr::Contig_rearr::rearrange_data(const void *sbuf, std::size_t 
     return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
       "Internal error while aggregating data from compute processes to aggregating processes (PIO_REARR_CONTIG). Unable to gather data during data aggregation (iosysid = %d)", ios_->iosysid);
   }
+
+  //std::cout << "DBG: sbuf[], rbuf[] after rearrange :\n" << std::flush;
+  //SPIO_Util::Dbg_Util::print_1dvec((int *)sbuf, (int *)((char *)sbuf + sbuf_sz));
+  //SPIO_Util::Dbg_Util::print_1dvec((int *)rbuf, (int *)((char *)rbuf + rbuf_sz));
 
   for(std::size_t i = 0; i < rearr_stypes_nvars.size(); i++){
     if(rearr_stypes_nvars[i] != MPI_DATATYPE_NULL){
