@@ -1,25 +1,26 @@
 #include "pio_rearr_utils.hpp"
 #include "spio_gptl_utils.hpp"
 #include <iostream>
+#include <vector>
 
 namespace SPIO_Util{
   namespace Rearr_Util{
+    char gsend_hs = 'h';
     int isend_hs(int to_proc, MPI_Comm comm, int comm_rank, int comm_sz, MPI_Request &req)
     {
       /* Tag identifies who the data is from */
       int tag = comm_sz + comm_rank;
-      char hs = 'h';
 
-      return MPI_Isend(&hs, 1, MPI_CHAR, to_proc, tag, comm, &req);
+      return MPI_Isend(&gsend_hs, 1, MPI_CHAR, to_proc, tag, comm, &req);
     }
 
+    char grecv_hs;
     int irecv_hs(int from_proc, MPI_Comm comm, int comm_rank, int comm_sz, MPI_Request &req)
     {
       /* Tag identifies who the data is from */
       int tag = comm_sz + from_proc;
-      char hs;
 
-      return MPI_Irecv(&hs, 1, MPI_CHAR, from_proc, tag, comm, &req);
+      return MPI_Irecv(&grecv_hs, 1, MPI_CHAR, from_proc, tag, comm, &req);
     }
 
   }// namespace Rearr_Util
