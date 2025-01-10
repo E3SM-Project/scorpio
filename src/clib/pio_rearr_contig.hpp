@@ -157,15 +157,29 @@ namespace SPIO{
         Alltoall_info rearr_alltoall_info_;
 
         int create_agg_comm(void );
+        static void get_non_fval_lcompmap_counts_displs(const PIO_Offset *lcompmap,
+              std::size_t lcompmap_sz,
+              std::size_t &non_fval_lcompmap_sz,
+              std::vector<int> &non_fval_lcompmap_counts,
+              std::vector<int> &non_fval_lcompmap_displs);
         int aggregate_compmap(const PIO_Offset *lcompmap, std::size_t lcompmap_sz,
+              std::size_t &non_fval_lcompmap_sz,
+              std::vector<int> &non_fval_lcompmap_counts,
+              std::vector<int> &non_fval_lcompmap_displs,
               std::vector<PIO_Offset> &gcompmap,
               std::vector<int> &gcompmap_counts,
               std::vector<int> &gcompmap_displs);
         int setup_data_agg_info(const PIO_Offset *lcompmap, std::size_t lcompmap_sz,
+              std::size_t non_fval_lcompmap_sz,
+              const std::vector<int> &non_fval_lcompmap_counts,
+              const std::vector<int> &non_fval_lcompmap_displs,
               const std::vector<PIO_Offset> &gcompmap,
               const std::vector<int> &gcompmap_counts,
               const std::vector<int> &gcompmap_displs,
               const std::vector<int> &to_proc);
+        int init_agg_send_type(const PIO_Offset *lcompmap, std::size_t lcompmap_sz,
+              const std::vector<int> &lcompmap_counts,
+              const std::vector<int> &lcompmap_displs);
         int init_agg_recv_types(const std::vector<int> &gcompmap_counts,
                                 const std::vector<std::size_t> &compmap_sorter);
         int aggregate_data(const void *sbuf, std::size_t sbuf_sz,
