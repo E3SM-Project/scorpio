@@ -96,24 +96,15 @@ namespace SPIO{
           }
         }
 
-        std::pair<PIO_Offset, PIO_Offset> get_rearr_decomp_map_range(int iorank)
-        {
-          assert(gdecomp_sz_ > 0);
-          assert(rearr_comm_iochunk_sz_ > 0);
+        std::vector<std::pair<PIO_Offset, PIO_Offset> > get_rearr_decomp_map_contig_ranges(int iorank) const;
 
-          PIO_Offset iochunk = rearr_comm_iochunk_sz_;
-          PIO_Offset start = iorank * iochunk;
-          PIO_Offset end = start + iochunk;
-          if(iorank == (rearr_comm_sz_ - 1)){
-            end = gdecomp_sz_;
-          }
-          return std::make_pair(start, end);
+        std::vector<std::pair<PIO_Offset, PIO_Offset> > get_rearr_decomp_map_contig_ranges(void ) const
+        {
+          return get_rearr_decomp_map_contig_ranges(rearr_comm_rank_);
         }
 
-        std::pair<PIO_Offset, PIO_Offset> get_rearr_decomp_map_range(void )
-        {
-          return get_rearr_decomp_map_range(rearr_comm_rank_);
-        }
+        void off_range_to_dim_range(PIO_Offset start_off, PIO_Offset end_off,
+                                    PIO_Offset *start, PIO_Offset *count) const;
 
         /* Rearrange data */
         int rearrange_comp2io(const void *sbuf, std::size_t sbuf_sz,
@@ -135,6 +126,8 @@ namespace SPIO{
          * not represent all elements of a variable/array
          */
         PIO_Offset gdecomp_sz_;
+        std::vector<int> gdimlen_;
+        std::vector<PIO_Offset> dim_chunk_sz_;
 
         int elem_pio_type_;
         int elem_mpi_type_;
@@ -155,6 +148,62 @@ namespace SPIO{
         int rearr_comm_sz_;
         PIO_Offset rearr_comm_iochunk_sz_;
         Alltoall_info rearr_alltoall_info_;
+
+        // FIXME: Change start_dim_idx ptr to a vector (requires changing the C array in ioregion list)
+        void convert_off_to_start_dim_idx(PIO_Offset start_off, PIO_Offset *start_dim_idx) const
+        {
+          std::size_t ndims = gdimlen_.size();
+          for(std::size_t i = 0; i < ndims; i++){
+            start_dim_idx[i] = 0;
+          }
+          for(std::size_t i = 0; i < ndims; i++){
+            start_dim_idx[i] = start_off / dim_chunk_sz_[i];
+
+            start_off -= start_dim_idx[i] * dim_chunk_sz_[i];
+            if(start_off == 0) break;
+          }
+          assert(start_off == 0);
+        }
+
+        // FIXME: Change count_dim_idx ptr to a vector (requires changing the C array in ioregion list)
+        void convert_off_to_count_dim_idx(PIO_Offset count_off, PIO_Offset *count_dim_idx) const
+        {
+          std::size_t ndims = gdimlen_.size();
+          for(std::size_t i = 0; i < ndims; i++){
+            count_dim_idx[i] = gdimlen_[i];
+          }
+          for(std::size_t i = 0; i < ndims; i++){
+            count_dim_idx[i] = count_off / dim_chunk_sz_[i];
+            
+            count_off -= count_dim_idx[i] * dim_chunk_sz_[i];
+            if(count_off == 0) break;
+          }
+
+          assert(count_off == 0);
+          for(std::size_t i = 0; i < ndims; i++){
+            if(count_dim_idx[i] != 0){
+              break;
+            }
+            else{
+              count_dim_idx[i] = 1;
+            }
+          }
+        }
+
+        std::pair<PIO_Offset, PIO_Offset> get_rearr_decomp_map_range(int iorank) const
+        {
+          assert(gdecomp_sz_ > 0);
+          assert(rearr_comm_iochunk_sz_ > 0);
+
+          PIO_Offset iochunk = rearr_comm_iochunk_sz_;
+          PIO_Offset start = iorank * iochunk;
+          PIO_Offset end = start + iochunk;
+          if(iorank == (rearr_comm_sz_ - 1)){
+            end = gdecomp_sz_;
+          }
+          return std::make_pair(start, end);
+        }
+
 
         int create_agg_comm(void );
         static void get_non_fval_lcompmap_counts_displs(const PIO_Offset *lcompmap,
@@ -188,6 +237,7 @@ namespace SPIO{
                               void *rbuf, std::size_t rbuf_sz, int nvars);
 
         int create_rearr_comm(void );
+        void set_rearr_comm_iochunk_sz(int ndims, const int *gdimlen);
         int get_rearr_toproc_map(const std::vector<PIO_Offset> &gcompmap,
               std::vector<int> &to_proc);
         int setup_data_rearr_info(std::vector<PIO_Offset> &gcompmap, std::vector<int> &to_proc,

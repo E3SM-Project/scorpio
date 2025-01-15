@@ -719,21 +719,35 @@ static inline void off_range_to_dim_range(PIO_Offset off_start, PIO_Offset off_e
   assert(off_start >= 0);
   assert((ndims > 0) && dimlen && dim_start && dim_count);
 
+  PIO_Offset off_count = off_end - off_start;
+
   std::vector<PIO_Offset> dim_chunk_sz(ndims, 1);
   for(int i = ndims - 2; i >= 0; i--){
     dim_chunk_sz[i] = dimlen [i + 1] * dim_chunk_sz[i + 1];
   }
 
-  PIO_Offset off_count = off_end - off_start;
   for(int i = 0; i < ndims; i++){
     dim_start[i] = off_start / dim_chunk_sz[i];
-    dim_count[i] = off_count / dim_chunk_sz[i];
-
     off_start -= dim_start[i] * dim_chunk_sz[i];
-    off_count -= dim_count[i] * dim_chunk_sz[i];
   }
 
-  assert((off_start == 0) && (off_count == 0));
+  assert(off_start == 0);
+
+  std::transform(dimlen, dimlen + ndims, dim_count, [](int len) { return static_cast<PIO_Offset>(len); });
+
+  for(int i = 0; i < ndims; i++){
+    dim_count[i] = off_count / dim_chunk_sz[i];
+
+    off_count -= dim_count[i] * dim_chunk_sz[i];
+
+    dim_count[i] = (dim_count[i] == 0) ? 1 : dim_count[i];
+  
+    if(off_count == 0){
+      break;
+    }
+  }
+
+  assert(off_count == 0);
 }
 
 static void init_iodesc_contig_rearr_fields(iosystem_desc_t *ios, io_desc_t *iodesc)
@@ -744,7 +758,9 @@ static void init_iodesc_contig_rearr_fields(iosystem_desc_t *ios, io_desc_t *iod
   if(ios->ioproc){
     iodesc->num_aiotasks = ios->num_iotasks;
   }
-  iodesc->maxregions = 1;
+
+  /* The first region is pre-allocated when iodesc is allocated */
+  iodesc->maxregions = 0;
   /* FIXME: We only need fillvalues when the total decomp map size is less than var size */
   iodesc->needsfill = true;
   /* FIXME: Remove the field since we no longer use maxbytes */
@@ -754,12 +770,28 @@ static void init_iodesc_contig_rearr_fields(iosystem_desc_t *ios, io_desc_t *iod
 
   if(ios->ioproc){
     assert(iodesc->firstregion && iodesc->firstregion->start && iodesc->firstregion->count);
-    iodesc->firstregion->loffset = 0;
-    /* Fill the start/count arrays for the first/only region */
-    std::pair<PIO_Offset, PIO_Offset> off_range = iodesc->rearr->get_rearr_decomp_map_range();
-    off_range_to_dim_range(off_range.first, off_range.second,
-                            iodesc->ndims, iodesc->dimlen,
-                            iodesc->firstregion->start, iodesc->firstregion->count);
+    /* Get (start, count) pairs of contiguous decomp ranges for this I/O process */
+    std::vector<std::pair<PIO_Offset, PIO_Offset> > off_ranges = iodesc->rearr->get_rearr_decomp_map_contig_ranges();
+    io_region *cur_region = iodesc->firstregion;
+    io_region *prev_region = cur_region;
+    int loff = 0;
+
+    // FIXME : Move to C++ lists for region list
+    for(int i = 0; i < off_ranges.size(); i++){
+      if(cur_region == NULL){
+        alloc_region2(ios, iodesc->ndims, &cur_region);
+        prev_region->next = cur_region;
+      }
+      cur_region->loffset = loff;
+      loff += static_cast<int>(off_ranges[i].second);
+      /* Convert the range (start, count) offsets to dim indices & store in the region info */
+      iodesc->rearr->off_range_to_dim_range(off_ranges[i].first, off_ranges[i].second,
+                                            cur_region->start, cur_region->count);
+
+      prev_region = cur_region;
+      cur_region = cur_region->next;
+    }
+    iodesc->maxregions = off_ranges.size();
   }
 }
 

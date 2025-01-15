@@ -54,9 +54,16 @@ int SPIO::DataRearr::Contig_rearr::init(int pio_type,
 {
   int ret = PIO_NOERR;
   assert(ios_);
+  assert(ndims > 0);
 
   lcompmap_sz_ = compmap_sz;
   gdecomp_sz_ = std::accumulate(gdimlen, gdimlen + ndims, 1, std::multiplies<int>());
+  std::copy(gdimlen, gdimlen + ndims, std::back_inserter(gdimlen_));
+  dim_chunk_sz_.resize(ndims);
+  dim_chunk_sz_[ndims - 1] = 1;
+  for(int i = ndims - 2; i >= 0; i--){
+    dim_chunk_sz_[i] = dim_chunk_sz_[i + 1] * gdimlen_[i + 1];
+  }
   
   elem_pio_type_ = pio_type;
   ret = find_mpi_type(elem_pio_type_, &elem_mpi_type_, &elem_mpi_type_sz_);
@@ -80,6 +87,8 @@ int SPIO::DataRearr::Contig_rearr::init(int pio_type,
     return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
       "Internal error while initializing PIO_REARR_CONTIG. Unable to create rearranger comm (iosysid = %d)", ios_->iosysid);
   }
+
+  set_rearr_comm_iochunk_sz(ndims, gdimlen);
 
   /* Aggregate compmaps into the aggregating procs */
   std::size_t non_fval_compmap_sz = 0;
@@ -119,6 +128,81 @@ int SPIO::DataRearr::Contig_rearr::init(int pio_type,
   is_init_ = true;
 
   return ret;
+}
+
+std::vector<std::pair<PIO_Offset, PIO_Offset> > SPIO::DataRearr::Contig_rearr::get_rearr_decomp_map_contig_ranges(int iorank) const
+{
+  assert(gdecomp_sz_ > 0);
+  assert(rearr_comm_iochunk_sz_ > 0);
+
+  PIO_Offset iochunk = rearr_comm_iochunk_sz_;
+  PIO_Offset start_off = iorank * iochunk;
+  PIO_Offset end_off = start_off + iochunk;
+  if(iorank == (rearr_comm_sz_ - 1)){
+    end_off = gdecomp_sz_;
+  }
+
+  assert((gdimlen_.size() > 0) && (dim_chunk_sz_.size() == gdimlen_.size()) &&
+          (start_off >= 0) && (end_off >= start_off));
+  
+  std::vector<std::pair<PIO_Offset, PIO_Offset> > contig_map_ranges;
+  int ndims = static_cast<int>(gdimlen_.size());
+
+  PIO_Offset cur_tot_count = end_off - start_off;
+
+  if(cur_tot_count == 0) return contig_map_ranges;
+
+  // First get start_off to a multiple of last dim len
+  // e.g. v[z][y][x], get range to get to multiple of x
+  PIO_Offset cur_range_start = start_off;
+  PIO_Offset cur_range_count = 0;
+  PIO_Offset off_from_last_dim_mult = cur_range_start % gdimlen_[ndims - 1];
+  if(off_from_last_dim_mult != 0){
+    cur_range_count = gdimlen_[ndims - 1] - off_from_last_dim_mult;
+    if(start_off + cur_range_count > end_off){
+      cur_range_count = end_off - start_off;
+    }
+    contig_map_ranges.push_back(std::make_pair(cur_range_start, cur_range_count));
+
+    cur_range_start += cur_range_count;
+    cur_tot_count -= cur_range_count;
+  }
+
+  if(cur_tot_count == 0) return contig_map_ranges;
+
+  // Break/partition the cur_range_start to end_off to contiguous dim chunks
+  // e.g. v[z][y][x], break up remaining range to ranges of sizes y*x, x, 1
+
+  PIO_Offset cur_range_end = cur_range_start;
+  for(int i = 0; i < ndims; i++){
+    cur_range_end = dim_chunk_sz_[i] * (end_off / dim_chunk_sz_[i]);
+    if(cur_range_end != 0){
+      cur_range_count = cur_range_end - cur_range_start;
+      if(cur_range_count > 0){
+        contig_map_ranges.push_back(std::make_pair(cur_range_start, cur_range_count));
+
+        cur_range_start += cur_range_count;
+        cur_tot_count -= cur_range_count;
+      }
+    }
+    if(cur_tot_count == 0) break;
+  }
+
+  assert(cur_tot_count == 0);
+
+  return contig_map_ranges;
+}
+
+// FIXME: Change start/count (on the caller side the list with C ptrs for start/count) to be
+// vectors
+void SPIO::DataRearr::Contig_rearr::off_range_to_dim_range(PIO_Offset start_off, PIO_Offset count_off,
+                                                            PIO_Offset *start, PIO_Offset *count) const
+{
+  assert((start_off >= 0) && (count_off >= 0));
+  assert(start && count);
+
+  convert_off_to_start_dim_idx(start_off, start);
+  convert_off_to_count_dim_idx(count_off, count);
 }
 
 int SPIO::DataRearr::Contig_rearr::rearrange_comp2io(const void *sbuf, std::size_t sbuf_sz,
@@ -757,11 +841,62 @@ inline int SPIO::DataRearr::Contig_rearr::create_rearr_comm(void )
     }
   }
 
+  /*
   if(ret == MPI_SUCCESS){
     rearr_comm_iochunk_sz_ = gdecomp_sz_ / rearr_comm_sz_;
   }
+  */
 
   return ret;
+}
+
+inline void SPIO::DataRearr::Contig_rearr::set_rearr_comm_iochunk_sz(int ndims, const int *gdimlen)
+{
+  assert((ndims > 0) && gdimlen);
+  assert(ios_);
+  assert(gdecomp_sz_ > 0);
+
+  if(ios_->ioproc){
+    assert((rearr_comm_ != MPI_COMM_NULL) && (rearr_comm_sz_ > 0));
+
+    rearr_comm_iochunk_sz_ = gdecomp_sz_ / rearr_comm_sz_;
+  }
+  else{
+    rearr_comm_iochunk_sz_ = 0;
+  }
+  /*
+  // Get the largest contiguous chunk of data on an I/O process for data rearrangement
+
+  // Number of contiguous regions in dim id
+  // gdimlen = {2, 5, 7}
+  //  => dim id 0 has 2 contiguous regions of dims {5, 7}
+  //  => dim id 1 has 10 contiguous regions of dims {7}
+  // => ncontig_dim_regions_in_idx = {2, 10, 70} respectively
+  PIO_Offset ncontig_dim_regions_in_idx = 1;
+  int idx_to_chunk = 0;
+  for(;idx_to_chunk < ndims; idx_to_chunk++){
+    ncontig_dim_regions_in_idx *= gdimlen[idx_to_chunk];
+    if(rearr_comm_sz_ < ncontig_dim_regions_in_idx){
+      break;
+    }
+  }
+  assert(idx_to_chunk < ndims);
+
+  // Size of a single contiguous dim region in chunk dim id
+  // e.g. gdimlen = {2, 5, 7},
+  //      1)  nprocs = 2 => idx_to_chunk = 0
+  //          sz_contig_dim_region_in_chunk_idx = size of contig region represented by {5, 7} => 5 * 7
+  //      2)  nprocs = 3 => idx_to_chunk = 1
+  //          sz_contig_dim_region_in_chunk_idx = size of contig region represented by {7} => 7
+  PIO_Offset sz_contig_dim_region_in_chunk_idx = 1;
+  for(int i = idx_to_chunk + 1; i < ndims; i++){
+    sz_contig_dim_region_in_chunk_idx *= static_cast<PIO_Offset>(gdimlen[i]);
+  }
+
+  // FIXME: Look at better way to partition data across procs. This method is ok when 
+  // rearr_comm_sz_ << ncontig_dim_regions_in_idx
+  rearr_comm_iochunk_sz_ = ncontig_dim_regions_in_idx/rearr_comm_sz_ * sz_contig_dim_region_in_chunk_idx;
+  */
 }
 
 int SPIO::DataRearr::Contig_rearr::get_rearr_toproc_map(const std::vector<PIO_Offset> &gcompmap,
