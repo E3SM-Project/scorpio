@@ -9,6 +9,7 @@
 #include <vector>
 #include <iostream>
 #include <sstream>
+#include <iterator>
 #include <algorithm>
 #include <initializer_list>
 
@@ -50,6 +51,8 @@ namespace SPIO_Util{
       ostr << "]";
       std::cout << ostr.str().c_str() << "\n" << std::flush;
     }
+
+    std::string get_iodesc_info(io_desc_t *ios);
   } // namespace Dbg_Util
 } // namespace SPIO_Util
 
