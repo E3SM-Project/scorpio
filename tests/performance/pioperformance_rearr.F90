@@ -7,7 +7,8 @@ program pioperformance_rearr
   use mpi
 #endif
   use pio, only : pio_iotype_netcdf, pio_iotype_pnetcdf, pio_iotype_netcdf4p, &
-       pio_iotype_netcdf4c, pio_iotype_adios, pio_iotype_hdf5, pio_rearr_subset, pio_rearr_box, PIO_MAX_NAME,&
+       pio_iotype_netcdf4c, pio_iotype_adios, pio_iotype_hdf5,&
+        pio_rearr_subset, pio_rearr_box, pio_rearr_any, pio_rearr_contig, PIO_MAX_NAME,&
         pio_rearr_opt_t, pio_rearr_comm_p2p, pio_rearr_comm_coll,&
         pio_rearr_comm_fc_2d_disable, pio_rearr_comm_fc_1d_comp2io,&
         pio_rearr_comm_fc_1d_io2comp, pio_rearr_comm_fc_2d_enable,&
@@ -19,7 +20,7 @@ program pioperformance_rearr
   integer, parameter :: MAX_IO_TASK_ARRAY_SIZE=256, MAX_DECOMP_FILES=256
   integer, parameter :: MAX_FNAME_LEN = 1024
   integer, parameter :: MAX_PIO_TYPENAME_LEN = 8
-  integer, parameter :: MAX_PIO_TYPES = 4, MAX_PIO_REARRS = 2
+  integer, parameter :: MAX_PIO_TYPES = 4, MAX_PIO_REARRS = 4
   integer, parameter :: MAX_NVARS = 12
 
   character(len=*), parameter :: PIO_NML_FNAME = 'pioperf_rearr.nl'
@@ -60,6 +61,10 @@ program pioperformance_rearr
   call CheckMPIreturn(__LINE__,ierr)
   if(mype==0) then
      Mastertask=.true.
+     if(mype == 0) then
+        print *, 'SCORPIO REPLAY TOOL'
+        print *, '======================='
+      endif
   else
      Mastertask=.false.
   endif
@@ -75,6 +80,9 @@ program pioperformance_rearr
   varsize = 0
   varsize(1) = 1
   unlimdimindof=.false.
+  if(mype == 0) then
+    print *, "Reading user input..."
+  endif
   call read_user_input(mype, decompfile, piotypes, rearrangers,&
         niotasks, nframes, unlimdimindof, nvars, varsize,&
         rearr_opts, ierr)
@@ -92,6 +100,8 @@ program pioperformance_rearr
   if(rearrangers(1)==0) then
     rearrangers(1)=1
     rearrangers(2)=2
+    rearrangers(3)=3
+    rearrangers(4)=4
   endif  
 
   do i=1,MAX_DECOMP_FILES
@@ -622,7 +632,7 @@ contains
     integer,  parameter :: c0 = -1
     double precision, parameter :: cd0 = 1.0e30
     integer :: nvarmult
-    character(len=*), parameter :: rearr_name(MAX_PIO_REARRS) = (/'   BOX','SUBSET'/)
+    character(len=*), parameter :: rearr_name(MAX_PIO_REARRS) = (/'   BOX','SUBSET','   ANY','CONTIG'/)
 
     nullify(compmap)
 
@@ -701,9 +711,9 @@ contains
           else
              mode = 0
           endif
-          do rearrtype=1,2
+          do rearrtype=1,4
              rearr = rearrangers(rearrtype)
-             if(rearr /= PIO_REARR_SUBSET .and. rearr /= PIO_REARR_BOX) exit
+             if(rearr /= PIO_REARR_SUBSET .and. rearr /= PIO_REARR_BOX .and. rearr /= PIO_REARR_ANY .and. rearr /= PIO_REARR_CONTIG) exit
 
              do n=niomin,niomax
                 ntasks = niotasks(n)
