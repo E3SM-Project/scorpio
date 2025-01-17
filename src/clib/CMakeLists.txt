@@ -36,7 +36,7 @@ set (pio_api_src
 # PIO lib source
 set (pio_lib_src
   topology.cpp pio_mpi_timer.cpp pio_timer.cpp pio_file.cpp
-  pioc_support.cpp pio_lists.cpp pio_print.cpp
+  pioc_support.cpp pio_lists.cpp pio_print.cpp spio_dbg_ds.cpp
   pioc.cpp pioc_sc.cpp pio_spmd.cpp pio_rearrange.cpp pio_rearr_utils.cpp pio_rearr_contig.cpp
   pio_nc4.cpp bget.cpp
   pio_nc.cpp pio_put_nc.cpp pio_get_nc.cpp pio_getput_int.cpp pio_msg.cpp pio_varm.cpp
