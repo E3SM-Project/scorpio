@@ -13,7 +13,6 @@
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
-#include <pio_minmax.h>
 #ifdef PIO_MICRO_TIMING
 #include "pio_timer.h"
 #endif
@@ -2508,7 +2507,7 @@ int compute_maxaggregate_bytes(iosystem_desc_t *ios, io_desc_t *iodesc)
         maxbytesoncomputetask = pio_cnbuffer_limit / iodesc->ndof;
 
     /* Take the min of the max IO and max comp bytes. */
-    maxbytes = min(maxbytesoniotask, maxbytesoncomputetask);
+    maxbytes = std::min(maxbytesoniotask, maxbytesoncomputetask);
     LOG((2, "compute_maxaggregate_bytes maxbytesoniotask = %d maxbytesoncomputetask = %d",
          maxbytesoniotask, maxbytesoncomputetask));
 
