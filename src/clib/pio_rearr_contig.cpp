@@ -376,7 +376,7 @@ int SPIO::DataRearr::Contig_rearr::disperse_data(const void *abuf, std::size_t a
       }
     }
     if(agg_gs_info_.stype != MPI_DATATYPE_NULL){
-      MPI_Aint stride_between_vars = static_cast<MPI_Aint>(abuf_sz * elem_mpi_type_sz_);
+      MPI_Aint stride_between_vars = static_cast<MPI_Aint>(abuf_sz / nvars);
       ret = MPI_Type_hvector(nvars, 1, stride_between_vars, agg_gs_info_.stype, &dis_rtype_nvars);
       if(ret == MPI_SUCCESS){
         ret = MPI_Type_commit(&dis_rtype_nvars);
