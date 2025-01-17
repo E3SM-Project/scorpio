@@ -35,6 +35,7 @@ program pioperformance_rearr
   integer :: vs, varsize(MAX_NVARS) !  Local size of array for idealized decomps
   logical :: unlimdimindof
   type(pio_rearr_opt_t) :: rearr_opts
+  integer :: log_level
 #ifdef BGQTRY
   external :: print_memusage
 #endif
@@ -80,12 +81,13 @@ program pioperformance_rearr
   varsize = 0
   varsize(1) = 1
   unlimdimindof=.false.
+  log_level = 0
   if(mype == 0) then
     print *, "Reading user input..."
   endif
   call read_user_input(mype, decompfile, piotypes, rearrangers,&
         niotasks, nframes, unlimdimindof, nvars, varsize,&
-        rearr_opts, ierr)
+        rearr_opts, log_level, ierr)
 
 #ifdef SPIO_ENABLE_GPTL_TIMING
 #ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
@@ -113,7 +115,7 @@ program pioperformance_rearr
               if(nvars(nv)>0) then
                  call pioperformance_rearrtest(decompfile(i), piotypes(1:niotypes),&
                       mype, npe, rearrangers, rearr_opts, niotasks, nframes,&
-                      nvars(nv), varsize(vs),unlimdimindof) 
+                      nvars(nv), varsize(vs),unlimdimindof, log_level)
               endif
            enddo
         endif
@@ -273,7 +275,7 @@ contains
   ! Parse a single command line arg
   subroutine parse_and_process_input(argv, decompfiles, piotypes,&
         rearrangers, niotasks, nframes, unlimdimindof, nvars, varsize,&
-        rearr_opts, ierr)
+        rearr_opts, log_level, ierr)
     character(len=*), intent(in)  :: argv
     character(len=MAX_FNAME_LEN), intent(out) :: decompfiles(MAX_DECOMP_FILES)
     integer, intent(out) :: piotypes(MAX_PIO_TYPES)
@@ -284,6 +286,7 @@ contains
     integer, intent(out) :: nvars(MAX_NVARS)
     integer, intent(out) :: varsize(MAX_NVARS)
     type(pio_rearr_opt_t), intent(out) :: rearr_opts
+    integer, intent(out) :: log_level
     integer, intent(out) :: ierr
 
     integer, parameter :: MAX_PIO_REARR_OPT_LEN = 128
@@ -361,6 +364,9 @@ contains
       else if (argv(:pos) == "--pio-varsize=") then
         call init_arr_from_list(argv(pos+1:), iarr=varsize, ierr=ierr)
         !print *, "Read varsize : ", varsize
+      else if (argv(:pos) == "--pio-log-level=") then
+        read(argv(pos+1:), *) log_level
+        !print *, "Read varsize : ", varsize
       end if
     end if
 
@@ -369,7 +375,7 @@ contains
   ! Parse command line user options
   subroutine read_cmd_line_input(decompfile, piotypes, rearrangers,&
         niotasks, nframes, unlimdimindof, nvars, varsize,&
-        rearr_opts, ierr)
+        rearr_opts, log_level, ierr)
     character(len=MAX_FNAME_LEN), intent(out) :: decompfile(MAX_DECOMP_FILES)
     integer, intent(out) :: piotypes(MAX_PIO_TYPES)
     integer, intent(out) :: rearrangers(MAX_PIO_REARRS)
@@ -379,6 +385,7 @@ contains
     integer, intent(out) :: nvars(MAX_NVARS)
     integer, intent(out) :: varsize(MAX_NVARS)
     type(pio_rearr_opt_t), intent(out) :: rearr_opts
+    integer, intent(out) :: log_level
     integer, intent(out) :: ierr
 
     integer, parameter :: MAX_STDIN_ARG_LEN = 8192
@@ -390,7 +397,7 @@ contains
       call get_command_argument(i, argv)
       call parse_and_process_input(argv, decompfile, piotypes, rearrangers,&
             niotasks, nframes, unlimdimindof, nvars, varsize,&
-            rearr_opts, ierr)
+            rearr_opts, log_level, ierr)
     end do
 
   end subroutine read_cmd_line_input
@@ -546,7 +553,7 @@ contains
   ! read (and override) the command line options
   subroutine read_user_input(mype, decompfile, piotypes, rearrangers,&
         niotasks, nframes, unlimdimindof, nvars, varsize,&
-        rearr_opts, ierr)
+        rearr_opts, log_level, ierr)
     integer, intent(in) :: mype
     character(len=MAX_FNAME_LEN), intent(out) :: decompfile(MAX_DECOMP_FILES)
     integer, intent(out) :: piotypes(MAX_PIO_TYPES)
@@ -557,11 +564,13 @@ contains
     integer, intent(out) :: nvars(MAX_NVARS)
     integer, intent(out) :: varsize(MAX_NVARS)
     type(pio_rearr_opt_t), intent(out) :: rearr_opts
+    integer, intent(out) :: log_level
     integer, intent(out) :: ierr
 
     character(len=MAX_PIO_TYPENAME_LEN) :: pio_typenames(MAX_PIO_TYPES)
 
     pio_typenames = ' '
+    log_level = 0
 
     if(mype == 0) then
       ! Read namelist file
@@ -571,7 +580,7 @@ contains
       ! Allow user to override the values via command line
       call read_cmd_line_input(decompfile, piotypes, rearrangers,&
             niotasks, nframes, unlimdimindof, nvars, varsize,&
-            rearr_opts, ierr)
+            rearr_opts, log_level, ierr)
     end if
 
     call MPI_Bcast(decompfile,MAX_FNAME_LEN*MAX_DECOMP_FILES,MPI_CHARACTER,0, MPI_COMM_WORLD,ierr)
@@ -582,6 +591,7 @@ contains
     call MPI_Bcast(unlimdimindof, 1, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
     call MPI_Bcast(nvars, MAX_NVARS, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
     call MPI_Bcast(varsize, MAX_NVARS, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
+    call MPI_Bcast(log_level, 1, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
 
     call bcast_rearr_opts(rearr_opts)
 
@@ -589,7 +599,7 @@ contains
 
   subroutine pioperformance_rearrtest(filename, piotypes, mype, npe_base, &
        rearrangers, rearr_opts, niotasks,nframes, nvars, varsize,&
-       unlimdimindof)
+       unlimdimindof, log_level)
     use pio
     character(len=*), intent(in) :: filename
     integer, intent(in) :: mype, npe_base
@@ -601,6 +611,7 @@ contains
     integer, intent(in) :: nvars
     integer, intent(in) :: varsize
     logical, intent(in) :: unlimdimindof
+    integer, intent(in) :: log_level
     integer(kind=PIO_Offset_kind), pointer :: compmap(:)
     integer :: ntasks
     integer :: comm
@@ -723,6 +734,8 @@ contains
 
                 call pio_init(mype, comm, ntasks, 0, stride, PIO_REARR_SUBSET,&
                   iosystem, rearr_opts=rearr_opts)
+
+                ierr = PIO_set_log_level(log_level)
                    
                 write(fname, '(a,i1,a,i5.5,a,i5.5,a,i5.5,a,i1,a,i5.5,a,i5.5,a)') 'pioperf-rearr-', rearr, &
                       '-ncomptasks-', npe, '-niotasks-', ntasks, '-stride-', stride, '-iotype-', iotype, &
