@@ -18,6 +18,7 @@
 #endif
 #include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
+#include "spio_dbg_utils.hpp"
 
 /* 10MB default limit. */
 extern PIO_Offset pio_buffer_size_limit;
@@ -410,6 +411,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                                                bufptr, llen, iodesc->mpitype, vdesc->request + vdesc->nreqs);
                         if (ierr != PIO_NOERR)
                         {
+                            LOG((3, "ERROR: ncmpi_iput_varn() FAILED: iodesc = %s", SPIO_Util::Dbg_Util::get_iodesc_info(iodesc).c_str()));
                             ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
                                       "Writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_PNETCDF iotype failed. Non blocking write for variable (%s, varid=%d) failed (Number of subarray requests/regions=%d, Size of data local to this process = %lld)", nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv], rrcnt, (long long int )llen);
                             break;
