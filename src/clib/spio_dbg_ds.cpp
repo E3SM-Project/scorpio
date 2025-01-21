@@ -18,7 +18,8 @@ std::string SPIO_Util::Dbg_Util::get_iodesc_info(io_desc_t *iodesc)
     ostr << "iodesc{";
     ostr << "ioid = " << iodesc->ioid << ", maplen =" << iodesc->maplen;
     ostr << ", map = [";
-      std::copy(iodesc->map, iodesc->map + iodesc->maplen, std::ostream_iterator<long>(ostr, ","));
+    //  std::copy(iodesc->map, iodesc->map + iodesc->maplen, std::ostream_iterator<long>(ostr, ","));
+      ostr << "...";
     ostr << "], ndof = " << iodesc->ndof << ", ndims = " << iodesc->ndims;
     ostr << ", dimlen = [";
       std::copy(iodesc->dimlen, iodesc->dimlen + iodesc->ndims, std::ostream_iterator<int>(ostr, ","));
@@ -30,19 +31,18 @@ std::string SPIO_Util::Dbg_Util::get_iodesc_info(io_desc_t *iodesc)
       if(cur_region == NULL){
         ostr << ", region " << i << "{NULL}"; continue;
       }
-      ostr << ", region " << i << "{";
+      ostr << ", region " << i << " {";
         ostr << "loffset = " << cur_region->loffset;
-        ostr << "start = [";
+        ostr << ", start = [";
           std::copy(cur_region->start, cur_region->start + iodesc->ndims, std::ostream_iterator<long>(ostr, ","));
-        ostr << "]";
+        ostr << "], ";
         ostr << "count = [";
           std::copy(cur_region->count, cur_region->count + iodesc->ndims, std::ostream_iterator<long>(ostr, ","));
         ostr << "]";
-      ostr << "}";
+      ostr << " }";
       cur_region = cur_region->next;
     }
     ostr << "}";
-    //std::copy(v.cbegin(), v.cend(), std::ostream_iterator<T>(ostr, ","));
   }
   else{
     ostr<< "iodesc{NULL}";
