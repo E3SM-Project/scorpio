@@ -21,6 +21,7 @@
 #include "spio_ltimer_utils.hpp"
 #include "spio_gptl_utils.hpp"
 #include "pio_rearr_contig.hpp"
+#include "spio_dbg_utils.hpp"
 
 /* Include headers for HDF5 compression filters */
 #if PIO_USE_HDF5
@@ -713,43 +714,6 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
   return PIO_NOERR;
 }
 
-static inline void off_range_to_dim_range(PIO_Offset off_start, PIO_Offset off_end,
-                    int ndims, const int *dimlen, PIO_Offset *dim_start, PIO_Offset *dim_count)
-{
-  assert(off_start >= 0);
-  assert((ndims > 0) && dimlen && dim_start && dim_count);
-
-  PIO_Offset off_count = off_end - off_start;
-
-  std::vector<PIO_Offset> dim_chunk_sz(ndims, 1);
-  for(int i = ndims - 2; i >= 0; i--){
-    dim_chunk_sz[i] = dimlen [i + 1] * dim_chunk_sz[i + 1];
-  }
-
-  for(int i = 0; i < ndims; i++){
-    dim_start[i] = off_start / dim_chunk_sz[i];
-    off_start -= dim_start[i] * dim_chunk_sz[i];
-  }
-
-  assert(off_start == 0);
-
-  std::transform(dimlen, dimlen + ndims, dim_count, [](int len) { return static_cast<PIO_Offset>(len); });
-
-  for(int i = 0; i < ndims; i++){
-    dim_count[i] = off_count / dim_chunk_sz[i];
-
-    off_count -= dim_count[i] * dim_chunk_sz[i];
-
-    dim_count[i] = (dim_count[i] == 0) ? 1 : dim_count[i];
-  
-    if(off_count == 0){
-      break;
-    }
-  }
-
-  assert(off_count == 0);
-}
-
 static void init_iodesc_contig_rearr_fields(iosystem_desc_t *ios, io_desc_t *iodesc)
 {
   assert(ios && iodesc && iodesc->rearr && iodesc->rearr->is_init());
@@ -776,6 +740,7 @@ static void init_iodesc_contig_rearr_fields(iosystem_desc_t *ios, io_desc_t *iod
     io_region *prev_region = cur_region;
     int loff = 0;
 
+    LOG((1, "Contig rearranger : iodesc {ioid=%d, llen=%lld, maxiobuflen=%lld, ndims=%d, dimlen=%s, maxregions=%lld", iodesc->ioid, static_cast<long long int>(iodesc->llen), static_cast<long long int>(iodesc->maxiobuflen), iodesc->ndims, SPIO_Util::Dbg_Util::vec1d_to_string(iodesc->dimlen, iodesc->dimlen + iodesc->ndims).c_str(), static_cast<long long int>(off_ranges.size())));
     // FIXME : Move to C++ lists for region list
     for(int i = 0; i < off_ranges.size(); i++){
       if(cur_region == NULL){
@@ -788,6 +753,7 @@ static void init_iodesc_contig_rearr_fields(iosystem_desc_t *ios, io_desc_t *iod
       iodesc->rearr->off_range_to_dim_range(off_ranges[i].first, off_ranges[i].second,
                                             cur_region->start, cur_region->count);
 
+      LOG((1, "Contig range = [%lld, %lld), start=%s, count=%s", static_cast<long long int>(off_ranges[i].first), static_cast<long long int>(off_ranges[i].second), SPIO_Util::Dbg_Util::vec1d_to_string(cur_region->start, cur_region->start + iodesc->ndims).c_str(), SPIO_Util::Dbg_Util::vec1d_to_string(cur_region->count, cur_region->count + iodesc->ndims).c_str()));
       prev_region = cur_region;
       cur_region = cur_region->next;
     }
