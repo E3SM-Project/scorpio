@@ -96,9 +96,9 @@ namespace SPIO{
           }
         }
 
-        std::vector<std::pair<PIO_Offset, PIO_Offset> > get_rearr_decomp_map_contig_ranges(int iorank) const;
+        std::vector<std::pair<PIO_Offset, PIO_Offset> > get_rearr_decomp_map_contig_ranges(int iorank);
 
-        std::vector<std::pair<PIO_Offset, PIO_Offset> > get_rearr_decomp_map_contig_ranges(void ) const
+        std::vector<std::pair<PIO_Offset, PIO_Offset> > get_rearr_decomp_map_contig_ranges(void )
         {
           return get_rearr_decomp_map_contig_ranges(rearr_comm_rank_);
         }
@@ -190,6 +190,23 @@ namespace SPIO{
           }
         }
 
+        void convert_off_to_start_dim_idx(PIO_Offset start_off, std::vector<PIO_Offset> &start_dim_idx,
+                                          std::size_t &last_contig_dim)
+        {
+          last_contig_dim = 0;
+          for(std::size_t i = 0; i < start_dim_idx.size(); i++){
+            if(start_off == 0){
+              start_dim_idx[i] = 0;
+            }
+            else{
+              start_dim_idx[i] = start_off / dim_chunk_sz_[i];
+              start_off -= start_dim_idx[i] * dim_chunk_sz_[i];
+              if(start_dim_idx[i] != 0) last_contig_dim = i;
+            }
+          }
+          assert(start_off == 0);
+        }
+
         std::pair<PIO_Offset, PIO_Offset> get_rearr_decomp_map_range(int iorank) const
         {
           assert(gdecomp_sz_ > 0);
@@ -204,7 +221,8 @@ namespace SPIO{
           return std::make_pair(start, end);
         }
 
-
+        void get_contig_ranges_from_off_range(std::vector<std::pair<PIO_Offset, PIO_Offset> > &contig_map_ranges,
+                                              PIO_Offset start_off, PIO_Offset count);
         int create_agg_comm(void );
         static void get_non_fval_lcompmap_counts_displs(const PIO_Offset *lcompmap,
               std::size_t lcompmap_sz,
