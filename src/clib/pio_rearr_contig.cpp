@@ -130,7 +130,76 @@ int SPIO::DataRearr::Contig_rearr::init(int pio_type,
   return ret;
 }
 
-std::vector<std::pair<PIO_Offset, PIO_Offset> > SPIO::DataRearr::Contig_rearr::get_rearr_decomp_map_contig_ranges(int iorank) const
+/*
+void SPIO::DataRearr::Contig_rearr::get_contig_ranges_from_off_range(std::vector<std::pair<PIO_Offset, PIO_Offset> > &contig_map_ranges, PIO_Offset start_off, PIO_Offset count, std::size_t dim_idx) const
+{
+  assert((dim_idx >= 0) && (dim_idx < dim_chunk_sz_.size()));
+  if(count == 0) return;
+
+  PIO_Offset end_off = start_off + count;
+  PIO_Offset cur_start_off = start_off;
+  for(std::size_t idx = dim_idx; idx < dim_chunk_sz_.size(); idx++){
+    PIO_Offset off_from_last_dim_mult = cur_start_off % dim_chunk_sz_[idx];
+    PIO_Offset start_off_dim_mult = cur_start_off;
+    if(off_from_last_dim_mult != 0){
+      start_off_dim_mult = cur_start_off + (dim_chunk_sz_[idx] - off_from_last_dim_mult);
+    }
+    if(start_off_dim_mult < end_off){
+      PIO_Offset ndim_idx = (end_off - start_off_dim_mult) / dim_chunk_sz_[idx];
+      if(ndim_idx > 0){
+        if(off_from_last_dim_mult > 0){
+          get_contig_ranges_from_off_range(contig_map_ranges, cur_start_off, (dim_chunk_sz_[idx] - off_from_last_dim_mult), dim_idx + 1);
+        }
+        PIO_Offset cur_range_count = ndim_idx * dim_chunk_sz_[idx];
+        contig_map_ranges.push_back(std::make_pair(start_off_dim_mult, cur_range_count));
+        cur_start_off = start_off_dim_mult + cur_range_count;
+        assert(cur_start_off <= end_off);
+        count -= (cur_start_off - start_off);
+        assert(count >= 0);
+        if(count > 0){
+          get_contig_ranges_from_off_range(contig_map_ranges, cur_start_off, count, dim_idx + 1);
+        }
+        break;
+      }
+    }
+  }
+}
+*/
+void SPIO::DataRearr::Contig_rearr::get_contig_ranges_from_off_range(std::vector<std::pair<PIO_Offset, PIO_Offset> > &contig_map_ranges,
+                                                                      PIO_Offset start_off, PIO_Offset count)
+{
+  std::size_t last_contig_dim = 0;
+  std::size_t ndims = gdimlen_.size();
+  std::vector<PIO_Offset> start_dim_idx(ndims, 0);
+
+  while(count > 0){
+    convert_off_to_start_dim_idx(start_off, start_dim_idx, last_contig_dim);
+    PIO_Offset last_contig_dim_nchunks = gdimlen_[last_contig_dim] - start_dim_idx[last_contig_dim];
+    PIO_Offset dim_nchunks = count / dim_chunk_sz_[last_contig_dim];
+    PIO_Offset range_sz = 0;
+    if(dim_nchunks > 0){
+      dim_nchunks = std::min(dim_nchunks, last_contig_dim_nchunks);
+      range_sz = dim_nchunks * dim_chunk_sz_[last_contig_dim];
+    }
+    else{
+      for(std::size_t idx = last_contig_dim + 1; idx < ndims; idx++){
+        dim_nchunks = count / dim_chunk_sz_[idx];
+        if(dim_nchunks > 0){
+          dim_nchunks = std::min(dim_nchunks, static_cast<PIO_Offset>(gdimlen_[idx]));
+          range_sz = dim_nchunks * dim_chunk_sz_[idx];
+          break;
+        }
+      }
+    }
+    contig_map_ranges.push_back(std::make_pair(start_off, range_sz));
+    start_off += range_sz;
+    count -= range_sz;
+  }
+
+  assert(count == 0);
+}
+
+std::vector<std::pair<PIO_Offset, PIO_Offset> > SPIO::DataRearr::Contig_rearr::get_rearr_decomp_map_contig_ranges(int iorank)
 {
   assert(gdecomp_sz_ > 0);
   assert(rearr_comm_iochunk_sz_ > 0);
@@ -146,6 +215,9 @@ std::vector<std::pair<PIO_Offset, PIO_Offset> > SPIO::DataRearr::Contig_rearr::g
           (start_off >= 0) && (end_off >= start_off));
   
   std::vector<std::pair<PIO_Offset, PIO_Offset> > contig_map_ranges;
+  get_contig_ranges_from_off_range(contig_map_ranges, start_off, end_off - start_off);
+
+  /*
   int ndims = static_cast<int>(gdimlen_.size());
 
   PIO_Offset cur_tot_count = end_off - start_off;
@@ -189,6 +261,7 @@ std::vector<std::pair<PIO_Offset, PIO_Offset> > SPIO::DataRearr::Contig_rearr::g
   }
 
   assert(cur_tot_count == 0);
+  */
 
   return contig_map_ranges;
 }
