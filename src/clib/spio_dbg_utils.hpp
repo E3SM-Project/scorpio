@@ -7,6 +7,7 @@
 #include "pio_types.hpp"
 
 #include <vector>
+#include <string>
 #include <iostream>
 #include <sstream>
 #include <iterator>
@@ -50,6 +51,17 @@ namespace SPIO_Util{
       std::copy(vbegin, vend, std::ostream_iterator<T>(ostr, ","));
       ostr << "]";
       std::cout << ostr.str().c_str() << "\n" << std::flush;
+    }
+
+    /* Convert vector to string */
+    template<typename T>
+    std::string vec1d_to_string(const T *vbegin, const T *vend)
+    {
+      std::ostringstream ostr;
+      ostr << "[";
+      std::copy(vbegin, vend, std::ostream_iterator<T>(ostr, ","));
+      ostr << "]";
+      return ostr.str();
     }
 
     std::string get_iodesc_info(io_desc_t *ios);
