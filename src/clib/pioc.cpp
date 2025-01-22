@@ -22,6 +22,7 @@
 #include "spio_gptl_utils.hpp"
 #include "pio_rearr_contig.hpp"
 #include "spio_dbg_utils.hpp"
+#include "spio_decomp_map_info_pool.hpp"
 
 #include <algorithm>
 
@@ -1022,6 +1023,8 @@ static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, 
     LOG((2, "Saving decomp map to %s", filename));
     PIOc_writemap_impl(filename, *ioidp, ndims, gdimlen, maplen, (PIO_Offset *)compmap, ios->my_comm);
     iodesc->is_saved = true;
+
+    SPIO_Util::Decomp_Util::gdpool_mgr.get_decomp_map_info_pool()->add_decomp_map_info(*ioidp, filename);
   }
 #endif
 
@@ -1796,6 +1799,10 @@ int PIOc_finalize_impl(int iosysid)
                             "PIO Finalize failed on iosytem (%d). Error sending async msg for PIO_MSG_FINALIZE", iosysid);
         }
     }
+
+#if PIO_SAVE_DECOMPS
+    SPIO_Util::Decomp_Util::serialize_decomp_map_info_pool(ios->union_comm);
+#endif
 
     ierr = spio_write_io_summary(ios);
     if(ierr != PIO_NOERR)
