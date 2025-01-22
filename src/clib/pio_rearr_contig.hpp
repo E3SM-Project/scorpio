@@ -130,7 +130,7 @@ namespace SPIO{
         std::vector<PIO_Offset> dim_chunk_sz_;
 
         int elem_pio_type_;
-        int elem_mpi_type_;
+        MPI_Datatype elem_mpi_type_;
         int elem_mpi_type_sz_;
 
         /* Gather scatter info for data aggregation */
