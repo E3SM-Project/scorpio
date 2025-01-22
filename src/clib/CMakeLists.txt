@@ -42,6 +42,7 @@ set (pio_lib_src
   pio_nc4.cpp bget.cpp
   pio_nc.cpp pio_put_nc.cpp pio_get_nc.cpp pio_getput_int.cpp pio_msg.cpp pio_varm.cpp
   pio_darray.cpp pio_darray_int.cpp spio_hash.cpp pio_sdecomps_regex.cpp spio_io_summary.cpp
+  spio_decomp_map_info_pool.cpp
   spio_ltimer.cpp spio_serializer.cpp spio_file_mvcache.cpp
   spio_tracer.cpp spio_tracer_mdata.cpp spio_tracer_decomp.cpp
   spio_rearrange_any.cpp)

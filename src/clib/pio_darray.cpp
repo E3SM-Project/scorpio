@@ -21,6 +21,7 @@
 #include "spio_gptl_utils.hpp"
 #include "spio_ltimer_utils.hpp"
 #include "pio_rearr_contig.hpp"
+#include "spio_decomp_map_info_pool.hpp"
 
 /* uint64_t definition */
 #ifdef _ADIOS2
@@ -2088,7 +2089,9 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
     LOG((2, "Saving decomp map (write) to %s", filename));
     PIOc_writemap_impl(filename, ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
     iodesc->is_saved = true;
+    SPIO_Util::Decomp_Util::gdpool_mgr.get_decomp_map_info_pool()->add_decomp_map_info(ioid, filename);
   }
+  SPIO_Util::Decomp_Util::gdpool_mgr.get_decomp_map_info_pool()->add_var_info(ioid, file->pio_ncid, file->fname, varid, file->varlist[varid].vname);
 #endif
   /* Get var description. */
   vdesc = &(file->varlist[varid]);
