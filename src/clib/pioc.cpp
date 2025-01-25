@@ -1849,7 +1849,7 @@ int PIOc_finalize_impl(int iosysid)
     }
 
 #if PIO_SAVE_DECOMPS
-    SPIO_Util::Decomp_Util::serialize_decomp_map_info_pool(ios->union_comm);
+    SPIO_Util::Decomp_Util::serialize_decomp_map_info_pool(ios);
 #endif
 
     ierr = spio_write_io_summary(ios);
