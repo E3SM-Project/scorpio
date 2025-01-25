@@ -1,6 +1,11 @@
 #ifndef __SPIO_DECOMP_MAP_INFO_HPP__
 #define __SPIO_DECOMP_MAP_INFO_HPP__
 
+#include "pio_config.h"
+#include "pio.h"
+#include "pio_internal.h"
+#include "pio_types.hpp"
+
 #include <vector>
 #include <map>
 #include <string>
@@ -86,7 +91,7 @@ namespace SPIO_Util{
 
     extern Decomp_map_info_pool_manager gdpool_mgr;
 
-    void serialize_decomp_map_info_pool(MPI_Comm comm);
+    void serialize_decomp_map_info_pool(iosystem_desc_t *ios);
   } // SPIO_Util
 } // Decomp_Util
 
