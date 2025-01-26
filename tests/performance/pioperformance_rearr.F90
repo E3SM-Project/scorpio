@@ -656,16 +656,10 @@ contains
 #else
        call pio_readdof(filename, ndims, gdims, compmap, MPI_COMM_WORLD)
 #endif
-
-!    print *,__FILE__,__LINE__,' gdims=',ndims
     endif
     maplen = size(compmap)
-!    color = 0
-!    if(maplen>0) then
-       color = 1
-!    endif
 
-    call MPI_Comm_split(MPI_COMM_WORLD, color, mype, comm, ierr)
+    comm = MPI_COMM_WORLD
 
     call MPI_Comm_size(comm, npe,  ierr)
     call CheckMPIreturn(__LINE__,ierr)
@@ -685,24 +679,36 @@ contains
           gmaplen = product(gdims)
        endif
     
+#ifdef VARINT
        allocate(ifld(maplen,nvars))
        allocate(ifld_in(maplen,nvars,nframes))
+       ifld = PIO_FILL_INT
+#endif
 
+#ifdef VARREAL
        allocate(rfld(maplen,nvars))
        allocate(rfld_in(maplen,nvars,nframes))
+       rfld = PIO_FILL_FLOAT
+#endif
 
+#ifdef VARDOUBLE
        allocate(dfld(maplen,nvars))
        allocate(dfld_in(maplen,nvars,nframes))
-
-       ifld = PIO_FILL_INT
-       rfld = PIO_FILL_FLOAT
        dfld = PIO_FILL_DOUBLE
+#endif
+
        do nv=1,nvars
           do j=1,maplen
              if(compmap(j) > 0) then
+#ifdef VARINT
                ifld(j,nv) = int(compmap(j))
-               dfld(j,nv) = ifld(j,nv)/1000000.0
-               rfld(j,nv) = 1.0E5*ifld(j,nv)
+#endif
+#ifdef VARREAL
+               rfld(j,nv) = 1.0E5*int(compmap(j))
+#endif
+#ifdef VARDOUBLE
+               dfld(j,nv) = int(compmap(j))/1000000.0
+#endif
              endif
           enddo
         enddo
@@ -714,9 +720,6 @@ contains
        do k=1,size(piotypes)
           iotype = piotypes(k)
           call MPI_Barrier(comm,ierr)
-          if(mype==0) then
-             !print *,'iotype=',piotypes(k)
-          endif
           if(iotype==PIO_IOTYPE_PNETCDF) then
              mode = PIO_64BIT_DATA
           else
@@ -740,7 +743,7 @@ contains
                 write(fname, '(a,i1,a,i5.5,a,i5.5,a,i5.5,a,i1,a,i5.5,a,i5.5,a)') 'pioperf-rearr-', rearr, &
                       '-ncomptasks-', npe, '-niotasks-', ntasks, '-stride-', stride, '-iotype-', iotype, &
                       '-nframes-',nframes,'-nvars-',nvars,'.nc'
-		
+
                 ierr =  PIO_CreateFile(iosystem, File, iotype, trim(fname), mode)
 
                 call WriteMetadata(File, gdims, vari, varr, vard, unlimdimindof)
@@ -761,14 +764,11 @@ contains
                 endif
 
                 wall(1) = MPI_Wtime()
-                ! print *,__FILE__,__LINE__,minval(dfld),maxval(dfld),minloc(dfld),maxloc(dfld)
 
                 do frame=1,nframes
                    recnum = frame
                    if( unlimdimindof) then
                       recnum = 1 + (frame-1)*gdims(ndims)
-!                      compmap = compmap2 + (frame-1)*gdims(ndims)
-!                      print *,__FILE__,__LINE__,compmap
 #ifdef VARINT
                       call PIO_InitDecomp(iosystem, PIO_INT, gdims, compmap, iodesc_i4, rearr=rearr)
 #endif
@@ -779,10 +779,8 @@ contains
                       call PIO_InitDecomp(iosystem, PIO_DOUBLE, gdims, compmap, iodesc_r8, rearr=rearr)
 #endif
                    endif
-                   !if(mype==0) print *,__FILE__,__LINE__,'Frame: ',recnum
 
                    do nv=1,nvars   
-                      !if(mype==0) print *,__FILE__,__LINE__,'var: ',nv
 #ifdef VARINT
                       call PIO_setframe(File, vari(nv), recnum)
                       call pio_write_darray(File, vari(nv), iodesc_i4, ifld(:,nv)    , ierr, fillval= PIO_FILL_INT)
@@ -810,7 +808,6 @@ contains
                 enddo
                 wall_wr_darr(2) = MPI_Wtime()
                 call pio_closefile(File)
-
 
                 call MPI_Barrier(comm,ierr)
 
@@ -915,15 +912,12 @@ contains
 #ifdef VARINT
 #ifdef DEBUG
                              write(*,'(a11,i2,a9,i11,a9,i11,a9,i2)') & 
-			        ' Int    PE=',mype,'ifld=',ifld(j,nv),' ifld_in=',ifld_in(j,nv,frame),' compmap=',compmap(j)
+                              ' Int    PE=',mype,'ifld=',ifld(j,nv),' ifld_in=',ifld_in(j,nv,frame),' compmap=',compmap(j)
 #endif
                             if(ifld(j,nv) /= ifld_in(j,nv,frame)) then
-                               !if(errorcnt < 10) then
-                               !   print *,__LINE__,'Int: ',mype,j,nv,ifld(j,nv),ifld_in(j,nv,frame),compmap(j)
-                               !endif
                                write(*,*) '***ERROR:Mismatch!***'
                                write(*,'(a11,i2,a9,i11,a9,i11,a9,i2)') & 
-			         ' Int    PE=',mype,'ifld=',ifld(j,nv),' ifld_in=',ifld_in(j,nv,frame),' compmap=',compmap(j)
+                                ' Int    PE=',mype,'ifld=',ifld(j,nv),' ifld_in=',ifld_in(j,nv,frame),' compmap=',compmap(j)
 
                                errorcnt = errorcnt+1
                             endif
@@ -931,16 +925,13 @@ contains
 #ifdef VARREAL
 #ifdef DEBUG
                             write(*,'(a11,i2,a9,f11.2,a9,f11.2,a9,i2)') &
-			        ' Real   PE=',mype,'rfld=',rfld(j,nv),' rfld_in=',rfld_in(j,nv,frame),' compmap=',compmap(j)
+                              ' Real   PE=',mype,'rfld=',rfld(j,nv),' rfld_in=',rfld_in(j,nv,frame),' compmap=',compmap(j)
 #endif
                             
                             if(rfld(j,nv) /= rfld_in(j,nv,frame) ) then
-                               !if(errorcnt < 10) then
-                               !   print *,__LINE__,'Real:', mype,j,nv,rfld(j,nv),rfld_in(j,nv,frame),compmap(j)
-                               !endif
                                write(*,*) '***ERROR:Mismatch!***'
                                write(*,'(a11,i2,a9,f11.2,a9,f11.2,a9,i2)') &
-			         ' Real   PE=',mype,'rfld=',rfld(j,nv),' rfld_in=',rfld_in(j,nv,frame),' compmap=',compmap(j)
+                                ' Real   PE=',mype,'rfld=',rfld(j,nv),' rfld_in=',rfld_in(j,nv,frame),' compmap=',compmap(j)
 
                                errorcnt = errorcnt+1                           
                             endif
@@ -948,15 +939,12 @@ contains
 #ifdef VARDOUBLE
 #ifdef DEBUG
                             write(*,'(a11,i2,a9,d11.4,a9,d11.4,a9,i2)') &
-			        'Double PE=',mype,'dfld=',dfld(j,nv),'dfld_in=',dfld_in(j,nv,frame),'compmap=',compmap(j)
+                              'Double PE=',mype,'dfld=',dfld(j,nv),'dfld_in=',dfld_in(j,nv,frame),'compmap=',compmap(j)
 #endif
                             if(dfld(j,nv) /= dfld_in(j,nv,frame) ) then
-                               !if(errorcnt < 10) then
-                               !   print *,__LINE__,'Dbl:',mype,j,nv,dfld(j,nv),dfld_in(j,nv,frame),compmap(j)
-                               !endif
                                write(*,*) '***ERROR:Mismatch!***'
                                write(*,'(a11,i2,a9,d11.4,a9,d11.4,a9,i2)') &
-			        'Double PE=',mype,'dfld=',dfld(j,nv),'dfld_in=',dfld_in(j,nv,frame),'compmap=',compmap(j)
+                                'Double PE=',mype,'dfld=',dfld(j,nv),'dfld_in=',dfld_in(j,nv,frame),'compmap=',compmap(j)
 
                                errorcnt = errorcnt+1
                             endif
@@ -987,7 +975,7 @@ contains
                         rearr_name(rearr), piotypes(k), ntasks, nvars, &
                         nvarmult*nvars*nframes*gmaplen*4.0D0/(1048576.0*wall(2))
 #ifdef BGQTRY 
-  call print_memusage()
+                  call print_memusage()
 #endif
                 end if
 #ifdef VARREAL                
@@ -1005,13 +993,12 @@ contains
        enddo
        deallocate(compmap)
        deallocate(gdims)
-       deallocate(ifld)
-       deallocate(ifld_in)
-       deallocate(rfld)
-       deallocate(dfld)
-       deallocate(dfld_in)
-       deallocate(rfld_in)
-       call MPI_Comm_free(comm, ierr)
+        if(allocated(ifld)) deallocate(ifld)
+        if(allocated(ifld_in))  deallocate(ifld_in)
+        if(allocated(rfld)) deallocate(rfld)
+        if(allocated(rfld_in))  deallocate(rfld_in)
+        if(allocated(dfld)) deallocate(dfld)
+        if(allocated(dfld_in))  deallocate(dfld_in)
     endif
 
   end subroutine pioperformance_rearrtest
