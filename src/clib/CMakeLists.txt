@@ -324,9 +324,24 @@ if (ADIOS_NO_DECOMPS)
 endif ()
 
 if (ADIOS_USE_COMPRESSION)
-  message(STATUS "Applying data compression to ADIOS BP files to reduce disk usage")
+  message(STATUS "Applying data compression to ADIOS BP files")
+  message(STATUS "Currently supported lossless compression methods (ADIOS operators): Blosc2 (default), BZip2")
+  message(STATUS "Blosc2 internal compressor (algorithm: blosclz, lz4, lz4hc, snappy, zlib, zstd) = zstd (default)")
+  message(STATUS "Blosc2 compression level (range: 0 – 9) = 1 (default)")
+  message(STATUS "Blosc2 shuffle mode (option: BLOSC_SHUFFLE, BLOSC_NOSHUFFLE, BLOSC_BITSHUFFLE) = BLOSC_BITSHUFFLE (default)")
+  message(STATUS "These are the default settings for lossless compression. Future versions will support configuration or run-time options")
   target_compile_definitions (pioc
-    PUBLIC _SPIO_ADIOS_USE_COMPRESSION)
+    PRIVATE _SPIO_ADIOS_USE_COMPRESSION)
+endif ()
+
+if (ADIOS_USE_LOSSY_COMPRESSION)
+  message(STATUS "Applying lossy compression to ADIOS BP files")
+  message(STATUS "Currently supported lossy compression methods (ADIOS operators): SZ (default), MGARD, ZFP")
+  message(STATUS "Lossy compression error bound = 0.001 (default)")
+  message(STATUS "These are the default settings for lossy compression. Future versions will support configuration or run-time options")
+  message(WARNING "The SZ or MGARD methods only support float or double types. For other types, lossless compression will be used instead")
+  target_compile_definitions (pioc
+    PRIVATE _SPIO_ADIOS_USE_LOSSY_COMPRESSION)
 endif ()
 
 if (PIO_ENABLE_API_TRACING)
