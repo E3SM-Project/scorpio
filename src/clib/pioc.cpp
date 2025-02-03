@@ -1433,6 +1433,7 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     ios->sname[0] = '\0';
     ios->io_comm = MPI_COMM_NULL;
     ios->intercomm = MPI_COMM_NULL;
+    ios->node_comm = MPI_COMM_NULL;
     ios->error_handler = default_error_handler;
     ios->default_rearranger = rearr;
     ios->num_iotasks = num_iotasks;
@@ -1663,6 +1664,14 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     else
         ios->io_rank = -1;
     LOG((3, "ios->io_comm = %d ios->io_rank = %d", ios->io_comm, ios->io_rank));
+
+    /* Create the node local comm - all procs in comp_comm that are local to
+     * this compute node (share memory) */
+    mpierr = MPI_Comm_split_type(ios->comp_comm, MPI_COMM_TYPE_SHARED, 0,
+              ios->info, &(ios->node_comm));
+    if(mpierr != MPI_SUCCESS){
+        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
 
     /* Rank in the union comm is the same as rank in the comp comm. */
     ios->union_rank = ios->comp_rank;
@@ -1983,6 +1992,8 @@ int PIOc_finalize_impl(int iosysid)
         MPI_Comm_free(&ios->union_comm);
     if (ios->io_comm != MPI_COMM_NULL)
         MPI_Comm_free(&ios->io_comm);
+    if (ios->node_comm != MPI_COMM_NULL)
+        MPI_Comm_free(&ios->node_comm);
 
     /* Delete the iosystem_desc_t data associated with this id. */
     LOG((2, "About to delete iosysid %d.", iosysid));
@@ -2385,6 +2396,7 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         my_iosys->union_comm = MPI_COMM_NULL;
         my_iosys->intercomm = MPI_COMM_NULL;
         my_iosys->my_comm = MPI_COMM_NULL;
+        my_iosys->node_comm = MPI_COMM_NULL;
         my_iosys->async = 1;
         my_iosys->error_handler = default_error_handler;
         my_iosys->num_comptasks = num_procs_per_comp[cmp];
@@ -2571,6 +2583,14 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
                                                 my_io_proc_list[0], 0, &my_iosys->intercomm)))
                 {
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
+                }
+
+                /* Create the node local comm - all procs in comp_comm that are local to
+                 * this compute node (share memory) */
+                mpierr = MPI_Comm_split_type(my_iosys->comp_comm, MPI_COMM_TYPE_SHARED, 0,
+                          my_iosys->info, &(my_iosys->node_comm));
+                if(mpierr != MPI_SUCCESS){
+                    return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
                 }
             }
             LOG((3, "intercomm created for cmp = %d", cmp));
@@ -2796,6 +2816,7 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
         iosys[i]->comp_comm = MPI_COMM_NULL;
         iosys[i]->intercomm = MPI_COMM_NULL;
         iosys[i]->my_comm = MPI_COMM_NULL;
+        iosys[i]->node_comm = MPI_COMM_NULL;
 
         iosys[i]->compgroup = MPI_GROUP_NULL;
         iosys[i]->iogroup = MPI_GROUP_NULL;
@@ -3167,6 +3188,14 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 }
 
                 MPI_Group_free(&union_comm_group);
+
+                /* Create the node local comm - all procs in comp_comm that are local to
+                 * this compute node (share memory) */
+                ret = MPI_Comm_split_type(iosys[i]->comp_comm, MPI_COMM_TYPE_SHARED, 0,
+                          iosys[i]->info, &(iosys[i]->node_comm));
+                if(ret != MPI_SUCCESS){
+                    return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
+                }
             }
         }
 
