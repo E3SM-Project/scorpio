@@ -411,6 +411,10 @@ typedef struct iosystem_desc_t
      * non-async) or the union (for async) communicator. */
     MPI_Comm my_comm;
 
+    /* Comm that includes procs from comp_comm that are local to this
+     * compute node (share the same memory) */
+    MPI_Comm node_comm;
+
     /** This MPI group contains the processors involved in
      * computation. */
     MPI_Group compgroup;
