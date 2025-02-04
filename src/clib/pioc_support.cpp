@@ -26,6 +26,11 @@
 #include "spio_file_mvcache.h"
 #include "spio_hash.h"
 #include "pio_rearr_contig.hpp"
+#include "spio_decomp_logger.hpp"
+#include <typeinfo>
+#include <vector>
+#include <string>
+#include <algorithm>
 
 /* Include headers for HDF5 compression filters */
 #if PIO_USE_HDF5
@@ -1885,19 +1890,7 @@ int PIOc_freedecomp_impl(int iosysid, int ioid)
     return ret;
 }
 
-/**
- * Read a decomposition map from a file. The decomp file is only read
- * by task 0 in the communicator.
- *
- * @param file the filename
- * @param ndims pointer to an int with the number of dims.
- * @param gdims pointer to an array of dimension ids.
- * @param fmaplen
- * @param map
- * @param comm
- * @returns 0 for success, error code otherwise.
- */
-int PIOc_readmap_impl(const char *file, int *ndims, int **gdims, PIO_Offset *fmaplen,
+int PIOc_readmap_txt_impl(const char *file, int *ndims, int **gdims, PIO_Offset *fmaplen,
                  PIO_Offset **map, MPI_Comm comm)
 {
     int npes, myrank;
@@ -2028,6 +2021,58 @@ int PIOc_readmap_impl(const char *file, int *ndims, int **gdims, PIO_Offset *fma
     }
     *gdims = tdims;
     return PIO_NOERR;
+}
+
+/**
+ * Read a decomposition map from a file. The decomp file is only read
+ * by task 0 in the communicator.
+ *
+ * @param file the filename
+ * @param ndims pointer to an int with the number of dims.
+ * @param gdims pointer to an array of dimension ids.
+ * @param fmaplen
+ * @param map
+ * @param comm
+ * @returns 0 for success, error code otherwise.
+ */
+int PIOc_readmap_impl(const char *file, int *ndims, int **gdims, PIO_Offset *fmaplen,
+                 PIO_Offset **map, MPI_Comm comm)
+{
+  if(!file || !ndims || !gdims || !fmaplen || !map){
+    return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
+                   "Reading I/O decomposition failed. Invalid arguments provided, file is %s (expected not NULL), ndims is %s (expected not NULL), gdims is %s (expected not NULL), fmaplen is %s (expected not NULL), map is %s (expected not NULL)", PIO_IS_NULL(file), PIO_IS_NULL(ndims), PIO_IS_NULL(gdims), PIO_IS_NULL(fmaplen), PIO_IS_NULL(map));
+  }
+
+  std::string log_fname(file);
+  SPIO_Util::Decomp_Util::Decomp_logger *logger =
+    SPIO_Util::Decomp_Util::create_decomp_logger(comm, log_fname);
+  if(typeid(*logger) == typeid(SPIO_Util::Decomp_Util::Decomp_txt_logger)){
+    delete logger;
+    return PIOc_readmap_txt_impl(file, ndims, gdims, fmaplen, map, comm);
+  }
+
+  std::string version;
+  int nprocs;
+  std::vector<int> rd_gdims;
+  std::vector<MPI_Offset> rd_compmap;
+
+  (*logger).read_only().open().get(version, nprocs, rd_gdims, rd_compmap).close();
+
+  *ndims = static_cast<int>(rd_gdims.size());
+  *gdims = (int *) malloc(*ndims * sizeof(int));
+  if(*gdims == NULL){
+    return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Unable to allocate (%lld bytes) to store gdims while reading decomposition file (%s)", static_cast<long long>(*ndims * sizeof(int)), log_fname.c_str());
+  }
+  std::copy(rd_gdims.cbegin(), rd_gdims.cend(), *gdims);
+  *fmaplen = static_cast<PIO_Offset>(rd_compmap.size());
+  *map = (PIO_Offset *) malloc(*fmaplen * sizeof(PIO_Offset));
+  if(*map == NULL){
+    return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Unable to allocate (%lld bytes) to store gmap while reading decomposition file (%s)", static_cast<long long>(*fmaplen * sizeof(PIO_Offset)), log_fname.c_str());
+  }
+  std::copy(rd_compmap.cbegin(), rd_compmap.cend(), *map);
+
+  delete logger;
+  return PIO_NOERR;
 }
 
 /**

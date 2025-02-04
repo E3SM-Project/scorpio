@@ -22,6 +22,7 @@
 #include "spio_ltimer_utils.hpp"
 #include "pio_rearr_contig.hpp"
 #include "spio_decomp_map_info_pool.hpp"
+#include "spio_decomp_logger.hpp"
 
 /* uint64_t definition */
 #ifdef _ADIOS2
@@ -2088,6 +2089,11 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
     }
     LOG((2, "Saving decomp map (write) to %s", filename));
     PIOc_writemap_impl(filename, ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
+    char log_fname[PIO_MAX_NAME];
+    ierr = pio_create_uniq_str(ios, iodesc, log_fname, PIO_MAX_NAME, "piodecomp", ".nc");
+    SPIO_Util::Decomp_Util::Decomp_logger *logger = SPIO_Util::Decomp_Util::create_decomp_logger(ios->comp_comm, std::string(log_fname));
+    (*logger).write_only().open().put(iodesc).close();
+    delete logger;
     iodesc->is_saved = true;
     SPIO_Util::Decomp_Util::gdpool_mgr.get_decomp_map_info_pool()->add_decomp_map_info(ioid, filename);
   }
