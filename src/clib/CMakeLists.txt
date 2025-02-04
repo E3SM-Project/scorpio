@@ -331,7 +331,7 @@ if (ADIOS_USE_COMPRESSION)
   message(STATUS "Blosc2 shuffle mode (option: BLOSC_SHUFFLE, BLOSC_NOSHUFFLE, BLOSC_BITSHUFFLE) = BLOSC_BITSHUFFLE (default)")
   message(STATUS "These are the default settings for lossless compression. Future versions will support configuration or run-time options")
   target_compile_definitions (pioc
-    PRIVATE _SPIO_ADIOS_USE_COMPRESSION)
+    PUBLIC _SPIO_ADIOS_USE_COMPRESSION)
 endif ()
 
 if (ADIOS_USE_LOSSY_COMPRESSION)
