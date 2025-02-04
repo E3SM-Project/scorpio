@@ -110,12 +110,14 @@ add_spio_executable (test_spio_rearr_utils_alltoall TRUE "" test_spio_rearr_util
 add_spio_executable (test_spio_rearr_contig TRUE "" test_spio_rearr_contig.cpp)
 add_spio_executable (test_spio_rearr_contig_nvars TRUE "" test_spio_rearr_contig_nvars.cpp)
 add_spio_executable (test_spio_rearr_contig_fillval TRUE "" test_spio_rearr_contig_fillval.cpp)
+add_spio_executable (test_spio_decomp_logger TRUE "" test_spio_decomp_logger.cpp)
 add_spio_executable (test_sdecomp_regex TRUE "" test_sdecomp_regex.cpp test_common.cpp)
 add_spio_executable(test_req_block_wait TRUE "" test_req_block_wait.cpp test_common.cpp)
 add_dependencies (tests test_spmd test_spio_ltimer test_spio_serializer test_spio_tree
                   test_spio_file_mvcache test_spio_rearr_utils_gather
                   test_spio_rearr_utils_scatter test_spio_rearr_utils_alltoall
                   test_spio_rearr_contig test_spio_rearr_contig_nvars test_spio_rearr_contig_fillval
+                  test_spio_decomp_logger
                   test_sdecomp_regex test_req_block_wait)
 
 if(PIO_USE_ASYNC_WR_THREAD)
@@ -206,6 +208,12 @@ else ()
   foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
     add_mpi_test(test_spio_rearr_contig_fillval${nproc}
       EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_contig_fillval
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_decomp_logger${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_decomp_logger
       NUMPROCS ${nproc}
       TIMEOUT ${DEFAULT_TEST_TIMEOUT})
   endforeach()
