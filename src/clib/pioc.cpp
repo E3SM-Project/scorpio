@@ -23,6 +23,7 @@
 #include "pio_rearr_contig.hpp"
 #include "spio_dbg_utils.hpp"
 #include "spio_decomp_map_info_pool.hpp"
+#include "spio_decomp_logger.hpp"
 
 #include <algorithm>
 
@@ -1022,6 +1023,13 @@ static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, 
     }
     LOG((2, "Saving decomp map to %s", filename));
     PIOc_writemap_impl(filename, *ioidp, ndims, gdimlen, maplen, (PIO_Offset *)compmap, ios->my_comm);
+
+    char log_fname[PIO_MAX_NAME];
+    ierr = pio_create_uniq_str(ios, iodesc, log_fname, PIO_MAX_NAME, "piodecomp", ".nc");
+    SPIO_Util::Decomp_Util::Decomp_logger *logger = SPIO_Util::Decomp_Util::create_decomp_logger(ios->comp_comm, std::string(log_fname));
+    (*logger).write_only().open().put(iodesc).close();
+    delete logger;
+
     iodesc->is_saved = true;
 
     SPIO_Util::Decomp_Util::gdpool_mgr.get_decomp_map_info_pool()->add_decomp_map_info(*ioidp, filename);
