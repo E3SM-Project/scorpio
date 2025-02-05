@@ -774,8 +774,14 @@ typedef struct iosystem_desc_t
     MPI_Comm block_comm;
     int block_myrank, block_nprocs;
     #ifdef _SPIO_ADIOS_USE_COMPRESSION
-    /* ADIOS operator for applying a specific compression method (e.g., Blosc2, BZip2) */
-    adios2_operator* compression_operator;
+    /* ADIOS operator for applying a specific lossless compression method (e.g., Blosc2, BZip2) */
+    adios2_operator* lossless_compression_operator;
+    int adios_lossless_compression_method;
+    #ifdef _SPIO_ADIOS_USE_LOSSY_COMPRESSION
+    /* ADIOS operator for applying a specific lossy compression method (e.g., SZ, MGARD, ZFP) */
+    adios2_operator* lossy_compression_operator;
+    int adios_lossy_compression_method;
+    #endif
     #endif
 #endif
 
@@ -914,6 +920,21 @@ typedef struct adios_att_desc_t
     /** Type converted from NC type to adios type */
     adios2_type adios_type;
 } adios_att_desc_t;
+
+#ifdef _SPIO_ADIOS_USE_COMPRESSION
+enum ADIOS_COMPRESSION_METHOD
+{
+    ADIOS_COMPRESSION_METHOD_BLOSC2 = 1,
+
+    ADIOS_COMPRESSION_METHOD_BZIP2 = 2,
+
+    ADIOS_COMPRESSION_METHOD_MGARD = 3,
+
+    ADIOS_COMPRESSION_METHOD_SZ = 4,
+
+    ADIOS_COMPRESSION_METHOD_ZFP = 5
+};
+#endif
 #endif /* _ADIOS2 */
 
 #ifdef _HDF5

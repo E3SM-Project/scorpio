@@ -1374,26 +1374,66 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
         }
 
-    #ifdef _SPIO_ADIOS_USE_COMPRESSION
-        /* adios2_define_operator defines an adios2 supported operator by its type. Returns: handler (success) or NULL (failure) */
-        #if defined(ADIOS2_HAVE_BLOSC2)
-        /* Prefer Blosc2 for data compression due to its performance benefits over BZip2 */
-        ios->compression_operator = adios2_define_operator(ios->adiosH, "Blosc2Lossless", "blosc");
-        #elif defined(ADIOS2_HAVE_BZIP2)
-        /* Fall back to BZip2 if Blosc2 is not available */
-        ios->compression_operator = adios2_define_operator(ios->adiosH, "BZip2Lossless", "bzip2");
-        #else
-        /* No supported compression operators are available */
-        ios->compression_operator = NULL;
-        #endif
+        #ifdef _SPIO_ADIOS_USE_COMPRESSION
+        ios->lossless_compression_operator = NULL;
 
-        /* Check if a valid compression operator was defined; if not, warn the user */
-        if (ios->compression_operator == NULL)
+        /* FIXME: Get lossless compression method during run-time */
+        ios->adios_lossless_compression_method = ADIOS_COMPRESSION_METHOD_BLOSC2; /* Use BLOSC2 as the default lossless compression method */
+
+        /* adios2_define_operator defines an adios2 supported operator by its type. Returns: handler (success) or NULL (failure) */
+        if (ios->adios_lossless_compression_method == ADIOS_COMPRESSION_METHOD_BLOSC2)
         {
-            printf("PIO: WARNING: Failed to define an adios2 supported compression operator (e.g., Blosc2, BZip2), "
-                   "or no supported compression operators are available. Data compression will be disabled.\n");
+            #ifdef ADIOS2_HAVE_BLOSC2
+            ios->lossless_compression_operator = adios2_define_operator(ios->adiosH, "Blosc2Lossless", "blosc");
+            #endif
         }
-    #endif
+        else if (ios->adios_lossless_compression_method == ADIOS_COMPRESSION_METHOD_BZIP2)
+        {
+            #ifdef ADIOS2_HAVE_BZIP2
+            ios->lossless_compression_operator = adios2_define_operator(ios->adiosH, "BZip2Lossless", "bzip2");
+            #endif
+        }
+
+        /* Check if a valid lossless compression operator was defined; if not, warn the user */
+        if (ios->lossless_compression_operator == NULL)
+        {
+            printf("PIO: WARNING: Failed to define an adios2 supported lossless compression operator (e.g., Blosc2, BZip2), "
+                   "or no supported lossless compression operators are available. Lossless compression will be disabled.\n");
+        }
+
+        #ifdef _SPIO_ADIOS_USE_LOSSY_COMPRESSION
+        ios->lossy_compression_operator = NULL;
+
+        /* FIXME: Get lossy compression method during run-time */
+        ios->adios_lossy_compression_method = ADIOS_COMPRESSION_METHOD_SZ; /* Use SZ as the default lossy compression method */
+
+        if (ios->adios_lossy_compression_method == ADIOS_COMPRESSION_METHOD_MGARD)
+        {
+            #ifdef ADIOS2_HAVE_MGARD
+            ios->lossy_compression_operator = adios2_define_operator(ios->adiosH, "MGARDLossy", "mgard");
+            #endif
+        }
+        if (ios->adios_lossy_compression_method == ADIOS_COMPRESSION_METHOD_SZ)
+        {
+            #ifdef ADIOS2_HAVE_SZ
+            ios->lossy_compression_operator = adios2_define_operator(ios->adiosH, "SZLossy", "sz");
+            #endif
+        }
+        else if (ios->adios_lossy_compression_method == ADIOS_COMPRESSION_METHOD_ZFP)
+        {
+            #ifdef ADIOS2_HAVE_ZFP
+            ios->lossy_compression_operator = adios2_define_operator(ios->adiosH, "ZFPLossy", "zfp");
+            #endif
+        }
+
+        /* Check if a valid lossy compression operator was defined; if not, warn the user */
+        if (ios->lossy_compression_operator == NULL)
+        {
+            printf("PIO: WARNING: Failed to define an adios2 supported lossy compression operator (e.g., SZ, MGARD, ZFP), "
+                   "or no supported lossy compression operators are available. Lossy compression will be disabled.\n");
+        }
+        #endif /* _SPIO_ADIOS_USE_LOSSY_COMPRESSION */
+        #endif /* _SPIO_ADIOS_USE_COMPRESSION */
     }
 
     ios->adios_readerH = adios2_init_mpi(ios->union_comm);

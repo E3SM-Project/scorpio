@@ -553,46 +553,115 @@ adios2_variable* spio_define_adios2_variable(iosystem_desc_t *ios, file_desc_t *
 #ifdef _SPIO_ADIOS_USE_COMPRESSION
     assert(ios != NULL && file != NULL);
     /* Skip compression for scalar variables (ndims == 0), see https://github.com/ornladios/ADIOS2/issues/4390 */
-    if (variable != NULL && ios->compression_operator != NULL && ndims > 0 && (file->iotype == PIO_IOTYPE_ADIOSC))
+    if (variable != NULL && ndims > 0 && (file->iotype == PIO_IOTYPE_ADIOSC))
     {
         size_t operation_index = 0;
         adios2_error adiosErr = adios2_error_none;
 
-        #if defined(ADIOS2_HAVE_BLOSC2)
-        /* Add a compression operation (Blosc2) to this variable */
-        adiosErr = adios2_add_operation(&operation_index, variable, ios->compression_operator, "compressor", "zstd"); /* Compressor type (e.g., zstd) */
-        if (adiosErr != adios2_error_none)
-        {
-            pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                    "Failed to add Blosc2 compression operation (compressor=zstd) to variable %s (adios2_error=%s)",
-                    name, convert_adios2_error_to_string(adiosErr));
-        }
+        /* Use lossless compression method by default */
+        int variable_compression_method = ios->adios_lossless_compression_method;
 
-        /* Compression level is an integer between 0 (no compression) and 9 (more compression, more memory consumption) inclusive */
-        adiosErr = adios2_set_operation_parameter(variable, operation_index, "clevel", "5");
-        if (adiosErr != adios2_error_none)
-        {
-            pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                    "Failed to set Blosc2 compression level (clevel=5) for variable %s (adios2_error=%s)",
-                    name, convert_adios2_error_to_string(adiosErr));
-        }
+        #ifdef _SPIO_ADIOS_USE_LOSSY_COMPRESSION
+        /* Switch to lossy compression method */
+        variable_compression_method = ios->adios_lossy_compression_method;
 
-        /* Shuffle option (BLOSC_SHUFFLE/BLOSC_NOSHUFFLE/BLOSC_BITSHUFFLE) */
-        adiosErr = adios2_set_operation_parameter(variable, operation_index, "doshuffle", "BLOSC_BITSHUFFLE");
-        if (adiosErr != adios2_error_none)
+        /* SZ or MGARD compressor only supports float or double types */
+        if (variable_compression_method == ADIOS_COMPRESSION_METHOD_SZ || variable_compression_method == ADIOS_COMPRESSION_METHOD_MGARD)
         {
-            pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                    "Failed to set Blosc2 shuffle (doshuffle=BLOSC_BITSHUFFLE) for variable %s (adios2_error=%s)",
-                    name, convert_adios2_error_to_string(adiosErr));
+            /* Switch back to lossless compression method for non floating point type */
+            if (type != adios2_type_float && type != adios2_type_double)
+                variable_compression_method = ios->adios_lossless_compression_method;
         }
-        #elif defined(ADIOS2_HAVE_BZIP2)
-        /* Add a compression operation (BZip2) to this variable */
-        adiosErr = adios2_add_operation(&operation_index, variable, ios->compression_operator, "", "");
-        if (adiosErr != adios2_error_none)
+        #endif
+
+        if (variable_compression_method == ADIOS_COMPRESSION_METHOD_BLOSC2)
         {
-            pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                    "Failed to add BZip2 compression operation to variable %s (adios2_error=%s)",
-                    name, convert_adios2_error_to_string(adiosErr));
+            if (ios->lossless_compression_operator != NULL)
+            {
+                /* Add a compression operation (Blosc2) to this variable */
+                adiosErr = adios2_add_operation(&operation_index, variable, ios->lossless_compression_operator, "compressor", "zstd"); /* Compressor type (e.g., zstd) */
+                if (adiosErr != adios2_error_none)
+                {
+                    pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                            "Failed to add Blosc2 compression operation (compressor=zstd) to variable %s (adios2_error=%s)",
+                            name, convert_adios2_error_to_string(adiosErr));
+                }
+
+                /* Compression level is an integer between 0 (no compression) and 9 (more compression, more memory consumption) inclusive */
+                adiosErr = adios2_set_operation_parameter(variable, operation_index, "clevel", "1");
+                if (adiosErr != adios2_error_none)
+                {
+                    pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                            "Failed to set Blosc2 compression level (clevel=5) for variable %s (adios2_error=%s)",
+                            name, convert_adios2_error_to_string(adiosErr));
+                }
+
+                /* Shuffle option (BLOSC_SHUFFLE/BLOSC_NOSHUFFLE/BLOSC_BITSHUFFLE) */
+                adiosErr = adios2_set_operation_parameter(variable, operation_index, "doshuffle", "BLOSC_BITSHUFFLE");
+                if (adiosErr != adios2_error_none)
+                {
+                    pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                            "Failed to set Blosc2 shuffle (doshuffle=BLOSC_BITSHUFFLE) for variable %s (adios2_error=%s)",
+                            name, convert_adios2_error_to_string(adiosErr));
+                }
+            }
+        }
+        else if (variable_compression_method == ADIOS_COMPRESSION_METHOD_BZIP2)
+        {
+            if (ios->lossless_compression_operator != NULL)
+            {
+                /* Add a compression operation (BZip2) to this variable */
+                adiosErr = adios2_add_operation(&operation_index, variable, ios->lossless_compression_operator, "", "");
+                if (adiosErr != adios2_error_none)
+                {
+                    pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                            "Failed to add BZip2 compression operation to variable %s (adios2_error=%s)",
+                            name, convert_adios2_error_to_string(adiosErr));
+                }
+            }
+        }
+        #ifdef _SPIO_ADIOS_USE_LOSSY_COMPRESSION
+        else if (variable_compression_method == ADIOS_COMPRESSION_METHOD_MGARD)
+        {
+            if (ios->lossy_compression_operator != NULL)
+            {
+                /* Add a lossy compression operation (MGARD) to this variable */
+                adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "accuracy", "0.001");
+                if (adiosErr != adios2_error_none)
+                {
+                    pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                            "Failed to add MGARD compression operation to variable %s (adios2_error=%s)",
+                            name, convert_adios2_error_to_string(adiosErr));
+                }
+            }
+        }
+        else if (variable_compression_method == ADIOS_COMPRESSION_METHOD_SZ)
+        {
+            if (ios->lossy_compression_operator != NULL)
+            {
+                /* Add a lossy compression operation (SZ) to this variable */
+                adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "accuracy", "0.001");
+                if (adiosErr != adios2_error_none)
+                {
+                    pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                            "Failed to add SZ compression operation to variable %s (adios2_error=%s)",
+                            name, convert_adios2_error_to_string(adiosErr));
+                }
+            }
+        }
+        else if (variable_compression_method == ADIOS_COMPRESSION_METHOD_ZFP)
+        {
+            if (ios->lossy_compression_operator != NULL)
+            {
+                /* Add a lossy compression operation (ZFP) to this variable */
+                adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "accuracy", "0.001");
+                if (adiosErr != adios2_error_none)
+                {
+                    pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                            "Failed to add ZFP compression operation to variable %s (adios2_error=%s)",
+                            name, convert_adios2_error_to_string(adiosErr));
+                }
+            }
         }
         #endif
     }
