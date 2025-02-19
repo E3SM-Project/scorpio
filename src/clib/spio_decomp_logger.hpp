@@ -119,7 +119,7 @@ namespace SPIO_Util{
 
     class Decomp_nc_logger : public Decomp_logger{
       public:
-        Decomp_nc_logger(MPI_Comm comm, MPI_Comm io_comm, MPI_Comm agg_comm, std::string log_fname) : Decomp_logger(comm, io_comm, agg_comm, log_fname), ncid_(INVALID_ID), comm_sz_dimid_(INVALID_ID), info_cached_(false), version_att_name_("version"), nprocs_att_name_("nprocs"), ndims_att_name_("ndims"), gdimlen_att_name_("gdimlen"), comm_sz_dim_name_("comm_sz"), counts_var_name_("counts"), gmaplen_dim_name_("gmaplen"), gmap_var_name_("gmap"), ioid_att_name_("ioid"), nprocs_(0){
+        Decomp_nc_logger(MPI_Comm comm, MPI_Comm io_comm, MPI_Comm agg_comm, std::string log_fname) : Decomp_logger(comm, io_comm, agg_comm, log_fname), ncid_(INVALID_ID), comm_sz_dimid_(INVALID_ID), info_cached_(false), version_att_name_("version"), nprocs_att_name_("nprocs"), ndims_att_name_("ndims"), gdimlen_att_name_("gdimlen"), comm_sz_dim_name_("comm_sz"), counts_var_name_("counts"), nregions_var_name_("nregions"), gmaplen_dim_name_("gmaplen"), gmap_var_name_("gmap"), gmap_nregions_dim_name_("gmap_nregions"), gmap_regions_var_name_("gmap_regions"), ioid_att_name_("ioid"), nprocs_(0){
         }
         virtual Decomp_logger &open(void );
 
@@ -149,14 +149,21 @@ namespace SPIO_Util{
         std::vector<PIO_Offset> lcompmap_;
         const std::string comm_sz_dim_name_;
         const std::string counts_var_name_;
+        const std::string nregions_var_name_;
         const std::string gmaplen_dim_name_;
         const std::string gmap_var_name_;
+        const std::string gmap_nregions_dim_name_;
+        const std::string gmap_regions_var_name_;
         const std::string ioid_att_name_;
         int nprocs_;
         
         void gather_starts_counts(std::vector<int> &agg_starts, std::vector<int> &agg_counts, MPI_Offset &agg_io_chunk_sz, io_desc_t *iodesc);
+        void gather_nregions_starts_counts(std::vector<int> &agg_nregions_starts, std::vector<int> &agg_nregions_counts, MPI_Offset &agg_nregions, const std::vector<PIO_Offset> &lregions);
         void gather_gmap(const std::vector<int> &starts, const std::vector<int> &counts, std::vector<MPI_Offset> &gmap_chunk, io_desc_t *iodesc);
+        void gather_gmap_regions(const std::vector<int> &starts, const std::vector<int> &counts, std::vector<PIO_Offset> &gmap_regions, const std::vector<PIO_Offset> &lregions);
         void read_and_cache_info(void );
+        void get_contig_map_regions(std::vector<PIO_Offset> &lregions, io_desc_t *iodesc);
+        void get_map_from_regions(std::vector<PIO_Offset> &lregions, std::vector<PIO_Offset> &lcompmap);
     };
 
     inline Decomp_logger *create_decomp_logger(MPI_Comm comm, MPI_Comm io_comm, MPI_Comm agg_comm, std::string log_fname){
