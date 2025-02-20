@@ -8,6 +8,9 @@
 #include <pio.h>
 #include <pio_tests.h>
 #include <pio_internal.h>
+#if SIZEOF_PIO_OFFSET >= 8
+#include <stdint.h>
+#endif
 
 /* The number of tasks this test should run on. */
 #define TARGET_NTASKS 4
@@ -76,6 +79,9 @@ int test_rearranger_opts1(int iosysid)
 int test_compare_offsets()
 {
     mapsort m1, m2, m3;
+#if SIZEOF_PIO_OFFSET >= 8
+    mapsort m_max, m_min;
+#endif
 
     m1.rfrom = 0;
     m1.soffset = 0;
@@ -86,6 +92,14 @@ int test_compare_offsets()
     m3.rfrom = 0;
     m3.soffset = 0;
     m3.iomap = 1;
+#if SIZEOF_PIO_OFFSET >= 8
+    m_max.rfrom = 0;
+    m_max.soffset = 0;
+    m_max.iomap = INT64_MAX;
+    m_min.rfrom = 0;
+    m_min.soffset = 0;
+    m_min.iomap = INT64_MIN;
+#endif
 
     /* Return 0 if either or both parameters are null. */
     if (compare_offsets(NULL, &m2))
@@ -102,6 +116,35 @@ int test_compare_offsets()
     /* m1 and m3 are different. */
     if (compare_offsets(&m1, &m3) != -1)
         return ERR_WRONG;
+
+#if SIZEOF_PIO_OFFSET >= 8
+    /* Some representative test cases for 64-bit offset comparison with extreme values */
+
+    /* Test: INT64_MAX - INT64_MIN, expected to be positive */
+    if (compare_offsets(&m_max, &m_min) <= 0)
+        return ERR_WRONG;
+
+    /* Test: INT64_MIN - INT64_MAX, expected to be negative */
+    if (compare_offsets(&m_min, &m_max) >= 0)
+        return ERR_WRONG;
+
+    /* Test: INT64_MAX - 0, expected to be positive */
+    if (compare_offsets(&m_max, &m1) <= 0)
+        return ERR_WRONG;
+
+    /* Test: 0 - INT64_MAX, expected to be negative */
+    if (compare_offsets(&m1, &m_max) >= 0)
+        return ERR_WRONG;
+
+    /* Test: INT64_MIN - 0, expected to be negative */
+    if (compare_offsets(&m_min, &m1) >= 0)
+        return ERR_WRONG;
+
+    /* Test: 0 - INT64_MIN, expected to be positive */
+    if (compare_offsets(&m1, &m_min) <= 0)
+        return ERR_WRONG;
+#endif
+
     return 0;
 }
 
