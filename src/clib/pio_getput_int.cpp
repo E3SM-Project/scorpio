@@ -2916,6 +2916,22 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                        "Setting (ADIOS) selection to variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
                                        av->name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
                     }
+
+                    #if defined(_SPIO_ADIOS_USE_LOSSY_COMPRESSION) && defined(ADIOS2_HAVE_ZFP)
+                    if (ios->adios_lossy_compression_method == ADIOS_COMPRESSION_METHOD_ZFP)
+                    {
+                        if (av_size == 1)
+                        {
+                            adiosErr = adios2_remove_operations(av->adios_varid);
+                            if (adiosErr != adios2_error_none)
+                            {
+                                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                               "Removing all current operations associated with variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                               av->name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+                            }
+                        }
+                    }
+                    #endif
                 }
 
                 char *mem_buffer = (char*)calloc(av_size, sizeof(char));

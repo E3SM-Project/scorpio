@@ -1067,6 +1067,7 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
     }
 
     char name[PIO_MAX_NAME];
+    char name_varid[PIO_MAX_NAME];
     adios2_variable *variableH = NULL;
     adios2_variable *num_decomp_block_writers_varid = NULL;
     if (file->adios_io_process == 1)
@@ -1089,7 +1090,6 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
         /* Variable to store the number of writer blocks, in case buffer merging doesn't happen */
         if (file->block_myrank == 0)
         {
-            char name_varid[PIO_MAX_NAME];
             snprintf(name_varid, PIO_MAX_NAME, "/__pio__/track/num_decomp_block_writers/%d", ioid);
             av_count = 1;
             num_decomp_block_writers_varid = adios2_inquire_variable(file->ioH, name_varid);
@@ -1157,6 +1157,23 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
                                "Setting (ADIOS) selection to variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
                                name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
             }
+
+            #if defined(_SPIO_ADIOS_USE_LOSSY_COMPRESSION) && defined(ADIOS2_HAVE_ZFP)
+            if (file->iosystem->adios_lossy_compression_method == ADIOS_COMPRESSION_METHOD_ZFP)
+            {
+                if (count_val == 1)
+                {
+                    adiosErr = adios2_remove_operations(variableH);
+                    if (adiosErr != adios2_error_none)
+                    {
+                        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Removing all current operations associated with variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                       name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+                    }
+                }
+            }
+            #endif
+
             adiosErr = adios2_put(file->engineH, variableH, file->block_array, adios2_mode_sync);
             if (adiosErr != adios2_error_none)
             {
@@ -1172,12 +1189,25 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
     /* Write the number of block writers */
     if (file->adios_io_process == 1 && file->block_myrank == 0)
     {
+        #if defined(_SPIO_ADIOS_USE_LOSSY_COMPRESSION) && defined(ADIOS2_HAVE_ZFP)
+        if (file->iosystem->adios_lossy_compression_method == ADIOS_COMPRESSION_METHOD_ZFP)
+        {
+            adiosErr = adios2_remove_operations(num_decomp_block_writers_varid);
+            if (adiosErr != adios2_error_none)
+            {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Removing all current operations associated with variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                               name_varid, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+            }
+        }
+        #endif
+
         adiosErr = adios2_put(file->engineH, num_decomp_block_writers_varid, &num_decomp_block_writers, adios2_mode_sync);
         if (adiosErr != adios2_error_none)
         {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
-                           name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+                           name_varid, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
         }
         (file->num_written_blocks)++;
     }
@@ -1447,6 +1477,23 @@ static int check_adios2_need_to_flush(file_desc_t *file, adios_var_desc_t *av)
                                "Setting (ADIOS) selection to variable (name=num_data_block_writers/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
                                av->name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
             }
+
+            #if defined(_SPIO_ADIOS_USE_LOSSY_COMPRESSION) && defined(ADIOS2_HAVE_ZFP)
+            if (file->iosystem->adios_lossy_compression_method == ADIOS_COMPRESSION_METHOD_ZFP)
+            {
+                if (count_val == 1)
+                {
+                    adiosErr = adios2_remove_operations(av->num_block_writers_varid);
+                    if (adiosErr != adios2_error_none)
+                    {
+                        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Removing all current operations associated with variable (name=num_data_block_writers/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                       av->name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+                    }
+                }
+            }
+            #endif
+
             adiosErr = adios2_put(file->engineH, av->num_block_writers_varid, av->num_wb_buffer, adios2_mode_sync);
             if (adiosErr != adios2_error_none)
             {
@@ -1471,6 +1518,23 @@ static int check_adios2_need_to_flush(file_desc_t *file, adios_var_desc_t *av)
                                "Setting (ADIOS) selection to variable (name=fillval_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
                                av->name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
             }
+
+            #if defined(_SPIO_ADIOS_USE_LOSSY_COMPRESSION) && defined(ADIOS2_HAVE_ZFP)
+            if (file->iosystem->adios_lossy_compression_method == ADIOS_COMPRESSION_METHOD_ZFP)
+            {
+                if (count_val == 1)
+                {
+                    adiosErr = adios2_remove_operations(av->fillval_varid);
+                    if (adiosErr != adios2_error_none)
+                    {
+                        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Removing all current operations associated with variable (name=fillval_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                       av->name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+                    }
+                }
+            }
+            #endif
+
             adiosErr = adios2_put(file->engineH, av->fillval_varid, av->fillval_buffer, adios2_mode_sync);
             if (adiosErr != adios2_error_none)
             {
@@ -1495,6 +1559,23 @@ static int check_adios2_need_to_flush(file_desc_t *file, adios_var_desc_t *av)
                                "Setting (ADIOS) selection to variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
                                av->name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
             }
+
+            #if defined(_SPIO_ADIOS_USE_LOSSY_COMPRESSION) && defined(ADIOS2_HAVE_ZFP)
+            if (file->iosystem->adios_lossy_compression_method == ADIOS_COMPRESSION_METHOD_ZFP)
+            {
+                if (count_val == 1)
+                {
+                    adiosErr = adios2_remove_operations(av->decomp_varid);
+                    if (adiosErr != adios2_error_none)
+                    {
+                        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Removing all current operations associated with variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                       av->name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+                    }
+                }
+            }
+            #endif
+
             adiosErr = adios2_put(file->engineH, av->decomp_varid, av->decomp_buffer, adios2_mode_sync);
             if (adiosErr != adios2_error_none)
             {
@@ -1519,6 +1600,23 @@ static int check_adios2_need_to_flush(file_desc_t *file, adios_var_desc_t *av)
                                "Setting (ADIOS) selection to variable (name=frame_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
                                av->name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
             }
+
+            #if defined(_SPIO_ADIOS_USE_LOSSY_COMPRESSION) && defined(ADIOS2_HAVE_ZFP)
+            if (file->iosystem->adios_lossy_compression_method == ADIOS_COMPRESSION_METHOD_ZFP)
+            {
+                if (count_val == 1)
+                {
+                    adiosErr = adios2_remove_operations(av->frame_varid);
+                    if (adiosErr != adios2_error_none)
+                    {
+                        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Removing all current operations associated with variable (name=frame_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                       av->name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+                    }
+                }
+            }
+            #endif
+
             adiosErr = adios2_put(file->engineH, av->frame_varid, av->frame_buffer, adios2_mode_sync);
             if (adiosErr != adios2_error_none)
             {
@@ -1863,6 +1961,23 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
                            "Setting (ADIOS) selection to variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
                            av->name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
         }
+
+         #if defined(_SPIO_ADIOS_USE_LOSSY_COMPRESSION) && defined(ADIOS2_HAVE_ZFP)
+        if (file->iosystem->adios_lossy_compression_method == ADIOS_COMPRESSION_METHOD_ZFP)
+        {
+            if (count_val == 1)
+            {
+                adiosErr = adios2_remove_operations(av->adios_varid);
+                if (adiosErr != adios2_error_none)
+                {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Removing all current operations associated with variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                   av->name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+                }
+            }
+        }
+        #endif
+
         adiosErr = adios2_put(file->engineH, av->adios_varid, file->block_array, adios2_mode_sync);
         if (adiosErr != adios2_error_none)
         {
