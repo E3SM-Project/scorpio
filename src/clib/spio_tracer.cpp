@@ -5,6 +5,7 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 
 #include <unistd.h>
 
@@ -306,7 +307,9 @@ SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_file_trace_
 
   ret = pio_get_file(fh, &file);  
   /* FIXME: Throw an exception instead */
-  assert(ret == PIO_NOERR);
+  if(ret != PIO_NOERR){
+    throw std::runtime_error(std::string("Unable to get file struct corresponding to file id, file id = ") + std::to_string(fh));
+  }
   assert(file->iosystem);
 
   /* FIXME: We might need to trace both I/O and compute procs for async I/O */
