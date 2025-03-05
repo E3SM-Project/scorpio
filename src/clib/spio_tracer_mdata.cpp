@@ -4,6 +4,7 @@
 #include <utility>
 #include <cassert>
 #include <fstream>
+#include <stdexcept>
 
 #include <unistd.h>
 
@@ -44,7 +45,9 @@ std::string SPIO_Util::Tracer::get_mpi_comm_info(MPI_Comm comm)
   int comm_key[wsz];
 
   ret = MPI_Gather(comm_lmap, 2, MPI_INT, comm_wmap, 2, MPI_INT, 0, comm);
-  assert(ret == MPI_SUCCESS);
+  if(ret != MPI_SUCCESS){
+    throw std::runtime_error("Unable to gather comm/world ranks on root process");
+  }
 
   std::string info = std::string("MPI_COMM_WORLD : [") + std::to_string(wrank) + std::string("/") + std::to_string(wsz) + std::string("]\n");
   info += std::string("MPI_COMM : [") + std::to_string(comm_rank) + std::string("/") + std::to_string(comm_sz) + std::string("]\n");

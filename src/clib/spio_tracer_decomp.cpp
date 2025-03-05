@@ -8,6 +8,7 @@
 #include <iostream>
 #include <algorithm>
 #include <iterator>
+#include <stdexcept>
 
 #include <unistd.h>
 
@@ -120,33 +121,54 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::init(void )
 
   int flags = NC_CLOBBER | NC_64BIT_DATA;
   ret = ncmpi_create(comm_, fname_.c_str(), flags, info, &ncid_);
-  assert(ret == NC_NOERR);
+  if(ret != NC_NOERR){
+    throw std::runtime_error(std::string("Unable to create NetCDF I/O decomposition log file, file = ") + fname_ +
+            std::string(", iosysid = ") + std::to_string(iosysid_));
+  }
 
   const std::string spio_version_name = std::string("SCORPIO_VERSION");
   const std::string spio_version = std::to_string(PIO_VERSION_MAJOR) + "." +
                                           std::to_string(PIO_VERSION_MINOR) + "." +
                                           std::to_string(PIO_VERSION_PATCH);
   ret = ncmpi_put_att_text(ncid_, NC_GLOBAL, spio_version_name.c_str(), spio_version.size() + 1, spio_version.c_str());
-  assert(ret == NC_NOERR);
+  if(ret != NC_NOERR){
+    throw std::runtime_error(std::string("Putting SCORPIO Version attribute in I/O decomposition log file, file = ") + fname_ +
+            std::string(", failed. iosysid = ") + std::to_string(iosysid_));
+  }
 
   const std::string spio_trace_log_aname = std::string("Trace_log_file");
   const std::string spio_trace_log_name = SPIO_Util::Tracer::get_trace_log_fname(iosysid_, wrank);
   ret = ncmpi_put_att_text(ncid_, NC_GLOBAL, spio_trace_log_aname.c_str(), spio_trace_log_name.size() + 1, spio_trace_log_name.c_str());
-  assert(ret == NC_NOERR);
+  if(ret != NC_NOERR){
+    throw std::runtime_error(std::string("Putting trace log file name/attribute in I/O decomposition log file, file = ") + fname_ +
+            std::string(", failed. iosysid = ") + std::to_string(iosysid_));
+  }
 
   const std::string spio_trace_mdata_aname = std::string("Trace_MData_file");
   const std::string spio_trace_mdata_name = SPIO_Util::Tracer::get_trace_mdata_fname(iosysid_, wrank);
   ret = ncmpi_put_att_text(ncid_, NC_GLOBAL, spio_trace_mdata_aname.c_str(), spio_trace_mdata_name.size() + 1, spio_trace_mdata_name.c_str());
-  assert(ret == NC_NOERR);
+  if(ret != NC_NOERR){
+    throw std::runtime_error(std::string("Putting trace meta-data file name/attribute in I/O decomposition log file, file = ") + fname_ +
+            std::string(", failed. iosysid = ") + std::to_string(iosysid_));
+  }
 
   ret = ncmpi_put_att_int(ncid_, NC_GLOBAL, "IOSystemID", NC_INT, 1, &iosysid_);
-  assert(ret == NC_NOERR);
+  if(ret != NC_NOERR){
+    throw std::runtime_error(std::string("Putting I/O system id as an attribute in I/O decomposition log file, file = ") + fname_ +
+            std::string(", failed. iosysid = ") + std::to_string(iosysid_));
+  }
 
   ret = ncmpi_put_att_int(ncid_, NC_GLOBAL, "MPIWRank", NC_INT, 1, &wrank);
-  assert(ret == NC_NOERR);
+  if(ret != NC_NOERR){
+    throw std::runtime_error(std::string("Putting MPI world rank as an attribute in I/O decomposition log file, file = ") + fname_ +
+            std::string(", failed. iosysid = ") + std::to_string(iosysid_));
+  }
 
   ret = ncmpi_enddef(ncid_);
-  assert(ret == NC_NOERR);
+  if(ret != NC_NOERR){
+    throw std::runtime_error(std::string("Ending NetCDF define mode in I/O decomposition log file, file = ") + fname_ +
+            std::string(", failed. iosysid = ") + std::to_string(iosysid_));
+  }
 
   ret = MPI_Info_free(&info);
   assert(ret == MPI_SUCCESS);
@@ -168,11 +190,17 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::log_decomp(int ioid, con
   MPI_Offset *lmapsz = NULL;
   if(comm_rank_ == 0){
     lmapsz = (MPI_Offset *)malloc(sizeof(MPI_Offset) * comm_sz_ * 2);
-    assert(lmapsz);
+    if(lmapsz == NULL){
+      throw std::runtime_error(std::string("Out of memory allocating memory for gathering local map sizes on root, ") +
+              std::to_string(static_cast<long long int>(sizeof(MPI_Offset) * comm_sz_ * 2)) + std::string(" bytes, ioid = ") +
+              std::to_string(ioid));
+    }
   }
 
-  ret = MPI_Gather(&mapsz_off, 1, MPI_OFFSET, lmapsz, 1, MPI_OFFSET, 0, comm_);  
-  assert(ret == MPI_SUCCESS);
+  ret = MPI_Gather(&mapsz_off, 1, MPI_OFFSET, lmapsz, 1, MPI_OFFSET, 0, comm_);
+  if(ret != MPI_SUCCESS){
+    throw std::runtime_error(std::string("Unable to gaher local map sizes on root, MPI_Gather failed, ioid = ") + std::to_string(ioid));
+  }
 
   /* Convert local map sizes from each proc to starting offsets for each proc */
   if(comm_rank_ == 0){
@@ -196,7 +224,9 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::log_decomp(int ioid, con
   /* gmap_sz_start[] = {global map size, local start offset} */
   MPI_Offset gmap_sz_start[2];
   ret = MPI_Scatter(lmapsz, 2, MPI_OFFSET, gmap_sz_start, 2, MPI_OFFSET, 0, comm_);
-  assert(ret == MPI_SUCCESS);
+  if(ret != MPI_SUCCESS){
+    throw std::runtime_error(std::string("Scattering global map sizes/start offset failed, ioid = ") + std::to_string(ioid));
+  }
 
   if(lmapsz){
     free(lmapsz);
@@ -213,27 +243,42 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::log_decomp(int ioid, con
       static_cast<long long> (mapsz_off)});
 
   int decomp_var_dimid = get_dim_id(static_cast<PIO_Offset>(gmap_sz_start[0]));
-
-  ret = ncmpi_redef(ncid_);
-  assert(ret == NC_NOERR);
-
   std::string decomp_vname = std::string("decomp_") + std::to_string(ioid);
   int decomp_varid = INVALID_NCID;
+
+  ret = ncmpi_redef(ncid_);
+  if(ret != NC_NOERR){
+    throw std::runtime_error(std::string("Unable to enter redef mode to write decompositing map, ncid = ") + std::to_string(ncid_) +
+            std::string(", vname = ") + decomp_vname);
+  }
+
   ret = ncmpi_def_var(ncid_, decomp_vname.c_str(), NC_INT64, 1, &decomp_var_dimid, &decomp_varid);
-  assert(ret == NC_NOERR);
+  if(ret != NC_NOERR){
+    throw std::runtime_error(std::string("Error while defining variable to write decomposition map, ncid = ") + std::to_string(ncid_) +
+            std::string(", vname = ") + decomp_vname);
+  }
 
   ret = ncmpi_enddef(ncid_);
-  assert(ret == NC_NOERR);
+  if(ret != NC_NOERR){
+    throw std::runtime_error(std::string("Unable to end redef mode while writing decomposition map, ncid = ") + std::to_string(ncid_) +
+            std::string(", vname = ") + decomp_vname);
+  }
 
   ret = ncmpi_iput_vara_longlong(ncid_, decomp_varid, &(gmap_sz_start[1]), &mapsz_off, static_cast<const long long *> (map), NULL);
-  assert(ret == NC_NOERR);
+  if(ret != NC_NOERR){
+    throw std::runtime_error(std::string("Unable to write decomposition map, ncid = ") + std::to_string(ncid_) +
+            std::string(", vname = ") + decomp_vname);
+  }
 
   /* FIXME: Ideally we just need to do one wait all during finalize. But PnetCDF, 1.12.3, crashes with too many pending reqs, so
    * to be safe wait after each write. We could also wait after some specific number of writes (or based on buffered data in
    * a process)
    */
   ret = ncmpi_wait_all(ncid_, NC_REQ_ALL, NULL, NULL);
-  assert(ret == MPI_SUCCESS);
+  if(ret != NC_NOERR){
+    throw std::runtime_error(std::string("Error while waiting after writing the decomposition map, ncid = ") + std::to_string(ncid_) +
+            std::string(", vname = ") + decomp_vname);
+  }
 }
 
 void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::finalize(void )
@@ -249,15 +294,23 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::finalize(void )
 
     if(ndecompsx3 > 0){
       ret = ncmpi_redef(ncid_);
-      assert(ret == NC_NOERR);
+      if(ret != NC_NOERR){
+        throw std::runtime_error(std::string("Unable to enter redef mode to write start/count for decomposition map, ncid = ") + std::to_string(ncid_));
+      }
 
       ret = ncmpi_def_dim(ncid_, "dim_comm_sz", comm_sz_, &dim_comm_sz_dimid);
-      assert(ret == NC_NOERR);
+      if(ret != NC_NOERR){
+        throw std::runtime_error(std::string("Error while defining comm size dimension, ncid = ") + std::to_string(ncid_) +
+                std::string(", comm size = ") + std::to_string(comm_sz_));
+      }
 
       dim_sz_to_id_[static_cast<PIO_Offset>(comm_sz_)] = dim_comm_sz_dimid;
 
       ret = ncmpi_def_dim(ncid_, "dim_ndecompsx3", static_cast<MPI_Offset>(ndecompsx3), &dim_ndecompsx3_dimid);
-      assert(ret == NC_NOERR);
+      if(ret != NC_NOERR){
+        throw std::runtime_error(std::string("Error while defining number_of_decompsx3 dimension, ncid = ") + std::to_string(ncid_) +
+                std::string(", number of decompisitions x 3 = ") + std::to_string(static_cast<long long int>(ndecompsx3)));
+      }
 
       dim_sz_to_id_[static_cast<PIO_Offset>(gsz_start_count_for_saved_decomps_.size())] = dim_ndecompsx3_dimid;
 
@@ -265,22 +318,32 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::finalize(void )
       int gsz_start_count_varid = INVALID_NCID;
       int gsz_start_count_var_dimids[] = {dim_comm_sz_dimid, dim_ndecompsx3_dimid};
       ret = ncmpi_def_var(ncid_, "gsz_start_count_var", NC_INT64, 2, gsz_start_count_var_dimids, &gsz_start_count_varid);
-      assert(ret == NC_NOERR);
+      if(ret != NC_NOERR){
+        throw std::runtime_error(std::string("Error while defining variable to store global map sizes/starts/counts, ncid = ") + std::to_string(ncid_));
+      }
 
       ret = ncmpi_enddef(ncid_);
-      assert(ret == NC_NOERR);
+      if(ret != NC_NOERR){
+        throw std::runtime_error(std::string("Unable to end redef mode to write start/count for decomposition map, ncid = ") + std::to_string(ncid_));
+      }
 
       MPI_Offset gsz_start_count_var_start[] = {comm_rank_, 0};
       MPI_Offset gsz_start_count_var_count[] = {1, static_cast<MPI_Offset>(ndecompsx3)};
       ret = ncmpi_iput_vara_longlong(ncid_, gsz_start_count_varid, gsz_start_count_var_start, gsz_start_count_var_count, gsz_start_count_for_saved_decomps_.data(), NULL);
-      assert(ret == NC_NOERR);
+      if(ret != NC_NOERR){
+        throw std::runtime_error(std::string("Error writing variable to store global map sizes/starts/counts, ncid = ") + std::to_string(ncid_));
+      }
     }
 
     ret = ncmpi_wait_all(ncid_, NC_REQ_ALL, NULL, NULL);
-    assert(ret == MPI_SUCCESS);
+    if(ret != NC_NOERR){
+      throw std::runtime_error(std::string("Error waiting after writing variable to store global map sizes/starts/counts, ncid = ") + std::to_string(ncid_));
+    }
 
     ret = ncmpi_close(ncid_);
-    assert(ret == MPI_SUCCESS);
+    if(ret != NC_NOERR){
+      throw std::runtime_error(std::string("Error closing file after writing variable to store global map sizes/starts/counts, ncid = ") + std::to_string(ncid_));
+    }
 
     ncid_ = INVALID_NCID;
   }
@@ -295,20 +358,27 @@ int SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::get_dim_id(PIO_Offset dim
     assert(ncid_ != INVALID_NCID);
 
     ret = ncmpi_redef(ncid_);
-    assert(ret == NC_NOERR);
+    if(ret != NC_NOERR){
+      throw std::runtime_error(std::string("Unable to enter redef mode to define dimension, dim size = ") +
+              std::to_string(static_cast<long long int>(dimsz)) + std::string(", ncid = ") + std::to_string(ncid_));
+    }
 
     std::string dimid_name = std::string("dimid_") + std::to_string(uniq_dimid_idx_++);
 
     ret = ncmpi_def_dim(ncid_, dimid_name.c_str(), static_cast<MPI_Offset>(dimsz), &dimid);
     if(ret != NC_NOERR){
-      std::cerr << "ERROR: Unable to define dimension ("<< dimid_name.c_str() << ", size=" << dimsz << ") : error = " << ret << "(" <<  ncmpi_strerror(ret) << ")" << std::flush;
+      throw std::runtime_error(std::string("Unable to define dimension, dim size = ") +
+              std::to_string(static_cast<long long int>(dimsz)) + std::string(", dim name = ") + dimid_name +
+              std::string(", ncid = ") + std::to_string(ncid_));
     }
-    assert(ret == NC_NOERR);
 
     dim_sz_to_id_[dimsz] = dimid;
 
     ret = ncmpi_enddef(ncid_);
-    assert(ret == NC_NOERR);
+    if(ret != NC_NOERR){
+      throw std::runtime_error(std::string("Unable to end redef mode to define dimension, dim size = ") +
+              std::to_string(static_cast<long long int>(dimsz)) + std::string(", ncid = ") + std::to_string(ncid_));
+    }
   }
   else{
     dimid = dim_id_iter->second;
