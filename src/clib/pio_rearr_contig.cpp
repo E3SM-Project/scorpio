@@ -10,6 +10,7 @@
 #include "pio_rearr_contig.hpp"
 #include "pio_rearr_utils.hpp"
 #include "spio_dbg_utils.hpp"
+#include "spio_gptl_utils.hpp"
 
 namespace SPIO_Util{
   template<typename CIter, typename Iter>
@@ -53,6 +54,8 @@ int SPIO::DataRearr::Contig_rearr::init(int pio_type,
       const int *gdimlen, int ndims, io_desc_t *iodesc)
 {
   int ret = PIO_NOERR;
+  SPIO_Util::GPTL_Util::GPTL_wrapper contig_init_timer("PIO:Contig_rearr::init");
+
   assert(ios_);
   assert(ndims > 0);
 
@@ -324,6 +327,8 @@ int SPIO::DataRearr::Contig_rearr::aggregate_data(const void *sbuf, std::size_t 
       void *abuf, std::size_t abuf_sz, int nvars)
 {
   int ret = PIO_NOERR;
+  SPIO_Util::GPTL_Util::GPTL_wrapper contig_agg_timer("PIO:Contig_rearr::aggregate_data");
+
   assert(is_init_);
 
   /* Gather data from compute processes in this aggregating comm to the aggregating/IO process */
@@ -409,6 +414,8 @@ int SPIO::DataRearr::Contig_rearr::disperse_data(const void *abuf, std::size_t a
       void *rbuf, std::size_t rbuf_sz, int nvars)
 {
   int ret = PIO_NOERR;
+  SPIO_Util::GPTL_Util::GPTL_wrapper contig_dis_timer("PIO:Contig_rearr::disperse_data");
+
   assert(is_init_);
 
   /* When scattering/dispersing data from aggregate process to compute processes,
@@ -608,6 +615,7 @@ int SPIO::DataRearr::Contig_rearr::aggregate_compmap(const PIO_Offset *lcompmap,
                                                       std::vector<int> &gcompmap_displs)
 {
   int ret = PIO_NOERR;
+  SPIO_Util::GPTL_Util::GPTL_wrapper ftimer("PIO:Contig_rearr::aggregate_compmap");
   assert(ios_ && (agg_comm_ != MPI_COMM_NULL));
 
   /* Get the compmap sizes from all procs in this aggregation comm */
@@ -728,6 +736,7 @@ int SPIO::DataRearr::Contig_rearr::setup_data_agg_info(const PIO_Offset *lcompma
                                                         const std::vector<int> &to_proc)
 {
   int ret = PIO_NOERR;
+  SPIO_Util::GPTL_Util::GPTL_wrapper ftimer("PIO:Contig_rearr::setup_data_agg_info");
 
   assert(ios_);
   /* Setup gather scatter info for sending/receiving data from compute procs to
@@ -763,6 +772,7 @@ int SPIO::DataRearr::Contig_rearr::setup_data_agg_info(const PIO_Offset *lcompma
   std::vector<std::size_t> gcompmap_idx(gcompmap.size());
   std::iota(gcompmap_idx.begin(), gcompmap_idx.end(), 0);
 
+  GPTLstart("PIO:Contig_rearr::setup_data_agg_info::sort");
   std::sort(gcompmap_idx.begin(), gcompmap_idx.end(),
             [&gcompmap,&to_proc](PIO_Offset a, PIO_Offset b){
               if(to_proc[a] == to_proc[b]){
@@ -774,6 +784,7 @@ int SPIO::DataRearr::Contig_rearr::setup_data_agg_info(const PIO_Offset *lcompma
                 return to_proc[a] < to_proc[b];
               }
             });
+  GPTLstop("PIO:Contig_rearr::setup_data_agg_info::sort");
 
   /* Aggregate compmap sorter can be used to sort any user data based on gcompmap */
   agg_compmap_sorter_.resize(gcompmap.size());
@@ -832,6 +843,7 @@ int SPIO::DataRearr::Contig_rearr::init_agg_recv_types(const std::vector<int> &g
       const std::vector<std::size_t> &compmap_sorter)
 {
   int ret = PIO_NOERR;
+  SPIO_Util::GPTL_Util::GPTL_wrapper ftimer("PIO:Contig_rearr::init_agg_recv_types");
   /* The compmap_sorter has the indices of the sorted data (based on to_proc & compmap)
    * So look for contiguous ranges in compmap_sorter array
    * We need to receive data in the aggregating process such that all data being sent
@@ -1009,6 +1021,7 @@ int SPIO::DataRearr::Contig_rearr::setup_data_rearr_info(std::vector<PIO_Offset>
                                                           const int *gdimlen, int ndims)
 {
   int ret = PIO_NOERR;
+  SPIO_Util::GPTL_Util::GPTL_wrapper ftimer("PIO:Contig_rearr::setup_data_rearr_info");
   assert(ios_);
 
   if(!ios_->ioproc){
@@ -1140,6 +1153,7 @@ int SPIO::DataRearr::Contig_rearr::init_rearr_send_types(
       const std::vector<PIO_Offset> &displs_counts_sent)
 {
   int ret = PIO_NOERR;
+  SPIO_Util::GPTL_Util::GPTL_wrapper ftimer("PIO:Contig_rearr::init_rearr_send_types");
 
   assert(ios_ && ios_->ioproc);
   assert(rearr_comm_sz_ > 0);
@@ -1200,6 +1214,7 @@ int SPIO::DataRearr::Contig_rearr::init_rearr_recvd_types(
       const std::vector<PIO_Offset> &displs_counts_recvd)
 {
   int ret = PIO_NOERR;
+  SPIO_Util::GPTL_Util::GPTL_wrapper ftimer("PIO:Contig_rearr::init_rearr_recvd_types");
 
   assert(ios_ && ios_->ioproc);
   assert(rearr_comm_sz_ > 0);
@@ -1268,6 +1283,8 @@ int SPIO::DataRearr::Contig_rearr::rearrange_data(const void *sbuf, std::size_t 
       void *rbuf, std::size_t rbuf_sz, int nvars, bool agg2rearr)
 {
   int ret = PIO_NOERR;
+  SPIO_Util::GPTL_Util::GPTL_wrapper contig_rearr_timer("PIO:Contig_rearr::rearrange_data");
+
   assert(is_init_);
 
   assert(ios_);
