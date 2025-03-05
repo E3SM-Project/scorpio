@@ -4,6 +4,7 @@
 #endif
 #include <iostream>
 #include <regex>
+#include "pio_internal.h"
 #include "adios2pio-nm-lib.h"
 #include "argparser.h"
 
