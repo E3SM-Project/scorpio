@@ -18,6 +18,7 @@
 namespace SPIO_Util{
   namespace Tracer{
 
+    /* This class stores the meta-data for the API traces */
     class Tracer_mdata{
       public:
         void add_iosysid(int iosysid){ if(iosysid > 0) { iosysid_infos_[iosysid].iosysid_ = iosysid; } }
@@ -50,6 +51,7 @@ namespace SPIO_Util{
         }
       private:
         /* FIXME: Decide if we need to leave the internal classes with all public member variables */
+        /* This class stores the file meta-data */
         class Ncid_info{
           public:
             Ncid_info():ncid_(0){}
@@ -68,6 +70,7 @@ namespace SPIO_Util{
             std::map<int, bool> varids_;
         };
 
+        /* This class stores the I/O system meta-data, including the meta-data on the files opened/created */
         class Iosysid_info{
           public:
             Iosysid_info():iosysid_(INVALID_IOSYSID), nioids_(0){}
