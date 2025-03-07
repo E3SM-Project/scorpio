@@ -287,15 +287,12 @@ SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace
      * that does not have rank 0 of the MPI_COMM_WORLD/PIO_DEFAULT_COMM */
     fstr->open((rank == MPI_ROOT_PROC) ? log_fname.c_str() : DEV_NULL.c_str(), std::ofstream::out | std::ofstream::trunc);
 
-    // FIXME: use insert() and get the iterator rather than insert and then find
     SPIO_Util::Logger::MPI_logger<std::ofstream> lstr(comm, fstr);
     lstr.log(get_trace_log_header(iosysid, mpi_wrank));
-    SPIO_Util::Tracer::GVars::trace_loggers_[std::to_string(iosysid)] = lstr;
-    iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(std::to_string(iosysid));
-    //std::pair<std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator, bool> res = SPIO_Util::Tracer::GVars::trace_loggers_.insert({std::to_string(comm), lstr});
-    //SPIO_Util::Tracer::GVars::trace_loggers_.insert({std::to_string(comm), lstr});
-    //assert(res.second);
-    //iter = res.first;
+
+    std::pair<std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator, bool> res = SPIO_Util::Tracer::GVars::trace_loggers_.insert({std::to_string(iosysid), lstr});
+    assert(res.second);
+    iter = res.first;
   }
   return iter->second;
 }
