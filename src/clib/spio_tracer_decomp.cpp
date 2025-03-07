@@ -18,7 +18,6 @@
 #include "mpi.h"
 #include "pnetcdf.h"
 #include "spio_tracer.hpp"
-//#include "spio_logger.hpp"
 #include "spio_tracer_mdata.hpp"
 #include "spio_tracer_decomp.hpp"
 

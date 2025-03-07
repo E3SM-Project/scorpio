@@ -19,6 +19,7 @@ namespace SPIO_Util{
   namespace Tracer{
     namespace Decomp_Utils{
 
+      /* A I/O decomp logger : Stores the I/O decomposition in NetCDF output files */
       class Decomp_nc_logger{
         public:
           Decomp_nc_logger() : iosysid_(INVALID_IOSYSID), comm_(MPI_COMM_NULL), comm_rank_(INVALID_MPI_RANK), comm_sz_(INVALID_MPI_SIZE), ncid_(INVALID_NCID) {}
