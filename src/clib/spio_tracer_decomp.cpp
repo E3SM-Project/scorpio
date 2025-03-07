@@ -16,7 +16,9 @@
 #include "pio.h"
 #include "pio_internal.h"
 #include "mpi.h"
-#include "pnetcdf.h"
+#if PIO_USE_PNETCDF
+  #include "pnetcdf.h"
+#endif
 #include "spio_tracer.hpp"
 #include "spio_tracer_mdata.hpp"
 #include "spio_tracer_decomp.hpp"
@@ -118,6 +120,7 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::init(void )
 
   fname_ = get_trace_decomp_tmp_fname(iosysid_, comm_, comm_rank_, wrank);
 
+#if PIO_USE_PNETCDF
   int flags = NC_CLOBBER | NC_64BIT_DATA;
   ret = ncmpi_create(comm_, fname_.c_str(), flags, info, &ncid_);
   if(ret != NC_NOERR){
@@ -168,6 +171,7 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::init(void )
     throw std::runtime_error(std::string("Ending NetCDF define mode in I/O decomposition log file, file = ") + fname_ +
             std::string(", failed. iosysid = ") + std::to_string(iosysid_));
   }
+#endif // PIO_USE_PNETCDF
 
   ret = MPI_Info_free(&info);
   assert(ret == MPI_SUCCESS);
@@ -245,6 +249,7 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::log_decomp(int ioid, con
   std::string decomp_vname = std::string("decomp_") + std::to_string(ioid);
   int decomp_varid = INVALID_NCID;
 
+#if PIO_USE_PNETCDF
   ret = ncmpi_redef(ncid_);
   if(ret != NC_NOERR){
     throw std::runtime_error(std::string("Unable to enter redef mode to write decompositing map, ncid = ") + std::to_string(ncid_) +
@@ -278,10 +283,12 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::log_decomp(int ioid, con
     throw std::runtime_error(std::string("Error while waiting after writing the decomposition map, ncid = ") + std::to_string(ncid_) +
             std::string(", vname = ") + decomp_vname);
   }
+#endif // PIO_USE_PNETCDF
 }
 
 void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::finalize(void )
 {
+#if PIO_USE_PNETCDF
   if(ncid_ != INVALID_NCID){
     int ret = MPI_SUCCESS;
     int dim_comm_sz_dimid = INVALID_NCID, dim_ndecompsx3_dimid = INVALID_NCID;
@@ -346,12 +353,14 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::finalize(void )
 
     ncid_ = INVALID_NCID;
   }
+#endif // PIO_USE_PNETCDF
 }
 
 int SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::get_dim_id(PIO_Offset dimsz)
 {
   int dimid = INVALID_NCID, ret = 0;
 
+#if PIO_USE_PNETCDF
   std::map<PIO_Offset, int>::iterator dim_id_iter = dim_sz_to_id_.find(dimsz);
   if(dim_id_iter == dim_sz_to_id_.end()){
     assert(ncid_ != INVALID_NCID);
@@ -382,6 +391,7 @@ int SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::get_dim_id(PIO_Offset dim
   else{
     dimid = dim_id_iter->second;
   }
+#endif // PIO_USE_PNETCDF
   return dimid;
 }
 
