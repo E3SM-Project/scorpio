@@ -11,6 +11,7 @@ source using compiler settings used for building the SCORPIO library
 
 import os, sys, logging
 import re, subprocess
+import shlex
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +73,12 @@ class SPIOReplayToolBuilder:
         os.chdir(self.spio_replay_tool_build_dir)
         # Configure replay tool
         os.environ["SCORPIO_DIR"] = self.spio_install_dir
-        cmake_cmd = "cmake -C " + scorpio_build_cache_file +\
-                    " -S " + self.spio_replay_tool_src_dir + " -B " + self.spio_replay_tool_build_dir
+        cmake_cmd = ["cmake", "-C", shlex.quote(scorpio_build_cache_file),
+                    "-S", shlex.quote(self.spio_replay_tool_src_dir), "-B", shlex.quote(self.spio_replay_tool_build_dir)]
 
         logger.info("CONFIGURE: Running cmake :\"{}\"".format(cmake_cmd))
         with open(self.spio_replay_tool_build_dir + "/configure_replay_tool.log", "w") as fh:
-            cmake_ret = subprocess.run(cmake_cmd.split(), stdout=fh, stderr=fh)
+            cmake_ret = subprocess.run(cmake_cmd, stdout=fh, stderr=fh)
             if cmake_ret.returncode == 0:
                 logger.info("Configure SUCCESS...")
                 logger.info(banner)
@@ -94,9 +95,9 @@ class SPIOReplayToolBuilder:
         # Build replay tool
         if cmake_ret.returncode == 0:
             with open(self.spio_replay_tool_build_dir + "/make_replay_tool.log", "w") as fh:
-                make_cmd = "make spio_replay.exe"
+                make_cmd = ["make", "spio_replay.exe"]
                 logger.info("BUILD: Running make :\"{}\"".format(make_cmd))
-                make_ret = subprocess.run(make_cmd.split(), stdout=fh, stderr=fh)
+                make_ret = subprocess.run(make_cmd, stdout=fh, stderr=fh)
                 if make_ret.returncode == 0:
                     logger.info("Build SUCCESS...")
                     logger.info(banner)
