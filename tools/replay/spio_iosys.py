@@ -98,7 +98,7 @@ def iosys_run_to_finalize_cb(spio_iosys, clock_tic):
     spio_iosys.iosys_src_file.write(spio_iosys.log_to_src_transformer.transform(spio_iosys.log_to_src_transformer.get_iosys_run_method_with_phase()))
 
 def iosys_ready_to_finalize_cb(spio_iosys, clock_tic):
-    iosys_run_to_finalize_cb(spio_iosys)
+    iosys_run_to_finalize_cb(spio_iosys, clock_tic)
 
 class SPIOIOSysExecEngine:
     """
