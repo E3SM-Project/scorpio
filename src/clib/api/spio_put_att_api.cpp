@@ -39,7 +39,7 @@ int PIOc_put_att_schar(int ncid, int varid, const char *name, nc_type xtype, PIO
     add_arg("varid", varid).add_arg("*name", name).
     add_arg("xtype", static_cast<long long int>(xtype)).
     add_arg("len", static_cast<long long int>(len)).
-    add_arg("*op", op).flush();
+    add_arg("*op", op, len).flush();
 #endif
   return PIOc_put_att_schar_impl(ncid, varid, name, xtype, len, op);
 }
@@ -123,7 +123,7 @@ int PIOc_put_att_uchar(int ncid, int varid, const char *name, nc_type xtype, PIO
     add_arg("varid", varid).add_arg("*name", name).
     add_arg("xtype", static_cast<long long int>(xtype)).
     add_arg("len", static_cast<long long int>(len)).
-    add_arg("*op", op).flush();
+    add_arg("*op", op, len).flush();
 #endif
   return PIOc_put_att_uchar_impl(ncid, varid, name, xtype, len, op);
 }
