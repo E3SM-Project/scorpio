@@ -68,6 +68,11 @@ if (PIO_ENABLE_TIMING)
       PUBLIC ${GPTL_C_INCLUDE_DIRS})
     target_link_libraries (pioc
       PUBLIC ${GPTL_C_LIBRARIES})
+
+    # GPTL expects HAVE_MPI, if MPI is available, when using GPTL header files
+    if (NOT PIO_USE_MPISERIAL)
+      target_compile_definitions (pioc PUBLIC HAVE_MPI)
+    endif ()
   else ()
     message (STATUS "Using internal GPTL C library for timing")
     target_include_directories (pioc
