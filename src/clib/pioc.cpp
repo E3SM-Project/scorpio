@@ -1671,9 +1671,13 @@ int PIOc_set_hint_impl(int iosysid, const char *hint, const char *hintval)
 
     /* Set the MPI hint. */
     if (ios->ioproc)
+#if PIO_USE_MPISERIAL
+        if ((mpierr = MPI_Info_set(ios->info, const_cast<char*>(hint), const_cast<char*>(hintval))))
+#else
         if ((mpierr = MPI_Info_set(ios->info, hint, hintval)))
+#endif
         {
-            LOG((1, "ERROR: Setting PIO hints failed. Settnig MPI hints using info object failed (mpierr = %d)", mpierr));
+            LOG((1, "ERROR: Setting PIO hints failed. Setting MPI hints using info object failed (mpierr = %d)", mpierr));
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
         }
@@ -1781,7 +1785,15 @@ int PIOc_finalize_impl(int iosysid)
 
     /* Free the MPI Info object. */
     if (ios->info != MPI_INFO_NULL)
+    {
+#if PIO_USE_MPISERIAL
+        /* MPI_Info_free() exists in the MPI serial library but is not publicly declared in mpi.h, so skip calling it. */
+        ios->info = MPI_INFO_NULL;
+#else
         MPI_Info_free(&ios->info);
+        ios->info = MPI_INFO_NULL;
+#endif
+    }
 
 #ifdef PIO_MICRO_TIMING
     ierr = mtimer_finalize();
@@ -2204,7 +2216,11 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
     int iomaster;
 
     /* Create a group for the IO component. */
+#if PIO_USE_MPISERIAL
+    if ((ret = MPI_Group_incl(world_group, num_io_procs, const_cast<int*>(my_io_proc_list), &io_group)))
+#else
     if ((ret = MPI_Group_incl(world_group, num_io_procs, my_io_proc_list, &io_group)))
+#endif
     {
         LOG((1, "ERROR: PIO Init (async) failed. Creating MPI group for IO component failed"));
         GPTLstop("PIO:PIOc_init_async");
@@ -2290,8 +2306,13 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         my_iosys->info = MPI_INFO_NULL;
 
         /* Create a group for this component. */
+#if PIO_USE_MPISERIAL
+        if ((ret = MPI_Group_incl(world_group, num_procs_per_comp[cmp], const_cast<int*>(my_proc_list[cmp]),
+                                  &group[cmp])))
+#else
         if ((ret = MPI_Group_incl(world_group, num_procs_per_comp[cmp], my_proc_list[cmp],
                                   &group[cmp])))
+#endif
         {
             GPTLstop("PIO:PIOc_init_async");
             return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);

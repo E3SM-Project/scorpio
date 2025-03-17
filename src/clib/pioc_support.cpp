@@ -2875,7 +2875,11 @@ int PIOc_writemap_impl(const char *file, int ioid, int ndims, const int *gdims, 
         if ((mpierr = MPI_Recv(&i, 1, MPI_INT, 0, npes+myrank, comm, &status)))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
         LOG((2,"MPI_Recv got %d", i));
+#if PIO_USE_MPISERIAL
+        if ((mpierr = MPI_Send(const_cast<PIO_Offset*>(map), maplen, PIO_OFFSET, 0, myrank, comm)))
+#else
         if ((mpierr = MPI_Send(map, maplen, PIO_OFFSET, 0, myrank, comm)))
+#endif
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
         LOG((2,"MPI_Send map complete"));
     }

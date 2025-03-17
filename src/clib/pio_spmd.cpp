@@ -154,8 +154,13 @@ int pio_swapm(const void *sendbuf, const int *sendcounts, const int *sdispls, co
 
         /* Call the MPI alltoall without flow control. */
         LOG((3, "Calling MPI_Alltoallw without flow control."));
+#if PIO_USE_MPISERIAL
+        if ((mpierr = MPI_Alltoallw(const_cast<void*>(sendbuf), const_cast<int*>(sendcounts), const_cast<int*>(sdispls), sndtypes, recvbuf,
+                                    const_cast<int*>(recvcounts), const_cast<int*>(rdispls), rcvtypes, comm)))
+#else
         if ((mpierr = MPI_Alltoallw(sendbuf, sendcounts, sdispls, sndtypes, recvbuf,
                                     recvcounts, rdispls, rcvtypes, comm)))
+#endif
         {
             GPTLstop("PIO:pio_swapm");
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
@@ -560,8 +565,13 @@ int pio_fc_gatherv(const void *sendbuf, int sendcnt, MPI_Datatype sendtype,
             /* copy local data */
             if ((mpierr = MPI_Type_size(sendtype, &dsize)))
                 return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
+#if PIO_USE_MPISERIAL
+            if ((mpierr = MPI_Sendrecv(const_cast<void*>(sendbuf), sendcnt, sendtype, mytask, 102, recvbuf, recvcnts[mytask],
+                                       recvtype, mytask, 102, comm, &status)))
+#else
             if ((mpierr = MPI_Sendrecv(sendbuf, sendcnt, sendtype, mytask, 102, recvbuf, recvcnts[mytask],
                                        recvtype, mytask, 102, comm, &status)))
+#endif
                 return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
 
             count = min(count, preposts);
@@ -575,15 +585,24 @@ int pio_fc_gatherv(const void *sendbuf, int sendcnt, MPI_Datatype sendtype,
             {
                 if ((mpierr = MPI_Recv(&hs, 1, MPI_INT, root, mtag, comm, &status)))
                     return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
+#if PIO_USE_MPISERIAL
+                if ((mpierr = MPI_Send(const_cast<void*>(sendbuf), sendcnt, sendtype, root, mtag, comm)))
+#else
                 if ((mpierr = MPI_Send(sendbuf, sendcnt, sendtype, root, mtag, comm)))
+#endif
                     return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
             }
         }
     }
     else
     {
+#if PIO_USE_MPISERIAL
+        if ((mpierr = MPI_Gatherv(const_cast<void*>(sendbuf), sendcnt, sendtype, recvbuf, const_cast<int*>(recvcnts),
+                                  const_cast<int*>(displs), recvtype, root, comm)))
+#else
         if ((mpierr = MPI_Gatherv(sendbuf, sendcnt, sendtype, recvbuf, recvcnts,
                                   displs, recvtype, root, comm)))
+#endif
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
     }
 
