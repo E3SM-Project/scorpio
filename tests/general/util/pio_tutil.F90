@@ -321,8 +321,14 @@ CONTAINS
     num_iotypes = 0
     ! First find the number of io types
 #ifdef _NETCDF4
+#ifdef _SPIO_HAS_NETCDF4_NCZARR
+      ! netcdf, netcdf4p, netcdf4p_nczarr, netcdf4c
+      num_iotypes = num_iotypes + 4
+#else
       ! netcdf, netcdf4p, netcdf4c
       num_iotypes = num_iotypes + 3
+#endif
+
 #elif _NETCDF
       ! netcdf
       num_iotypes = num_iotypes + 1
@@ -387,6 +393,11 @@ CONTAINS
       iotypes(i) = PIO_iotype_netcdf4p
       iotype_descs(i) = "NETCDF4P"
       i = i + 1
+#ifdef _SPIO_HAS_NETCDF4_NCZARR
+      iotypes(i) = PIO_iotype_netcdf4p_nczarr
+      iotype_descs(i) = "NETCDF4P_NCZARR"
+      i = i + 1
+#endif
 #elif _NETCDF
       ! netcdf
       iotypes(i) = PIO_iotype_netcdf
@@ -412,8 +423,13 @@ CONTAINS
     num_iotypes = 0
     ! First find the number of io types
 #ifdef _NETCDF4
+#ifdef _SPIO_HAS_NETCDF4_NCZARR
+      ! netcdf4p, netcdf4c, netcdf4p_nczarr
+      num_iotypes = num_iotypes + 3
+#else
       ! netcdf4p, netcdf4c
       num_iotypes = num_iotypes + 2
+#endif
 #endif
 
     ALLOCATE(iotypes(num_iotypes))
@@ -428,6 +444,11 @@ CONTAINS
       iotypes(i) = PIO_iotype_netcdf4p
       iotype_descs(i) = "NETCDF4P"
       i = i + 1
+#ifdef _SPIO_HAS_NETCDF4_NCZARR
+      iotypes(i) = PIO_iotype_netcdf4p_nczarr
+      iotype_descs(i) = "NETCDF4P_NCZARR"
+      i = i + 1
+#endif
 #endif
   END SUBROUTINE
 
@@ -454,8 +475,8 @@ CONTAINS
       num_iotypes = num_iotypes + 1
 #endif
 #ifndef _NETCDF4
-      ! netcdf4p, netcdf4c
-      num_iotypes = num_iotypes + 2
+      ! netcdf4p, netcdf4c, netcdf4p_nczarr
+      num_iotypes = num_iotypes + 3
 #endif
 #ifndef _PNETCDF
       ! pnetcdf
@@ -495,6 +516,9 @@ CONTAINS
       i = i + 1
       iotypes(i) = PIO_iotype_netcdf4p
       iotype_descs(i) = "NETCDF4P"
+      i = i + 1
+      iotypes(i) = PIO_iotype_netcdf4p_nczarr
+      iotype_descs(i) = "NETCDF4P_NCZARR"
       i = i + 1
 #endif
 #ifndef _PNETCDF
@@ -547,8 +571,13 @@ CONTAINS
     ! First find the number of io types
     num_iotypes = 0
 #ifdef _NETCDF4
+#ifdef _SPIO_HAS_NETCDF4_NCZARR
+      ! netcdf, netcdf4p, netcdf4c, netcdf4p_nczarr
+      num_iotypes = num_iotypes + 4
+#else
       ! netcdf, netcdf4p, netcdf4c
       num_iotypes = num_iotypes + 3
+#endif
 #elif _NETCDF
       ! netcdf
       num_iotypes = num_iotypes + 1
@@ -610,6 +639,11 @@ CONTAINS
       iotypes(i) = PIO_iotype_netcdf4p
       iotype_descs(i) = "NETCDF4P"
       i = i + 1
+#ifdef _SPIO_HAS_NETCDF4_NCZARR
+      iotypes(i) = PIO_iotype_netcdf4p_nczarr
+      iotype_descs(i) = "NETCDF4P_NCZARR"
+      i = i + 1
+#endif
 #elif _NETCDF
       ! netcdf
       iotypes(i) = PIO_iotype_netcdf
@@ -641,8 +675,8 @@ CONTAINS
       num_iotypes = num_iotypes + 1
 #endif
 #ifndef _NETCDF4
-      ! netcdf4p, netcdf4c
-      num_iotypes = num_iotypes + 2
+      ! netcdf4p, netcdf4c, netcdf4p_nczarr
+      num_iotypes = num_iotypes + 3
 #endif
 #ifndef _PNETCDF
       ! pnetcdf
@@ -705,6 +739,9 @@ CONTAINS
       i = i + 1
       iotypes(i) = PIO_iotype_netcdf4p
       iotype_descs(i) = "NETCDF4P"
+      i = i + 1
+      iotypes(i) = PIO_iotype_netcdf4p_nczarr
+      iotype_descs(i) = "NETCDF4P_NCZARR"
       i = i + 1
 #endif
 #ifndef _PNETCDF
