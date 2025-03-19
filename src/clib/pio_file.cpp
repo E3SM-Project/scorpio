@@ -92,6 +92,7 @@ int PIOc_open_impl(int iosysid, const char *path, int mode, int *ncidp)
     if (mode & NC_NETCDF4)
     {
 #ifdef _NETCDF4
+        /* FIXME: Add logic to find NCZARR type */
         if (mode & NC_MPIIO || mode & NC_MPIPOSIX)
             iotype = PIO_IOTYPE_NETCDF4P;
         else
@@ -121,8 +122,8 @@ int PIOc_open_impl(int iosysid, const char *path, int mode, int *ncidp)
  * @param ncidp A pointer that gets the ncid of the newly created
  * file.
  * @param iotype A pointer to a pio output format. Must be one of
- * PIO_IOTYPE_PNETCDF, PIO_IOTYPE_NETCDF, PIO_IOTYPE_NETCDF4C, or
- * PIO_IOTYPE_NETCDF4P.
+ * PIO_IOTYPE_PNETCDF, PIO_IOTYPE_NETCDF, PIO_IOTYPE_NETCDF4C,
+ * PIO_IOTYPE_NETCDF4P or PIO_IOTYPE_NETCDF4P_NCZARR.
  * @param filename The filename to create.
  * @param mode The netcdf mode for the create operation.
  * @returns 0 for success, error code otherwise.
@@ -243,6 +244,7 @@ int PIOc_create_impl(int iosysid, const char *filename, int cmode, int *ncidp)
     if (cmode & NC_NETCDF4)
     {
 #ifdef _NETCDF4
+        /* FIXME: Add logic to find NCZARR */
         if (cmode & NC_MPIIO || cmode & NC_MPIPOSIX)
             iotype = PIO_IOTYPE_NETCDF4P;
         else
@@ -385,6 +387,7 @@ static int sync_file(int ncid)
             {
 #ifdef _NETCDF4
             case PIO_IOTYPE_NETCDF4P:
+            case PIO_IOTYPE_NETCDF4P_NCZARR:
                 ierr = nc_sync(file->fh);
                 break;
             case PIO_IOTYPE_NETCDF4C:
@@ -994,6 +997,7 @@ int PIOc_closefile_impl(int ncid)
         {
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_close(file->fh);
             break;
         case PIO_IOTYPE_NETCDF4C:
