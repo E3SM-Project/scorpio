@@ -5,20 +5,14 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdarg.h>
-#if PIO_ENABLE_LOGGING
 #include <unistd.h>
-#endif /* PIO_ENABLE_LOGGING */
 #include <pio.h>
 #include <pio_internal.h>
 
 #include <execinfo.h>
 
-#ifdef _ADIOS2
 #include <dirent.h>
-#endif
-#ifdef _HDF5
 #include <sys/stat.h>
-#endif
 #include <string>
 #include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
@@ -69,7 +63,6 @@ extern int default_error_handler;
 
 extern bool fortran_order;
 
-#ifdef _ADIOS2
 /**
  * Utility function to remove a directory and all its contents.
  */
@@ -127,6 +120,7 @@ int spio_remove_directory(const char *path)
     return r;
 }
 
+#ifdef _ADIOS2
 static int flush_adios2_tracking_data(file_desc_t *file)
 {
     if (file->adios_io_process != 1)

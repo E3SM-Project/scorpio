@@ -337,10 +337,8 @@ extern "C" {
     /* Handle end and re-defs. */
     int spio_change_def(int ncid, int is_enddef);
 
-#ifdef _ADIOS2
     /* Remove a directory in the filesystem */
     int spio_remove_directory(const char *path);
-#endif
 
     /* Initialize and finalize logging. */
     void pio_init_logging(void);
