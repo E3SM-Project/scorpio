@@ -2703,6 +2703,10 @@ enum PIO_IOTYPE GetIOType_nm(const string &t)
     {
         iotype = PIO_IOTYPE_NETCDF4P;
     }
+    else if (t == "nczarr" || t == "NCZARR" || t == "5")
+    {
+        iotype = PIO_IOTYPE_NETCDF4P_NCZARR;
+    }
     else
     {
         throw invalid_argument("Invalid conversion type given: " + t + "\n");
