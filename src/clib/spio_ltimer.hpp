@@ -11,11 +11,17 @@ namespace PIO_Util{
         void start(void );
         /* Stop the timer */
         void stop(void );
+        /* Get latest start time */
+        inline double get_start_time(void ) const { return start_; }
+        /* Get latest stop time */
+        inline double get_stop_time(void ) const { return stop_; }
         /* Get elapsed wallclock time */
         double get_wtime(void ) const;
       private:
         /* Start time for the most recent start() call */
         double start_;
+        /* Stop time for the most recent stop() call */
+        double stop_;
         /* Elapsed wallclock time, recorded on stop() */
         double wtime_;
         /* The current recursive depth/level to keep track of
