@@ -5,20 +5,16 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdarg.h>
-#if PIO_ENABLE_LOGGING
-#include <unistd.h>
-#endif /* PIO_ENABLE_LOGGING */
 #include <pio.h>
 #include <pio_internal.h>
 
 #include <execinfo.h>
 
-#ifdef _ADIOS2
 #include <dirent.h>
-#endif
-#ifdef _HDF5
 #include <sys/stat.h>
-#endif
+#include <unistd.h>
+#include <stdlib.h>
+#include <libgen.h>
 #include <string>
 #include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
@@ -69,7 +65,37 @@ extern int default_error_handler;
 
 extern bool fortran_order;
 
-#ifdef _ADIOS2
+static std::string spio_get_nczarr_fname(const char *fname)
+{
+  std::string nczarr_fname;
+  const std::string nczarr_fname_prefix = "file://";
+  const std::string nczarr_fname_suffix = "#mode=nczarr,file";
+  const std::string fname_sep = "/";
+
+  if(!fname){
+    return nczarr_fname;
+  }
+
+  char dname[PIO_MAX_NAME + 1];
+  char real_dname[PIO_MAX_NAME + 1];
+  char bname[PIO_MAX_NAME + 1];
+
+  strncpy(dname, fname, PIO_MAX_NAME); dname[PIO_MAX_NAME] = '\0';
+  strncpy(bname, fname, PIO_MAX_NAME); bname[PIO_MAX_NAME] = '\0';
+
+  char *dname_ptr = dirname(dname);
+  char *bname_ptr = basename(bname);
+
+  char *real_dname_ptr = realpath(dname_ptr, real_dname);
+  if(real_dname_ptr){
+    nczarr_fname =  nczarr_fname_prefix +
+                    real_dname_ptr + fname_sep + bname_ptr +
+                    nczarr_fname_suffix;
+  }
+
+  return nczarr_fname;
+}
+
 /**
  * Utility function to remove a directory and all its contents.
  */
@@ -127,6 +153,7 @@ int spio_remove_directory(const char *path)
     return r;
 }
 
+#ifdef _ADIOS2
 static int flush_adios2_tracking_data(file_desc_t *file)
 {
     if (file->adios_io_process != 1)
@@ -2921,6 +2948,13 @@ int PIO_get_avail_iotypes(char *buf, size_t sz)
               pio_iotype_to_string(PIO_IOTYPE_NETCDF4P), PIO_IOTYPE_NETCDF4P);
     sz = max_sz - strlen(buf);
     cbuf = buf + strlen(buf);
+#ifdef PIO_USE_NETCDF4_NCZARR
+    assert(sz > 0);
+    snprintf(cbuf, sz, ", %s (%d)",
+              pio_iotype_to_string(PIO_IOTYPE_NETCDF4P_NCZARR), PIO_IOTYPE_NETCDF4P_NCZARR);
+    sz = max_sz - strlen(buf);
+    cbuf = buf + strlen(buf);
+#endif
 #endif /* _NETCDF4 */
 
 #ifdef _PNETCDF
@@ -2952,8 +2986,8 @@ int PIO_get_avail_iotypes(char *buf, size_t sz)
  * @param ncidp A pointer that gets the ncid of the newly created
  * file.
  * @param iotype A pointer to a pio output format. Must be one of
- * PIO_IOTYPE_PNETCDF, PIO_IOTYPE_NETCDF, PIO_IOTYPE_NETCDF4C, or
- * PIO_IOTYPE_NETCDF4P.
+ * PIO_IOTYPE_PNETCDF, PIO_IOTYPE_NETCDF, PIO_IOTYPE_NETCDF4C,
+ * PIO_IOTYPE_NETCDF4P or PIO_IOTYPE_NETCDF4P_NCZARR.
  * @param filename The filename to create.
  * @param mode The netcdf mode for the create operation.
  * @returns 0 for success, error code otherwise.
@@ -3064,7 +3098,8 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 
     /* Set to true if this task should participate in IO (only true for
      * one task with netcdf serial files. */
-    if (file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_PNETCDF ||
+    if (file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR ||
+        file->iotype == PIO_IOTYPE_PNETCDF ||
         ios->io_rank == 0)
         file->do_io = 1;
 
@@ -3444,6 +3479,24 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                  ios->io_comm, file->mode, file->fh));
             ierr = nc_create_par(filename, file->mode, ios->io_comm, ios->info, &file->fh);
             LOG((2, "nc_create_par returned %d file->fh = %d", ierr, file->fh));
+            break;
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
+            file->mode = file->mode |  NC_NETCDF4;
+            LOG((2, "Calling nc_create_par (nczarr) io_comm = %d mode = %d fh = %d",
+                 ios->io_comm, file->mode, file->fh));
+            ierr = PIO_ENOTBUILT;
+#if PIO_USE_NETCDF4_NCZARR
+            {
+              std::string filename_nczarr = spio_get_nczarr_fname(filename);
+              if(!filename_nczarr.empty()){
+                ierr = nc_create_par(filename_nczarr.c_str(), file->mode,
+                                      ios->io_comm, ios->info, &file->fh);
+              }
+            }
+            LOG((2, "nc_create_par returned %d file->fh = %d", ierr, file->fh));
+#else
+            LOG((2, "nc_create_par returned %d, NCZarr support not built/enabled", ierr));
+#endif
             break;
         case PIO_IOTYPE_NETCDF4C:
             file->mode = file->mode | NC_NETCDF4;
@@ -4883,7 +4936,8 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 
     /* Set to true if this task should participate in IO (only true
      * for one task with netcdf serial files. */
-    if (file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_PNETCDF ||
+    if (file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR ||
+        file->iotype == PIO_IOTYPE_PNETCDF ||
         ios->io_rank == 0)
         file->do_io = 1;
 
@@ -5187,6 +5241,26 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #endif
             break;
 
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
+            file->mode = file->mode |  NC_NETCDF4;
+            LOG((2, "Calling nc_open_par (nczarr) io_comm = %d mode = %d fh = %d",
+                 ios->io_comm, file->mode, file->fh));
+            ierr = PIO_ENOTBUILT;
+#ifndef _MPISERIAL
+#if PIO_USE_NETCDF4_NCZARR
+            {
+              std::string filename_nczarr = spio_get_nczarr_fname(filename);
+              if(!filename_nczarr.empty()){
+                ierr = nc_open_par(filename_nczarr.c_str(), file->mode,
+                                      ios->io_comm, ios->info, &file->fh);
+              }
+            }
+            LOG((2, "nc_open_par returned %d file->fh = %d", ierr, file->fh));
+#else
+            LOG((2, "nc_open_par returned %d, NCZarr support not built/enabled", ierr));
+#endif
+#endif
+            break;
         case PIO_IOTYPE_NETCDF4C:
             if (ios->io_rank == 0)
             {
@@ -5731,6 +5805,10 @@ int iotype_is_valid(int iotype)
 #ifdef _NETCDF4
     if (iotype == PIO_IOTYPE_NETCDF4C || iotype == PIO_IOTYPE_NETCDF4P)
         ret++;
+#ifdef PIO_USE_NETCDF4_NCZARR
+    if (iotype == PIO_IOTYPE_NETCDF4P_NCZARR)
+        ret++;
+#endif
 #endif /* _NETCDF4 */
 
     /* Some builds include pnetcdf. */
