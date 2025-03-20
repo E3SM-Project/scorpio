@@ -32,7 +32,7 @@
 #define DIM_TIME_SZ 1
 #define DIM_LEV_SZ 5
 #define DIM_NCOLS_SZ_PER_PROC 10
-#define FILE_PATH_MAX_SZ 1024
+#define FILE_PATH_MAX_SZ PATH_MAX+1
 
 #if PIO_USE_NETCDF4
 
