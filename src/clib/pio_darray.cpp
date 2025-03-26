@@ -321,7 +321,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
 
   /* Move data from compute to IO tasks. */
   if(iodesc->rearranger == PIO_REARR_CONTIG){
-    ierr = iodesc->rearr->rearrange_comp2io(array, arraylen, mv_iobuf, rlen * iodesc->mpitype_size, nvars);
+    ierr = iodesc->rearr->rearrange_comp2io(array, arraylen * nvars * iodesc->mpitype_size, mv_iobuf, rlen * iodesc->mpitype_size, nvars);
   }
   else{
     ierr = rearrange_comp2io(ios, iodesc, file, array, mv_iobuf, nvars);
@@ -3686,7 +3686,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 #endif
   /* Rearrange the data. */
   if(iodesc->rearranger == PIO_REARR_CONTIG){
-    ierr = iodesc->rearr->rearrange_io2comp(iobuf, rlen, array, iodesc->ndof * iodesc->mpitype_size, 1);
+    ierr = iodesc->rearr->rearrange_io2comp(iobuf, rlen * iodesc->mpitype_size, array, iodesc->ndof * iodesc->mpitype_size, 1);
   }
   else{
     ierr = rearrange_io2comp(ios, iodesc, iobuf, array);
