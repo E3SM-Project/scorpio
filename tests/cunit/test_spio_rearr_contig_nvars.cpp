@@ -152,7 +152,7 @@ int test_c2i_block_data_rearr_nvars(MPI_Comm comm, int wrank, int wsz, int nvars
       LOG_RANK0(wrank, "Initializing contig rearranger failed");
       return PIO_EINTERNAL;
     }
-    ret = rearr.rearrange_comp2io(sdata.data(), compmap.size(),
+    ret = rearr.rearrange_comp2io(sdata.data(), sdata.size() * sizeof(double),
             rdata.data(), rdata.size() * sizeof(double), nvars);
     if(ret != PIO_NOERR){
       LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
@@ -223,7 +223,7 @@ int test_block_data_rearr_nvars(MPI_Comm comm, int wrank, int wsz, int nvars)
       LOG_RANK0(wrank, "Initializing contig rearranger failed");
       return PIO_EINTERNAL;
     }
-    ret = rearr.rearrange_comp2io(sdata.data(), compmap.size(),
+    ret = rearr.rearrange_comp2io(sdata.data(), sdata.size() * sizeof(double),
             rdata.data(), rdata.size() * sizeof(double), nvars);
     if(ret != PIO_NOERR){
       LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
@@ -241,8 +241,8 @@ int test_block_data_rearr_nvars(MPI_Comm comm, int wrank, int wsz, int nvars)
     std::copy(sdata.begin(), sdata.end(), exp_data.begin());
     std::fill(sdata.begin(), sdata.end(), PIO_FILL_DOUBLE);
 
-    ret = rearr.rearrange_io2comp(rdata.data(), compmap.size(),
-            sdata.data(), compmap.size() * sizeof(double), nvars);
+    ret = rearr.rearrange_io2comp(rdata.data(), rdata.size() * sizeof(double),
+            sdata.data(), sdata.size() * sizeof(double), nvars);
     if(ret != PIO_NOERR){
       LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
       return PIO_EINTERNAL;
@@ -315,7 +315,7 @@ int test_rev_block_data_rearr_nvars(MPI_Comm comm, int wrank, int wsz, int nvars
       LOG_RANK0(wrank, "Initializing contig rearranger failed");
       return PIO_EINTERNAL;
     }
-    ret = rearr.rearrange_comp2io(sdata.data(), compmap.size(),
+    ret = rearr.rearrange_comp2io(sdata.data(), sdata.size() * sizeof(double),
             rdata.data(), rdata.size() * sizeof(double), nvars);
     if(ret != PIO_NOERR){
       LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
@@ -333,8 +333,8 @@ int test_rev_block_data_rearr_nvars(MPI_Comm comm, int wrank, int wsz, int nvars
     std::copy(sdata.begin(), sdata.end(), exp_data.begin());
     std::fill(sdata.begin(), sdata.end(), PIO_FILL_DOUBLE);
 
-    ret = rearr.rearrange_io2comp(rdata.data(), compmap.size(),
-            sdata.data(), compmap.size() * sizeof(double), nvars);
+    ret = rearr.rearrange_io2comp(rdata.data(), rdata.size() * sizeof(double),
+            sdata.data(), sdata.size() * sizeof(double), nvars);
     if(ret != PIO_NOERR){
       LOG_RANK0(wrank, "Rearranging data using contig rearranger failed (I/O to compute procs)");
       return PIO_EINTERNAL;
@@ -409,7 +409,7 @@ int test_mrange_block_data_rearr_nvars(MPI_Comm comm, int wrank, int wsz, int nv
       LOG_RANK0(wrank, "Initializing contig rearranger failed");
       return PIO_EINTERNAL;
     }
-    ret = rearr.rearrange_comp2io(sdata.data(), compmap.size(),
+    ret = rearr.rearrange_comp2io(sdata.data(), sdata.size() * sizeof(double),
             rdata.data(), rdata.size() * sizeof(double), nvars);
     if(ret != PIO_NOERR){
       LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
@@ -427,8 +427,8 @@ int test_mrange_block_data_rearr_nvars(MPI_Comm comm, int wrank, int wsz, int nv
     std::copy(sdata.begin(), sdata.end(), exp_data.begin());
     std::fill(sdata.begin(), sdata.end(), PIO_FILL_DOUBLE);
 
-    ret = rearr.rearrange_io2comp(rdata.data(), compmap.size(),
-            sdata.data(), compmap.size() * sizeof(double), nvars);
+    ret = rearr.rearrange_io2comp(rdata.data(), rdata.size() * sizeof(double),
+            sdata.data(), sdata.size() * sizeof(double), nvars);
     if(ret != PIO_NOERR){
       LOG_RANK0(wrank, "Rearranging data using contig rearranger failed (I/O to compute procs)");
       return PIO_EINTERNAL;
@@ -515,7 +515,7 @@ int test_mrange_oddz_data_rearr_nvars(MPI_Comm comm, int wrank, int wsz, int nva
       LOG_RANK0(wrank, "Initializing contig rearranger failed");
       return PIO_EINTERNAL;
     }
-    ret = rearr.rearrange_comp2io(sdata.data(), compmap.size(),
+    ret = rearr.rearrange_comp2io(sdata.data(), sdata.size() * sizeof(double),
             rdata.data(), rdata.size() * sizeof(double), nvars);
     if(ret != PIO_NOERR){
       LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
@@ -539,8 +539,8 @@ int test_mrange_oddz_data_rearr_nvars(MPI_Comm comm, int wrank, int wsz, int nva
     std::copy(sdata.begin(), sdata.end(), exp_data.begin());
     std::fill(sdata.begin(), sdata.end(), PIO_FILL_DOUBLE);
 
-    ret = rearr.rearrange_io2comp(rdata.data(), compmap.size(),
-            sdata.data(), compmap.size() * sizeof(double), nvars);
+    ret = rearr.rearrange_io2comp(rdata.data(), rdata.size() * sizeof(double),
+            sdata.data(), sdata.size() * sizeof(double), nvars);
     if(ret != PIO_NOERR){
       LOG_RANK0(wrank, "Rearranging data using contig rearranger failed (I/O to compute procs)");
       return PIO_EINTERNAL;
