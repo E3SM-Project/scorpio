@@ -2501,7 +2501,11 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
          *   Use NC_64BIT_DATA instead of PIO_64BIT_OFFSET. Some output files will have variables
          *   that require more than 4GB storage.
          */
-        ret = PIOc_createfile(iosysid, &ncid, &pio_iotype, outfilename.c_str(), PIO_64BIT_DATA | PIO_CLOBBER);
+        int cmode = PIO_CLOBBER;
+        if(pio_iotype != PIO_IOTYPE_NETCDF4P_NCZARR){
+          cmode |= PIO_64BIT_DATA;
+        }
+        ret = PIOc_createfile(iosysid, &ncid, &pio_iotype, outfilename.c_str(), cmode);
         if (ret != PIO_NOERR)
         {
             cerr << "rank " << mpirank << ":ERROR in PIOc_createfile(), code = " << ret
@@ -2702,6 +2706,10 @@ enum PIO_IOTYPE GetIOType_nm(const string &t)
     else if (t == "netcdf4p" || t == "NETCDF4P" || t == "4")
     {
         iotype = PIO_IOTYPE_NETCDF4P;
+    }
+    else if (t == "nczarr" || t == "NCZARR" || t == "5")
+    {
+        iotype = PIO_IOTYPE_NETCDF4P_NCZARR;
     }
     else
     {

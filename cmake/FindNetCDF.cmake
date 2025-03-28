@@ -37,7 +37,6 @@ find_valid_components (NetCDF)
 #==============================================================================
 # SEARCH FOR VALIDATED COMPONENTS
 foreach (NCDFcomp IN LISTS NetCDF_FIND_VALID_COMPONENTS)
-
     # If not found already, search...
     if (NOT NetCDF_${NCDFcomp}_FOUND)
 
@@ -147,6 +146,25 @@ foreach (NCDFcomp IN LISTS NetCDF_FIND_VALID_COMPONENTS)
                 CHECK_FUNCTION_EXISTS(nc__enddef NetCDF_C_NC__ENDDEF_EXISTS)
             endif ()
 
+            string(TOLOWER "${NCDFcomp}" ncdfcomp)
+            find_program(NetCDF_${NCDFcomp}_CONFIG_EXE
+                          NAMES n${ncdfcomp}-config
+                          HINTS ${NetCDF_${NCDFcomp}_INCLUDE_DIR}/../bin)
+
+            if (NetCDF_${NCDFcomp}_CONFIG_EXE)
+              message(STATUS "NetCDF_${NCDFcomp}_CONFIG_EXE = ${NetCDF_${NCDFcomp}_CONFIG_EXE}")
+              execute_process(COMMAND "${NetCDF_${NCDFcomp}_CONFIG_EXE}" "--has-nczarr"
+                              OUTPUT_VARIABLE NetCDF_${NCDFcomp}_has_nczarr
+                              OUTPUT_STRIP_TRAILING_WHITESPACE)
+              if(${NetCDF_${NCDFcomp}_has_nczarr} STREQUAL "yes")
+                message(STATUS "NetCDF (${NCDFcomp} component) has NCZarr support")
+                set(NetCDF_${NCDFcomp}_HAS_NCZARR TRUE CACHE BOOL "Has NCZarr support")
+              else ()
+                message(STATUS "NetCDF (${NCDFcomp} component) does not have NCZarr support")
+              endif ()
+            else ()
+              message(STATUS "NetCDF_${NCDFcomp}_CONFIG_EXE not found. Disabling checks for NCZarr support.")
+            endif ()
         endif ()
 
     endif ()
