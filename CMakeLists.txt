@@ -409,7 +409,7 @@ endif ()
 
 if (PIO_ENABLE_DOC)
   message(STATUS "Enabling SCORPIO Documentation...")
-  add_subdirectory (doc)
+  add_subdirectory (docs)
 else ()
   message(STATUS "Disabling SCORPIO Documentation... (default, use -DPIO_ENABLE_DOC:BOOL=ON to enable documentation)")
 endif ()

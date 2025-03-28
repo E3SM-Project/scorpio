@@ -32,7 +32,7 @@ ${CMAKE_CURRENT_SOURCE_DIR}/../src/clib/pioc_sc.c" )
     ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
 
   # Copy necessary files.
-  add_custom_target(doc
+  add_custom_target(docs
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/customdoxygen.css
     ${CMAKE_CURRENT_BINARY_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/DoxygenLayout.xml
