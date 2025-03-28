@@ -76,6 +76,10 @@
  *  in the NetCDF library, 0 otherwise */
 #define PIO_USE_NETCDF4 @PIO_USE_NETCDF4@
 
+/** Set to 1 if the library is configured to use the NetCDF4 features,
+ *  and has NCZarr support, 0 otherwise */
+#define PIO_USE_NETCDF4_NCZARR @PIO_USE_NETCDF4_NCZARR@
+
 /** Set to 1 if the library is configured to use the ADIOS library,
  *  0 otherwise */
 #define PIO_USE_ADIOS @PIO_USE_ADIOS@

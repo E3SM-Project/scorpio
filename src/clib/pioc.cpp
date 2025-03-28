@@ -1933,6 +1933,9 @@ int PIOc_iotype_available_impl(int iotype)
     switch(iotype)
     {
 #ifdef _NETCDF4
+#if PIO_USE_NETCDF4_NCZARR
+    case PIO_IOTYPE_NETCDF4P_NCZARR:
+#endif
     case PIO_IOTYPE_NETCDF4P:
     case PIO_IOTYPE_NETCDF4C:
         return 1;

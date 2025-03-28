@@ -13,6 +13,8 @@ const char *pio_iotype_to_string(int iotype)
                               return "PIO_IOTYPE_NETCDF4C";
     case PIO_IOTYPE_NETCDF4P:
                               return "PIO_IOTYPE_NETCDF4P";
+    case PIO_IOTYPE_NETCDF4P_NCZARR:
+                              return "PIO_IOTYPE_NETCDF4P_NCZARR";
     case PIO_IOTYPE_ADIOS:
                               return "PIO_IOTYPE_ADIOS";
     case PIO_IOTYPE_ADIOSC:

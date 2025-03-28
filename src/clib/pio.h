@@ -1213,14 +1213,17 @@ enum PIO_IOTYPE
     /** NetCDF4 (HDF5) parallel */
     PIO_IOTYPE_NETCDF4P = 4,
 
+    /** NetCDF4 (HDF5) parallel NCZarr */
+    PIO_IOTYPE_NETCDF4P_NCZARR = 5,
+
     /** ADIOS parallel */
-    PIO_IOTYPE_ADIOS = 5,
+    PIO_IOTYPE_ADIOS = 6,
 
     /** ADIOS parallel with compression */
-    PIO_IOTYPE_ADIOSC = 6,
+    PIO_IOTYPE_ADIOSC = 7,
 
     /** HDF5 parallel */
-    PIO_IOTYPE_HDF5 = 7
+    PIO_IOTYPE_HDF5 = 8
 };
 
 /**
