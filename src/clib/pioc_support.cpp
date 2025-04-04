@@ -5253,6 +5253,11 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
               if(!filename_nczarr.empty()){
                 ierr = nc_open_par(filename_nczarr.c_str(), file->mode,
                                       ios->io_comm, ios->info, &file->fh);
+                if(ierr != NC_NOERR){
+                  /* The file being opened may not be NCZarr, for now retry with NetCDF4 */
+                  file->iotype = PIO_IOTYPE_NETCDF4P;
+                  ierr = nc_open_par(filename, file->mode, ios->io_comm, ios->info, &file->fh);
+                }
               }
             }
             LOG((2, "nc_open_par returned %d file->fh = %d", ierr, file->fh));
