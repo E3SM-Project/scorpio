@@ -41,6 +41,7 @@ int PIOc_put_varm_impl(int ncid, int varid, const PIO_Offset start[], const PIO_
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
             ierr = nc_put_varm(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,   buf);;
             break;
@@ -125,6 +126,7 @@ int PIOc_put_varm_uchar_impl(int ncid, int varid, const PIO_Offset start[], cons
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
             ierr = nc_put_varm_uchar(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             break;
@@ -205,6 +207,7 @@ int PIOc_put_varm_short_impl(int ncid, int varid, const PIO_Offset start[], cons
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
             ierr = nc_put_varm_short(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             break;
@@ -286,6 +289,7 @@ int PIOc_put_varm_text_impl(int ncid, int varid, const PIO_Offset start[], const
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
             ierr = nc_put_varm_text(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             break;
@@ -368,6 +372,7 @@ int PIOc_put_varm_ushort_impl(int ncid, int varid, const PIO_Offset start[], con
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
             ierr = nc_put_varm_ushort(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             break;
@@ -450,6 +455,7 @@ int PIOc_put_varm_ulonglong_impl(int ncid, int varid, const PIO_Offset start[], 
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
             ierr = nc_put_varm_ulonglong(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             break;
@@ -531,6 +537,7 @@ int PIOc_put_varm_int_impl(int ncid, int varid, const PIO_Offset start[], const 
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
             ierr = nc_put_varm_int(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             break;
@@ -613,6 +620,7 @@ int PIOc_put_varm_float_impl(int ncid, int varid, const PIO_Offset start[], cons
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
             ierr = nc_put_varm_float(file->fh, varid,(size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             break;
@@ -694,6 +702,7 @@ int PIOc_put_varm_long_impl(int ncid, int varid, const PIO_Offset start[], const
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
             ierr = nc_put_varm_long(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             break;
@@ -777,6 +786,7 @@ int PIOc_put_varm_uint_impl(int ncid, int varid, const PIO_Offset start[], const
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
             ierr = nc_put_varm_uint(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             break;
@@ -859,6 +869,7 @@ int PIOc_put_varm_double_impl(int ncid, int varid, const PIO_Offset start[], con
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
             ierr = nc_put_varm_double(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             break;
@@ -940,6 +951,7 @@ int PIOc_put_varm_schar_impl(int ncid, int varid, const PIO_Offset start[], cons
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
             ierr = nc_put_varm_schar(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             break;
@@ -1021,6 +1033,7 @@ int PIOc_put_varm_longlong_impl(int ncid, int varid, const PIO_Offset start[], c
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
             ierr = nc_put_varm_longlong(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             break;
@@ -1102,6 +1115,7 @@ int PIOc_get_varm_uchar_impl(int ncid, int varid, const PIO_Offset start[], cons
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_get_varm_uchar(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             break;
         case PIO_IOTYPE_NETCDF4C:
@@ -1180,6 +1194,7 @@ int PIOc_get_varm_schar_impl(int ncid, int varid, const PIO_Offset start[], cons
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_get_varm_schar(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             break;
         case PIO_IOTYPE_NETCDF4C:
@@ -1258,6 +1273,7 @@ int PIOc_get_varm_double_impl(int ncid, int varid, const PIO_Offset start[], con
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_get_varm_double(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             break;
         case PIO_IOTYPE_NETCDF4C:
@@ -1336,6 +1352,7 @@ int PIOc_get_varm_text_impl(int ncid, int varid, const PIO_Offset start[], const
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_get_varm_text(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             break;
         case PIO_IOTYPE_NETCDF4C:
@@ -1414,6 +1431,7 @@ int PIOc_get_varm_int_impl(int ncid, int varid, const PIO_Offset start[], const 
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_get_varm_int(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             break;
         case PIO_IOTYPE_NETCDF4C:
@@ -1492,6 +1510,7 @@ int PIOc_get_varm_uint_impl(int ncid, int varid, const PIO_Offset start[], const
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_get_varm_uint(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             break;
         case PIO_IOTYPE_NETCDF4C:
@@ -1565,6 +1584,7 @@ int PIOc_get_varm_impl(int ncid, int varid, const PIO_Offset start[], const PIO_
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_get_varm(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,   buf);;
             break;
         case PIO_IOTYPE_NETCDF4C:
@@ -1643,6 +1663,7 @@ int PIOc_get_varm_float_impl(int ncid, int varid, const PIO_Offset start[], cons
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_get_varm_float(file->fh, varid,(size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             break;
         case PIO_IOTYPE_NETCDF4C:
@@ -1721,6 +1742,7 @@ int PIOc_get_varm_long_impl(int ncid, int varid, const PIO_Offset start[], const
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_get_varm_long(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             break;
         case PIO_IOTYPE_NETCDF4C:
@@ -1799,6 +1821,7 @@ int PIOc_get_varm_ushort_impl(int ncid, int varid, const PIO_Offset start[], con
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_get_varm_ushort(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             break;
         case PIO_IOTYPE_NETCDF4C:
@@ -1877,6 +1900,7 @@ int PIOc_get_varm_longlong_impl(int ncid, int varid, const PIO_Offset start[], c
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_get_varm_longlong(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             break;
         case PIO_IOTYPE_NETCDF4C:
@@ -1955,6 +1979,7 @@ int PIOc_get_varm_short_impl(int ncid, int varid, const PIO_Offset start[], cons
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_get_varm_short(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             break;
         case PIO_IOTYPE_NETCDF4C:
@@ -2033,6 +2058,7 @@ int PIOc_get_varm_ulonglong_impl(int ncid, int varid, const PIO_Offset start[], 
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_get_varm_ulonglong(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             break;
         case PIO_IOTYPE_NETCDF4C:

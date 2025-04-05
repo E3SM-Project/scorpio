@@ -25,7 +25,7 @@ module pio
        pio_rearr_comm_fc_2d_disable, pio_rearr_comm_unlimited_pend_req,&
        pio_rearr_comm_p2p, pio_rearr_comm_coll,&
        pio_int, pio_real, pio_double, pio_noerr, iotype_netcdf, &
-       iotype_pnetcdf,  pio_iotype_netcdf4p, pio_iotype_netcdf4c, &
+       iotype_pnetcdf,  pio_iotype_netcdf4p, pio_iotype_netcdf4p_nczarr, pio_iotype_netcdf4c, &
        pio_iotype_pnetcdf,pio_iotype_netcdf, pio_iotype_adios, pio_iotype_adiosc, pio_iotype_hdf5, &
        pio_global, pio_char, pio_write, pio_nowrite, pio_clobber, pio_noclobber, &
        pio_max_name, pio_max_var_dims, pio_rearr_subset, pio_rearr_box, pio_rearr_any,&

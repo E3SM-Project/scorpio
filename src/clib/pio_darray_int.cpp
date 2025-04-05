@@ -246,6 +246,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
             {
 #ifdef _NETCDF4
             case PIO_IOTYPE_NETCDF4P:
+            case PIO_IOTYPE_NETCDF4P_NCZARR:
                 /* For each variable to be written. */
                 for (int nv = 0; nv < nvars; nv++)
                 {
@@ -262,7 +263,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                     if(ierr != NC_NOERR)
                     {
                         ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
-                                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_NETCDF4P iotype failed. Changing parallel access for variable (%s, varid=%d) to collective failed", nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using %s iotype failed. Changing parallel access for variable (%s, varid=%d) to collective failed", nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype), pio_get_vname_from_file(file, varids[nv]), varids[nv]);
                         break;
                     }
 
@@ -306,13 +307,13 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                         break;
                     default:
                         ierr = pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
-                                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_NETCDF4P iotype failed. Unsupported variable data type (type=%d)", nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype);
+                                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using %s iotype failed. Unsupported variable data type (type=%d)", nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype), iodesc->piotype);
                         break;
                     }
                     if(ierr != NC_NOERR)
                     {
                         ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
-                                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_NETCDF4P iotype failed. Writing variable (%s, varid=%d) failed", nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using %s iotype failed. Writing variable (%s, varid=%d) failed", nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype), pio_get_vname_from_file(file, varids[nv]), varids[nv]);
                         break;
                     }
                 }
@@ -1249,6 +1250,7 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
             {
 #ifdef _NETCDF4
             case PIO_IOTYPE_NETCDF4P:
+            case PIO_IOTYPE_NETCDF4P_NCZARR:
                 /* ierr = nc_get_vara(file->fh, vid, start, count, bufptr); */
                 switch (iodesc->piotype)
                 {
@@ -1290,7 +1292,7 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
                     break;
                 default:
                     ierr = pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
-                                    "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=PIO_IOTYPE_NETCDF4P. Unsupported variable type (type=%d)", pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid, file->iotype);
+                                    "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. Unsupported variable type (type=%d)", pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype), file->iotype);
                     break;
                 }
                 break;
@@ -1359,7 +1361,7 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
         LOG((1, "nc*_get_var* failed, ierr = %d", ierr));
         GPTLstop("PIO:read_darray_nc");
         return pio_err(NULL, file, ierr, __FILE__, __LINE__,
-                        "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. The underlying I/O library (%s) call, nc*_get_var*, failed.", pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype), (file->iotype == PIO_IOTYPE_NETCDF4P) ? "NetCDF" : "PnetCDF");
+                        "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. The underlying I/O library (%s) call, nc*_get_var*, failed.", pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype), ((file->iotype == PIO_IOTYPE_NETCDF4P) || (file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR)) ? "NetCDF" : "PnetCDF");
     }
 
     /* Stop timing this function. */
