@@ -4,6 +4,8 @@
 #include <utility>
 #include <cassert>
 #include <fstream>
+#include <iostream>
+#include <stdexcept>
 
 #include <unistd.h>
 
@@ -12,6 +14,8 @@
 #include "pio_internal.h"
 #include "mpi.h"
 #include "spio_tracer.hpp"
+#include "spio_tracer_mdata.hpp"
+#include "spio_tracer_decomp.hpp"
 #include "spio_logger.hpp"
 
 namespace SPIO_Util{
@@ -19,23 +23,65 @@ namespace SPIO_Util{
     /* FIXME: Move to a singleton */
     namespace GVars{
       static std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> > trace_loggers_;
+      static Tracer_mdata tracer_mdata_;
     }
+
+    /* static member defn */
+    const std::string Timed_func_call_tracer::NULL_PTR = "NULL";
+    int Timed_func_call_tracer::gfunc_id_ = 0;
+
   } // namespace Tracer
 } // namespace SPIO_Util
 
-SPIO_Util::Tracer::Timed_func_call_tracer::Timed_func_call_tracer(const std::string &func_name) : func_name_(func_name), mpi_comm_(MPI_COMM_NULL), iosysid_(INVALID_IOSYSID), fh_(INVALID_FH), is_io_proc_(false), needs_finalize_(false)
+SPIO_Util::Tracer::Timed_func_call_tracer::Timed_func_call_tracer(const std::string &func_name) : func_id_(gfunc_id_), func_name_(func_name), mpi_comm_(MPI_COMM_NULL), wrank_(INVALID_RANK), iosysid_(INVALID_IOSYSID), fh_(INVALID_FH), is_io_proc_(false), needs_finalize_(false)
 {
+  gfunc_id_++;
+  timer_.start();
 }
 
 SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tracer::set_iosys_id(int iosysid)
 {
   iosysid_ = iosysid;
-  iosystem_desc_t *iosys = pio_get_iosystem_from_id(iosysid);
-  /* FIXME: Throw an exception instead */
-  assert(iosys);
-  mpi_comm_ = iosys->union_comm;
+  if(iosysid != PIO_DEFAULT){
+    iosystem_desc_t *iosys = pio_get_iosystem_from_id(iosysid);
+    /* FIXME: Throw an exception instead */
+    if(iosys){
+      mpi_comm_ = iosys->union_comm;
+    }
+    else{
+      /* User error - invalid iosysid */
+      mpi_comm_ = PIO_DEFAULT_COMM;
+      iosysid_ = PIO_DEFAULT;
+    }
+    /* For compute comps in async I/O, the I/O system ids corresponding
+      to other compute comms are mostly just placeholders, all comms are
+      NULL here - just ignore these */
+    assert( (mpi_comm_ != MPI_COMM_NULL) ||
+            ( (iosys->io_comm == MPI_COMM_NULL) &&
+              (iosys->comp_comm == MPI_COMM_NULL) &&
+              (iosys->async)  ) );
+  }
+  else{
+    mpi_comm_ = PIO_DEFAULT_COMM;
+  }
 
-  iosys_trace_key_ = std::to_string(iosysid);
+  if(mpi_comm_ != MPI_COMM_NULL){
+    iosys_trace_key_ = std::to_string(iosysid_);
+
+    int ret = MPI_Comm_rank(MPI_COMM_WORLD, &wrank_);
+    assert(ret == MPI_SUCCESS);
+  }
+  else{
+    /* For compute comps in async I/O, the I/O system ids corresponding
+      to other compute comms are mostly just placeholders, all comms are
+      NULL here - just ignore these */
+    /* Ignore logging in this process */
+    iosysid_ = INVALID_IOSYSID;
+  }
+
+  if(iosysid_ != INVALID_IOSYSID){
+    GVars::tracer_mdata_.add_iosysid(iosysid_);
+  }
 
   return *this;
 }
@@ -48,11 +94,46 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
   fh_ = fh;
   ret = pio_get_file(fh_, &file);
   /* FIXME: Throw an exception instead */
-  assert((ret == PIO_NOERR) && file && file->iosystem);
-  iosysid_ = file->iosystem->iosysid;
-  mpi_comm_ = file->iosystem->union_comm;
+  if(ret == PIO_NOERR){
+    assert(file && file->iosystem);
+    iosysid_ = file->iosystem->iosysid;
+    mpi_comm_ = file->iosystem->union_comm;
+
+    GVars::tracer_mdata_.add_ncid(iosysid_, fh);
+  }
+  else{
+    /* Most likely a user error, specifying an invalid file id, log the call to default logger */
+    iosysid_ = PIO_DEFAULT;
+    mpi_comm_ = PIO_DEFAULT_COMM;
+  }
 
   iosys_trace_key_ = std::to_string(iosysid_);
+
+  return *this;
+}
+
+SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tracer::set_dim_id(int fh, int dimid)
+{
+  assert(iosysid_ != INVALID_IOSYSID);
+  GVars::tracer_mdata_.add_dimid(iosysid_, fh, dimid);
+
+  return *this;
+}
+
+SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tracer::set_var_id(int fh, int varid)
+{
+  assert(iosysid_ != INVALID_IOSYSID);
+  GVars::tracer_mdata_.add_varid(iosysid_, fh, varid);
+
+  return *this;
+}
+
+SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tracer::set_decomp_info(int decomp_id, const PIO_Offset *map, int sz)
+{
+  if(iosysid_ != INVALID_IOSYSID){
+    GVars::tracer_mdata_.add_ioid(iosysid_);
+    SPIO_Util::Tracer::trace_decomp(iosysid_, wrank_, decomp_id, map, sz);
+  }
 
   return *this;
 }
@@ -60,7 +141,9 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
 void SPIO_Util::Tracer::Timed_func_call_tracer::flush(void )
 {
   /* Serialize the function call */
-  std::string ser_fcall(FUNC_ENTER + func_name_ + FUNC_CALL_PREFIX);
+  std::string ser_fcall(  std::to_string(func_id_) + FUNC_ID_SEP +
+                          std::to_string(timer_.get_start_time()) + FUNC_TIME_SEP +
+                          FUNC_ENTER + func_name_ + FUNC_CALL_PREFIX);
   if(args_.size() > 0){
     std::vector<std::pair<std::string, std::string> >::const_iterator iter = args_.cbegin();
     ser_fcall += (*iter).first + ARG_EQUAL + (*iter).second;
@@ -71,7 +154,7 @@ void SPIO_Util::Tracer::Timed_func_call_tracer::flush(void )
   ser_fcall += FUNC_CALL_SUFFIX;
 
   if(iosysid_ != INVALID_IOSYSID){
-    SPIO_Util::Logger::MPI_logger<std::ofstream> &logger = SPIO_Util::Tracer::get_iosys_trace_logger(iosysid_);
+    SPIO_Util::Logger::MPI_logger<std::ofstream> &logger = SPIO_Util::Tracer::get_iosys_trace_logger(iosysid_, wrank_);
     logger.log(ser_fcall);
     logger.flush();
   }
@@ -81,21 +164,39 @@ void SPIO_Util::Tracer::Timed_func_call_tracer::flush(void )
 
 void SPIO_Util::Tracer::Timed_func_call_tracer::finalize(void )
 {
+  if(iosysid_ != INVALID_IOSYSID){
+    SPIO_Util::Logger::MPI_logger<std::ofstream> &logger = SPIO_Util::Tracer::get_iosys_trace_mdata_logger(iosysid_, wrank_);
+    logger.slog(get_mpi_comm_info(mpi_comm_));
+    logger.log(std::string("I/O System Info: ") + GVars::tracer_mdata_.get_mdata(iosysid_));
+    logger.flush();
+  }
   needs_finalize_ = true;
 }
 
 SPIO_Util::Tracer::Timed_func_call_tracer::~Timed_func_call_tracer()
 {
+  timer_.stop();
   log_func_call_exit();
   if(needs_finalize_){
     SPIO_Util::Tracer::finalize_iosys_trace_logger(iosys_trace_key_);
+
+    /* FIXME: We only need to finalize the PIO_DEFAULT trace log after all trace loggers are finalized.
+        So trace the init/finalize of all loggers and finalize the trace logger for PIO_DEFAULT when
+        finalizing the last iosys logger
+    */
+    SPIO_Util::Tracer::finalize_iosys_trace_logger(std::to_string(PIO_DEFAULT));
+
+    SPIO_Util::Tracer::finalize_iosys_trace_mdata_logger(iosys_trace_key_);
+    SPIO_Util::Tracer::finalize_trace_decomp(iosysid_);
     needs_finalize_ = false;
   }
 }
 
 void SPIO_Util::Tracer::Timed_func_call_tracer::log_func_call_exit(void )
 {
-  std::string ser_fcall(FUNC_EXIT + func_name_ + FUNC_CALL_PREFIX);
+  std::string ser_fcall(  std::to_string(func_id_) + FUNC_ID_SEP +
+                          std::to_string(timer_.get_stop_time()) + FUNC_TIME_SEP +
+                          FUNC_EXIT + func_name_ + FUNC_CALL_PREFIX);
 
   if(rvals_.size() > 0){
     std::vector<std::pair<std::string, std::string> >::const_iterator iter = rvals_.cbegin();
@@ -106,13 +207,25 @@ void SPIO_Util::Tracer::Timed_func_call_tracer::log_func_call_exit(void )
   }
   ser_fcall += FUNC_CALL_SUFFIX;
   if(iosysid_ != INVALID_IOSYSID){
-    SPIO_Util::Logger::MPI_logger<std::ofstream> &logger = SPIO_Util::Tracer::get_iosys_trace_logger(iosysid_);
+    SPIO_Util::Logger::MPI_logger<std::ofstream> &logger = SPIO_Util::Tracer::get_iosys_trace_logger(iosysid_, wrank_);
     logger.log(ser_fcall);
     logger.flush();
   }
 }
 
-std::string SPIO_Util::Tracer::get_trace_log_header(int iosysid)
+std::string SPIO_Util::Tracer::get_trace_log_fname(int iosysid, int mpi_wrank)
+{
+  const std::string LOG_FILE_PREFIX = "spio_trace_log_";
+  const std::string LOG_FILE_SUFFIX = ".log";
+  std::string iosys_str = std::string("_iosys_") + ((iosysid != PIO_DEFAULT) ? std::to_string(iosysid) : "PIO_DEFAULT") + std::string("_");
+
+  long long int pid = static_cast<long long int>(getpid());
+  std::string log_fname = LOG_FILE_PREFIX + iosys_str + std::to_string(pid) + std::string("_") + std::to_string(mpi_wrank) + LOG_FILE_SUFFIX;
+
+  return log_fname;
+}
+
+static inline std::string get_trace_log_header(int iosysid, int mpi_rank)
 {
   static const std::string spio_version = std::string("SCORPIO VERSION : ") +
                                           std::to_string(PIO_VERSION_MAJOR) + "." +
@@ -124,12 +237,18 @@ std::string SPIO_Util::Tracer::get_trace_log_header(int iosysid)
 
   std::string iosys_info = std::string("I/O System ID : ") + std::to_string(iosysid) + "\n";
 
-  std::string hdr = banner + spio_trace_log_info + iosys_info + banner;
+  std::string rank_info = std::string("MPI World rank : ") + std::to_string(mpi_rank) + "\n";
+
+  std::string mdata_info = std::string("Trace Mdata file : ") + SPIO_Util::Tracer::get_trace_mdata_fname(iosysid, mpi_rank) + "\n";
+
+  std::string decomp_info = std::string("I/O Decomp file : ") + SPIO_Util::Tracer::get_trace_decomp_fname(iosysid, mpi_rank) + "\n";
+
+  std::string hdr = banner + spio_trace_log_info + iosys_info + rank_info + mdata_info + decomp_info + banner;
 
   return hdr;
 }
 
-std::string SPIO_Util::Tracer::get_trace_log_footer(void )
+static inline std::string get_trace_log_footer(void )
 {
   static const std::string banner =
                                   "=================================================================\n";
@@ -137,7 +256,8 @@ std::string SPIO_Util::Tracer::get_trace_log_footer(void )
   return banner;
 }
 
-SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace_logger(int iosysid)
+
+SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace_logger(int iosysid, int mpi_wrank)
 {
   /* FIXME: We might need to trace both I/O and compute procs for async I/O */
   std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(std::to_string(iosysid));
@@ -145,56 +265,59 @@ SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace
     const int MPI_ROOT_PROC = 0;
     int ret = MPI_SUCCESS, rank = -1;
 
-    iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);  
-    /* FIXME: Throw an exception instead */
-    assert(ios);
+    MPI_Comm comm = SPIO_Util::Tracer::PIO_DEFAULT_COMM;
 
-    ret = MPI_Comm_rank(ios->union_comm, &rank);
+    if(iosysid != PIO_DEFAULT){
+      iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
+      /* FIXME: Throw an exception instead */
+      assert(ios);
+      comm = ios->union_comm;
+    }
+
+    ret = MPI_Comm_rank(comm, &rank);
     assert(ret == MPI_SUCCESS);
 
     // FIXME: use unique_ptr
     std::ofstream *fstr = new std::ofstream();
     const std::string DEV_NULL = "/dev/null";
-    const std::string LOG_FILE_PREFIX = "spio_trace_log_";
-    const std::string LOG_FILE_SUFFIX = ".log";
-    std::string iosys_str = std::string("_iosys_") + std::to_string(iosysid) + std::string("_");
+    std::string log_fname = get_trace_log_fname(iosysid, mpi_wrank);
 
-    long long int pid = static_cast<long long int>(getpid());
-    std::string log_fname = LOG_FILE_PREFIX + iosys_str + std::to_string(pid) + LOG_FILE_SUFFIX;
+    /* FIXME: We always log from the root proc, 0, and in the case of PIO_DEFAULT its the root process. This can cause issues when we use
+     * PIO_DEFAULT as the I/O system, to handle user error cases etc where we cannot determine the I/O system, to log calls from a component
+     * that does not have rank 0 of the MPI_COMM_WORLD/PIO_DEFAULT_COMM */
     fstr->open((rank == MPI_ROOT_PROC) ? log_fname.c_str() : DEV_NULL.c_str(), std::ofstream::out | std::ofstream::trunc);
 
-    // FIXME: use insert() and get the iterator rather than insert and then find
-    SPIO_Util::Logger::MPI_logger<std::ofstream> lstr(ios->union_comm, fstr);
-    lstr.log(SPIO_Util::Tracer::get_trace_log_header(iosysid));
-    SPIO_Util::Tracer::GVars::trace_loggers_[std::to_string(iosysid)] = lstr;
-    iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(std::to_string(iosysid));
-    //std::pair<std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator, bool> res = SPIO_Util::Tracer::GVars::trace_loggers_.insert({std::to_string(comm), lstr});
-    //SPIO_Util::Tracer::GVars::trace_loggers_.insert({std::to_string(comm), lstr});
-    //assert(res.second);
-    //iter = res.first;
+    SPIO_Util::Logger::MPI_logger<std::ofstream> lstr(comm, fstr);
+    lstr.log(get_trace_log_header(iosysid, mpi_wrank));
+
+    std::pair<std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator, bool> res = SPIO_Util::Tracer::GVars::trace_loggers_.insert({std::to_string(iosysid), lstr});
+    assert(res.second);
+    iter = res.first;
   }
   return iter->second;
 }
 
-SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_file_trace_logger(int fh)
+SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_file_trace_logger(int fh, int mpi_rank)
 {
   file_desc_t *file = NULL;
   int ret = PIO_NOERR;
 
   ret = pio_get_file(fh, &file);  
   /* FIXME: Throw an exception instead */
-  assert(ret == PIO_NOERR);
+  if(ret != PIO_NOERR){
+    throw std::runtime_error(std::string("Unable to get file struct corresponding to file id, file id = ") + std::to_string(fh));
+  }
   assert(file->iosystem);
 
   /* FIXME: We might need to trace both I/O and compute procs for async I/O */
-  return get_iosys_trace_logger(file->iosystem->iosysid);
+  return get_iosys_trace_logger(file->iosystem->iosysid, mpi_rank);
 }
 
 void SPIO_Util::Tracer::finalize_iosys_trace_logger(std::string iosys_key)
 {
   std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(iosys_key);
   if(iter != SPIO_Util::Tracer::GVars::trace_loggers_.end()){
-    (*iter).second.log(SPIO_Util::Tracer::get_trace_log_footer());
+    (*iter).second.log(get_trace_log_footer());
     std::ofstream *fstr = (*iter).second.get_log_stream();
     assert(fstr);
     fstr->close();
