@@ -1185,18 +1185,22 @@ int PIOc_deletefile_impl(int iosysid, const char *filename)
             {
                 spio_remove_directory(adios_bp_filename);
             }
+
             free(adios_bp_filename);
 #endif
 
-            if(stat(filename, &sd) == 0){
-              if(S_ISDIR(sd.st_mode)){
+            int ret = stat(filename, &sd);
+            if ((ret == 0) && S_ISDIR(sd.st_mode))
+            {
                 /* Delete the directory pointed to by filename (e.g. NCZarr files) */
                 spio_remove_directory(filename);
-              }
-              else{
-                /* Delete the file (for ADIOS BP files, delete the symlink file) */
+            }
+            else
+            {
+                /* Delete the file (for ADIOS BP files, delete the symlink file).
+                    Ignore stat errors (dangling symlinks etc) and force unlink
+                */
                 ierr = unlink(filename);
-              }
             }
         }
 
