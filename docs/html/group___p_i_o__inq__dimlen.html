@@ -23,7 +23,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">SCORPIO
-   &#160;<span id="projectnumber">1.6.3</span>
+   &#160;<span id="projectnumber">1.7.0</span>
    </div>
   </td>
  </tr>
@@ -87,9 +87,6 @@ Functions/Subroutines</h2></td></tr>
 <tr class="memitem:ga55dabf0721a32f5ad19facbf11e15475"><td class="memItemLeft" align="right" valign="top">integer function&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__inq__dimlen.html#ga55dabf0721a32f5ad19facbf11e15475">spio_inq_dim::pio_inq_dimlen_fh_dimid_offlen</a> (fh, dimid, dimlen)</td></tr>
 <tr class="memdesc:ga55dabf0721a32f5ad19facbf11e15475"><td class="mdescLeft">&#160;</td><td class="mdescRight">Inquire/get the length of a dimension in a file.  <a href="group___p_i_o__inq__dimlen.html#ga55dabf0721a32f5ad19facbf11e15475">More...</a><br /></td></tr>
 <tr class="separator:ga55dabf0721a32f5ad19facbf11e15475"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:gadd004af4a485f2fcfd1a818ed6a81fb1"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="group___p_i_o__inq__dimlen.html#gadd004af4a485f2fcfd1a818ed6a81fb1">PIOc_inq_dimlen</a> (int ncid, int dimid, <a class="el" href="pio_8h.html#a0f811bf52f99ac4fc6c28c8ee2c9eb10">PIO_Offset</a> *lenp)</td></tr>
-<tr class="memdesc:gadd004af4a485f2fcfd1a818ed6a81fb1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Find the length of a dimension.  <a href="group___p_i_o__inq__dimlen.html#gadd004af4a485f2fcfd1a818ed6a81fb1">More...</a><br /></td></tr>
-<tr class="separator:gadd004af4a485f2fcfd1a818ed6a81fb1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <p>Inquire the length/size of a dimension. </p>
@@ -296,56 +293,10 @@ Functions/Subroutines</h2></td></tr>
 
 </div>
 </div>
-<a id="gadd004af4a485f2fcfd1a818ed6a81fb1"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#gadd004af4a485f2fcfd1a818ed6a81fb1">&#9670;&nbsp;</a></span>PIOc_inq_dimlen()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">int PIOc_inq_dimlen </td>
-          <td>(</td>
-          <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>ncid</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>dimid</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype"><a class="el" href="pio_8h.html#a0f811bf52f99ac4fc6c28c8ee2c9eb10">PIO_Offset</a> *&#160;</td>
-          <td class="paramname"><em>lenp</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Find the length of a dimension. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">ncid</td><td>the ncid of an open file. </td></tr>
-    <tr><td class="paramname">dimid</td><td>the dimension ID. </td></tr>
-    <tr><td class="paramname">lenp</td><td>a pointer that gets the length of the dimension. Igorned if NULL. </td></tr>
-  </table>
-  </dd>
-</dl>
-<dl class="section return"><dt>Returns</dt><dd>0 for success, error code otherwise. </dd></dl>
-<dl class="section author"><dt>Author</dt><dd>Jim Edwards, Ed Hartnett </dd></dl>
-
-</div>
-</div>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Apr 30 2024 09:16:39 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Tue Apr 8 2025 11:46:45 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>

@@ -1,9 +1,7 @@
 var searchData=
 [
-  ['gcd_1430',['gcd',['../pioc__sc_8c.html#af23d9d3b957105f099417c29e1404852',1,'pioc_sc.c']]],
-  ['gcd_5farray_1431',['gcd_array',['../pioc__sc_8c.html#afb1273a26986a5a8b8894067c3cbb556',1,'pioc_sc.c']]],
-  ['gcdblocksize_1432',['GCDblocksize',['../pioc__sc_8c.html#a1e828814e18fec67a056c843f7bd1356',1,'pioc_sc.c']]],
-  ['gcdblocksize_5fgaps_1433',['GCDblocksize_gaps',['../pioc__sc_8c.html#ab31bb3daedce8acecfa328f2ab94f2fc',1,'pioc_sc.c']]],
-  ['get_5ftext_5fvar_5fsz_1434',['get_text_var_sz',['../namespacespio__util.html#a5a4bdbfcadf1b96f9e4ccca3027984a6',1,'spio_util']]],
-  ['get_5fvar_5fdim_5fsz_1435',['get_var_dim_sz',['../namespacespio__util.html#a883482b2deb3511b3ec16ac87b837552',1,'spio_util']]]
+  ['if_1152',['if',['../src_2flib_2_c_make_lists_8txt.html#ac0646738190cb23097baf722029375ab',1,'CMakeLists.txt']]],
+  ['include_1153',['include',['../examples_2c_2_c_make_lists_8txt.html#a1fc154924b2d59f3f5bc1788e57d7299',1,'include(LibMPI) include(SPIOUtils) include_directories(&quot;$:&#160;CMakeLists.txt'],['../examples_2f03_2_c_make_lists_8txt.html#aa2030b5177e06ab779e6274cff074319',1,'include(SPIOUtils) string(TOUPPER &quot;$:&#160;CMakeLists.txt']]],
+  ['init_1154',['init',['../structpioexample_1_1pioexampleclass.html#a839b15f3abf340e2b046964bfe297808',1,'pioexample::pioexampleclass::init()'],['../namespacepioexample.html#a78080ad7096ad345563544273bb61b85',1,'pioexample::init()']]],
+  ['init_5flogging_1155',['init_logging',['../example2_8c.html#a34cfad2213dacda3f966cb58ca85ec62',1,'example2.c']]]
 ];

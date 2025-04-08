@@ -23,7 +23,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">SCORPIO
-   &#160;<span id="projectnumber">1.6.3</span>
+   &#160;<span id="projectnumber">1.7.0</span>
    </div>
   </td>
  </tr>
@@ -110,9 +110,13 @@ Variables</h2></td></tr>
 <tr class="separator:aa287cbbd71c85a5927d77a70f8cfb622"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3ddb852c38b6848155440794a20aba25"><td class="memItemLeft" align="right" valign="top">integer(i4), parameter, public&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacepio__types.html#a3ddb852c38b6848155440794a20aba25">pio_iotype_netcdf4p</a> = 4</td></tr>
 <tr class="separator:a3ddb852c38b6848155440794a20aba25"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af6bb0bd8afaf7043c426997bc626adc8"><td class="memItemLeft" align="right" valign="top">integer(i4), parameter, public&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacepio__types.html#af6bb0bd8afaf7043c426997bc626adc8">pio_iotype_adios</a> = 5</td></tr>
+<tr class="memitem:aa12a454e936fc599fec61c340a2ac8de"><td class="memItemLeft" align="right" valign="top">integer(i4), parameter, public&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacepio__types.html#aa12a454e936fc599fec61c340a2ac8de">pio_iotype_netcdf4p_nczarr</a> = 5</td></tr>
+<tr class="separator:aa12a454e936fc599fec61c340a2ac8de"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af6bb0bd8afaf7043c426997bc626adc8"><td class="memItemLeft" align="right" valign="top">integer(i4), parameter, public&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacepio__types.html#af6bb0bd8afaf7043c426997bc626adc8">pio_iotype_adios</a> = 6</td></tr>
 <tr class="separator:af6bb0bd8afaf7043c426997bc626adc8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7d1bc2e03ee297545b59c1f61d2fd961"><td class="memItemLeft" align="right" valign="top">integer(i4), parameter, public&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacepio__types.html#a7d1bc2e03ee297545b59c1f61d2fd961">pio_iotype_hdf5</a> = 6</td></tr>
+<tr class="memitem:ab7ebfd81ed1dd3b03f4be262359c2bbe"><td class="memItemLeft" align="right" valign="top">integer(i4), parameter, public&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacepio__types.html#ab7ebfd81ed1dd3b03f4be262359c2bbe">pio_iotype_adiosc</a> = 7</td></tr>
+<tr class="separator:ab7ebfd81ed1dd3b03f4be262359c2bbe"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7d1bc2e03ee297545b59c1f61d2fd961"><td class="memItemLeft" align="right" valign="top">integer(i4), parameter, public&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacepio__types.html#a7d1bc2e03ee297545b59c1f61d2fd961">pio_iotype_hdf5</a> = 8</td></tr>
 <tr class="separator:a7d1bc2e03ee297545b59c1f61d2fd961"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa490e16cc42b3f4e5bf5232f170afafc"><td class="memItemLeft" align="right" valign="top">integer(i4), parameter, public&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacepio__types.html#aa490e16cc42b3f4e5bf5232f170afafc">iotype_pnetcdf</a> = PIO_iotype_pnetcdf</td></tr>
 <tr class="separator:aa490e16cc42b3f4e5bf5232f170afafc"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -527,7 +531,21 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">integer(i4), parameter, public pio_types::pio_iotype_adios = 5</td>
+          <td class="memname">integer(i4), parameter, public pio_types::pio_iotype_adios = 6</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="ab7ebfd81ed1dd3b03f4be262359c2bbe"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab7ebfd81ed1dd3b03f4be262359c2bbe">&#9670;&nbsp;</a></span>pio_iotype_adiosc</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">integer(i4), parameter, public pio_types::pio_iotype_adiosc = 7</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -541,7 +559,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">integer(i4), parameter, public pio_types::pio_iotype_hdf5 = 6</td>
+          <td class="memname">integer(i4), parameter, public pio_types::pio_iotype_hdf5 = 8</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -584,6 +602,20 @@ Variables</h2></td></tr>
       <table class="memname">
         <tr>
           <td class="memname">integer(i4), parameter, public pio_types::pio_iotype_netcdf4p = 4</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="aa12a454e936fc599fec61c340a2ac8de"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa12a454e936fc599fec61c340a2ac8de">&#9670;&nbsp;</a></span>pio_iotype_netcdf4p_nczarr</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">integer(i4), parameter, public pio_types::pio_iotype_netcdf4p_nczarr = 5</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -1027,7 +1059,7 @@ Variables</h2></td></tr>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Apr 30 2024 09:16:40 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Tue Apr 8 2025 11:46:45 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>
