@@ -509,6 +509,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     switch (file->iotype)
     {
     case PIO_IOTYPE_NETCDF4P:
+    case PIO_IOTYPE_NETCDF4P_NCZARR:
     case PIO_IOTYPE_PNETCDF:
     case PIO_IOTYPE_HDF5:
         if ((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
@@ -595,6 +596,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
         {
         case PIO_IOTYPE_PNETCDF:
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             if ((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
                                                DARRAY_FILL, frame)))
             {
@@ -3924,6 +3926,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
             break;
         case PIO_IOTYPE_PNETCDF:
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             if ((ierr = pio_read_darray_nc(file, fndims, iodesc, varid, iobuf)))
             {
                 GPTLstop("PIO:PIOc_read_darray");

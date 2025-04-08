@@ -6,6 +6,8 @@
 #include <pio.h>
 #include <pio_internal.h>
 #include "spio_io_summary.h"
+#include <sys/stat.h>
+#include <unistd.h>
 
 #ifdef _ADIOS2
 #include "../../tools/adios2pio-nm/adios2pio-nm-lib-c.h"
@@ -90,6 +92,7 @@ int PIOc_open_impl(int iosysid, const char *path, int mode, int *ncidp)
     if (mode & NC_NETCDF4)
     {
 #ifdef _NETCDF4
+        /* FIXME: Add logic to find NCZARR type */
         if (mode & NC_MPIIO || mode & NC_MPIPOSIX)
             iotype = PIO_IOTYPE_NETCDF4P;
         else
@@ -119,8 +122,8 @@ int PIOc_open_impl(int iosysid, const char *path, int mode, int *ncidp)
  * @param ncidp A pointer that gets the ncid of the newly created
  * file.
  * @param iotype A pointer to a pio output format. Must be one of
- * PIO_IOTYPE_PNETCDF, PIO_IOTYPE_NETCDF, PIO_IOTYPE_NETCDF4C, or
- * PIO_IOTYPE_NETCDF4P.
+ * PIO_IOTYPE_PNETCDF, PIO_IOTYPE_NETCDF, PIO_IOTYPE_NETCDF4C,
+ * PIO_IOTYPE_NETCDF4P or PIO_IOTYPE_NETCDF4P_NCZARR.
  * @param filename The filename to create.
  * @param mode The netcdf mode for the create operation.
  * @returns 0 for success, error code otherwise.
@@ -241,6 +244,7 @@ int PIOc_create_impl(int iosysid, const char *filename, int cmode, int *ncidp)
     if (cmode & NC_NETCDF4)
     {
 #ifdef _NETCDF4
+        /* FIXME: Add logic to find NCZARR */
         if (cmode & NC_MPIIO || cmode & NC_MPIPOSIX)
             iotype = PIO_IOTYPE_NETCDF4P;
         else
@@ -383,6 +387,7 @@ static int sync_file(int ncid)
             {
 #ifdef _NETCDF4
             case PIO_IOTYPE_NETCDF4P:
+            case PIO_IOTYPE_NETCDF4P_NCZARR:
                 ierr = nc_sync(file->fh);
                 break;
             case PIO_IOTYPE_NETCDF4C:
@@ -992,6 +997,7 @@ int PIOc_closefile_impl(int ncid)
         {
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_NETCDF4P_NCZARR:
             ierr = nc_close(file->fh);
             break;
         case PIO_IOTYPE_NETCDF4C:
@@ -1155,12 +1161,12 @@ int PIOc_deletefile_impl(int iosysid, const char *filename)
      * barriers are needed to assure that no task is trying to operate
      * on the file while it is being deleted. IOTYPE is not known, but
      * nc_delete() will delete any type of file. */
+    mpierr = MPI_Barrier(ios->union_comm);
     if (ios->ioproc)
     {
-        mpierr = MPI_Barrier(ios->io_comm);
-
         if (!mpierr && ios->io_rank == 0)
         {
+            struct stat sd;
 #ifdef _ADIOS2
             /* Append ".bp" to filename for the corresponding ADIOS BP filename */
             static const char adios_bp_filename_extn[] = ".bp";
@@ -1175,27 +1181,31 @@ int PIOc_deletefile_impl(int iosysid, const char *filename)
             }
             snprintf(adios_bp_filename, adios_bp_filename_len, "%s%s", filename, adios_bp_filename_extn);
 
-            struct stat sd;
             if (0 == stat(adios_bp_filename, &sd))
             {
                 spio_remove_directory(adios_bp_filename);
             }
-            free(adios_bp_filename);
 
-            /* Delete the file (for ADIOS BP files, delete the symlink file) */
-            ierr = unlink(filename);
-#elif defined(_PNETCDF)
-            ierr = ncmpi_delete(filename, MPI_INFO_NULL);
-#elif defined(_NETCDF)
-            ierr = nc_delete(filename);
-#else
-            ierr = unlink(filename);
+            free(adios_bp_filename);
 #endif
+
+            int ret = stat(filename, &sd);
+            if ((ret == 0) && S_ISDIR(sd.st_mode))
+            {
+                /* Delete the directory pointed to by filename (e.g. NCZarr files) */
+                spio_remove_directory(filename);
+            }
+            else
+            {
+                /* Delete the file (for ADIOS BP files, delete the symlink file).
+                    Ignore stat errors (dangling symlinks etc) and force unlink
+                */
+                ierr = unlink(filename);
+            }
         }
 
-        if (!mpierr)
-            mpierr = MPI_Barrier(ios->io_comm);
     }
+    mpierr = MPI_Barrier(ios->union_comm);
     LOG((2, "PIOc_deletefile ierr = %d", ierr));
 
     ierr = check_netcdf(ios, NULL, ierr, __FILE__, __LINE__);

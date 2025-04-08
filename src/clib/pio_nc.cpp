@@ -432,8 +432,10 @@ int PIOc_inq_unlimdims_impl(int ncid, int *nunlimdimsp, int *unlimdimidsp)
         }
 #endif /* _PNETCDF */
 #ifdef _NETCDF4
-        else if ((file->iotype == PIO_IOTYPE_NETCDF4C || file->iotype == PIO_IOTYPE_NETCDF4P) &&
-                 file->do_io)
+        else if ((file->iotype == PIO_IOTYPE_NETCDF4C ||
+                  file->iotype == PIO_IOTYPE_NETCDF4P ||
+                  file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR) &&
+                  file->do_io)
         {
             LOG((2, "PIOc_inq calling netcdf-4 nc_inq_unlimdims"));
             int *tmp_unlimdimids;
@@ -3649,7 +3651,7 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
         }
 
         /* For netCDF-4 parallel files, set parallel access to collective. */
-        if (!ierr && file->iotype == PIO_IOTYPE_NETCDF4P && file->do_io)
+        if (!ierr && (file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR) && file->do_io)
         {
             ierr = nc_var_par_access(file->fh, *varidp, NC_COLLECTIVE);
             if (ierr != PIO_NOERR)
@@ -4856,6 +4858,7 @@ int PIOc_copy_att_impl(int incid, int ivarid, const char *name,
     case PIO_IOTYPE_NETCDF:
     case PIO_IOTYPE_NETCDF4C:
     case PIO_IOTYPE_NETCDF4P:
+    case PIO_IOTYPE_NETCDF4P_NCZARR:
           if(ios->ioproc && ifile->do_io){
             ierr = nc_copy_att(ifile->fh, ivarid, name,
                     ofile->fh, ovarid);

@@ -52,7 +52,7 @@ int PIOc_def_var_deflate_impl(int ncid, int varid, int shuffle, int deflate,
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
     /* Only netCDF-4 files can use this feature. */
-    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4C)
+    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4P_NCZARR && file->iotype != PIO_IOTYPE_NETCDF4C)
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -78,7 +78,7 @@ int PIOc_def_var_deflate_impl(int ncid, int varid, int shuffle, int deflate,
     if (ios->ioproc)
     {
 #ifdef _NETCDF4
-        if (file->iotype == PIO_IOTYPE_NETCDF4P)
+        if (file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR)
             ierr = NC_EINVAL;
         else
         {
@@ -152,7 +152,7 @@ int PIOc_inq_var_deflate_impl(int ncid, int varid, int *shufflep, int *deflatep,
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
     /* Only netCDF-4 files can use this feature. */
-    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4C)
+    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4P_NCZARR && file->iotype != PIO_IOTYPE_NETCDF4C)
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -277,7 +277,7 @@ int PIOc_def_var_chunking_impl(int ncid, int varid, int storage, const PIO_Offse
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
     /* Only netCDF-4 files can use this feature. */
-    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4C)
+    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4P_NCZARR && file->iotype != PIO_IOTYPE_NETCDF4C)
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -420,7 +420,7 @@ int PIOc_inq_var_chunking_impl(int ncid, int varid, int *storagep, PIO_Offset *c
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
     /* Only netCDF-4 files can use this feature. */
-    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4C)
+    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4P_NCZARR && file->iotype != PIO_IOTYPE_NETCDF4C)
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -572,7 +572,7 @@ int PIOc_def_var_endian_impl(int ncid, int varid, int endian)
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
     /* Only netCDF-4 files can use this feature. */
-    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4C)
+    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4P_NCZARR && file->iotype != PIO_IOTYPE_NETCDF4C)
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -656,7 +656,7 @@ int PIOc_inq_var_endian_impl(int ncid, int varid, int *endianp)
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
     /* Only netCDF-4 files can use this feature. */
-    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4C)
+    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4P_NCZARR && file->iotype != PIO_IOTYPE_NETCDF4C)
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -756,7 +756,7 @@ int PIOc_set_chunk_cache_impl(int iosysid, int iotype, PIO_Offset size, PIO_Offs
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
 
     /* Only netCDF-4 files can use this feature. */
-    if (iotype != PIO_IOTYPE_NETCDF4P && iotype != PIO_IOTYPE_NETCDF4C)
+    if (iotype != PIO_IOTYPE_NETCDF4P && iotype != PIO_IOTYPE_NETCDF4P_NCZARR && iotype != PIO_IOTYPE_NETCDF4C)
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         return pio_err(ios, NULL, PIO_ENOTNC4, __FILE__, __LINE__,
@@ -783,7 +783,7 @@ int PIOc_set_chunk_cache_impl(int iosysid, int iotype, PIO_Offset size, PIO_Offs
     {
 #ifdef _NETCDF4
         LOG((2, "calling nc_chunk_cache"));
-        if (iotype == PIO_IOTYPE_NETCDF4P)
+        if (iotype == PIO_IOTYPE_NETCDF4P || iotype == PIO_IOTYPE_NETCDF4P_NCZARR)
             ierr = nc_set_chunk_cache(size, nelems, preemption);
         else
             if (!ios->io_rank)
@@ -852,7 +852,7 @@ int PIOc_get_chunk_cache_impl(int iosysid, int iotype, PIO_Offset *sizep, PIO_Of
     assert(ios);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     /* Only netCDF-4 files can use this feature. */
-    if (iotype != PIO_IOTYPE_NETCDF4P && iotype != PIO_IOTYPE_NETCDF4C)
+    if (iotype != PIO_IOTYPE_NETCDF4P && iotype != PIO_IOTYPE_NETCDF4P_NCZARR && iotype != PIO_IOTYPE_NETCDF4C)
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         return pio_err(ios, NULL, PIO_ENOTNC4, __FILE__, __LINE__,
@@ -881,7 +881,7 @@ int PIOc_get_chunk_cache_impl(int iosysid, int iotype, PIO_Offset *sizep, PIO_Of
     if (ios->ioproc)
     {
 #ifdef _NETCDF4
-        if (iotype == PIO_IOTYPE_NETCDF4P)
+        if (iotype == PIO_IOTYPE_NETCDF4P || iotype == PIO_IOTYPE_NETCDF4P_NCZARR)
             ierr = nc_get_chunk_cache((size_t *)sizep, (size_t *)nelemsp, preemptionp);
         else
             if (!ios->io_rank)
@@ -975,7 +975,7 @@ int PIOc_set_var_chunk_cache_impl(int ncid, int varid, PIO_Offset size, PIO_Offs
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
     /* Only netCDF-4 files can use this feature. */
-    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4C)
+    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4P_NCZARR && file->iotype != PIO_IOTYPE_NETCDF4C)
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1065,7 +1065,7 @@ int PIOc_get_var_chunk_cache_impl(int ncid, int varid, PIO_Offset *sizep, PIO_Of
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
     /* Only netCDF-4 files can use this feature. */
-    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4C)
+    if (file->iotype != PIO_IOTYPE_NETCDF4P && file->iotype != PIO_IOTYPE_NETCDF4P_NCZARR && file->iotype != PIO_IOTYPE_NETCDF4C)
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
