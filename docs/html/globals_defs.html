@@ -23,7 +23,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">SCORPIO
-   &#160;<span id="projectnumber">1.6.3</span>
+   &#160;<span id="projectnumber">1.7.0</span>
    </div>
   </td>
  </tr>
@@ -68,6 +68,7 @@ $(function() {
 <h3><a id="index__5F"></a>- _ -</h3><ul>
 <li>__PIO_FILE__
 : <a class="el" href="spio__decomp_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_decomp.F90</a>
+, <a class="el" href="spio__inq__var_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_inq_var.F90</a>
 , <a class="el" href="spio__inq__var__cint_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_inq_var_cint.F90</a>
 , <a class="el" href="spio__misc__api_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_misc_api.F90</a>
 , <a class="el" href="spio__misc__api__cint_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_misc_api_cint.F90</a>
@@ -76,7 +77,7 @@ $(function() {
 , <a class="el" href="spio__util__cint_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_util_cint.F90</a>
 , <a class="el" href="spio__darray_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_darray.F90</a>
 , <a class="el" href="spio__darray__cint_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_darray_cint.F90</a>
-, <a class="el" href="spio__inq__var_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_inq_var.F90</a>
+, <a class="el" href="spio__inq__file__cint_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_inq_file_cint.F90</a>
 , <a class="el" href="spio__get__att_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_get_att.F90</a>
 , <a class="el" href="spio__get__att__cint_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_get_att_cint.F90</a>
 , <a class="el" href="spio__get__var_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_get_var.F90</a>
@@ -95,6 +96,7 @@ $(function() {
 , <a class="el" href="spio__def__var__cint_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_def_var_cint.F90</a>
 , <a class="el" href="spio__err_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_err.F90</a>
 , <a class="el" href="pio__nf__utils_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">pio_nf_utils.F90</a>
+, <a class="el" href="spio__file__modif_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_file_modif.F90</a>
 , <a class="el" href="spio__init_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_init.F90</a>
 , <a class="el" href="spio__init__cint_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_init_cint.F90</a>
 , <a class="el" href="spio__inq__att_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_inq_att.F90</a>
@@ -102,7 +104,6 @@ $(function() {
 , <a class="el" href="spio__inq__dim_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_inq_dim.F90</a>
 , <a class="el" href="spio__inq__dim__cint_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_inq_dim_cint.F90</a>
 , <a class="el" href="spio__inq__file_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_inq_file.F90</a>
-, <a class="el" href="spio__inq__file__cint_8_f90.html#aaec2e599e7ee1dfe94c1a00871779142">spio_inq_file_cint.F90</a>
 </li>
 </ul>
 
@@ -115,12 +116,6 @@ $(function() {
 
 
 <h3><a id="index_d"></a>- d -</h3><ul>
-<li>DARRAY_DATA
-: <a class="el" href="pio__darray_8c.html#a39e0b8106c05983fec7d71c188bc5cbc">pio_darray.c</a>
-</li>
-<li>DARRAY_FILL
-: <a class="el" href="pio__darray_8c.html#a3cbe4eaef9f3dd377fc4ddff08c32d02">pio_darray.c</a>
-</li>
 <li>DECOMP_BACKTRACE_ATT_NAME
 : <a class="el" href="pio_8h.html#a47738ade7edcd4f2c042f1db9122caf0">pio.h</a>
 </li>
@@ -169,9 +164,6 @@ $(function() {
 <li>DECOMP_VERSION_ATT_NAME
 : <a class="el" href="pio_8h.html#a478ec727417fbd8321eae4a8acfb7280">pio.h</a>
 </li>
-<li>DEFAULT_BLOCKSIZE
-: <a class="el" href="pioc__sc_8c.html#a46a626f6d8b24b07925d82cde2175864">pioc_sc.c</a>
-</li>
 <li>DIM_LEN
 : <a class="el" href="example1_8c.html#a64ac6367028a6df084dea6efe741a795">example1.c</a>
 </li>
@@ -189,6 +181,9 @@ $(function() {
 : <a class="el" href="test__adios_8c.html#abb9a4d44855abe600d3496639857d413">test_adios.c</a>
 , <a class="el" href="test__hdf5_8c.html#abb9a4d44855abe600d3496639857d413">test_hdf5.c</a>
 </li>
+<li>DIM_LEV_SZ
+: <a class="el" href="netcdf4p_8c.html#a179db0d5fb8ed97cbd16301a8bf0e6fe">netcdf4p.c</a>
+</li>
 <li>DIM_NAME
 : <a class="el" href="example1_8c.html#a68eca42e606398f1b7321200813679e4">example1.c</a>
 </li>
@@ -197,6 +192,12 @@ $(function() {
 </li>
 <li>DIM_NAME_Y
 : <a class="el" href="put__var_8c.html#a5835259d9855cc9e03cc44776d1179e6">put_var.c</a>
+</li>
+<li>DIM_NCOLS_SZ_PER_PROC
+: <a class="el" href="netcdf4p_8c.html#a34822eadd3c7941542f5ac62cfc2a048">netcdf4p.c</a>
+</li>
+<li>DIM_TIME_SZ
+: <a class="el" href="netcdf4p_8c.html#a762a8896ed70ddb1368c218e1aa21db6">netcdf4p.c</a>
 </li>
 </ul>
 
@@ -257,6 +258,13 @@ $(function() {
 </ul>
 
 
+<h3><a id="index_f"></a>- f -</h3><ul>
+<li>FILE_PATH_MAX_SZ
+: <a class="el" href="netcdf4p_8c.html#a39ebeff08225e4304aec18c52b5446d0">netcdf4p.c</a>
+</li>
+</ul>
+
+
 <h3><a id="index_l"></a>- l -</h3><ul>
 <li>LOG_LEVEL
 : <a class="el" href="darray__async_8c.html#a0b87e0d3bf5853bcbb0b66a7c48fdc05">darray_async.c</a>
@@ -286,13 +294,16 @@ $(function() {
 
 <h3><a id="index_n"></a>- n -</h3><ul>
 <li>NDIM
-: <a class="el" href="example1_8c.html#a2b1fd2d28c6a7d4a3f7027cc1b6466f3">example1.c</a>
-, <a class="el" href="example2_8c.html#a2b1fd2d28c6a7d4a3f7027cc1b6466f3">example2.c</a>
+: <a class="el" href="example2_8c.html#a2b1fd2d28c6a7d4a3f7027cc1b6466f3">example2.c</a>
 , <a class="el" href="put__var_8c.html#a2b1fd2d28c6a7d4a3f7027cc1b6466f3">put_var.c</a>
+, <a class="el" href="example1_8c.html#a2b1fd2d28c6a7d4a3f7027cc1b6466f3">example1.c</a>
 </li>
 <li>NDIM3
 : <a class="el" href="darray__async_8c.html#ae9a30074b626aafde2d63f2855d57647">darray_async.c</a>
 , <a class="el" href="darray__no__async_8c.html#ae9a30074b626aafde2d63f2855d57647">darray_no_async.c</a>
+</li>
+<li>NDIMS
+: <a class="el" href="netcdf4p_8c.html#aa831695ab6b5b36d12747bb769b9a43e">netcdf4p.c</a>
 </li>
 <li>NUM_COMP_TASKS
 : <a class="el" href="darray__async_8c.html#a1fb5ac15171c5a44c19e0f6413972e0c">darray_async.c</a>
@@ -443,7 +454,7 @@ $(function() {
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Apr 30 2024 09:16:40 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Tue Apr 8 2025 11:46:45 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>

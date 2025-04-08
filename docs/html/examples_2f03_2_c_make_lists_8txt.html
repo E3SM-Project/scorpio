@@ -23,7 +23,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">SCORPIO
-   &#160;<span id="projectnumber">1.6.3</span>
+   &#160;<span id="projectnumber">1.7.0</span>
    </div>
   </td>
  </tr>
@@ -76,11 +76,11 @@ Functions</h2></td></tr>
 <tr class="separator:aa2030b5177e06ab779e6274cff074319"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af4a362522d570691b6ee4c79c1f46913"><td class="memItemLeft" align="right" valign="top">CMAKE_FORTRAN_COMPILER_NAME&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="examples_2f03_2_c_make_lists_8txt.html#af4a362522d570691b6ee4c79c1f46913">set</a> (CMAKE_Fortran_FLAGS &quot;${CMAKE_Fortran_FLAGS} -g -O0&quot;) set(CMAKE_C_FLAGS &quot;$</td></tr>
 <tr class="separator:af4a362522d570691b6ee4c79c1f46913"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa351717bc7b78ffb4bf3589c840b68f2"><td class="memItemLeft" align="right" valign="top">g O0&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="examples_2f03_2_c_make_lists_8txt.html#aa351717bc7b78ffb4bf3589c840b68f2">set</a> (CMAKE_CXX_FLAGS &quot;${CMAKE_CXX_FLAGS} -g -O0&quot;) if(CMAKE_FORTRAN_COMPILER_NAME STREQUAL &quot;XL&quot;) else() endif() if(PIO_USE_MPISERIAL) find_package(MPISERIAL COMPONENTS Fortran REQUIRED) <a class="el" href="examples_2f03_2_c_make_lists_8txt.html#a94109a6d9622a6ac0f5a3f3ef3c322db">else</a>() find_package(MPI REQUIRED) endif() find_path(MPIMOD_PATH NAMES mpi.mod MPI.mod HINTS $</td></tr>
+<tr class="memitem:aa351717bc7b78ffb4bf3589c840b68f2"><td class="memItemLeft" align="right" valign="top">g O0&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="examples_2f03_2_c_make_lists_8txt.html#aa351717bc7b78ffb4bf3589c840b68f2">set</a> (CMAKE_CXX_FLAGS &quot;${CMAKE_CXX_FLAGS} -g -O0&quot;) if(CMAKE_FORTRAN_COMPILER_NAME STREQUAL &quot;XL&quot;) else() endif() <a class="el" href="src_2flib_2_c_make_lists_8txt.html#ac0646738190cb23097baf722029375ab">if</a>(PIO_USE_MPISERIAL) find_package(MPISERIAL COMPONENTS Fortran REQUIRED) <a class="el" href="examples_2f03_2_c_make_lists_8txt.html#a94109a6d9622a6ac0f5a3f3ef3c322db">else</a>() find_package(MPI REQUIRED) endif() find_path(MPIMOD_PATH NAMES mpi.mod MPI.mod HINTS $</td></tr>
 <tr class="separator:aa351717bc7b78ffb4bf3589c840b68f2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a91b0339e5d13addef46f30f0d359fce9"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="examples_2f03_2_c_make_lists_8txt.html#a91b0339e5d13addef46f30f0d359fce9">check_macro</a> (MPI_HAS_Fortran_MOD NAME TryMPIMod.f90 HINTS ${CMAKE_MODULE_PATH} DEFINITIONS -I${MPIMOD_PATH} COMMENT &quot;whether MPI Fortran module is supported&quot;) if($</td></tr>
 <tr class="separator:a91b0339e5d13addef46f30f0d359fce9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a490a58aa9ad8991c7848ad5a0eef5eaa"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="examples_2f03_2_c_make_lists_8txt.html#a490a58aa9ad8991c7848ad5a0eef5eaa">message</a> (STATUS &quot;MPI Fortran module verified and enabled.&quot;) else() message(STATUS &quot;MPI Fortran module failed verification and therefore disabled.&quot;) endif() if(PIO_ENABLE_TIMING) find_package(GPTL COMPONENTS Fortran_Perf QUIET) if(GPTL_Fortran_Perf_FOUND) message(STATUS &quot;Found GPTL Fortran Perf</td></tr>
+<tr class="memitem:a490a58aa9ad8991c7848ad5a0eef5eaa"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="examples_2f03_2_c_make_lists_8txt.html#a490a58aa9ad8991c7848ad5a0eef5eaa">message</a> (STATUS &quot;MPI Fortran module verified and enabled.&quot;) else() message(STATUS &quot;MPI Fortran module failed verification and therefore disabled.&quot;) endif() <a class="el" href="src_2flib_2_c_make_lists_8txt.html#ac0646738190cb23097baf722029375ab">if</a>(PIO_ENABLE_TIMING) find_package(GPTL COMPONENTS Fortran_Perf QUIET) <a class="el" href="src_2flib_2_c_make_lists_8txt.html#ac0646738190cb23097baf722029375ab">if</a>(GPTL_Fortran_Perf_FOUND) message(STATUS &quot;Found GPTL Fortran Perf</td></tr>
 <tr class="separator:a490a58aa9ad8991c7848ad5a0eef5eaa"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a94109a6d9622a6ac0f5a3f3ef3c322db"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="examples_2f03_2_c_make_lists_8txt.html#a94109a6d9622a6ac0f5a3f3ef3c322db">else</a> () <a class="el" href="examples_2f03_2_c_make_lists_8txt.html#a490a58aa9ad8991c7848ad5a0eef5eaa">message</a>(STATUS &quot;Using internal GPTL Fortran library for timing&quot;) endif() endif() add_spio_executable(examplePio_f90 FALSE $</td></tr>
 <tr class="separator:a94109a6d9622a6ac0f5a3f3ef3c322db"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -196,7 +196,7 @@ Functions</h2></td></tr>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Apr 30 2024 09:16:39 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Tue Apr 8 2025 11:46:44 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>

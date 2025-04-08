@@ -23,7 +23,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">SCORPIO
-   &#160;<span id="projectnumber">1.6.3</span>
+   &#160;<span id="projectnumber">1.7.0</span>
    </div>
   </td>
  </tr>
@@ -175,12 +175,12 @@ Formatting Example</h2>
    <a href="http://www.unidata.ucar.edu/software/netcdf/docs/group__attributes.html">http://www.unidata.ucar.edu/software/netcdf/docs/group__attributes.html</a>
 
    @param ncid the ncid of the open file, obtained from
-   <a class="el" href="pio__file_8c.html#ae8e01fc5492663b46def2be31a95034c" title="Open an existing file using PIO library.">PIOc_openfile()</a> or <a class="el" href="pio__file_8c.html#aa481a8333f620329dce4be12e1dd6a11" title="Create a new file using pio.">PIOc_createfile()</a>.
+   PIOc_openfile() or PIOc_createfile().
    @param varid the variable ID.
    @param attnum the attribute ID.
    @return PIO_NOERR for success, error code otherwise.  See PIOc_Set_File_Error_Handling
  */
-int <a class="el" href="group___p_i_o__inq__attname.html#gaa7d8b173e8bba7544c042301877082a0" title="The PIO-C interface for the NetCDF function nc_inq_attname.">PIOc_inq_attname(int ncid, int varid, int attnum, char *name)</a> 
+int PIOc_inq_attname(int ncid, int varid, int attnum, char *name) 
 {
     <a class="el" href="structiosystem__desc__t.html" title="IO system descriptor structure.">iosystem_desc_t</a> *ios;  /* Pointer to io system information. */
     <a class="el" href="structfile__desc__t.html" title="File descriptor structure.">file_desc_t</a> *file;     /* Pointer to file information. */
@@ -268,7 +268,7 @@ Further Information</h1>
 </div><!-- PageDoc -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Apr 30 2024 09:16:39 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Tue Apr 8 2025 11:46:45 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>

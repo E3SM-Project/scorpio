@@ -23,7 +23,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">SCORPIO
-   &#160;<span id="projectnumber">1.6.3</span>
+   &#160;<span id="projectnumber">1.7.0</span>
    </div>
   </td>
  </tr>
@@ -73,7 +73,7 @@ Dependencies</h3>
 <p>SCORPIO can use NetCDF (version 4.3.3+) and/or PnetCDF (version 1.6.1+) for I/O. Ideally, the NetCDF version should be built with MPI, which requires that it be linked with an MPI-enabled version of HDF5. Optionally, NetCDF can be built with DAP support, which introduces a dependency on CURL. Additionally, HDF5, itself, introduces dependencies on LIBZ and (optionally) SZIP.</p>
 <h3><a class="anchor" id="autotoc_md17"></a>
 Configuring with CMake</h3>
-<p>To configure the build, SCORPIO requires CMake version 2.8.12+. The typical configuration with CMake can be done as follows:</p>
+<p>To configure the build, SCORPIO requires CMake version 3.7+. The typical configuration with CMake can be done as follows:</p>
 <pre class="fragment">&gt; CC=mpicc CXX=mpicxx FC=mpif90 cmake [-DOPTION1=value1 -DOPTION2=value2 ...] /path/to/pio/source
 </pre><p>where <code>mpicc</code>, <code>mpicxx</code> and <code>mpif90</code> are the appropriate MPI-enabled compiler wrappers for your system.</p>
 <p>The <code>OPTIONS</code> section typically should consist of pointers to the install locations for various dependencies, assuming these dependencies are not located in <em>canonical</em> search locations. <br  />
@@ -124,7 +124,7 @@ Examples</h3>
 </div><!-- PageDoc -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Apr 30 2024 09:16:39 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Tue Apr 8 2025 11:46:45 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>
