@@ -1648,6 +1648,8 @@ int test_malloc_iodesc2(int iosysid, int my_rank)
         ioid = pio_add_to_iodesc_list(iodesc, MPI_COMM_NULL);
         if (iodesc->firstregion)
             free_region_list(iodesc->firstregion);
+        free(iodesc->map);
+        free(iodesc->dimlen);
         if ((ret = pio_delete_iodesc_from_list(ioid)))
             return ret;
     }
