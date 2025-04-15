@@ -129,6 +129,20 @@ io_desc_t *get_iodesc(int wrank, iosystem_desc_t *ios, const std::vector<PIO_Off
   return iodesc;
 }
 
+void free_iodesc(io_desc_t *iodesc)
+{
+  if(!iodesc){
+    return;
+  }
+
+  free(iodesc->firstregion->start);
+  free(iodesc->firstregion->count);
+  free(iodesc->firstregion);
+  free(iodesc->map);
+  free(iodesc->dimlen);
+  free(iodesc);
+}
+
 int test_create_decomp_logger(MPI_Comm comm, int wrank, int wsz)
 {
   int nio_procs = (wsz/2 > 0) ? wsz/2 : wsz;
@@ -192,6 +206,7 @@ int test_simple_decomp_logger(MPI_Comm comm, int wrank, int wsz)
     }
 
     (*logger).write_only().open().put(iodesc).close();
+    free_iodesc(iodesc);
     delete logger;
   }
   catch(...){
@@ -238,6 +253,7 @@ int test_simple_decomp_logger_wr_cached_rd(MPI_Comm comm, int wrank, int wsz)
     }
 
     (*logger).write_only().open().put(iodesc).close();
+    free_iodesc(iodesc);
 
     std::string version;
     int rd_nprocs = -1;
@@ -312,6 +328,7 @@ int test_simple_decomp_logger_wr_rd(MPI_Comm comm, int wrank, int wsz)
     }
 
     (*logger).write_only().open().put(iodesc).close();
+    free_iodesc(iodesc);
     delete logger;
 
     logger =
@@ -399,6 +416,7 @@ int test_vlen_decomp_logger(MPI_Comm comm, int wrank, int wsz)
     }
 
     (*logger).write_only().open().put(iodesc).close();
+    free_iodesc(iodesc);
 
     delete logger;
 
@@ -482,6 +500,7 @@ int test_rvlen_decomp_logger(MPI_Comm comm, int wrank, int wsz)
     }
 
     (*logger).write_only().open().put(iodesc).close();
+    free_iodesc(iodesc);
 
     delete logger;
 
