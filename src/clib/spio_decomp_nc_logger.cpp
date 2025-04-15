@@ -529,12 +529,8 @@ void SPIO_Util::Decomp_Util::Decomp_nc_logger::get_map_from_regions(std::vector<
   for(std::size_t i = 0; i < lregions.size(); i += 2){
     PIO_Offset start = lregions[i];
     PIO_Offset count = lregions[i + 1];
-    if(start != 0){
-      std::generate_n(std::back_inserter(lcompmap), count, [&start] () mutable { return start++; });
-    }
-    else{
-      std::fill_n(std::back_inserter(lcompmap), count, 0);
-    }
+
+    std::generate_n(std::back_inserter(lcompmap), count, [&start] () mutable { return start++; });
   }
 }
 
