@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <libgen.h>
+#include <iostream>
 #include <string>
 #include <regex>
 #include <vector>
@@ -61,7 +62,7 @@ extern int GPTLis_initialized (void);
 
 /* Some logging constants. */
 #if PIO_ENABLE_LOGGING
-#define MAX_LOG_MSG 1024
+#define MAX_LOG_MSG 8192
 #define MAX_RANK_STR 12
 #define ERROR_PREFIX "ERROR: "
 #define NC_LEVEL_DIFF 3
@@ -1044,70 +1045,33 @@ void pio_finalize_gptl(void)
  */
 void pio_log(int severity, const char *fmt, ...)
 {
-    va_list argp;
-    int t;
-    int rem_len = MAX_LOG_MSG;
-    char msg[MAX_LOG_MSG];
-    char *ptr = msg;
-    char rank_str[MAX_RANK_STR];
+  va_list argp;
+  int log_msg_sz = 0;
 
-    /* If the severity is greater than the log level, we don't print
-       this message. */
-    if (severity > pio_log_level)
-        return;
+  if(severity > pio_log_level) return;
 
-    /* If the severity is 0, only print on rank 0. */
-    if (severity < 1 && my_rank != 0)
-        return;
+  // Find the size of the log msg
+  va_start(argp, fmt);
+  int log_msg_size = std::vsnprintf(NULL, 0, fmt, argp);
+  va_end(argp);
 
-    /* If the severity is zero, this is an error. Otherwise insert that
-       many tabs before the message. */
-    if (!severity)
-    {
-        strncpy(ptr, ERROR_PREFIX, (rem_len > 0) ? rem_len : 0);
-        ptr += strlen(ERROR_PREFIX);
-        rem_len -= strlen(ERROR_PREFIX);
-    }
-    for (t = 0; t < severity; t++)
-    {
-        strncpy(ptr++, "\t", (rem_len > 0) ? rem_len : 0);
-        rem_len--;
-    }
+  if(log_msg_size == 0) return;
 
-    /* Show the rank. */
-    snprintf(rank_str, MAX_RANK_STR, "%d ", my_rank);
-    strncpy(ptr, rank_str, (rem_len > 0) ? rem_len : 0);
-    ptr += strlen(rank_str);
-    rem_len -= strlen(rank_str);
+  // Get the log msg
+  std::string log_msg(log_msg_size + 1, '\0');
+  va_start(argp, fmt);
+  vsnprintf(&log_msg[0], log_msg.size(), fmt, argp);
+  va_end(argp);
 
-    /* Print out the variable list of args with vprintf. */
-    va_start(argp, fmt);
-    vsnprintf(ptr, ((rem_len > 0) ? rem_len : 0), fmt, argp);
-    va_end(argp);
-
-    /* Put on a final linefeed. */
-    ptr = msg + strlen(msg);
-    rem_len = MAX_LOG_MSG - strlen(msg);
-    strncpy(ptr, "\n\0", (rem_len > 0) ? rem_len : 0);
-
-    /* Add string delimiter to handle the case where the buffer
-     * is completely filled up
-     */
-    msg[MAX_LOG_MSG - 1] = '\0';
-
-    /* Send message to log file. */
-    if (LOG_FILE)
-    {
-        fprintf(LOG_FILE, "%s", msg);
-        fflush(LOG_FILE);
-    }
-    else
-    {
-        /* Send message to stdout. */
-        fprintf(stdout, "%s", msg);
-        /* Ensure an immediate flush of stdout. */
-        fflush(stdout);
-    }
+  // Write log msg to file
+  if(LOG_FILE){
+    fprintf(LOG_FILE, "%s\n", log_msg.c_str());
+    fflush(LOG_FILE);
+  }
+  else{
+    fprintf(stdout, "%s\n", log_msg.c_str());
+    fflush(stdout);
+  }
 }
 #endif /* PIO_ENABLE_LOGGING */
 
