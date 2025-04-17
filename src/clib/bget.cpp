@@ -1032,7 +1032,7 @@ void brel(void *buf)
            released,  since  it's  negative to indicate that the buffer is
            allocated. */
 
-        register bufsize size = b->bh.bsize;
+        bufsize size = b->bh.bsize;
 
         /* Make the previous buffer the one we're working on. */
         assert(BH((char *) b - b->bh.prevfree)->bsize == b->bh.prevfree);
