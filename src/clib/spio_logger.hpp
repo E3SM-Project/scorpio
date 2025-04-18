@@ -24,6 +24,9 @@ namespace SPIO_Util{
         /* Log message */
         void log(const std::string &log_msg);
 
+        /* Singleton log : Logging is only done once - e.g. writing headers etc */
+        void slog(const std::string &slog_msg);
+
         /* Explicitly flush the contents of the logger */
         void flush(void );
 
@@ -35,6 +38,7 @@ namespace SPIO_Util{
         MPI_Comm mpi_comm_;
         TStream *ostr_;
         bool is_io_proc_;
+        bool slog_done_;
 
         static const int MPI_RANK_ROOT = 0;
         static const char LOG_SEP = '\n';
@@ -43,7 +47,7 @@ namespace SPIO_Util{
 } // namespace SPIO_Util
 
 template<typename TStream>
-SPIO_Util::Logger::MPI_logger<TStream>::MPI_logger(MPI_Comm comm, TStream *ostr):mpi_comm_(comm), ostr_(ostr), is_io_proc_(false)
+SPIO_Util::Logger::MPI_logger<TStream>::MPI_logger(MPI_Comm comm, TStream *ostr):mpi_comm_(comm), ostr_(ostr), is_io_proc_(false), slog_done_(false)
 {
   int rank;
   int ret;
@@ -60,6 +64,15 @@ void SPIO_Util::Logger::MPI_logger<TStream>::log(const std::string &log_msg)
 {
   if(is_io_proc_){
     (*ostr_) << log_msg.c_str() << LOG_SEP;
+  }
+}
+
+template<typename TStream>
+void SPIO_Util::Logger::MPI_logger<TStream>::slog(const std::string &slog_msg)
+{
+  if(!slog_done_){
+    log(slog_msg);
+    slog_done_ = true;
   }
 }
 

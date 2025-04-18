@@ -41,7 +41,9 @@ add_library (pioc ${pio_api_src}
   pioc.cpp pioc_sc.cpp pio_spmd.cpp pio_rearrange.cpp pio_nc4.cpp bget.cpp
   pio_nc.cpp pio_put_nc.cpp pio_get_nc.cpp pio_getput_int.cpp pio_msg.cpp pio_varm.cpp
   pio_darray.cpp pio_darray_int.cpp spio_hash.cpp pio_sdecomps_regex.cpp spio_io_summary.cpp
-  spio_ltimer.cpp spio_serializer.cpp spio_file_mvcache.cpp spio_tracer.cpp spio_rearrange_any.cpp)
+  spio_ltimer.cpp spio_serializer.cpp spio_file_mvcache.cpp
+  spio_tracer.cpp spio_tracer_mdata.cpp spio_tracer_decomp.cpp
+  spio_rearrange_any.cpp)
 
 #==============================================================================
 #  FIND EXTERNAL LIBRARIES/DEPENDENCIES
@@ -381,9 +383,17 @@ endif ()
 if (PIO_ENABLE_API_TRACING)
   message(STATUS "Enabling API tracing")
   set(ENABLE_API_TRACING 1)
+  if (PIO_ENABLE_API_VAR_TRACING)
+    message(STATUS "Enabling variable tracing in APIs")
+    set(ENABLE_API_VAR_TRACING 1)
+  else ()
+    message(STATUS "Disabling variable tracing in APIs (default)")
+    set(ENABLE_API_VAR_TRACING 0)
+  endif ()
 else ()
   message(STATUS "API tracing disabled (default)")
   set(ENABLE_API_TRACING 0)
+  set(ENABLE_API_VAR_TRACING 0)
 endif ()
 
 # The MPI library detection was done in the top level
