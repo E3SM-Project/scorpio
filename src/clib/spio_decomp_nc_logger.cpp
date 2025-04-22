@@ -543,8 +543,8 @@ void SPIO_Util::Decomp_Util::Decomp_nc_logger::gather_nregions_starts_counts(std
   assert(lregions.size() % 2 == 0);
 
   if(is_io_proc_){
-    assert(agg_nregions_starts.size() == agg_comm_sz_);
-    assert(agg_nregions_counts.size() == agg_comm_sz_);
+    assert(static_cast<int>(agg_nregions_starts.size()) == agg_comm_sz_);
+    assert(static_cast<int>(agg_nregions_counts.size()) == agg_comm_sz_);
   }
 
   agg_nregions = 0;
