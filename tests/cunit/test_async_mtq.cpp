@@ -148,7 +148,7 @@ int test_enq_deq_int(int wrank, const int max_elems_in_q, const int nthreads,
     /* Verify that we dequeued all elements in the queue */
     std::vector<bool> elem_in_q(max_elems_in_q, false);
     for(int i=0; i<nthreads; i++){
-      for(int j=0; j<ovals[i].size(); j++){
+      for(std::size_t j=0; j<ovals[i].size(); j++){
         int idx = (ovals[i])[j];
         if((idx < 0) || (idx >= max_elems_in_q)){
           /* Invalid element in queue */
@@ -253,7 +253,7 @@ int test_enq_deq_utype(int wrank, const int max_elems_in_q, const int nthreads)
     /* Verify that we dequeued all elements in the queue */
     std::vector<bool> elem_in_q(max_elems_in_q, false);
     for(int i=0; i<nthreads; i++){
-      for(int j=0; j<ovals[i].size(); j++){
+      for(std::size_t j=0; j<ovals[i].size(); j++){
         int ioval = (ovals[i])[j].i;
         int idx = ioval;
         float foval = (ovals[i])[j].f;
@@ -353,7 +353,7 @@ int test_enq_deq_putype(int wrank, const int max_elems_in_q, const int nthreads)
     /* Verify that we dequeued all elements in the queue */
     std::vector<bool> elem_in_q(max_elems_in_q, false);
     for(int i=0; i<nthreads; i++){
-      for(int j=0; j<ovals[i].size(); j++){
+      for(std::size_t j=0; j<ovals[i].size(); j++){
         int ioval = ((ovals[i])[j])->i;
         int idx = ioval;
         float foval = ((ovals[i])[j])->f;
