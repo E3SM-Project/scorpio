@@ -744,7 +744,7 @@ static void init_iodesc_contig_rearr_fields(iosystem_desc_t *ios, io_desc_t *iod
 
     LOG((1, "Contig rearranger : iodesc {ioid=%d, llen=%lld, maxiobuflen=%lld, ndims=%d, dimlen=%s, maxregions=%lld", iodesc->ioid, static_cast<long long int>(iodesc->llen), static_cast<long long int>(iodesc->maxiobuflen), iodesc->ndims, SPIO_Util::Dbg_Util::vec1d_to_string(iodesc->dimlen, iodesc->dimlen + iodesc->ndims).c_str(), static_cast<long long int>(off_ranges.size())));
     // FIXME : Move to C++ lists for region list
-    for(int i = 0; i < off_ranges.size(); i++){
+    for(std::size_t i = 0; i < off_ranges.size(); i++){
       if(cur_region == NULL){
         alloc_region2(ios, iodesc->ndims, &cur_region);
         prev_region->next = cur_region;
