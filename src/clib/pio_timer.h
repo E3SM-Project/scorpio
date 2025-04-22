@@ -69,7 +69,7 @@ extern "C" {
 /* Init timer framework - needs to be called once before using timers */
 int mtimer_init(mtimer_type_t type);
 /* Create/Start/Stop/Destroy a timer */
-mtimer_t mtimer_create(const char *name, MPI_Comm comm, char *log_fname);
+mtimer_t mtimer_create(const char *name, MPI_Comm comm, const char *log_fname);
 int mtimer_start(mtimer_t mt);
 int mtimer_stop(mtimer_t mt, const char *log_msg);
 int mtimer_destroy(mtimer_t *pmt);

@@ -76,7 +76,7 @@ int mtimer_init(mtimer_type_t type)
  * comm : MPI communicator where the timer runs
  * log_fname : File name for the timer logs
  */
-mtimer_t mtimer_create(const char *name, MPI_Comm comm, char *log_fname)
+mtimer_t mtimer_create(const char *name, MPI_Comm comm, const char *log_fname)
 {
     assert((name != NULL) && (log_fname != NULL));
     mtimer_t mt = (mtimer_t )malloc(sizeof(struct mtimer_info));

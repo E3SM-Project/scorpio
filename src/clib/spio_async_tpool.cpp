@@ -127,7 +127,6 @@ int pio_async_tpool_create(void )
 
 int pio_async_tpool_op_add(pio_async_op_t *op)
 {
-  int ret;
   PIO_Util::PIO_async_tpool *tpool = tpool_mgr.get_tpool_instance();
   assert(tpool);
   LOG((2, "pio_async_tpool_op_add(): Adding op"));

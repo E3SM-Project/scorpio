@@ -80,7 +80,7 @@ static int verbose;
 static void
 usage(char *argv0)
 {
-    char *help =
+    const char *help =
     "Usage: %s [-h] | [-q] [-k format] [file_name]\n"
     "       [-h] Print help\n"
     "       [-q] Quiet mode (reports when fail)\n"
@@ -127,7 +127,7 @@ void convert_gidx_to_dim_idx(int gidx, int ndims, const MPI_Offset *gdimlen, std
   int dim_chunk_sz[ndims];
 
   assert(ndims > 0);
-  assert(gdimlen && (dim_idx.size() == ndims));
+  assert(gdimlen && (static_cast<int>(dim_idx.size()) == ndims));
 
   dim_chunk_sz[ndims - 1] = 1;
   for(int i = ndims - 2; i >= 0; i--){
@@ -216,7 +216,6 @@ int validate_starts_counts(MPI_Offset start_off, MPI_Offset end_off,
                             const std::vector<std::vector<MPI_Offset> > &counts)
 {
   const int FAIL = 1, SUCCESS = 0;
-  MPI_Offset cur_off;
 
   if(start_off > end_off){
     std::cerr << "ERROR: Start offset provided needs to be <= end offset\n";
@@ -315,9 +314,9 @@ static inline void convert_off_to_start_dim_idx(const std::vector<MPI_Offset> &d
 static inline void convert_off_to_count_dim_idx(int ndims, const MPI_Offset *gdimlen, const std::vector<MPI_Offset> &dim_chunk_sz, int count_off, std::vector<MPI_Offset> &count_dim_idx)
 {
   assert(dim_chunk_sz.size() == count_dim_idx.size());
-  assert(count_dim_idx.size() == ndims);
+  assert(static_cast<int>(count_dim_idx.size()) == ndims);
 
-  for(std::size_t i = 0; i < ndims; i++){
+  for(int i = 0; i < ndims; i++){
     count_dim_idx[i] = gdimlen[i];
   }
   for(std::size_t i = 0; i < dim_chunk_sz.size(); i++){
@@ -435,7 +434,8 @@ pnetcdf_io(MPI_Comm comm, char *filename, int cmode)
     int var3did, buf3d[NZ][NY][NX], var3d_rankid, buf3d_rank[NZ][NY][NX];
     char str_att[128];
     float float_att[100];
-    MPI_Offset  global_nz, global_ny, global_nx, global_tot_sz, gdimlen[3];
+    MPI_Offset  global_nz, global_ny, global_nx, gdimlen[3];
+    //MPI_Offset  global_tot_sz;
     MPI_Offset  global_nx_1d2d;
     MPI_Offset start[3], count[3];
     std::vector<std::vector<MPI_Offset> > starts, counts;
@@ -456,7 +456,7 @@ pnetcdf_io(MPI_Comm comm, char *filename, int cmode)
     global_nx = NX;
     global_nx_1d2d = NX * nprocs;
 
-    global_tot_sz = global_nz * global_ny * global_nx;
+    //global_tot_sz = global_nz * global_ny * global_nx;
     gdimlen[0] = global_nz;
     gdimlen[1] = global_ny;
     gdimlen[2] = global_nx;

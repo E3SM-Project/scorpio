@@ -556,7 +556,7 @@ int pio_var_rearr_and_cache(file_desc_t *file, var_desc_t *vdesc,
     /* viobuf cache list keeps track of iobuf that contains the
      * rearranged data
      */
-    viobuf_cache_t *p = vdesc->viobuf_ltail;
+    //viobuf_cache_t *p = vdesc->viobuf_ltail;
     pnew = (viobuf_cache_t *)calloc(1, sizeof(viobuf_cache_t));
     if(!pnew){
       return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,

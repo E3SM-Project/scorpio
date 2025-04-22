@@ -1157,7 +1157,7 @@ int SPIO::DataRearr::Contig_rearr::init_rearr_send_types(
 
   assert(ios_ && ios_->ioproc);
   assert(rearr_comm_sz_ > 0);
-  assert(nregion_infos_sent.size() == rearr_comm_sz_);
+  assert(static_cast<int>(nregion_infos_sent.size()) == rearr_comm_sz_);
 
   rearr_alltoall_info_.scounts.reserve(rearr_comm_sz_);
   rearr_alltoall_info_.sdispls.reserve(rearr_comm_sz_);
@@ -1218,7 +1218,7 @@ int SPIO::DataRearr::Contig_rearr::init_rearr_recvd_types(
 
   assert(ios_ && ios_->ioproc);
   assert(rearr_comm_sz_ > 0);
-  assert(nregion_infos_recvd.size() == rearr_comm_sz_);
+  assert(static_cast<int>(nregion_infos_recvd.size()) == rearr_comm_sz_);
 
   rearr_alltoall_info_.rcounts.reserve(rearr_comm_sz_);
   rearr_alltoall_info_.rdispls.reserve(rearr_comm_sz_);
@@ -1232,7 +1232,7 @@ int SPIO::DataRearr::Contig_rearr::init_rearr_recvd_types(
   for(int i = 0; i < rearr_comm_sz_; i++){
     if(nregion_infos_recvd[i] != 0){
       /* We receive an indexed type based on the region info we received from each process */
-      int data_ranki_idx = static_cast<int>(data_idx);
+      //int data_ranki_idx = static_cast<int>(data_idx);
       int nregions = nregion_infos_recvd[i] / 2;
 
       assert(nregions > 0);
@@ -1335,9 +1335,9 @@ int SPIO::DataRearr::Contig_rearr::rearrange_data(const void *sbuf, std::size_t 
 
     rearr_stypes_nvars.reserve(rearr_comm_sz_);
     rearr_rtypes_nvars.reserve(rearr_comm_sz_);
-    assert(rearr_alltoall_info_.stypes.size() == rearr_comm_sz_);
-    assert(rearr_alltoall_info_.rtypes.size() == rearr_comm_sz_);
-    for(std::size_t i = 0; i < rearr_comm_sz_; i++){
+    assert(static_cast<int>(rearr_alltoall_info_.stypes.size()) == rearr_comm_sz_);
+    assert(static_cast<int>(rearr_alltoall_info_.rtypes.size()) == rearr_comm_sz_);
+    for(int i = 0; i < rearr_comm_sz_; i++){
       MPI_Datatype rearr_stype = MPI_DATATYPE_NULL;
       MPI_Datatype rearr_rtype = MPI_DATATYPE_NULL;
       /* Send type for block of vars */
