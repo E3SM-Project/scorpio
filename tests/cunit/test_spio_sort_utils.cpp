@@ -158,6 +158,138 @@ int test_rev_kway_merge_sort(MPI_Comm comm, int wrank, int wsz)
   return PIO_NOERR;
 }
 
+int test_indirect_simple_kway_merge_sort(MPI_Comm comm, int wrank, int wsz)
+{
+  std::vector<double> data_range1 = {12, 28, 32, 36, 37, 68, 69, 70};
+  std::vector<double> data_range2 = {2, 3, 4, 6, 9, 10, 13, 14, 30, 81};
+
+  std::vector<double> data;
+  data.insert(data.end(), data_range1.begin(), data_range1.end());
+  data.insert(data.end(), data_range2.begin(), data_range2.end());
+
+  std::vector<std::size_t> data_idx(data.size());
+  std::iota(data_idx.begin(), data_idx.end(), 0);
+
+  std::vector<std::pair<std::size_t, std::size_t> > ranges =
+    { {0, data_range1.size()}, {data_range1.size(), data_range1.size() + data_range2.size()} };
+
+  std::vector<double> exp_data(data);
+  std::sort(exp_data.begin(), exp_data.end());
+
+  try{
+    SPIO_Util::vec_kway_merge_sort(data_idx, ranges,
+      [&data](const std::size_t a, const std::size_t b){ return (data[a] + 1 == data[b]); },
+      [&data](const std::size_t a, const std::size_t b){ return data[a] < data[b]; });
+
+    std::vector<double> sorted_data(data.size());
+    std::transform(data_idx.cbegin(), data_idx.cend(),
+      sorted_data.begin(), [&data](const std::size_t idx){ return data[idx]; });
+
+    if(!cmp_result(wrank, sorted_data, exp_data)){
+      LOG_RANK0(wrank, "ERROR: Unexpected/Invalid data in sorted buffer\n");
+      return PIO_EINTERNAL;
+    }
+  }
+  catch(...){
+    LOG_RANK0(wrank, "Kway merge sort of Vector failed\n");
+    return PIO_EINTERNAL;
+  }
+
+  return PIO_NOERR;
+}
+
+int test_indirect_odd_even_kway_merge_sort(MPI_Comm comm, int wrank, int wsz)
+{
+  const std::size_t NELEMS = 32;
+  std::vector<double> data_range1;
+  std::vector<double> data_range2;
+
+  for(std::size_t i = 0; i < NELEMS; i+=2){
+    data_range1.push_back(i);
+    data_range2.push_back(i + 1);
+  }
+
+  std::vector<double> data;
+  data.insert(data.end(), data_range1.begin(), data_range1.end());
+  data.insert(data.end(), data_range2.begin(), data_range2.end());
+
+  std::vector<std::size_t> data_idx(data.size());
+  std::iota(data_idx.begin(), data_idx.end(), 0);
+
+  std::vector<std::pair<std::size_t, std::size_t> > ranges =
+    { {0, data_range1.size()}, {data_range1.size(), data_range1.size() + data_range2.size()} };
+
+  std::vector<double> exp_data(data);
+  std::sort(exp_data.begin(), exp_data.end());
+
+  try{
+    SPIO_Util::vec_kway_merge_sort(data_idx, ranges,
+      [&data](const std::size_t a, const std::size_t b){ return (data[a] + 1 == data[b]); },
+      [&data](const std::size_t a, const std::size_t b){ return data[a] < data[b]; });
+
+    std::vector<double> sorted_data(data.size());
+    std::transform(data_idx.cbegin(), data_idx.cend(),
+      sorted_data.begin(), [&data](const std::size_t idx){ return data[idx]; });
+
+    if(!cmp_result(wrank, sorted_data, exp_data)){
+      LOG_RANK0(wrank, "ERROR: Unexpected/Invalid data in sorted buffer\n");
+      return PIO_EINTERNAL;
+    }
+  }
+  catch(...){
+    LOG_RANK0(wrank, "Kway merge sort of Vector failed\n");
+    return PIO_EINTERNAL;
+  }
+
+  return PIO_NOERR;
+}
+
+int test_indirect_rev_kway_merge_sort(MPI_Comm comm, int wrank, int wsz)
+{
+  std::vector<double> data_range1 = {11, 12, 13, 14};
+  std::vector<double> data_range2 = {5, 6, 7, 8, 9};
+  std::vector<double> data_range3 = {2, 4};
+
+  std::vector<double> data;
+  data.insert(data.end(), data_range1.begin(), data_range1.end());
+  data.insert(data.end(), data_range2.begin(), data_range2.end());
+  data.insert(data.end(), data_range3.begin(), data_range3.end());
+
+  std::vector<std::size_t> data_idx(data.size());
+  std::iota(data_idx.begin(), data_idx.end(), 0);
+
+  std::vector<std::pair<std::size_t, std::size_t> > ranges =
+    { {0, data_range1.size()},
+      {data_range1.size(), data_range1.size() + data_range2.size()},
+      {data_range1.size() + data_range2.size(),
+        data_range1.size() + data_range2.size() + data_range3.size()}
+    };
+
+  std::vector<double> exp_data(data);
+  std::sort(exp_data.begin(), exp_data.end());
+
+  try{
+    SPIO_Util::vec_kway_merge_sort(data_idx, ranges,
+      [&data](const std::size_t a, const std::size_t b){ return (data[a] + 1 == data[b]); },
+      [&data](const std::size_t a, const std::size_t b){ return data[a] < data[b]; });
+
+    std::vector<double> sorted_data(data.size());
+    std::transform(data_idx.cbegin(), data_idx.cend(),
+      sorted_data.begin(), [&data](const std::size_t idx){ return data[idx]; });
+
+    if(!cmp_result(wrank, sorted_data, exp_data)){
+      LOG_RANK0(wrank, "ERROR: Unexpected/Invalid data in sorted buffer\n");
+      return PIO_EINTERNAL;
+    }
+  }
+  catch(...){
+    LOG_RANK0(wrank, "Kway merge sort of Vector failed\n");
+    return PIO_EINTERNAL;
+  }
+
+  return PIO_NOERR;
+}
+
 int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
 {
   int nerrs = 0, ret = PIO_NOERR, mpierr = MPI_SUCCESS;
@@ -166,7 +298,10 @@ int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
   std::vector<std::pair<std::string, std::function<int(MPI_Comm, int, int)> > > test_funcs = {
       {"test_simple_kway_merge_sort", test_simple_kway_merge_sort},
       {"test_odd_even_kway_merge_sort", test_odd_even_kway_merge_sort},
-      {"test_rev_kway_merge_sort", test_rev_kway_merge_sort}
+      {"test_rev_kway_merge_sort", test_rev_kway_merge_sort},
+      {"test_indirect_simple_kway_merge_sort", test_indirect_simple_kway_merge_sort},
+      {"test_indirect_odd_even_kway_merge_sort", test_indirect_odd_even_kway_merge_sort},
+      {"test_indirect_rev_kway_merge_sort", test_indirect_rev_kway_merge_sort}
     };
   
   for(std::size_t tid = 0; tid < test_funcs.size(); tid++){
