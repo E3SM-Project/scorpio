@@ -268,7 +268,14 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::log_decomp(int ioid, con
             std::string(", vname = ") + decomp_vname);
   }
 
-  ret = ncmpi_iput_vara_longlong(ncid_, decomp_varid, &(gmap_sz_start[1]), &mapsz_off, static_cast<const long long *> (map), NULL);
+  ret = PIO_EINTERNAL;
+  if(sizeof(PIO_Offset) == sizeof(long long)){
+    ret = ncmpi_iput_vara_longlong(ncid_, decomp_varid, &(gmap_sz_start[1]), &mapsz_off, (const long long *)(map), NULL);
+  }
+  else if(sizeof(PIO_Offset) == sizeof(long)){
+    ret = ncmpi_iput_vara_long(ncid_, decomp_varid, &(gmap_sz_start[1]), &mapsz_off, (const long *) (map), NULL);
+  }
+
   if(ret != NC_NOERR){
     throw std::runtime_error(std::string("Unable to write decomposition map, ncid = ") + std::to_string(ncid_) +
             std::string(", vname = ") + decomp_vname);
@@ -335,7 +342,14 @@ void SPIO_Util::Tracer::Decomp_Utils::Decomp_nc_logger::finalize(void )
 
       MPI_Offset gsz_start_count_var_start[] = {comm_rank_, 0};
       MPI_Offset gsz_start_count_var_count[] = {1, static_cast<MPI_Offset>(ndecompsx3)};
-      ret = ncmpi_iput_vara_longlong(ncid_, gsz_start_count_varid, gsz_start_count_var_start, gsz_start_count_var_count, gsz_start_count_for_saved_decomps_.data(), NULL);
+      ret = PIO_EINTERNAL;
+      if(sizeof(MPI_Offset) == sizeof(long long)){
+        ret = ncmpi_iput_vara_longlong(ncid_, gsz_start_count_varid, gsz_start_count_var_start, gsz_start_count_var_count, (const long long *) gsz_start_count_for_saved_decomps_.data(), NULL);
+      }
+      else if(sizeof(MPI_Offset) == sizeof(long)){
+        ret = ncmpi_iput_vara_long(ncid_, gsz_start_count_varid, gsz_start_count_var_start, gsz_start_count_var_count, (const long *) gsz_start_count_for_saved_decomps_.data(), NULL);
+      }
+
       if(ret != NC_NOERR){
         throw std::runtime_error(std::string("Error writing variable to store global map sizes/starts/counts, ncid = ") + std::to_string(ncid_));
       }
