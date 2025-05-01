@@ -146,11 +146,14 @@ foreach (NCDFcomp IN LISTS NetCDF_FIND_VALID_COMPONENTS)
                 CHECK_FUNCTION_EXISTS(nc__enddef NetCDF_C_NC__ENDDEF_EXISTS)
             endif ()
 
-            string(TOLOWER "${NCDFcomp}" ncdfcomp)
+            if (NCDFcomp STREQUAL "C")
+              set (config_exe_name nc-config)
+            else()
+              set (config_exe_name nf-config)
+            endif()
             find_program(NetCDF_${NCDFcomp}_CONFIG_EXE
-                          NAMES n${ncdfcomp}-config
+                          NAMES ${config_exe_name}
                           HINTS ${NetCDF_${NCDFcomp}_INCLUDE_DIR}/../bin)
-
             if (NetCDF_${NCDFcomp}_CONFIG_EXE)
               message(STATUS "NetCDF_${NCDFcomp}_CONFIG_EXE = ${NetCDF_${NCDFcomp}_CONFIG_EXE}")
               execute_process(COMMAND "${NetCDF_${NCDFcomp}_CONFIG_EXE}" "--has-nczarr"
