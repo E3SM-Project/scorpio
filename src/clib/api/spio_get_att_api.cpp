@@ -149,6 +149,7 @@ int PIOc_get_att_uchar(int ncid, int varid, const char *name, unsigned char *ip)
 #if SPIO_ENABLE_API_TRACING
   tr.add_rval("*ip", ip);
 #endif
+  return ret;
 }
 
 int PIOc_get_att_ushort(int ncid, int varid, const char *name, unsigned short *ip)
