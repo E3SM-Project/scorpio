@@ -40,7 +40,7 @@ int PIOc_get_att_schar(int ncid, int varid, const char *name, signed char *ip)
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_schar");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
     add_arg("varid", varid).add_arg("*name", name).
-    add_arg("*ip", ip).flush();
+    add_arg("*ip", static_cast<void *>(ip)).flush();
 #endif
   ret = PIOc_get_att_schar_impl(ncid, varid, name, ip);
 
@@ -142,9 +142,14 @@ int PIOc_get_att_uchar(int ncid, int varid, const char *name, unsigned char *ip)
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_uchar");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
     add_arg("varid", varid).add_arg("*name", name).
-    add_arg("*ip", ip).flush();
+    add_arg("*ip", static_cast<void *>(ip)).flush();
 #endif
-  return PIOc_get_att_uchar_impl(ncid, varid, name, ip);
+  ret = PIOc_get_att_uchar_impl(ncid, varid, name, ip);
+
+#if SPIO_ENABLE_API_TRACING
+  tr.add_rval("*ip", ip);
+#endif
+  return ret;
 }
 
 int PIOc_get_att_ushort(int ncid, int varid, const char *name, unsigned short *ip)
