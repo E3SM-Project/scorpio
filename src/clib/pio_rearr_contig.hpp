@@ -59,7 +59,7 @@ namespace SPIO{
         Contig_rearr(iosystem_desc_t *ios):is_init_(false), ios_(ios), iodesc_(NULL),
           lcompmap_sz_(0), elem_pio_type_(PIO_NAT), elem_mpi_type_(MPI_DATATYPE_NULL),
           elem_mpi_type_sz_(0), agg_comm_(MPI_COMM_NULL), is_agg_root_(false),
-          agg_comm_sz_(0), rearr_comm_(MPI_COMM_NULL), rearr_comm_sz_(0),
+          agg_comm_sz_(0), agg_iochunk_sz_(0), rearr_comm_(MPI_COMM_NULL), rearr_comm_sz_(0),
           rearr_comm_iochunk_sz_(0){}
         /* Initialize the rearranger */
         int init(int pio_type, const PIO_Offset *compmap, std::size_t compmap_sz,
@@ -137,6 +137,8 @@ namespace SPIO{
         MPI_Comm agg_comm_;
         bool is_agg_root_;
         int agg_comm_sz_;
+        /* Size/Num of elements of the data chunk in this aggregating process */
+        std::size_t agg_iochunk_sz_;
         std::vector<std::size_t> agg_compmap_sorter_;
         /* The byte displacements for each process, that is part of agg_comm_, in the aggregated data */
         std::vector<int> agg_data_byte_displs_;
