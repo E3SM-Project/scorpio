@@ -287,8 +287,7 @@ int SPIO::DataRearr::Contig_rearr::rearrange_comp2io(const void *sbuf, std::size
   int ret = PIO_NOERR;
   assert(is_init_);
 
-  /* FIXME: We need a better way to find this info out */
-  std::size_t agg_data_nelems = agg_compmap_sorter_.size();
+  std::size_t agg_data_nelems = agg_iochunk_sz_;
 
   /* Aggregate data */
   void *agg_buf = NULL;
@@ -335,8 +334,7 @@ int SPIO::DataRearr::Contig_rearr::aggregate_data(const void *sbuf, std::size_t 
   MPI_Datatype agg_stype_nvars = MPI_DATATYPE_NULL;
   std::vector<MPI_Datatype> agg_rtypes_nvars;
 
-  /* FIXME: We need a better way to find this info out */
-  std::size_t agg_data_nelems = agg_compmap_sorter_.size();
+  std::size_t agg_data_nelems = agg_iochunk_sz_;
   assert(abuf_sz == nvars * agg_data_nelems * elem_mpi_type_sz_);
 
 //  std::cout << "DBG: sbuf[], abuf[] before gather :" << abuf_sz << "," << nvars << "," << elem_mpi_type_sz_ << ":" << std::flush;
@@ -428,8 +426,7 @@ int SPIO::DataRearr::Contig_rearr::disperse_data(const void *abuf, std::size_t a
   MPI_Datatype dis_rtype_nvars = MPI_DATATYPE_NULL;
   std::vector<MPI_Datatype> dis_stypes_nvars;
 
-  /* FIXME: We need a better way to find this info out */
-  std::size_t agg_data_nelems = agg_compmap_sorter_.size();
+  std::size_t agg_data_nelems = agg_iochunk_sz_;
   assert(abuf_sz == nvars * agg_data_nelems * elem_mpi_type_sz_);
 
   if(nvars > 1){
@@ -505,8 +502,7 @@ int SPIO::DataRearr::Contig_rearr::rearrange_io2comp(const void *sbuf, std::size
   int ret = PIO_NOERR;
   assert(is_init_);
 
-  /* FIXME: We need a better way to find this info out */
-  std::size_t agg_data_nelems = agg_compmap_sorter_.size();
+  std::size_t agg_data_nelems = agg_iochunk_sz_;
 
   /* Disperse/scatter data */
   void *agg_buf = NULL;
@@ -787,7 +783,8 @@ int SPIO::DataRearr::Contig_rearr::setup_data_agg_info(const PIO_Offset *lcompma
   GPTLstop("PIO:Contig_rearr::setup_data_agg_info::sort");
 
   /* Aggregate compmap sorter can be used to sort any user data based on gcompmap */
-  agg_compmap_sorter_.resize(gcompmap.size());
+  agg_iochunk_sz_ = gcompmap.size();
+  agg_compmap_sorter_.resize(agg_iochunk_sz_);
   for(std::size_t i = 0; i < gcompmap_idx.size(); i++){
     agg_compmap_sorter_[gcompmap_idx[i]] = i;
   }
@@ -1297,8 +1294,7 @@ int SPIO::DataRearr::Contig_rearr::rearrange_data(const void *sbuf, std::size_t 
   //std::vector<MPI_Datatype> agg_rtypes_nvars;
   std::vector<MPI_Datatype> rearr_stypes_nvars, rearr_rtypes_nvars;
 
-  /* FIXME: We need a better way to find this info out */
-  std::size_t agg_data_nelems = agg_compmap_sorter_.size();
+  std::size_t agg_data_nelems = agg_iochunk_sz_;
   //assert(abuf_sz == nvars * agg_data_nelems * elem_mpi_type_sz_);
 
   //std::cout << "DBG: sbuf[], rbuf[] before rearrange :\n" << std::flush;
