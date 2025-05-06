@@ -9,11 +9,11 @@
 
 static void init_user_options(spio_tool_utils::ArgParser &ap)
 {
-    ap.add_opt("bp-file", "data produced by PIO with ADIOS format")
-      .add_opt("idir", "Directory containing data output from PIO (in ADIOS format)")
+    ap.add_opt("bp-file", "data produced by SCORPIO with ADIOS format")
+      .add_opt("idir", "Directory containing data output from SCORPIO (in ADIOS format)")
       .add_opt("nc-file", "output file name after conversion")
-      .add_opt("pio-format", "output PIO_IO_TYPE. Supported parameters: \"pnetcdf\",  \"netcdf\",  \"netcdf4c\",  \"netcdf4p\", \"nczarr\"")
-      .add_opt("rearr", "PIO rearranger. Supported parameters: \"subset\", \"box\", \"any\". Default \"any\".")
+      .add_opt("pio-format", "output SCORPIO I/O type. Supported parameters: \"pnetcdf\",  \"netcdf\",  \"netcdf4c\",  \"netcdf4p\", \"nczarr\"")
+      .add_opt("rearr", "SCORPIO rearranger. Supported parameters: \"subset\", \"box\", \"any\". Default \"any\".")
       .add_opt("verbose", "Turn on verbose info messages");
 }
 
