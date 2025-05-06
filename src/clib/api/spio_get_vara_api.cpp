@@ -31,7 +31,7 @@ int PIOc_get_vara_text(int ncid, int varid, const PIO_Offset *start, const PIO_O
 #endif
   ret = PIOc_get_vara_text_impl(ncid, varid, start, count, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_vslice_sz_from_count(ncid, varid, count));
 #endif
   return ret;
@@ -49,7 +49,7 @@ int PIOc_get_vara_schar(int ncid, int varid, const PIO_Offset *start, const PIO_
 #endif
   ret = PIOc_get_vara_schar_impl(ncid, varid, start, count, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_vslice_sz_from_count(ncid, varid, count));
 #endif
   return ret;
@@ -67,7 +67,7 @@ int PIOc_get_vara_short(int ncid, int varid, const PIO_Offset *start, const PIO_
 #endif
   ret = PIOc_get_vara_short_impl(ncid, varid, start, count, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_vslice_sz_from_count(ncid, varid, count));
 #endif
   return ret;
@@ -85,7 +85,7 @@ int PIOc_get_vara_int(int ncid, int varid, const PIO_Offset *start, const PIO_Of
 #endif
   ret = PIOc_get_vara_int_impl(ncid, varid, start, count, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_vslice_sz_from_count(ncid, varid, count));
 #endif
   return ret;
@@ -103,7 +103,7 @@ int PIOc_get_vara_float(int ncid, int varid, const PIO_Offset *start, const PIO_
 #endif
   ret = PIOc_get_vara_float_impl(ncid, varid, start, count, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_vslice_sz_from_count(ncid, varid, count));
 #endif
   return ret;
@@ -121,7 +121,7 @@ int PIOc_get_vara_long(int ncid, int varid, const PIO_Offset *start, const PIO_O
 #endif
   ret = PIOc_get_vara_long_impl(ncid, varid, start, count, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_vslice_sz_from_count(ncid, varid, count));
 #endif
   return ret;
@@ -139,7 +139,7 @@ int PIOc_get_vara_double(int ncid, int varid, const PIO_Offset *start,
 #endif
   ret = PIOc_get_vara_double_impl(ncid, varid, start, count, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_vslice_sz_from_count(ncid, varid, count));
 #endif
   return ret;
@@ -157,7 +157,7 @@ int PIOc_get_vara_uchar(int ncid, int varid, const PIO_Offset *start, const PIO_
 #endif
   ret = PIOc_get_vara_uchar_impl(ncid, varid, start, count, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_vslice_sz_from_count(ncid, varid, count));
 #endif
   return ret;
@@ -175,7 +175,7 @@ int PIOc_get_vara_ushort(int ncid, int varid, const PIO_Offset *start, const PIO
 #endif
   ret = PIOc_get_vara_ushort_impl(ncid, varid, start, count, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_vslice_sz_from_count(ncid, varid, count));
 #endif
   return ret;
@@ -193,7 +193,7 @@ int PIOc_get_vara_uint(int ncid, int varid, const PIO_Offset *start, const PIO_O
 #endif
   ret = PIOc_get_vara_uint_impl(ncid, varid, start, count, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_vslice_sz_from_count(ncid, varid, count));
 #endif
   return ret;
@@ -211,7 +211,7 @@ int PIOc_get_vara_longlong(int ncid, int varid, const PIO_Offset *start, const P
 #endif
   ret = PIOc_get_vara_longlong_impl(ncid, varid, start, count, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_vslice_sz_from_count(ncid, varid, count));
 #endif
   return ret;
@@ -229,7 +229,7 @@ int PIOc_get_vara_ulonglong(int ncid, int varid, const PIO_Offset *start, const 
 #endif
   ret = PIOc_get_vara_ulonglong_impl(ncid, varid, start, count, buf);
 
-#if SPIO_ENABLE_API_TRACING
+#if (SPIO_ENABLE_API_TRACING) && (SPIO_ENABLE_API_VAR_TRACING)
   tr.add_rval("*buf", buf, PIO_Util::PIO_Get_Utils::get_vslice_sz_from_count(ncid, varid, count));
 #endif
   return ret;
