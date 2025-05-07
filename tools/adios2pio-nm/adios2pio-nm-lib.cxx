@@ -2306,12 +2306,14 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
     if(ierr != BP2PIO_NOERR)
     {
         fprintf(stderr, "ERROR: Checking BP file (%s) conversion status failed\n", infilepath.c_str());
+        GPTLstop("adios2pio:ConvertBPFile");
         return BP2PIO_ERROR;
     }
 
     if(conv_done)
     {
         /* Avoid converting BP files that have already been converted */
+        GPTLstop("adios2pio:ConvertBPFile");
         return BP2PIO_NOERR;
     }
 
@@ -2326,6 +2328,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         ierr = OpenAdiosFile(adios, bpIO, bpReader, file0, err_msg);
         if (ierr != PIO_NOERR)
         {
+            GPTLstop("adios2pio:ConvertBPFile");
             fprintf(stderr, "ERROR: Cannot open file: %s\n", file0.c_str());
             fflush(stderr);
             return ierr;
@@ -2344,6 +2347,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         else
         {
             fprintf(stderr, "ERROR: /__pio__/info/nproc is missing.\n");
+            GPTLstop("adios2pio:ConvertBPFile");
             return BP2PIO_ERROR;
         }
 
@@ -2397,12 +2401,14 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
             if (mpierr != MPI_SUCCESS)
             {
                 fprintf(stderr, "Bcasting /__pio__/info/block_nprocs failed, mpierr = %d\n", mpierr);
+                GPTLstop("adios2pio:ConvertBPFile");
                 return BP2PIO_ERROR;
             }
         }
         else
         {
             fprintf(stderr, "ERROR: /__pio__/info/block_nprocs is missing.\n");
+            GPTLstop("adios2pio:ConvertBPFile");
             return BP2PIO_ERROR;
         }
 
@@ -2444,6 +2450,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
             if (mpierr != MPI_SUCCESS)
             {
                 fprintf(stderr, "Bcasting /__pio__/info/block_list failed, mpierr = %d\n", mpierr);
+                GPTLstop("adios2pio:ConvertBPFile");
                 return BP2PIO_ERROR;
             }
 
@@ -2455,6 +2462,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         else
         {
             fprintf(stderr, "ERROR: /__pio__/info/block_list is missing.\n");
+            GPTLstop("adios2pio:ConvertBPFile");
             return BP2PIO_ERROR;
         }
         bpReader[0].EndStep();
@@ -2465,7 +2473,10 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         ierr = CreateIOProcessGroup(w_comm, w_nproc, w_mpirank, block_procs, &comm, &mpirank, &nproc, &io_proc);
         GPTLstop("adios2pio:ConvertBPFile:CreateIOProcessGroup");
         if (ierr != BP2PIO_NOERR)
+        {
+            GPTLstop("adios2pio:ConvertBPFile");
             return ierr;
+        }
 
         /* Close files. Create a new ADIOS object, because the MPI processes are clustered into two groups */
         bpReader[0].Close();
@@ -2480,6 +2491,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
             /* Not I/O process */
             MPI_Comm_free(&comm);
             MPI_Barrier(w_comm);
+            GPTLstop("adios2pio:ConvertBPFile");
             return BP2PIO_NOERR;
         }
 
@@ -2661,6 +2673,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         {
             cerr << "rank " << mpirank << ":ERROR in PIOc_finalize(), code = " << ret
                  << " at " << __func__ << ":" << __LINE__ << endl;
+           GPTLstop("adios2pio:ConvertBPFile");
            throw std::runtime_error("PIOc_finalize error.");
         }
     }
@@ -2684,7 +2697,9 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
     GPTLstop("adios2pio:ConvertBPFile");
 
     if (ierr != BP2PIO_NOERR)
+    {
         return ierr;
+    }
 
     return BP2PIO_NOERR;
 }
