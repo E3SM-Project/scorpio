@@ -2831,7 +2831,7 @@ static int FindBPDirs(const string &bppdir,
     while ((pde = readdir(pdir)) != NULL)
     {
         assert(pde);
-        string dname(pde->d_name);
+        string dname(bppdir + "/" + pde->d_name);
         /* Add dirs named "*.bp" to bpdirs */
         string dname_prefix;
         if ((pde->d_type == DT_DIR) &&
