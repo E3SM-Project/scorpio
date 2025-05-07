@@ -19,6 +19,7 @@
 
 #include "adios2pio-nm-lib.h"
 #include "adios2pio-nm-lib-c.h"
+#include "spio_misc_tool_utils.h"
 
 using namespace std;
 
@@ -2720,9 +2721,13 @@ enum PIO_IOTYPE GetIOType_nm(const string &t)
 }
 
 int ConvertBPToNC(const string &infilepath, const string &outfilename,
-                  const string &piotype, const string &rearr, MPI_Comm comm_in)
+                  const string &piotype, const string &rearr, MPI_Comm comm_in,
+                  const std::string &rm_ifname_rgx)
 {
     int ierr = BP2PIO_NOERR;
+    int rank = -1;
+
+    MPI_Comm_rank(comm_in, &rank);
 
     try
     {
@@ -2731,6 +2736,23 @@ int ConvertBPToNC(const string &infilepath, const string &outfilename,
         if (ierr != BP2PIO_NOERR)
         {
             throw std::runtime_error("ConvertBPFile error.");
+        }
+
+        if ((rank == 0) && !rm_ifname_rgx.empty())
+        {
+            /* On root proc, delete the input BP file if its name matches the passed in regex */
+#ifdef SPIO_NO_CXX_REGEX
+            /* Only "*" is supported for no regex case, and we assume its "*" if not empty() */
+            spio_tool_utils::rmdir_f(infilepath);
+#else
+            std::smatch match;
+            std::regex rgx(rm_ifname_rgx);
+            if (std::regex_match(infilepath, match, rgx))
+            {
+                std::cout << "Deleting BP file : " << infilepath.c_str() << "\n";
+                spio_tool_utils::rmdir_f(infilepath);
+            }
+#endif
         }
     }
     catch (const std::exception &e)
@@ -2838,7 +2860,7 @@ static int FindBPDirs(const string &bppdir,
  * and converts them, one at a time, to NetCDF files
  */
 int MConvertBPToNC(const string &bppdir, const string &piotype, const string &rearr,
-                    MPI_Comm comm)
+                    MPI_Comm comm, const std::string &rm_ifname_rgx)
 {
     int ierr = BP2PIO_NOERR;
     vector<string> bpdirs;
@@ -2858,7 +2880,7 @@ int MConvertBPToNC(const string &bppdir, const string &piotype, const string &re
         MPI_Barrier(comm);
         ierr = ConvertBPToNC(bpdirs[i],
                 conv_fname_prefixes[i] + CONV_FNAME_SUFFIX,
-                piotype, rearr, comm);
+                piotype, rearr, comm, rm_ifname_rgx);
         MPI_Barrier(comm);
         if (ierr != BP2PIO_NOERR)
         {
@@ -2884,8 +2906,10 @@ int C_API_ConvertBPToNC(const char *infilepath, const char *outfilename,
     else
         rearr = "subset";
 
+    /* FIXME: Currently we don't support regex deletes of BP input files */
+    std::string rm_ifname_rgx;
     return ConvertBPToNC(string(infilepath), string(outfilename),
-                         string(piotype), rearr, comm_in);
+                         string(piotype), rearr, comm_in, rm_ifname_rgx);
 }
 
 #ifdef __cplusplus

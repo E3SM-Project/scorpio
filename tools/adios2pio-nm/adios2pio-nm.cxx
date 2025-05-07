@@ -10,6 +10,7 @@
 static void init_user_options(spio_tool_utils::ArgParser &ap)
 {
     ap.add_opt("bp-file", "data produced by SCORPIO with ADIOS format")
+      .add_opt("rm-bp-file-after-conv", "remove the ADIOS BP file after conversion")
       .add_opt("idir", "Directory containing data output from SCORPIO (in ADIOS format)")
       .add_opt("nc-file", "output file name after conversion")
       .add_opt("pio-format", "output SCORPIO I/O type. Supported parameters: \"pnetcdf\",  \"netcdf\",  \"netcdf4c\",  \"netcdf4p\", \"nczarr\"")
@@ -55,9 +56,10 @@ static int get_user_options(
               int argc, char *argv[],
               std::string &idir,
               std::string &ifile, std::string &ofile,
+              std::string &rm_ifname_rgx,
               std::string &otype,
               std::string &rearr,
-              int &debug_lvl)
+              int &debug_lvl, int rank)
 {
     const std::string DEFAULT_PIO_FORMAT("pnetcdf");
     const std::string DEFAULT_REARRANGER("any");
@@ -94,6 +96,23 @@ static int get_user_options(
     {
         assert(ap.has_arg("idir"));
         idir = ap.get_arg<std::string>("idir");
+    }
+
+    if (ap.has_arg("rm-bp-file-after-conv"))
+    {
+        try{
+          /* Remove all input files matching the provided regex */
+          rm_ifname_rgx = ap.get_arg<std::string>("rm-bp-file-after-conv");
+#ifdef SPIO_NO_CXX_REGEX
+          if(rank == 0){
+            std::cout << "WARNING: No C++ regex support. Ignoring specified regex for deleting files and deleting all input/BP files after conversion...\n";
+          }
+          rm_ifname_rgx = ".*";
+#endif
+        } catch(...){
+          /* Remove all input files */
+          rm_ifname_rgx = ".*";
+        }
     }
 
     if (ap.has_arg("pio-format"))
@@ -143,10 +162,11 @@ int main(int argc, char *argv[])
 
     /* Parse the user options */
     string idir, infilepath, outfilename, piotype, rearr;
+    string rm_ifname_rgx;
     int debug_lvl = 0;
     ret = get_user_options(ap, argc, argv,
                             idir, infilepath, outfilename,
-                            piotype, rearr, debug_lvl);
+                            rm_ifname_rgx, piotype, rearr, debug_lvl, rank);
 
     if (ret != 0)
     {
@@ -165,11 +185,11 @@ int main(int argc, char *argv[])
     MPI_Barrier(comm_in);
     if (idir.size() == 0)
     {
-        ret = ConvertBPToNC(infilepath, outfilename, piotype, rearr, comm_in);
+        ret = ConvertBPToNC(infilepath, outfilename, piotype, rearr, comm_in, rm_ifname_rgx);
     }
     else
     {
-        ret = MConvertBPToNC(idir, piotype, rearr, comm_in);
+        ret = MConvertBPToNC(idir, piotype, rearr, comm_in, rm_ifname_rgx);
     }
     MPI_Barrier(comm_in);
 
