@@ -89,7 +89,7 @@ endif ()
 #  DEFINE THE TARGET LIBRARY
 #==============================================================================
 SET(SRC ${SCORPIO_SOURCE_DIR}/tools/util/argparser.cxx adios2pio-nm.cxx)
-add_library(adios2pio-nm-lib adios2pio-nm-lib.cxx)
+add_library(adios2pio-nm-lib ${SCORPIO_SOURCE_DIR}/tools/util/spio_misc_tool_utils.cxx adios2pio-nm-lib.cxx)
 include_directories(
   "${PROJECT_SOURCE_DIR}"   # to find foo/foo.h
   "${PROJECT_BINARY_DIR}")  # to find foo/config.h

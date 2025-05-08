@@ -30,6 +30,9 @@ namespace spio_tool_utils{
   /* Global check if a Scorpio function was successful */
   bool gsuccess(MPI_Comm comm, int lspio_err);
 
+  /* Remove directory, including all subdirs/files i.e., "rm -rf" */
+  void rmdir_f(const std::string &dname);
+
 } // namespace spio_tool_utils
 
 #endif // __SPIO_MISC_TOOL_UTILS_H__
