@@ -19,6 +19,7 @@
 
 #include "adios2pio-nm-lib.h"
 #include "adios2pio-nm-lib-c.h"
+#include "spio_misc_tool_utils.h"
 
 using namespace std;
 
@@ -2305,12 +2306,14 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
     if(ierr != BP2PIO_NOERR)
     {
         fprintf(stderr, "ERROR: Checking BP file (%s) conversion status failed\n", infilepath.c_str());
+        GPTLstop("adios2pio:ConvertBPFile");
         return BP2PIO_ERROR;
     }
 
     if(conv_done)
     {
         /* Avoid converting BP files that have already been converted */
+        GPTLstop("adios2pio:ConvertBPFile");
         return BP2PIO_NOERR;
     }
 
@@ -2325,6 +2328,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         ierr = OpenAdiosFile(adios, bpIO, bpReader, file0, err_msg);
         if (ierr != PIO_NOERR)
         {
+            GPTLstop("adios2pio:ConvertBPFile");
             fprintf(stderr, "ERROR: Cannot open file: %s\n", file0.c_str());
             fflush(stderr);
             return ierr;
@@ -2343,6 +2347,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         else
         {
             fprintf(stderr, "ERROR: /__pio__/info/nproc is missing.\n");
+            GPTLstop("adios2pio:ConvertBPFile");
             return BP2PIO_ERROR;
         }
 
@@ -2396,12 +2401,14 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
             if (mpierr != MPI_SUCCESS)
             {
                 fprintf(stderr, "Bcasting /__pio__/info/block_nprocs failed, mpierr = %d\n", mpierr);
+                GPTLstop("adios2pio:ConvertBPFile");
                 return BP2PIO_ERROR;
             }
         }
         else
         {
             fprintf(stderr, "ERROR: /__pio__/info/block_nprocs is missing.\n");
+            GPTLstop("adios2pio:ConvertBPFile");
             return BP2PIO_ERROR;
         }
 
@@ -2443,6 +2450,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
             if (mpierr != MPI_SUCCESS)
             {
                 fprintf(stderr, "Bcasting /__pio__/info/block_list failed, mpierr = %d\n", mpierr);
+                GPTLstop("adios2pio:ConvertBPFile");
                 return BP2PIO_ERROR;
             }
 
@@ -2454,6 +2462,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         else
         {
             fprintf(stderr, "ERROR: /__pio__/info/block_list is missing.\n");
+            GPTLstop("adios2pio:ConvertBPFile");
             return BP2PIO_ERROR;
         }
         bpReader[0].EndStep();
@@ -2464,7 +2473,10 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         ierr = CreateIOProcessGroup(w_comm, w_nproc, w_mpirank, block_procs, &comm, &mpirank, &nproc, &io_proc);
         GPTLstop("adios2pio:ConvertBPFile:CreateIOProcessGroup");
         if (ierr != BP2PIO_NOERR)
+        {
+            GPTLstop("adios2pio:ConvertBPFile");
             return ierr;
+        }
 
         /* Close files. Create a new ADIOS object, because the MPI processes are clustered into two groups */
         bpReader[0].Close();
@@ -2479,6 +2491,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
             /* Not I/O process */
             MPI_Comm_free(&comm);
             MPI_Barrier(w_comm);
+            GPTLstop("adios2pio:ConvertBPFile");
             return BP2PIO_NOERR;
         }
 
@@ -2660,6 +2673,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         {
             cerr << "rank " << mpirank << ":ERROR in PIOc_finalize(), code = " << ret
                  << " at " << __func__ << ":" << __LINE__ << endl;
+           GPTLstop("adios2pio:ConvertBPFile");
            throw std::runtime_error("PIOc_finalize error.");
         }
     }
@@ -2683,7 +2697,9 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
     GPTLstop("adios2pio:ConvertBPFile");
 
     if (ierr != BP2PIO_NOERR)
+    {
         return ierr;
+    }
 
     return BP2PIO_NOERR;
 }
@@ -2720,9 +2736,13 @@ enum PIO_IOTYPE GetIOType_nm(const string &t)
 }
 
 int ConvertBPToNC(const string &infilepath, const string &outfilename,
-                  const string &piotype, const string &rearr, MPI_Comm comm_in)
+                  const string &piotype, const string &rearr, MPI_Comm comm_in,
+                  const std::string &rm_ifname_rgx)
 {
     int ierr = BP2PIO_NOERR;
+    int rank = -1;
+
+    MPI_Comm_rank(comm_in, &rank);
 
     try
     {
@@ -2731,6 +2751,23 @@ int ConvertBPToNC(const string &infilepath, const string &outfilename,
         if (ierr != BP2PIO_NOERR)
         {
             throw std::runtime_error("ConvertBPFile error.");
+        }
+
+        if ((rank == 0) && !rm_ifname_rgx.empty())
+        {
+            /* On root proc, delete the input BP file if its name matches the passed in regex */
+#ifdef SPIO_NO_CXX_REGEX
+            /* Only "*" is supported for no regex case, and we assume its "*" if not empty() */
+            spio_tool_utils::rmdir_f(infilepath);
+#else
+            std::smatch match;
+            std::regex rgx(rm_ifname_rgx);
+            if (std::regex_match(infilepath, match, rgx))
+            {
+                std::cout << "Deleting BP file : " << infilepath.c_str() << "\n";
+                spio_tool_utils::rmdir_f(infilepath);
+            }
+#endif
         }
     }
     catch (const std::exception &e)
@@ -2809,7 +2846,7 @@ static int FindBPDirs(const string &bppdir,
     while ((pde = readdir(pdir)) != NULL)
     {
         assert(pde);
-        string dname(pde->d_name);
+        string dname(bppdir + "/" + pde->d_name);
         /* Add dirs named "*.bp" to bpdirs */
         string dname_prefix;
         if ((pde->d_type == DT_DIR) &&
@@ -2838,7 +2875,7 @@ static int FindBPDirs(const string &bppdir,
  * and converts them, one at a time, to NetCDF files
  */
 int MConvertBPToNC(const string &bppdir, const string &piotype, const string &rearr,
-                    MPI_Comm comm)
+                    MPI_Comm comm, const std::string &rm_ifname_rgx)
 {
     int ierr = BP2PIO_NOERR;
     vector<string> bpdirs;
@@ -2858,7 +2895,7 @@ int MConvertBPToNC(const string &bppdir, const string &piotype, const string &re
         MPI_Barrier(comm);
         ierr = ConvertBPToNC(bpdirs[i],
                 conv_fname_prefixes[i] + CONV_FNAME_SUFFIX,
-                piotype, rearr, comm);
+                piotype, rearr, comm, rm_ifname_rgx);
         MPI_Barrier(comm);
         if (ierr != BP2PIO_NOERR)
         {
@@ -2884,8 +2921,10 @@ int C_API_ConvertBPToNC(const char *infilepath, const char *outfilename,
     else
         rearr = "subset";
 
+    /* FIXME: Currently we don't support regex deletes of BP input files */
+    std::string rm_ifname_rgx;
     return ConvertBPToNC(string(infilepath), string(outfilename),
-                         string(piotype), rearr, comm_in);
+                         string(piotype), rearr, comm_in, rm_ifname_rgx);
 }
 
 #ifdef __cplusplus
