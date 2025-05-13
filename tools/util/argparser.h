@@ -80,7 +80,11 @@ template<>
 inline std::string ArgParser::get_arg<std::string>(const std::string &opt) const
 {
   assert(arg_map_.count(opt) == 1);
-  return arg_map_.at(opt);
+  std::string opt_val = arg_map_.at(opt);
+  if(opt_val == NOVAL_OPT_STR){
+    throw std::runtime_error("Requested value for argument with no value");
+  }
+  return opt_val;
 }
 
 /* Get an int argument already parsed by the parser */
