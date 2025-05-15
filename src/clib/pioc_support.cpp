@@ -1774,10 +1774,8 @@ int PIOc_freedecomp_impl(int iosysid, int ioid)
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function calls. */
     int ret = 0;
 
-    GPTLstart("PIO:PIOc_freedecomp");
     if (!(ios = pio_get_iosystem_from_id(iosysid)))
     {
-        GPTLstop("PIO:PIOc_freedecomp");
         return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
                         "Freeing PIO decomposition failed. Invalid iosystem id (%d) provided", iosysid);
     }
@@ -1786,7 +1784,6 @@ int PIOc_freedecomp_impl(int iosysid, int ioid)
 
     if (!(iodesc = pio_get_iodesc_from_id(ioid)))
     {
-        GPTLstop("PIO:PIOc_freedecomp");
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         return pio_err(ios, NULL, PIO_EBADID, __FILE__, __LINE__,
                         "Freeing PIO decomposition failed. Invalid io decomposition id (%d) provided", ioid);
@@ -1800,7 +1797,6 @@ int PIOc_freedecomp_impl(int iosysid, int ioid)
         PIO_SEND_ASYNC_MSG(ios, msg, &ret, iosysid, ioid);
         if(ret != PIO_NOERR)
         {
-            GPTLstop("PIO:PIOc_freedecomp");
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                             "Freeing PIO decomposition failed (iosysid = %d, iodesc id=%d). Error sending asynchronous message, PIO_MSG_FREEDECOMP, on iosystem", iosysid, ioid);
@@ -1822,7 +1818,6 @@ int PIOc_freedecomp_impl(int iosysid, int ioid)
             if (iodesc->rtype[i] != MPI_DATATYPE_NULL)
                 if ((mpierr = MPI_Type_free(&iodesc->rtype[i])))
                 {
-                    GPTLstop("PIO:PIOc_freedecomp");
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
                 }
@@ -1836,7 +1831,6 @@ int PIOc_freedecomp_impl(int iosysid, int ioid)
             if (iodesc->stype[i] != MPI_DATATYPE_NULL)
                 if ((mpierr = MPI_Type_free(iodesc->stype + i)))
                 {
-                    GPTLstop("PIO:PIOc_freedecomp");
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
                 }
@@ -1866,7 +1860,6 @@ int PIOc_freedecomp_impl(int iosysid, int ioid)
     if (iodesc->rearranger == PIO_REARR_SUBSET)
         if ((mpierr = MPI_Comm_free(&iodesc->subset_comm)))
         {
-            GPTLstop("PIO:PIOc_freedecomp");
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
         }
@@ -1879,12 +1872,10 @@ int PIOc_freedecomp_impl(int iosysid, int ioid)
     ret = pio_delete_iodesc_from_list(ioid);
     if (ret != PIO_NOERR)
     {
-        GPTLstop("PIO:PIOc_freedecomp");
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Freeing PIO decomposition failed (iosysid = %d, ioid=%d). Error while trying to delete I/O descriptor from internal list", iosysid, ioid); 
     }
-    GPTLstop("PIO:PIOc_freedecomp");
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
 
     return ret;

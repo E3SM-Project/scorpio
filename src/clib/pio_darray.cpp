@@ -1958,7 +1958,6 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
   int mpierr = MPI_SUCCESS;  /* Return code from MPI functions. */
   int ierr = PIO_NOERR;  /* Return code. */
 
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer1("PIO:PIOc_write_darray");
   SPIO_Util::GPTL_Util::GPTL_wrapper func_timer2("PIO:write_total");
   LOG((1, "PIOc_write_darray ncid = %d varid = %d ioid = %d arraylen = %d",
        ncid, varid, ioid, arraylen));
@@ -1978,7 +1977,6 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
   SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper ios_fstats_tot_timer(ios->io_fstats->tot_timer_name);
 
   if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
-    GPTLstart("PIO:PIOc_write_darray_adios");
     GPTLstart("PIO:write_total_adios");
   }
 
@@ -1991,7 +1989,6 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
   /* Can we write to this file? */
   if(!(file->mode & PIO_WRITE)){
     if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
-      GPTLstop("PIO:PIOc_write_darray_adios");
       GPTLstop("PIO:write_total_adios");
     }
     return pio_err(ios, file, PIO_EPERM, __FILE__, __LINE__,
@@ -2001,7 +1998,6 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
   /* Get decomposition information. */
   if(!(iodesc = pio_get_iodesc_from_id(ioid))){
     if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
-      GPTLstop("PIO:PIOc_write_darray_adios");
       GPTLstop("PIO:write_total_adios");
     }
     return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
@@ -2014,7 +2010,6 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
    * if it is too big (the excess values will be ignored.) */
   if(arraylen < iodesc->ndof){
     if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
-      GPTLstop("PIO:PIOc_write_darray_adios");
       GPTLstop("PIO:write_total_adios");
     }
     return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__,
@@ -2081,7 +2076,6 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
     ierr = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME, "piodecomp", ".dat");
     if(ierr != PIO_NOERR){
       if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
-        GPTLstop("PIO:PIOc_write_darray_adios");
         GPTLstop("PIO:write_total_adios");
       }
       return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
@@ -2150,7 +2144,6 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
       spio_ltimer_stop(file->io_fstats->tot_timer_name);
       if((ierr = find_var_fillvalue(file, varid, vdesc))){
         if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
-          GPTLstop("PIO:PIOc_write_darray_adios");
           GPTLstop("PIO:write_total_adios");
         }
         return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
@@ -2181,7 +2174,6 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
   if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
     ierr = PIO_NOERR;
     ierr = PIOc_write_darray_adios(file, varid, ioid, iodesc, arraylen, array, fillvalue);
-    GPTLstop("PIO:PIOc_write_darray_adios");
     GPTLstop("PIO:write_total_adios");
     return ierr;
   }
@@ -2282,7 +2274,6 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
     spio_ltimer_stop(file->io_fstats->wr_timer_name);
     spio_ltimer_stop(file->io_fstats->tot_timer_name);
     if((ierr = flush_buffer(ncid, wmb, (needsflush == 2)))){
-      GPTLstop("PIO:PIOc_write_darray");
       GPTLstop("PIO:write_total");
       return pio_err(ios, file, ierr, __FILE__, __LINE__,
                       "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Flushing data (multiple cached variables with the same decomposition) from compute processes to I/O processes %s failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (needsflush == 2) ? "and to disk" : "");
@@ -3443,7 +3434,6 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 #ifdef _ADIOS2
   adios_var_desc_t *vdesc_adios2; /* Info about the variable from the adios structure */
 #endif
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_read_darray");
 
   /* Get the file info. */
   if((ierr = pio_get_file(ncid, &file))){
@@ -3664,15 +3654,12 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
   #ifdef _ADIOS2
         case PIO_IOTYPE_ADIOS:
         case PIO_IOTYPE_ADIOSC:
-            GPTLstart("PIO:PIOc_read_darray_adios");
             if((ierr = PIOc_read_darray_adios(file, fndims, iodesc, varid, array))){
-              GPTLstop("PIO:PIOc_read_darray_adios");
               return pio_err(ios, file, ierr, __FILE__, __LINE__,
                              "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using ADIOS iotype failed. "
                              "Reading variable in parallel failed",
                              pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
             }
-            GPTLstop("PIO:PIOc_read_darray_adios");
             return PIO_NOERR;
   #endif
       default:
