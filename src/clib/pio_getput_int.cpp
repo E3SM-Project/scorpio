@@ -41,12 +41,10 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function codes. */
     int ierr = PIO_NOERR;           /* Return code from function calls. */
 
-    GPTLstart("PIO:spio_put_att_tc");
     GPTLstart("PIO:write_total");
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
     {
-        GPTLstop("PIO:spio_put_att_tc");
         GPTLstop("PIO:write_total");
         return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
                         "Writing variable (varid=%d) attribute (%s) to file failed. Invalid file id (ncid=%d) provided", varid, (name) ? name : "NULL", ncid);
@@ -83,14 +81,12 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 
     if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
-        GPTLstart("PIO:spio_put_att_tc_adios");
         GPTLstart("PIO:write_total_adios");
     }
 
     /* User must provide some valid parameters. */
     if (!name || !op || strlen(name) > PIO_MAX_NAME || len < 0)
     {
-        GPTLstop("PIO:spio_put_att_tc");
         GPTLstop("PIO:write_total");
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -98,7 +94,6 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
         {
-            GPTLstop("PIO:spio_put_att_tc_adios");
             GPTLstop("PIO:write_total_adios");
         }
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__,
@@ -120,11 +115,9 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         ierr = PIOc_inq_type_impl(ncid, atttype, NULL, &atttype_len);
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_type failed, ierr = %d", ierr));
-            GPTLstop("PIO:spio_put_att_tc");
             GPTLstop("PIO:write_total");
             if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             {
-                GPTLstop("PIO:spio_put_att_tc_adios");
                 GPTLstop("PIO:write_total_adios");
             }
             return ierr;
@@ -137,11 +130,9 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         {
             ierr = PIOc_inq_type_impl(ncid, memtype, NULL, &memtype_len);
             if(ierr != PIO_NOERR){
-                GPTLstop("PIO:spio_put_att_tc");
                 GPTLstop("PIO:write_total");
                 if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
                 {
-                    GPTLstop("PIO:spio_put_att_tc_adios");
                     GPTLstop("PIO:write_total_adios");
                 }
                 LOG((1, "PIOc_inq_type failed, ierr = %d", ierr));
@@ -166,7 +157,6 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             len * memtype_len, op);
         if(ierr != PIO_NOERR)
         {
-            GPTLstop("PIO:spio_put_att_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -174,7 +164,6 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             {
-                GPTLstop("PIO:spio_put_att_tc_adios");
                 GPTLstop("PIO:write_total_adios");
             }
             return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
@@ -184,7 +173,6 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         /* Broadcast values currently only known on computation tasks to IO tasks. */
         if ((mpierr = MPI_Bcast(&atttype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
-            GPTLstop("PIO:spio_put_att_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -192,14 +180,12 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             {
-                GPTLstop("PIO:spio_put_att_tc_adios");
                 GPTLstop("PIO:write_total_adios");
             }
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
         if ((mpierr = MPI_Bcast(&memtype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
-            GPTLstop("PIO:spio_put_att_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -207,7 +193,6 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             {
-                GPTLstop("PIO:spio_put_att_tc_adios");
                 GPTLstop("PIO:write_total_adios");
             }
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -225,13 +210,11 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         ierr = begin_adios2_step(file, ios);
         if (ierr != PIO_NOERR)
         {
-            GPTLstop("PIO:spio_put_att_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->wr_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            GPTLstop("PIO:spio_put_att_tc_adios");
             GPTLstop("PIO:write_total_adios");
             return pio_err(NULL, file, ierr, __FILE__, __LINE__,
                            "adios2_begin_step failed for file (%s)", pio_get_fname_from_file(file));
@@ -256,13 +239,11 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         int num_attrs = file->num_attrs;
         if (num_attrs >= PIO_MAX_ATTRS)
         {
-            GPTLstop("PIO:spio_put_att_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->wr_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            GPTLstop("PIO:spio_put_att_tc_adios");
             GPTLstop("PIO:write_total_adios");
             return pio_err(ios, file, PIO_EMAXATTS, __FILE__, __LINE__,
                            "Writing variable (%s, varid=%d) attribute (%s) to file (%s, ncid=%d) using ADIOS iotype failed. "
@@ -273,13 +254,11 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         file->adios_attrs[num_attrs].att_name = spio_strdup(name);
         if (file->adios_attrs[num_attrs].att_name == NULL)
         {
-            GPTLstop("PIO:spio_put_att_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->wr_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            GPTLstop("PIO:spio_put_att_tc_adios");
             GPTLstop("PIO:write_total_adios");
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
                            "Writing variable (%s, varid=%d) attribute (%s) to file (%s, ncid=%d) using ADIOS iotype failed. "
@@ -320,13 +299,11 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 
                 if (attributeH == NULL)
                 {
-                    GPTLstop("PIO:spio_put_att_tc");
                     GPTLstop("PIO:write_total");
                     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->wr_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    GPTLstop("PIO:spio_put_att_tc_adios");
                     GPTLstop("PIO:write_total_adios");
                     return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                    "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
@@ -342,13 +319,11 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             }
         }
 
-        GPTLstop("PIO:spio_put_att_tc");
         GPTLstop("PIO:write_total");
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        GPTLstop("PIO:spio_put_att_tc_adios");
         GPTLstop("PIO:write_total_adios");
 
         return PIO_NOERR;
@@ -361,7 +336,6 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         int num_attrs = file->hdf5_num_attrs;
         if (num_attrs >= PIO_MAX_ATTRS)
         {
-            GPTLstop("PIO:spio_put_att_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -376,7 +350,6 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         file->hdf5_attrs[num_attrs].att_name = spio_strdup(name);
         if (file->hdf5_attrs[num_attrs].att_name == NULL)
         {
-            GPTLstop("PIO:spio_put_att_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -449,7 +422,6 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                 ierr = ncmpi_put_att_ulonglong(file->fh, varid, name, atttype, len, (const unsigned long long int *) op);
                 break;
             default:
-                GPTLstop("PIO:spio_put_att_tc");
                 GPTLstop("PIO:write_total");
                 spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -529,7 +501,6 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                 /*      break; */
 #endif /* _NETCDF */
             default:
-                GPTLstop("PIO:spio_put_att_tc");
                 GPTLstop("PIO:write_total");
                 spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -544,7 +515,6 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
     if(ierr != PIO_NOERR){
         LOG((1, "nc*_put_att_* failed, ierr = %d", ierr));
-        GPTLstop("PIO:spio_put_att_tc");
         GPTLstop("PIO:write_total");
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -554,7 +524,6 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                         "Writing variable (%s, varid=%d) attribute (%s) to file (%s, ncid=%d) failed. Internal I/O library (%s) call failed", pio_get_vname_from_file(file, varid), varid, name, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
     }
 
-    GPTLstop("PIO:spio_put_att_tc");
     GPTLstop("PIO:write_total");
     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -592,11 +561,9 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function calls. */
     int ierr = PIO_NOERR;               /* Return code from function calls. */
 
-    GPTLstart("PIO:spio_get_att_tc");
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
     {
-        GPTLstop("PIO:spio_get_att_tc");
         return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
                         "Reading attribute (%s) from file failed. Invalid file id (ncid=%d) provided", (name) ? name : "NULL", ncid);
     }
@@ -612,7 +579,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     /* User must provide a name and destination pointer. */
     if (!name || !ip || strlen(name) > PIO_MAX_NAME)
     {
-        GPTLstop("PIO:spio_get_att_tc");
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -636,7 +602,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         ierr = PIOc_inq_att_impl(ncid, varid, name, &atttype, &attlen);
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_att failed, ierr = %d", ierr));
-            GPTLstop("PIO:spio_get_att_tc");
             return ierr;
         }
         LOG((2, "atttype = %d attlen = %d", atttype, attlen));
@@ -645,7 +610,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         ierr = PIOc_inq_type_impl(ncid, atttype, NULL, &atttype_len);
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_type failed, ierr=%d", ierr));
-            GPTLstop("PIO:spio_get_att_tc");
             return ierr;
         }
 
@@ -658,7 +622,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             ierr = PIOc_inq_type_impl(ncid, memtype, NULL, &memtype_len);
             if(ierr != PIO_NOERR){
                 LOG((1, "PIOc_inq_type failed, ierr = %d", ierr));
-                GPTLstop("PIO:spio_get_att_tc");
                 return ierr;
             }
         }
@@ -680,7 +643,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         if(ierr != PIO_NOERR)
         {
             LOG((1, "Error sending async msg for PIO_MSG_GET_ATT"));
-            GPTLstop("PIO:spio_get_att_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -693,7 +655,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         LOG((2, "spio_get_att_tc bcast from comproot = %d attlen = %d atttype_len = %d", ios->comproot, attlen, atttype_len));
         if ((mpierr = MPI_Bcast(&attlen, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
-            GPTLstop("PIO:spio_get_att_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -702,7 +663,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         }
         if ((mpierr = MPI_Bcast(&atttype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
-            GPTLstop("PIO:spio_get_att_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -711,7 +671,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         }
         if ((mpierr = MPI_Bcast(&memtype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
-            GPTLstop("PIO:spio_get_att_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -739,7 +698,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             full_name = (char *) calloc(full_name_len, 1);
             if (full_name == NULL)
             {
-                GPTLstop("PIO:spio_get_att_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -760,7 +718,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             full_name = (char *) calloc(full_name_len, 1);
             if (full_name == NULL)
             {
-                GPTLstop("PIO:spio_get_att_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -801,7 +758,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                     adiosErr = adios2_attribute_data(ip, &size_attr, attr);
                     if (adiosErr != adios2_error_none)
                     {
-                        GPTLstop("PIO:spio_get_att_tc");
                         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                         spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -817,7 +773,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                 break;
             }
             default:
-                GPTLstop("PIO:spio_get_att_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -830,7 +785,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 
         free(full_name);
 
-        GPTLstop("PIO:spio_get_att_tc");
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -886,7 +840,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                 ierr = ncmpi_get_att_ulonglong(file->fh, varid, name, (unsigned long long int *) ip);
                 break;
             default:
-                GPTLstop("PIO:spio_get_att_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -944,7 +897,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                 /*      break; */
 #endif /* _NETCDF */
             default:
-                GPTLstop("PIO:spio_get_att_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -958,7 +910,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
     if(ierr != PIO_NOERR){
         LOG((1, "nc*_get_att_* failed, ierr = %d", ierr));
-        GPTLstop("PIO:spio_get_att_tc");
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -972,7 +923,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     if ((mpierr = MPI_Bcast(ip, (int)attlen * memtype_len, MPI_BYTE, ios->ioroot,
                             ios->my_comm)))
     {
-        GPTLstop("PIO:spio_get_att_tc");
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -981,7 +931,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     }
 
     LOG((2, "get_att_tc data bcast complete"));
-    GPTLstop("PIO:spio_get_att_tc");
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1039,7 +988,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function codes. */
     int ierr = PIO_NOERR;                           /* Return code. */
 
-    GPTLstart("PIO:spio_get_vars_tc");
     LOG((1, "spio_get_vars_tc ncid = %d varid = %d xtype = %d start_present = %d "
          "count_present = %d stride_present = %d", ncid, varid, xtype, start_present,
          count_present, stride_present));
@@ -1047,7 +995,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
     {
-        GPTLstop("PIO:spio_get_vars_tc");
         return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
                         "Reading variable (varid=%d) from file failed. Invalid file id (ncid=%d) provided", varid, ncid);
     }
@@ -1063,7 +1010,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     /* User must provide a place to put some data. */
     if (!buf)
     {
-        GPTLstop("PIO:spio_get_vars_tc");
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1083,7 +1029,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         ierr = PIOc_inq_vartype_impl(ncid, varid, &vartype);
         if(ierr != PIO_NOERR){
-            GPTLstop("PIO:spio_get_vars_tc");
             return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
                         "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring the variable type failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
         }
@@ -1099,7 +1044,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         {
             ierr = PIOc_inq_type_impl(ncid, xtype, NULL, &typelen);
             if(ierr != PIO_NOERR){
-                GPTLstop("PIO:spio_get_vars_tc");
                 return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
                             "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring the variable type length failed", pio_get_vname_from_file(file, varid), varid, pio_get_vname_from_file(file, varid), ncid);
             }
@@ -1108,7 +1052,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         /* Get the number of dims for this var. */
         ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
         if(ierr != PIO_NOERR){
-            GPTLstop("PIO:spio_get_vars_tc");
             return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
                         "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring the number of variable dimensions failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
         }
@@ -1163,7 +1106,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             xtype, num_elem, typelen);
         if(ierr != PIO_NOERR)
         {
-            GPTLstop("PIO:spio_get_vars_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1188,7 +1130,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         /* Broadcast values currently only known on computation tasks to IO tasks. */
         if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->comproot, ios->my_comm)))
         {
-            GPTLstop("PIO:spio_get_vars_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1197,7 +1138,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
         if ((mpierr = MPI_Bcast(&num_elem, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
-            GPTLstop("PIO:spio_get_vars_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1206,7 +1146,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
         if ((mpierr = MPI_Bcast(&typelen, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
-            GPTLstop("PIO:spio_get_vars_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1215,7 +1154,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
         if ((mpierr = MPI_Bcast(&xtype, 1, MPI_INT, ios->comproot, ios->my_comm)))
         {
-            GPTLstop("PIO:spio_get_vars_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1236,7 +1174,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             /* Turn on independent access for pnetcdf file. */
             if ((ierr = ncmpi_begin_indep_data(file->fh)))
             {
-                GPTLstop("PIO:spio_get_vars_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1288,7 +1225,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     ierr = ncmpi_get_vars_ulonglong(file->fh, varid, start, count, stride, (unsigned long long int *) buf);
                     break;
                 default:
-                    GPTLstop("PIO:spio_get_vars_tc");
                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1301,7 +1237,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             /* Turn off independent access for pnetcdf file. */
             if ((ierr = ncmpi_end_indep_data(file->fh)))
             {
-                GPTLstop("PIO:spio_get_vars_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1323,7 +1258,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     cnt = (PIO_Offset*) calloc(ndims, sizeof(PIO_Offset));
                     if (cnt == NULL)
                     {
-                        GPTLstop("PIO:spio_get_vars_tc");
                         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                         spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1374,7 +1308,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 ierr = ncmpi_get_vars_ulonglong_all(file->fh, varid, start, count, stride, (unsigned long long int *) buf);
                 break;
             default:
-                GPTLstop("PIO:spio_get_vars_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1448,7 +1381,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 /*      break; */
 #endif /* _NETCDF */
             default:
-                GPTLstop("PIO:spio_get_vars_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1463,7 +1395,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     {
         if (varid < 0 || varid >= file->num_vars)
         {
-            GPTLstop("PIO:PIOc_get_vars_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1477,7 +1408,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         /* Check put_var tag */
         if (strncmp(file->adios_vars[varid].nc_op_tag, "put_var", 7) != 0)
         {
-            GPTLstop("PIO:PIOc_get_vars_tc");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1504,7 +1434,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             adiosErr = adios2_current_step(&current_adios_step, file->engineH);
             if (adiosErr != adios2_error_none)
             {
-                GPTLstop("PIO:PIOc_get_vars_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1524,7 +1453,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 adiosErr = adios2_end_step(file->engineH);
                 if (adiosErr != adios2_error_none)
                 {
-                    GPTLstop("PIO:PIOc_get_vars_tc");
                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1541,7 +1469,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             adiosErr = adios2_close(file->engineH);
             if (adiosErr != adios2_error_none)
             {
-                GPTLstop("PIO:PIOc_get_vars_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1555,7 +1482,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
             if (file->engineH == NULL)
             {
-                GPTLstop("PIO:PIOc_get_vars_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1578,7 +1504,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     adiosErr = adios2_end_step(file->engineH);
                     if (adiosErr != adios2_error_none)
                     {
-                        GPTLstop("PIO:PIOc_get_vars_tc");
                         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                         spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1603,7 +1528,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 adiosErr = adios2_end_step(file->engineH);
                 if (adiosErr != adios2_error_none)
                 {
-                    GPTLstop("PIO:PIOc_get_vars_tc");
                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1619,7 +1543,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 adiosErr = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.0, &status);
                 if (adiosErr != adios2_error_none)
                 {
-                    GPTLstop("PIO:PIOc_get_vars_tc");
                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1704,7 +1627,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 av->adios_varid = adios2_inquire_variable(file->ioH, vname);
                 if (av->adios_varid == NULL)
                 {
-                    GPTLstop("PIO:PIOc_get_vars_tc");
                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1729,7 +1651,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             mem_buffer = (char *) calloc(av->adios_type_size, 1);
                             if (mem_buffer == NULL)
                             {
-                                GPTLstop("PIO:PIOc_get_vars_tc");
                                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1743,7 +1664,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             adiosErr = adios2_get(file->engineH, av->adios_varid, mem_buffer, adios2_mode_sync);
                             if (adiosErr != adios2_error_none)
                             {
-                                GPTLstop("PIO:PIOc_get_vars_tc");
                                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1770,7 +1690,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             /* This is not a scalar var. */
             if (stride_present)
             {
-                GPTLstop("PIO:PIOc_get_vars_tc");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1833,7 +1752,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 av->adios_varid = adios2_inquire_variable(file->ioH, vname);
                 if (av->adios_varid == NULL)
                 {
-                    GPTLstop("PIO:PIOc_get_vars_tc");
                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1851,7 +1769,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, av->adios_varid, required_adios_step);
                         if (data_blocks == NULL)
                         {
-                            GPTLstop("PIO:PIOc_get_vars_tc");
                             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1879,7 +1796,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         adiosErr = adios2_variable_type(&read_type, av->adios_varid);
                         if (adiosErr != adios2_error_none)
                         {
-                            GPTLstop("PIO:PIOc_get_vars_tc");
                             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1910,7 +1826,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 mem_buffer_size = (char *) calloc(1, sizeof(size_t));
                                 if (mem_buffer_size == NULL)
                                 {
-                                    GPTLstop("PIO:PIOc_get_vars_tc");
                                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1924,7 +1839,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 adiosErr = adios2_set_block_selection(av->adios_varid, block_id);
                                 if (adiosErr != adios2_error_none)
                                 {
-                                    GPTLstop("PIO:PIOc_get_vars_tc");
                                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1938,7 +1852,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 adiosErr = adios2_selection_size(&var_size, av->adios_varid);
                                 if (adiosErr != adios2_error_none)
                                 {
-                                    GPTLstop("PIO:PIOc_get_vars_tc");
                                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1966,7 +1879,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 mem_buffer = (char *) calloc(var_size, av->adios_type_size);
                                 if (mem_buffer == NULL)
                                 {
-                                    GPTLstop("PIO:PIOc_get_vars_tc");
                                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -1980,7 +1892,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 adiosErr = adios2_get(file->engineH, av->adios_varid, mem_buffer, adios2_mode_sync);
                                 if (adiosErr != adios2_error_none)
                                 {
-                                    GPTLstop("PIO:PIOc_get_vars_tc");
                                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -2225,7 +2136,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             }
                             else
                             {
-                                GPTLstop("PIO:PIOc_get_vars_tc");
                                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -2246,7 +2156,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
     if(ierr != PIO_NOERR){
         LOG((1, "nc*_get_vars_* failed, ierr = %d", ierr));
-        GPTLstop("PIO:spio_get_vars_tc");
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -2260,7 +2169,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
          typelen, ios->ioroot));
     if ((mpierr = MPI_Bcast(buf, num_elem * typelen, MPI_BYTE, ios->ioroot, ios->my_comm)))
     {
-        GPTLstop("PIO:spio_get_vars_tc");
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -2272,7 +2180,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     ios->io_fstats->rb += num_elem * typelen;
     file->io_fstats->rb += num_elem * typelen;
 
-    GPTLstop("PIO:spio_get_vars_tc");
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -2463,7 +2370,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function codes. */
     int ierr = PIO_NOERR;          /* Return code from function calls. */
 
-    GPTLstart("PIO:spio_put_vars_tc");
     GPTLstart("PIO:write_total");
     LOG((1, "spio_put_vars_tc ncid = %d varid = %d start_present = %d "
          "count_present = %d stride_present = %d xtype = %d", ncid, varid,
@@ -2472,7 +2378,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     /* Get file info. */
     if ((ierr = pio_get_file(ncid, &file)))
     {
-        GPTLstop("PIO:spio_put_vars_tc");
         GPTLstop("PIO:write_total");
         return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
                         "Writing variable (varid=%d) to file failed. Invalid file id (ncid=%d) provided", varid, ncid);
@@ -2509,14 +2414,12 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
     if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
-        GPTLstart("PIO:spio_put_vars_tc_adios");
         GPTLstart("PIO:write_total_adios");
     }
 
     /* User must provide a place to put some data. */
     if (!buf)
     {
-        GPTLstop("PIO:spio_put_vars_tc");
         GPTLstop("PIO:write_total");
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -2524,7 +2427,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
         {
-            GPTLstop("PIO:spio_put_vars_tc_adios");
             GPTLstop("PIO:write_total_adios");
         }
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__,
@@ -2542,11 +2444,9 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         ierr = PIOc_inq_vartype_impl(ncid, varid, &vartype);
         if(ierr != PIO_NOERR){
-            GPTLstop("PIO:spio_put_vars_tc");
             GPTLstop("PIO:write_total");
             if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             {
-                GPTLstop("PIO:spio_put_vars_tc_adios");
                 GPTLstop("PIO:write_total_adios");
             }
             return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
@@ -2560,11 +2460,9 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         /* Get the number of dims for this var. */
         ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
         if(ierr != PIO_NOERR){
-            GPTLstop("PIO:spio_put_vars_tc");
             GPTLstop("PIO:write_total");
             if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             {
-                GPTLstop("PIO:spio_put_vars_tc_adios");
                 GPTLstop("PIO:write_total_adios");
             }
             return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
@@ -2578,11 +2476,9 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         {
             ierr = PIOc_inq_type_impl(ncid, xtype, NULL, &typelen);
             if(ierr != PIO_NOERR){
-                GPTLstop("PIO:spio_put_vars_tc");
                 GPTLstop("PIO:write_total");
                 if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
                 {
-                    GPTLstop("PIO:spio_put_vars_tc_adios");
                     GPTLstop("PIO:write_total_adios");
                 }
                 return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
@@ -2636,7 +2532,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             num_elem * typelen, buf); 
         if(ierr != PIO_NOERR)
         {
-            GPTLstop("PIO:spio_put_vars_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -2644,7 +2539,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             {
-                GPTLstop("PIO:spio_put_vars_tc_adios");
                 GPTLstop("PIO:write_total_adios");
             }
             return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
@@ -2668,7 +2562,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         LOG((2, "spio_put_vars_tc bcast from comproot"));
         if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->comproot, ios->my_comm)))
         {
-            GPTLstop("PIO:spio_put_vars_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -2676,14 +2569,12 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             {
-                GPTLstop("PIO:spio_put_vars_tc_adios");
                 GPTLstop("PIO:write_total_adios");
             }
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
         if ((mpierr = MPI_Bcast(&xtype, 1, MPI_INT, ios->comproot, ios->my_comm)))
         {
-            GPTLstop("PIO:spio_put_vars_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -2691,7 +2582,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             {
-                GPTLstop("PIO:spio_put_vars_tc_adios");
                 GPTLstop("PIO:write_total_adios");
             }
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -2705,13 +2595,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     {
         if (varid < 0 || varid >= file->num_vars)
         {
-            GPTLstop("PIO:spio_put_vars_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->wr_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            GPTLstop("PIO:spio_put_vars_tc_adios");
             GPTLstop("PIO:write_total_adios");
             return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
                            "Writing variable to file (%s, ncid=%d) failed. Invalid variable id (varid=%d, expected >=0 and < number of variables in the file, %d) provided",
@@ -2721,13 +2609,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         ierr = begin_adios2_step(file, ios);
         if (ierr != PIO_NOERR)
         {
-            GPTLstop("PIO:spio_put_vars_tc");
             GPTLstop("PIO:write_total");
             spio_ltimer_stop(ios->io_fstats->wr_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->wr_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            GPTLstop("PIO:spio_put_vars_tc_adios");
             GPTLstop("PIO:write_total_adios");
             return pio_err(NULL, file, ierr, __FILE__, __LINE__,
                            "adios2_begin_step failed for file (%s)", pio_get_fname_from_file(file));
@@ -2805,13 +2691,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                                                   adios2_constant_dims_false);
                     if (av->adios_varid == NULL)
                     {
-                        GPTLstop("PIO:spio_put_vars_tc");
                         GPTLstop("PIO:write_total");
                         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                         spio_ltimer_stop(file->io_fstats->wr_timer_name);
                         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                        GPTLstop("PIO:spio_put_vars_tc_adios");
                         GPTLstop("PIO:write_total_adios");
                         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                     "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
@@ -2822,13 +2706,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 adiosErr = adios2_put(file->engineH, av->adios_varid, buf, adios2_mode_sync);
                 if (adiosErr != adios2_error_none)
                 {
-                    GPTLstop("PIO:spio_put_vars_tc");
                     GPTLstop("PIO:write_total");
                     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->wr_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    GPTLstop("PIO:spio_put_vars_tc_adios");
                     GPTLstop("PIO:write_total_adios");
                     return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                    "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
@@ -2846,13 +2728,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 LOG((2, "ADIOS does not support striding %s:%s\n"
                         "Variable %s will be corrupted in the output"
                         , __FILE__, __func__, av->name));
-                GPTLstop("PIO:spio_put_vars_tc");
                 GPTLstop("PIO:write_total");
                 spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->wr_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                GPTLstop("PIO:spio_put_vars_tc_adios");
                 GPTLstop("PIO:write_total_adios");
                 return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "ADIOS does not support striding. Variable %s file (%s, ncid=%d)",
@@ -2930,13 +2810,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                                                   adios2_constant_dims_false);
                     if (av->adios_varid == NULL)
                     {
-                        GPTLstop("PIO:spio_put_vars_tc");
                         GPTLstop("PIO:write_total");
                         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                         spio_ltimer_stop(file->io_fstats->wr_timer_name);
                         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                        GPTLstop("PIO:spio_put_vars_tc_adios");
                         GPTLstop("PIO:write_total_adios");
                         return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                        "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
@@ -2948,13 +2826,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     adiosErr = adios2_set_selection(av->adios_varid, 1, NULL, &av_size);
                     if (adiosErr != adios2_error_none)
                     {
-                        GPTLstop("PIO:spio_put_vars_tc");
                         GPTLstop("PIO:write_total");
                         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                         spio_ltimer_stop(file->io_fstats->wr_timer_name);
                         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                        GPTLstop("PIO:spio_put_vars_tc_adios");
                         GPTLstop("PIO:write_total_adios");
                         return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                        "Setting (ADIOS) selection to variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
@@ -2981,13 +2857,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 char *mem_buffer = (char*)calloc(av_size, sizeof(char));
                 if (mem_buffer == NULL)
                 {
-                    GPTLstop("PIO:spio_put_vars_tc");
                     GPTLstop("PIO:write_total");
                     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->wr_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    GPTLstop("PIO:spio_put_vars_tc_adios");
                     GPTLstop("PIO:write_total_adios");
                     return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
                                    "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory, allocating memory (%lld bytes) for putting ADIOS variable (name = %s)",
@@ -3004,13 +2878,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 mem_buffer = NULL;
                 if (adiosErr != adios2_error_none)
                 {
-                    GPTLstop("PIO:spio_put_vars_tc");
                     GPTLstop("PIO:write_total");
                     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->wr_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    GPTLstop("PIO:spio_put_vars_tc_adios");
                     GPTLstop("PIO:write_total_adios");
                     return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                    "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
@@ -3035,13 +2907,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     attributeH = adios2_define_attribute_array(file->ioH, att_name, adios2_type_string, dimnames, av->ndims);
                     if (attributeH == NULL)
                     {
-                        GPTLstop("PIO:spio_put_vars_tc");
                         GPTLstop("PIO:write_total");
                         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                         spio_ltimer_stop(file->io_fstats->wr_timer_name);
                         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                        GPTLstop("PIO:spio_put_vars_tc_adios");
                         GPTLstop("PIO:write_total_adios");
                         return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                        "Defining (ADIOS) attribute array (name=%s, size=%d) failed for file (%s, ncid=%d)",
@@ -3064,13 +2934,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_int32_t, &av->ndims);
                 if (attributeH == NULL)
                 {
-                    GPTLstop("PIO:spio_put_vars_tc");
                     GPTLstop("PIO:write_total");
                     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->wr_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    GPTLstop("PIO:spio_put_vars_tc_adios");
                     GPTLstop("PIO:write_total_adios");
                     return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                    "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
@@ -3086,13 +2954,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_int32_t, &av->nc_type);
                 if (attributeH == NULL)
                 {
-                    GPTLstop("PIO:spio_put_vars_tc");
                     GPTLstop("PIO:write_total");
                     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->wr_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    GPTLstop("PIO:spio_put_vars_tc_adios");
                     GPTLstop("PIO:write_total_adios");
                     return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                    "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
@@ -3110,13 +2976,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_int32_t, &save_adios_type);
                 if (attributeH == NULL)
                 {
-                    GPTLstop("PIO:spio_put_vars_tc");
                     GPTLstop("PIO:write_total");
                     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->wr_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    GPTLstop("PIO:spio_put_vars_tc_adios");
                     GPTLstop("PIO:write_total_adios");
                     return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                    "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
@@ -3132,13 +2996,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_string, "put_var");
                 if (attributeH == NULL)
                 {
-                    GPTLstop("PIO:spio_put_vars_tc");
                     GPTLstop("PIO:write_total");
                     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->wr_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    GPTLstop("PIO:spio_put_vars_tc_adios");
                     GPTLstop("PIO:write_total_adios");
                     return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                    "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
@@ -3148,13 +3010,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             file->num_written_blocks += 4;
         }
 
-        GPTLstop("PIO:spio_put_vars_tc");
         GPTLstop("PIO:write_total");
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        GPTLstop("PIO:spio_put_vars_tc_adios");
         GPTLstop("PIO:write_total_adios");
 
         return PIO_NOERR;
@@ -3174,7 +3034,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 if (!(vdesc->request = (int *) realloc(vdesc->request,
                                                 sizeof(int) * (vdesc->nreqs + PIO_REQUEST_ALLOC_CHUNK))))
                 {
-                    GPTLstop("PIO:spio_put_vars_tc");
                     GPTLstop("PIO:write_total");
                     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -3190,7 +3049,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                                       PIO_REQUEST_ALLOC_CHUNK));
                 if(!(vdesc->request_sz))
                 {
-                    GPTLstop("PIO:spio_put_vars_tc");
                     GPTLstop("PIO:write_total");
                     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -3282,7 +3140,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         ierr = ncmpi_bput_var_ulonglong(file->fh, varid, (const unsigned long long int *) buf, request);
                         break;
                     default:
-                        GPTLstop("PIO:spio_put_vars_tc");
                         GPTLstop("PIO:write_total");
                         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -3317,7 +3174,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     LOG((2, "stride not present"));
                     if (!(fake_stride = (PIO_Offset *) malloc(ndims * sizeof(PIO_Offset))))
                     {
-                        GPTLstop("PIO:spio_put_vars_tc");
                         GPTLstop("PIO:write_total");
                         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -3376,7 +3232,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         ierr = ncmpi_bput_vars_ulonglong(file->fh, varid, start, count, fake_stride, (const unsigned long long int *) buf, request);
                         break;
                     default:
-                        GPTLstop("PIO:spio_put_vars_tc");
                         GPTLstop("PIO:write_total");
                         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -3486,7 +3341,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 /*      break; */
 #endif /* _NETCDF */
             default:
-                GPTLstop("PIO:spio_put_vars_tc");
                 GPTLstop("PIO:write_total");
                 spio_ltimer_stop(ios->io_fstats->wr_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -3502,7 +3356,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
     if(ierr != PIO_NOERR){
         LOG((1, "nc*_put_vars_* failed, ierr = %d", ierr));
-        GPTLstop("PIO:spio_put_vars_tc");
         GPTLstop("PIO:write_total");
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -3515,7 +3368,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
     LOG((2, "spio_put_vars_tc bcast netcdf return code %d complete", ierr));
 
-    GPTLstop("PIO:spio_put_vars_tc");
     GPTLstop("PIO:write_total");
     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);

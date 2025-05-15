@@ -4,10 +4,12 @@
 #include "pio_api_impl.h"
 #include "spio_tracer.hpp"
 #include "spio_get_utils.hpp"
+#include "spio_gptl_utils.hpp"
 
 /* APIs for reading entire non-distributed data/variable */
 int PIOc_get_var(int ncid, int varid, void *buf)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -18,6 +20,7 @@ int PIOc_get_var(int ncid, int varid, void *buf)
 
 int PIOc_get_var_text(int ncid, int varid, char *buf)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_text");
@@ -35,6 +38,7 @@ int PIOc_get_var_text(int ncid, int varid, char *buf)
 
 int PIOc_get_var_schar(int ncid, int varid, signed char *buf)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_schar");
@@ -51,6 +55,7 @@ int PIOc_get_var_schar(int ncid, int varid, signed char *buf)
 
 int PIOc_get_var_short(int ncid, int varid, short *buf)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_short");
@@ -67,6 +72,7 @@ int PIOc_get_var_short(int ncid, int varid, short *buf)
 
 int PIOc_get_var_int(int ncid, int varid, int *buf)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_int");
@@ -83,6 +89,7 @@ int PIOc_get_var_int(int ncid, int varid, int *buf)
 
 int PIOc_get_var_long(int ncid, int varid, long *buf)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_long");
@@ -99,6 +106,7 @@ int PIOc_get_var_long(int ncid, int varid, long *buf)
 
 int PIOc_get_var_float(int ncid, int varid, float *buf)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_float");
@@ -115,6 +123,7 @@ int PIOc_get_var_float(int ncid, int varid, float *buf)
 
 int PIOc_get_var_double(int ncid, int varid, double *buf)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_double");
@@ -131,6 +140,7 @@ int PIOc_get_var_double(int ncid, int varid, double *buf)
 
 int PIOc_get_var_uchar(int ncid, int varid, unsigned char *buf)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_uchar");
@@ -147,6 +157,7 @@ int PIOc_get_var_uchar(int ncid, int varid, unsigned char *buf)
 
 int PIOc_get_var_ushort(int ncid, int varid, unsigned short *buf)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_ushort");
@@ -163,6 +174,7 @@ int PIOc_get_var_ushort(int ncid, int varid, unsigned short *buf)
 
 int PIOc_get_var_uint(int ncid, int varid, unsigned int *buf)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_uint");
@@ -179,6 +191,7 @@ int PIOc_get_var_uint(int ncid, int varid, unsigned int *buf)
 
 int PIOc_get_var_longlong(int ncid, int varid, long long *buf)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_longlong");
@@ -195,6 +208,7 @@ int PIOc_get_var_longlong(int ncid, int varid, long long *buf)
 
 int PIOc_get_var_ulonglong(int ncid, int varid, unsigned long long *buf)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_ulonglong");

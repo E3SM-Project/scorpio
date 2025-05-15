@@ -866,7 +866,6 @@ static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, 
   int mpierr = MPI_SUCCESS;  /* Return code from MPI function calls. */
   int ierr;              /* Return code. */
 
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_initdecomp");
   LOG((1, "PIOc_InitDecomp iosysid = %d pio_type = %d ndims = %d maplen = %d",
        iosysid, pio_type, ndims, maplen));
 
@@ -1382,12 +1381,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
 /* TIMING_INTERNAL implies that the timing statistics are gathered/
  * displayed by pio
  */
-#ifdef TIMING
-#ifdef TIMING_INTERNAL
-    pio_init_gptl();
-#endif
-#endif
-    SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_Init_Intracomm");
     /* Turn on the logging system. */
     pio_init_logging();
 
@@ -1834,7 +1827,6 @@ int PIOc_finalize_impl(int iosysid)
     char gptl_log_fname[PIO_MAX_NAME];
 #endif
 
-    SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_finalize");
     LOG((1, "PIOc_finalize iosysid = %d MPI_COMM_NULL = %d", iosysid,
          MPI_COMM_NULL));
 
@@ -2191,13 +2183,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
 /* TIMING_INTERNAL implies that the timing statistics are gathered/
  * displayed by pio
  */
-#ifdef TIMING
-#ifdef TIMING_INTERNAL
-    pio_init_gptl();
-#endif
-#endif
-    SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_init_async");
-
     /* Check input parameters. */
     if (num_io_procs < 1 || component_count < 1 || !num_procs_per_comp || !iosysidp ||
         (rearranger != PIO_REARR_BOX && rearranger != PIO_REARR_SUBSET))
@@ -2741,12 +2726,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
 /* TIMING_INTERNAL implies that the timing statistics are gathered/
  * displayed by pio
  */
-#ifdef TIMING
-#ifdef TIMING_INTERNAL
-    pio_init_gptl();
-#endif
-#endif
-    SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_init_intercomm");
     assert((component_count > 0) && ucomp_comms && iosysidps);
     if((component_count <= 0) || (ucomp_comms == NULL) ||
         ((rearranger != PIO_REARR_BOX) && (rearranger != PIO_REARR_SUBSET)) ||
