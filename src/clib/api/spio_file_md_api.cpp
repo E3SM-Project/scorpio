@@ -3,10 +3,12 @@
 #include "pio_internal.h"
 #include "pio_api_impl.h"
 #include "spio_tracer.hpp"
+#include "spio_gptl_utils.hpp"
 
 /* ================= File meta-data APIs ============== */
 int PIOc_redef(int ncid)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_redef");
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_redef");
   tr.set_file_id(ncid).add_arg("ncid", ncid).flush();
@@ -16,6 +18,7 @@ int PIOc_redef(int ncid)
 
 int PIOc_enddef(int ncid)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_enddef");
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_enddef");
   tr.set_file_id(ncid).add_arg("ncid", ncid).flush();
@@ -25,6 +28,7 @@ int PIOc_enddef(int ncid)
 
 int PIOc_inq_format(int ncid, int *formatp)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_inqx");
   int ret = PIO_NOERR;
 
 #if SPIO_ENABLE_API_TRACING
@@ -42,6 +46,7 @@ int PIOc_inq_format(int ncid, int *formatp)
 
 int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_inqx");
   int ret = PIO_NOERR;
 
 #if SPIO_ENABLE_API_TRACING
@@ -61,6 +66,7 @@ int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp)
 
 int PIOc_inq_ndims(int ncid, int *ndimsp)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_inqx");
   int ret = PIO_NOERR;
 
 #if SPIO_ENABLE_API_TRACING
@@ -78,6 +84,7 @@ int PIOc_inq_ndims(int ncid, int *ndimsp)
 
 int PIOc_inq_nvars(int ncid, int *nvarsp)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_inqx");
   int ret = PIO_NOERR;
 
 #if SPIO_ENABLE_API_TRACING
@@ -95,6 +102,7 @@ int PIOc_inq_nvars(int ncid, int *nvarsp)
 
 int PIOc_inq_natts(int ncid, int *ngattsp)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_inqx");
   int ret = PIO_NOERR;
 
 #if SPIO_ENABLE_API_TRACING
@@ -112,6 +120,7 @@ int PIOc_inq_natts(int ncid, int *ngattsp)
 
 int PIOc_inq_unlimdim(int ncid, int *unlimdimidp)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_inqx");
   int ret = PIO_NOERR;
 
 #if SPIO_ENABLE_API_TRACING
@@ -129,6 +138,7 @@ int PIOc_inq_unlimdim(int ncid, int *unlimdimidp)
 
 int PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_inqx");
   int ret = PIO_NOERR;
 
 #if SPIO_ENABLE_API_TRACING
@@ -150,6 +160,7 @@ int PIOc_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
 
 int PIOc_inq_type(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_inqx");
   int ret = PIO_NOERR;
 
 #if SPIO_ENABLE_API_TRACING
