@@ -3,6 +3,7 @@
 #include "pio_internal.h"
 #include "pio_api_impl.h"
 #include "spio_tracer.hpp"
+#include "spio_gptl_utils.hpp"
 
 /* ========== APIs to handle I/O Decomposition =============== */
 
@@ -11,6 +12,7 @@ int PIOc_InitDecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, in
                     const PIO_Offset *compmap, int *ioidp, const int *rearr,
                     const PIO_Offset *iostart, const PIO_Offset *iocount)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_InitDecomp");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_InitDecomp");
@@ -33,6 +35,7 @@ int PIOc_InitDecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, in
 int PIOc_InitDecomp_bc(int iosysid, int basetype, int ndims, const int *gdimlen,
                        const long int *start, const long int *count, int *ioidp)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_InitDecomp_bc");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_InitDecomp_bc");
@@ -56,6 +59,7 @@ int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, i
                      const PIO_Offset *compmap, int *ioidp, int rearranger,
                      const PIO_Offset *iostart, const PIO_Offset *iocount)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_init_decomp");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_init_decomp");
@@ -80,6 +84,7 @@ int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, i
 /* Free resources associated with a decomposition. */
 int PIOc_freedecomp(int iosysid, int ioid)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_freedecomp");
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_freedecomp");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).add_arg("ioid", ioid).flush();
@@ -92,6 +97,7 @@ int PIOc_freedecomp(int iosysid, int ioid)
 int PIOc_readmap(const char *file, int *ndims, int **gdims, PIO_Offset *fmaplen,
                  PIO_Offset **map, MPI_Comm comm)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_readmap");
   /* FIXME: Add support for tracing comm-specific calls */
   return PIOc_readmap_impl(file, ndims, gdims, fmaplen, map, comm);
 }
@@ -99,6 +105,7 @@ int PIOc_readmap(const char *file, int *ndims, int **gdims, PIO_Offset *fmaplen,
 int PIOc_readmap_from_f90(const char *file,int *ndims, int **gdims, PIO_Offset *maplen,
                           PIO_Offset **map, int f90_comm)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_readmap_from_f90");
   /* FIXME: Add support for tracing comm-specific calls */
   return PIOc_readmap_from_f90_impl(file, ndims, gdims, maplen, map, f90_comm);
 }
@@ -106,6 +113,7 @@ int PIOc_readmap_from_f90(const char *file,int *ndims, int **gdims, PIO_Offset *
 int PIOc_writemap(const char *file, int ioid, int ndims, const int *gdims, PIO_Offset maplen,
                   const PIO_Offset *map, MPI_Comm comm)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_writemap");
   /* FIXME: Add support for tracing comm-specific calls */
   return PIOc_writemap_impl(file, ioid, ndims, gdims, maplen, map, comm);
 }
@@ -113,6 +121,7 @@ int PIOc_writemap(const char *file, int ioid, int ndims, const int *gdims, PIO_O
 int PIOc_writemap_from_f90(const char *file, int ioid, int ndims, const int *gdims,
                            PIO_Offset maplen, const PIO_Offset *map, int f90_comm)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_writemap_from_f90");
   /* FIXME: Add support for tracing comm-specific calls */
   return PIOc_writemap_from_f90_impl(file, ioid, ndims, gdims, maplen, map, f90_comm);
 }
@@ -121,6 +130,7 @@ int PIOc_writemap_from_f90(const char *file, int ioid, int ndims, const int *gdi
 /* Write a decomposition file. */
 int PIOc_write_decomp(const char *file, int iosysid, int ioid, MPI_Comm comm)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_write_decomp");
   /* FIXME: Add support for tracing comm-specific calls */
   return PIOc_write_decomp_impl(file, iosysid, ioid, comm);
 }
@@ -130,6 +140,7 @@ int PIOc_write_decomp(const char *file, int iosysid, int ioid, MPI_Comm comm)
 int PIOc_write_nc_decomp(int iosysid, const char *filename, int cmode, int ioid,
                          const char *title, const char *history, int fortran_order)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_write_nc_decomp");
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_write_nc_decomp");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).
@@ -146,6 +157,7 @@ int PIOc_write_nc_decomp(int iosysid, const char *filename, int cmode, int ioid,
 int PIOc_read_nc_decomp(int iosysid, const char *filename, int *ioid, MPI_Comm comm,
                         int pio_type, char *title, char *history, int *fortran_order)
 {
+  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_read_nc_decomp");
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_read_nc_decomp");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).
