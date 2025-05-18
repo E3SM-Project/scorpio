@@ -765,6 +765,7 @@ int SPIO::DataRearr::Contig_rearr::setup_data_agg_info(const PIO_Offset *lcompma
   /* Sort the indices of gcompmap to a view that we need for data rearrangement between
    * aggregator/IO procs
    */
+  /*
   std::vector<std::size_t> gcompmap_idx(gcompmap.size());
   std::iota(gcompmap_idx.begin(), gcompmap_idx.end(), 0);
 
@@ -772,22 +773,23 @@ int SPIO::DataRearr::Contig_rearr::setup_data_agg_info(const PIO_Offset *lcompma
   std::sort(gcompmap_idx.begin(), gcompmap_idx.end(),
             [&gcompmap,&to_proc](PIO_Offset a, PIO_Offset b){
               if(to_proc[a] == to_proc[b]){
-                /* Sort all data to send to each proc */
+                // Sort all data to send to each proc
                 return gcompmap[a] < gcompmap[b];
               }
               else{
-                /* Aggregate all data to send to a proc together */
+                // Aggregate all data to send to a proc together
                 return to_proc[a] < to_proc[b];
               }
             });
   GPTLstop("PIO:Contig_rearr::setup_data_agg_info::sort");
 
-  /* Aggregate compmap sorter can be used to sort any user data based on gcompmap */
+  // Aggregate compmap sorter can be used to sort any user data based on gcompmap
   agg_iochunk_sz_ = gcompmap.size();
   agg_compmap_sorter_.resize(agg_iochunk_sz_);
   for(std::size_t i = 0; i < gcompmap_idx.size(); i++){
     agg_compmap_sorter_[gcompmap_idx[i]] = i;
   }
+  */
   /*
   for(std::size_t i = 0; i < gcompmap_idx.size(); i++){
     if(gcompmap[gcompmap_idx[i]] == -1){
@@ -803,7 +805,22 @@ int SPIO::DataRearr::Contig_rearr::setup_data_agg_info(const PIO_Offset *lcompma
 //  std::cout << "DBG: agg_compmap_sorter_ : " << std::flush;
 //  SPIO_Util::Dbg_Util::print_1dvec(agg_compmap_sorter_);
 
-  ret = init_agg_recv_types(gcompmap_counts, agg_compmap_sorter_);
+  agg_iochunk_sz_ = gcompmap.size();
+  GPTLstart("PIO:Contig_rearr::setup_data_agg_info::sort");
+  agg_compmap_sorter_.init(gcompmap.size(),
+    [&gcompmap,&to_proc](std::size_t a, std::size_t b){
+      if(to_proc[a] == to_proc[b]){
+        // Sort all data to send to each proc
+        return gcompmap[a] < gcompmap[b];
+      }
+      else{
+        // Aggregate all data to send to a proc together
+        return to_proc[a] < to_proc[b];
+      }
+    });
+  GPTLstop("PIO:Contig_rearr::setup_data_agg_info::sort");
+
+  ret = init_agg_recv_types(gcompmap_counts, agg_compmap_sorter_.get_sort_map());
   return ret;
 }
 
@@ -1029,8 +1046,10 @@ int SPIO::DataRearr::Contig_rearr::setup_data_rearr_info(std::vector<PIO_Offset>
   assert(to_proc.size() == gcompmap.size());
 
   /* Sort gcompmap (the aggregated compmap from compute procs) based on compmap sorter map */
-  SPIO_Util::vec_map_sort(gcompmap, agg_compmap_sorter_);
-  SPIO_Util::vec_map_sort(to_proc, agg_compmap_sorter_);
+  //SPIO_Util::vec_map_sort(gcompmap, agg_compmap_sorter_);
+  //SPIO_Util::vec_map_sort(to_proc, agg_compmap_sorter_);
+  agg_compmap_sorter_.sort(gcompmap);
+  agg_compmap_sorter_.sort(to_proc);
 
   /* Exchange information about the data being sent from each process,
    * 1) The number of regions (a single region is a contiguous chunk/block of elements/data)

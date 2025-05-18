@@ -5,6 +5,7 @@
 #include "pio.h"
 #include "pio_internal.h"
 #include "pio_types.hpp"
+#include "spio_map_sorter.hpp"
 
 #include <vector>
 #include <utility>
@@ -139,7 +140,8 @@ namespace SPIO{
         int agg_comm_sz_;
         /* Size/Num of elements of the data chunk in this aggregating process */
         std::size_t agg_iochunk_sz_;
-        std::vector<std::size_t> agg_compmap_sorter_;
+        //std::vector<std::size_t> agg_compmap_sorter_;
+        SPIO_Util::Map_sorter agg_compmap_sorter_;
         /* The byte displacements for each process, that is part of agg_comm_, in the aggregated data */
         std::vector<int> agg_data_byte_displs_;
         GatherScatter_info agg_gs_info_;
