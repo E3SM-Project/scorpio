@@ -809,14 +809,8 @@ int SPIO::DataRearr::Contig_rearr::setup_data_agg_info(const PIO_Offset *lcompma
   GPTLstart("PIO:Contig_rearr::setup_data_agg_info::sort");
   agg_compmap_sorter_.init(gcompmap.size(),
     [&gcompmap,&to_proc](std::size_t a, std::size_t b){
-      if(to_proc[a] == to_proc[b]){
-        // Sort all data to send to each proc
-        return gcompmap[a] < gcompmap[b];
-      }
-      else{
-        // Aggregate all data to send to a proc together
-        return to_proc[a] < to_proc[b];
-      }
+      // Sort all data to send to each proc
+      return gcompmap[a] < gcompmap[b];
     });
   GPTLstop("PIO:Contig_rearr::setup_data_agg_info::sort");
 
