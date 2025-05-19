@@ -4727,18 +4727,6 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #ifdef _ADIOS2
     if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
-        if (mode & PIO_WRITE)
-        {
-            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->rd_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Opening file (%s) using ADIOS iotype failed. "
-                           "Open to append mode is not supported yet",
-                           filename);
-        }
-
         /* Trying to open a file with adios unless ADIOS_BP2NC_TEST option is enabled for unit tests */
         bool adios2_file_exist = false;
 
