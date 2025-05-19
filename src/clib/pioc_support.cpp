@@ -4725,13 +4725,13 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #ifdef _ADIOS2
     if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
-        if (file->mode & PIO_WRITE)
+        if (mode & PIO_WRITE)
         {
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "Opening file (%s) using ADIOS iotype failed. "
                            "Open to append mode is not supported yet",
                            filename);
@@ -4762,7 +4762,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Opening file (%s) using ADIOS iotype failed. "
                                "The low level (ADIOS) I/O library call failed to declare a new io handler",
                                filename);
@@ -4775,7 +4775,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Opening file (%s) using ADIOS iotype failed. "
                                "The low level (ADIOS) I/O library call failed to set a single parameter (adios2_error=%s)",
                                filename, convert_adios2_error_to_string(adiosErr));
@@ -4788,7 +4788,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Opening file (%s) using ADIOS iotype failed. "
                                "The low level (ADIOS) I/O library call failed to set a single parameter (adios2_error=%s)",
                                filename, convert_adios2_error_to_string(adiosErr));
@@ -4801,7 +4801,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Opening file (%s) using ADIOS iotype failed. "
                                "The low level (ADIOS) I/O library call failed to set a single parameter (adios2_error=%s)",
                                filename, convert_adios2_error_to_string(adiosErr));
@@ -4814,7 +4814,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Opening file (%s) using ADIOS iotype failed. "
                                "The low level (ADIOS) I/O library call failed to set a single parameter (adios2_error=%s)",
                                filename, convert_adios2_error_to_string(adiosErr));
@@ -4827,7 +4827,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Opening file (%s) using ADIOS iotype failed. "
                                "The low level (ADIOS) I/O library call failed to set the engine type for current io handler (adios2_error=%s)",
                                filename, convert_adios2_error_to_string(adiosErr));
