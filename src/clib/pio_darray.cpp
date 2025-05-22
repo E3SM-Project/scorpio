@@ -2169,6 +2169,27 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
                         "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. The file was not opened for writing, try reopening the file in write mode (use the PIO_WRITE flag)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
     }
 
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
+    {
+        /* ADIOS type does not support open to append mode */
+        if (file->is_reopened)
+        {
+            GPTLstop("PIO:PIOc_write_darray");
+            GPTLstop("PIO:write_total");
+            GPTLstop("PIO:PIOc_write_darray_adios");
+            GPTLstop("PIO:write_total_adios");
+            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->wr_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "Open to append mode is not supported yet",
+                           pio_get_vname_from_file(file, varid), varid,
+                           pio_get_fname_from_file(file), ncid);
+        }
+    }
+
     /* Get decomposition information. */
     if (!(iodesc = pio_get_iodesc_from_id(ioid)))
     {
