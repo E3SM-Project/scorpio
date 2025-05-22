@@ -1,4 +1,156 @@
 ! Write multiple frames of a 2d variable with an unlimited dimension
+! and read the data in multiple chunks of the unlimited dimension
+PIO_TF_TEMPLATE<PIO_TF_PREDEF_TYPENAME PIO_TF_DATA_TYPE, PIO_TF_PREDEF_TYPENAME PIO_TF_FC_DATA_TYPE>
+PIO_TF_AUTO_TEST_SUB_BEGIN nc_wr_2d_unlim_dim_rd_mchunks
+  implicit none
+  integer, parameter :: NDIMS = 2
+  integer, parameter :: NFRAMES = 6
+  ! FIXME: Support NFRAMES that is not exactly divisible by FRAME_CHUNK_SZ
+  integer, parameter :: FRAME_CHUNK_SZ = 2
+  integer, parameter :: VEC_LOCAL_SZ = 7
+  type(var_desc_t)  :: pio_var
+  type(file_desc_t) :: pio_file
+  character(len=PIO_TF_MAX_STR_LEN) :: filename
+  character(len=*), parameter :: PIO_VAR_NAME = 'PIO_TF_test_var'
+  type(io_desc_t) :: wr_iodesc, rd_iodesc_frame_chunk, rd_iodesc_all_frames
+  integer, dimension(:), allocatable :: compdof_wr
+  integer, dimension(:), allocatable :: compdof_rd_frame_chunk, compdof_rd_all_frames
+  integer, dimension(NDIMS) :: start, count
+  PIO_TF_FC_DATA_TYPE, dimension(:,:), allocatable :: rbuf, wbuf, exp_val
+  integer, dimension(NDIMS-1) :: dims
+  integer, dimension(NDIMS) :: pio_dims
+  integer :: i, nrows, ierr
+  integer(kind=pio_offset_kind) :: f, cur_frame_idx
+  ! iotypes = valid io types
+  integer, dimension(:), allocatable :: iotypes
+  character(len=PIO_TF_MAX_STR_LEN), dimension(:), allocatable :: iotype_descs
+  integer :: num_iotypes
+
+  ! Data evenly distributed across all procs
+  ! Each proc has VEC_LOCAL_SZ elements on each frame
+  dims(1) = VEC_LOCAL_SZ * pio_tf_world_sz_
+  start(1) = VEC_LOCAL_SZ * pio_tf_world_rank_ + 1
+  start(2) = 1
+  count(1) = VEC_LOCAL_SZ
+  count(2) = 1
+
+  nrows = count(1)
+
+  allocate(wbuf(nrows, NFRAMES))
+  allocate(rbuf(nrows, NFRAMES))
+  rbuf = 0
+  allocate(exp_val(nrows, NFRAMES))
+  allocate(compdof_wr(nrows))
+  allocate(compdof_rd_frame_chunk(nrows * FRAME_CHUNK_SZ))
+  allocate(compdof_rd_all_frames(nrows * NFRAMES))
+  do i=1,nrows
+    compdof_wr(i) = start(1) - 1 + i
+  end do
+  do f=1,FRAME_CHUNK_SZ
+    cur_frame_idx = (f - 1) * nrows + 1
+    compdof_rd_frame_chunk(cur_frame_idx:cur_frame_idx + nrows - 1) = compdof_wr(:)
+  end do
+  do f=1,NFRAMES
+    cur_frame_idx = (f - 1) * nrows + 1
+    compdof_rd_all_frames(cur_frame_idx:cur_frame_idx + nrows - 1) = compdof_wr(:)
+  end do
+  do f=1,NFRAMES
+    do i=1,nrows
+      wbuf(i,f) = int(compdof_wr(i) + (f-1) * dims(1))
+      exp_val(i,f) = wbuf(i,f)
+    end do
+  end do
+
+  call PIO_initdecomp(pio_tf_iosystem_, PIO_TF_DATA_TYPE, dims, compdof_wr, wr_iodesc)
+  call PIO_initdecomp(pio_tf_iosystem_, PIO_TF_DATA_TYPE, dims, compdof_rd_frame_chunk, rd_iodesc_frame_chunk)
+  call PIO_initdecomp(pio_tf_iosystem_, PIO_TF_DATA_TYPE, dims, compdof_rd_all_frames, rd_iodesc_all_frames)
+
+  deallocate(compdof_wr)
+  deallocate(compdof_rd_frame_chunk)
+  deallocate(compdof_rd_all_frames)
+
+  num_iotypes = 0
+  call PIO_TF_Get_nc_iotypes(iotypes, iotype_descs, num_iotypes)
+  filename = "test_pio_decomp_simple_tests.testfile"
+  do i=1,num_iotypes
+    PIO_TF_LOG(0,*) "Testing : PIO_TF_DATA_TYPE : ", iotype_descs(i)
+    ierr = PIO_createfile(pio_tf_iosystem_, pio_file, iotypes(i), filename, PIO_CLOBBER) 
+    PIO_TF_CHECK_ERR(ierr, "Could not create file " // trim(filename))
+
+    ierr = PIO_def_dim(pio_file, 'PIO_TF_test_dim_row', dims(1), pio_dims(1))
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a dim : " // trim(filename))
+
+    ierr = PIO_def_dim(pio_file, 'PIO_TF_test_dim_time', pio_unlimited, pio_dims(2))
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a dim : " // trim(filename))
+
+    ierr = PIO_def_var(pio_file, PIO_VAR_NAME, PIO_TF_DATA_TYPE, pio_dims, pio_var)
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a var : " // trim(filename))
+
+    ierr = PIO_enddef(pio_file)
+    PIO_TF_CHECK_ERR(ierr, "Failed to end redef mode : " // trim(filename))
+
+    ! Write data - one frame at a time
+    do f=1,NFRAMES
+      call PIO_setframe(pio_file, pio_var, f)
+      ! Write the current frame
+      call PIO_write_darray(pio_file, pio_var, wr_iodesc, wbuf(:,f), ierr)
+      PIO_TF_CHECK_ERR(ierr, "Failed to write darray : " // trim(filename))
+    end do
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+    call PIO_closefile(pio_file)
+
+    ierr = PIO_openfile(pio_tf_iosystem_, pio_file, iotypes(i), filename, PIO_nowrite)
+    PIO_TF_CHECK_ERR(ierr, "Could not reopen file " // trim(filename))
+
+    ierr = PIO_inq_varid(pio_file, PIO_VAR_NAME, pio_var)
+    PIO_TF_CHECK_ERR(ierr, "Could not inq var : " // trim(filename))
+#else
+    call PIO_syncfile(pio_file)
+#endif
+
+    ! Read data - one frame chunk at a time
+    rbuf = 0
+    do f=1,NFRAMES,FRAME_CHUNK_SZ
+      call PIO_setframe(pio_file, pio_var, f)
+      call PIO_read_darray(pio_file, pio_var, rd_iodesc_frame_chunk, rbuf(:,f), ierr)
+      PIO_TF_CHECK_ERR(ierr, "Failed to read darray : " // trim(filename))
+    end do
+
+    do f=1,NFRAMES
+      PIO_TF_CHECK_VAL((rbuf(:,f), exp_val(:,f)), "While reading data, one frame chunk at a time, Got wrong val, frame=", f)
+    end do
+
+    ! Read data - all frames at a time
+    rbuf = 0
+    f = 1
+    call PIO_setframe(pio_file, pio_var, f)
+    call PIO_read_darray(pio_file, pio_var, rd_iodesc_all_frames, rbuf(:,:), ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to read darray : " // trim(filename))
+
+    do f=1,NFRAMES
+      PIO_TF_CHECK_VAL((rbuf(:,f), exp_val(:,f)), "While reading data, all frames at a time, Got wrong val, frame=", f)
+    end do
+
+    call PIO_closefile(pio_file)
+    
+    call PIO_deletefile(pio_tf_iosystem_, filename);
+  end do
+
+  if(allocated(iotypes)) then
+    deallocate(iotypes)
+    deallocate(iotype_descs)
+  end if
+
+  call PIO_freedecomp(pio_tf_iosystem_, rd_iodesc_all_frames)
+  call PIO_freedecomp(pio_tf_iosystem_, rd_iodesc_frame_chunk)
+  call PIO_freedecomp(pio_tf_iosystem_, wr_iodesc)
+  deallocate(exp_val)
+  deallocate(rbuf)
+  deallocate(wbuf)
+PIO_TF_AUTO_TEST_SUB_END nc_wr_2d_unlim_dim_rd_mchunks
+
+! Write multiple frames of a 2d variable with an unlimited dimension
 PIO_TF_TEMPLATE<PIO_TF_PREDEF_TYPENAME PIO_TF_DATA_TYPE, PIO_TF_PREDEF_TYPENAME PIO_TF_FC_DATA_TYPE>
 PIO_TF_AUTO_TEST_SUB_BEGIN nc_wr_rd_2d_unlim_dim
   implicit none
