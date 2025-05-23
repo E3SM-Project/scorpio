@@ -60,6 +60,27 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
     spio_ltimer_start(ios->io_fstats->wr_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
 
+#ifdef _ADIOS2
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
+    {
+        /* ADIOS type does not support open to append mode */
+        if (file->is_reopened)
+        {
+            GPTLstop("PIO:spio_put_att_tc");
+            GPTLstop("PIO:write_total");
+            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->wr_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Writing variable (%s, varid=%d) attribute (%s) to file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "Open to append mode is not supported yet",
+                           pio_get_vname_from_file(file, varid), varid, PIO_IS_NULL(name),
+                           pio_get_fname_from_file(file), ncid);
+        }
+    }
+#endif
+
     if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
         GPTLstart("PIO:spio_put_att_tc_adios");
@@ -2462,6 +2483,27 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
     spio_ltimer_start(ios->io_fstats->wr_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
+
+#ifdef _ADIOS2
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
+    {
+        /* ADIOS type does not support open to append mode */
+        if (file->is_reopened)
+        {
+            GPTLstop("PIO:spio_put_vars_tc");
+            GPTLstop("PIO:write_total");
+            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->wr_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using ADIOS iotype failed. "
+                           "Open to append mode is not supported yet",
+                           pio_get_vname_from_file(file, varid), varid,
+                           pio_get_fname_from_file(file), ncid);
+        }
+    }
+#endif
 
     if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {

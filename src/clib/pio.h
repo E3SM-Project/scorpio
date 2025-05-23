@@ -1193,6 +1193,9 @@ typedef struct file_desc_t
     /** True if we need reserve some extra space in the header when
      * creating NetCDF files to accommodate anticipated changes. */
     bool reserve_extra_header_space;
+
+    /** True if this is an existing file reopened */
+    bool is_reopened;
 } file_desc_t;
 
 /**
