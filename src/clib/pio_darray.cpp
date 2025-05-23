@@ -2169,6 +2169,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
                         "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. The file was not opened for writing, try reopening the file in write mode (use the PIO_WRITE flag)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
     }
 
+#ifdef _ADIOS2
     if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
         /* ADIOS type does not support open to append mode */
@@ -2189,6 +2190,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
                            pio_get_fname_from_file(file), ncid);
         }
     }
+#endif
 
     /* Get decomposition information. */
     if (!(iodesc = pio_get_iodesc_from_id(ioid)))
