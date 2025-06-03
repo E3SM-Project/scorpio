@@ -268,6 +268,21 @@ else()
   message(STATUS "PIO_REARR_ANY rearranger : Setting the local decomposition map length range for SUBSET rearanger (PIO_REARR_ANY_SUBSET_RANGE) to " ${PIO_REARR_ANY_SUBSET_RANGE} " (default)")
 endif()
 
+if(WITH_ADIOS2)
+  if(DEFINED SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX)
+    if(WITH_PNETCDF)
+      message(STATUS "Overriding ADIOS type with PnetCDF for creating files matching regex: ${SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX}")
+    else()
+      message(WARNING "Requested override of ADIOS with PnetCDF for file creation, but PnetCDF is not enabled. Override will be ignored.")
+    endif()
+  else()
+    # Use a regex pattern that matches nothing: \b\B (word boundary followed by non-boundary)
+    # This effectively disables overriding ADIOS type with PnetCDF for file creation by default.
+    set(SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX "\\b\\B")
+    message(STATUS "Disabling override of ADIOS type with PnetCDF for file creation (default)")
+  endif()
+endif()
+
 #==============================================================================
 #  DETECT SYSTEM/COMPILERS (and set compiler specific options)
 #==============================================================================
