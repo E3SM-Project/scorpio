@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <libgen.h>
 #include <string>
+#include <regex>
 #include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
 #include "spio_hash.h"
@@ -3179,6 +3180,36 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
+    }
+
+    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
+    {
+#ifdef SPIO_NO_CXX_REGEX
+        if (ios->io_rank == 0)
+        {
+            printf("PIO: WARNING: C++11 regex support is not available; skipping override of ADIOS with PnetCDF for creating file %s\n", filename);
+        }
+#else /* SPIO_NO_CXX_REGEX */
+        std::regex rgx(SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX);
+        if (std::regex_match(filename, rgx))
+        {
+#ifdef _PNETCDF
+            if (ios->io_rank == 0)
+            {
+                printf("PIO: WARNING: Creating file %s with PnetCDF instead of ADIOS (matched regex: %s)\n",
+                       filename, SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX);
+            }
+
+            file->iotype = PIO_IOTYPE_PNETCDF;
+#else
+            if (ios->io_rank == 0)
+            {
+                printf("PIO: WARNING: PnetCDF is not available; skipping override of ADIOS with PnetCDF for creating file %s (matched regex: %s)\n",
+                       filename, SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX);
+            }
+#endif
+        }
+#endif /* SPIO_NO_CXX_REGEX */
     }
 
     if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
