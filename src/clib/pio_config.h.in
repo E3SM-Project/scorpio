@@ -64,6 +64,9 @@
 /** Range of length of the local decomposition map for SUBSET rearanger. */
 #define PIO_REARR_ANY_SUBSET_RANGE "@PIO_REARR_ANY_SUBSET_RANGE@"
 
+/** Set the regex to override ADIOS type with PnetCDF for file creation. */
+#define SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX "@SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX@"
+
 /** Set to 1 if the library is configured to use the PnetCDF library,
  *  0 otherwise */
 #define PIO_USE_PNETCDF @PIO_USE_PNETCDF@
