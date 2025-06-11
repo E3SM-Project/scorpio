@@ -9,10 +9,10 @@
 
 static void init_user_options(spio_tool_utils::ArgParser &ap)
 {
-  ap.add_opt("bp-file", "data produced by SCORPIO with ADIOS format")
-    .add_opt("rm-bp-file-after-conv", "remove the ADIOS BP file after conversion")
-    .add_opt("idir", "Directory containing data output from SCORPIO (in ADIOS format)")
-    .add_opt("nc-file", "output file name after conversion")
+  ap.add_opt("bp-file", "input file (or regex of basename for multiple files) in ADIOS BP format")
+    .add_opt("rm-bp-file-after-conv", "remove the ADIOS BP file after conversion (or regex to specify which files to delete after conversion)")
+    .add_opt("idir", "Directory containing the input files (in ADIOS BP format)")
+    .add_opt("nc-file", "output file name after conversion (will be used as prefix when converting multiple files)")
     .add_opt("pio-format", "output SCORPIO I/O type. Supported parameters: \"pnetcdf\",  \"netcdf\",  \"netcdf4c\",  \"netcdf4p\", \"nczarr\"")
     .add_opt("rearr", "SCORPIO rearranger. Supported parameters: \"subset\", \"box\", \"any\". Default \"any\".")
     .add_opt("verbose", "Turn on verbose info messages");
@@ -52,7 +52,7 @@ static int get_user_options(
               spio_tool_utils::ArgParser &ap,
               int argc, char *argv[],
               std::string &idir,
-              std::string &ifile, std::string &ofile,
+              std::string &ifname_rgx, std::string &ofile,
               std::string &rm_ifname_rgx,
               std::string &otype,
               std::string &rearr,
@@ -67,25 +67,20 @@ static int get_user_options(
 #else
   ap.parse(argc, argv);
 #endif
+
   if(!ap.has_arg("bp-file") && !ap.has_arg("idir")){
     ap.print_usage(std::cerr);
     return 1;
   }
+
   if(ap.has_arg("bp-file")){
-    ifile = ap.get_arg<std::string>("bp-file");
+    ifname_rgx = ap.get_arg<std::string>("bp-file");
     if(ap.has_arg("nc-file")){
       ofile = ap.get_arg<std::string>("nc-file");
     }
-    else{
-      ofile = strip_bp_ext(ifile);
-    }
-    if(ofile.size() == 0){
-      ap.print_usage(std::cerr);
-      return 1;
-    }
   }
-  else{
-    assert(ap.has_arg("idir"));
+
+  if(ap.has_arg("idir")){
     idir = ap.get_arg<std::string>("idir");
   }
 
@@ -145,11 +140,11 @@ int main(int argc, char *argv[])
   init_user_options(ap);
 
   /* Parse the user options */
-  string idir, infilepath, outfilename, piotype, rearr;
+  string idir, ifname_rgx, outfilename, piotype, rearr;
   string rm_ifname_rgx;
   int debug_lvl = 0;
   ret = get_user_options(ap, argc, argv,
-                          idir, infilepath, outfilename,
+                          idir, ifname_rgx, outfilename,
                           rm_ifname_rgx, piotype, rearr, debug_lvl, rank);
 
   if(ret != 0){
@@ -168,10 +163,11 @@ int main(int argc, char *argv[])
   SetDebugOutput(debug_lvl);
   MPI_Barrier(comm_in);
   if(idir.size() == 0){
-    ret = ConvertBPToNC(infilepath, outfilename, piotype, rearr, comm_in, rm_ifname_rgx);
+    /* FIXME: Hopefully ifname_rgx is actually a file name - not regex */
+    ret = ConvertBPToNC(ifname_rgx, outfilename, piotype, rearr, comm_in, rm_ifname_rgx);
   }
   else{
-    ret = MConvertBPToNC(idir, piotype, rearr, comm_in, rm_ifname_rgx);
+    ret = MConvertBPToNC(idir, ifname_rgx, piotype, rearr, comm_in, rm_ifname_rgx);
   }
   MPI_Barrier(comm_in);
 
