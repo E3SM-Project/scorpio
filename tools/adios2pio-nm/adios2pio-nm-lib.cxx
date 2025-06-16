@@ -2831,7 +2831,8 @@ static bool IsBPDir(const std::string &bp_dname,
  * corresponding file name prefixes to be used for converted
  * files
  */
-static int FindBPDirs(const string &bppdir,
+static int FindBPDirs(MPI_Comm comm, const string &bppdir,
+                      const string &bpdir_name_rgx,
                       vector<string> &bpdirs,
                       vector<string> &conv_fname_prefixes)
 {
@@ -2841,6 +2842,21 @@ static int FindBPDirs(const string &bppdir,
         fprintf(stderr, "Folder %s does not exist.\n", bppdir.c_str());
         return BP2PIO_ERROR;
     }
+
+    int rank = 0;
+    MPI_Comm_rank(comm, &rank);
+#ifdef SPIO_NO_CXX_REGEX
+    if(!bpdir_name_rgx.empty())
+    {
+        if(rank == 0)
+        {
+            printf("WARNING: C++ regex not supported, ignoring regex for converting files (converting all files)...\n");
+        }
+    }
+#else
+    std::smatch match;
+    std::regex rgx((!bpdir_name_rgx.empty()) ? bpdir_name_rgx : ".*");
+#endif
 
     struct dirent *pde = NULL;
     while ((pde = readdir(pdir)) != NULL)
@@ -2852,6 +2868,16 @@ static int FindBPDirs(const string &bppdir,
         if ((pde->d_type == DT_DIR) &&
             IsBPDir(dname, dname_prefix))
         {
+#ifndef SPIO_NO_CXX_REGEX
+            if(!std::regex_match(dname, match, rgx))
+            {
+                if(rank == 0)
+                {
+                    printf("WARNING: Skipping BP file (did not match specified regex): %s\n", dname.c_str());
+                }
+                continue;
+            }
+#endif
             conv_fname_prefixes.push_back(dname_prefix);
             const std::string NC_SUFFIX(".nc");
             const std::string BP_SUFFIX(".bp");
@@ -2868,13 +2894,15 @@ static int FindBPDirs(const string &bppdir,
  * bppdir:  Directory containing multiple directories, named "*.bp",
  *          each directory containing BP files corresponding to a single
  *          file. This is the "BP Parent Directory".
+ * bpdir_name_rgx : Regex to match BP directories/files that need to be converted
  * piotype: The PIO IO type used for converting BP files to NetCDF using PIO
  * comm:    The MPI communicator to be used for conversion
  *
  * The function looks for all directories in bppdir named "*.bp"
  * and converts them, one at a time, to NetCDF files
  */
-int MConvertBPToNC(const string &bppdir, const string &piotype, const string &rearr,
+int MConvertBPToNC(const string &bppdir, const std::string &bpdir_name_rgx,
+                    const string &piotype, const string &rearr,
                     MPI_Comm comm, const std::string &rm_ifname_rgx)
 {
     int ierr = BP2PIO_NOERR;
@@ -2882,7 +2910,7 @@ int MConvertBPToNC(const string &bppdir, const string &piotype, const string &re
     vector<string> conv_fname_prefixes;
     const std::string CONV_FNAME_SUFFIX(".nc");
 
-    ierr = FindBPDirs(bppdir, bpdirs, conv_fname_prefixes);
+    ierr = FindBPDirs(comm, bppdir, bpdir_name_rgx, bpdirs, conv_fname_prefixes);
     if (ierr != BP2PIO_NOERR)
     {
         fprintf(stderr, "Unable to read directory, %s\n", bppdir.c_str());
