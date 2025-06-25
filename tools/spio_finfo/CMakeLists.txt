@@ -73,9 +73,9 @@ endif ()
 #==============================================================================
 #  DEFINE THE TARGET
 #==============================================================================
-set(SRC ${SCORPIO_SOURCE_DIR}/tools/util/argparser.cxx
-    ${SCORPIO_SOURCE_DIR}/tools/util/spio_misc_tool_utils.cxx
-    ${SCORPIO_SOURCE_DIR}/tools/util/spio_lib_info.cxx
+set(SRC ${SCORPIO_SOURCE_DIR}/util/argparser.cxx
+    ${SCORPIO_SOURCE_DIR}/util/spio_misc_tool_utils.cxx
+    ${SCORPIO_SOURCE_DIR}/util/spio_lib_info.cxx
     spio_file_test_utils.cxx
     spio_finfo.cxx
     spio_finfo_tool.cxx)
@@ -108,7 +108,7 @@ target_include_directories(spio_finfo.exe PRIVATE
   ${PIO_INCLUDE_DIRS}
   ${SCORPIO_BINARY_DIR}/src/clib
   ${SCORPIO_SOURCE_DIR}/src/clib
-  ${SCORPIO_SOURCE_DIR}/tools/util
+  ${SCORPIO_SOURCE_DIR}/util
   ${NetCDF_C_INCLUDE_DIRS}
   ${PnetCDF_C_INCLUDE_DIRS} 
   ${PIO_C_EXTRA_INCLUDE_DIRS})
