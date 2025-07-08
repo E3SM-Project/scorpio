@@ -225,6 +225,26 @@ if (WITH_HDF5)
       PUBLIC ${HDF5_C_INCLUDE_DIRS} ${HDF5_HL_INCLUDE_DIRS})
     target_link_libraries (pioc
       PUBLIC ${HDF5_C_LIBRARIES} ${HDF5_HL_LIBRARIES} ${CMAKE_DL_LIBS})
+
+    # Look for HDF5 ZFP (compression library) filter library
+    set(H5Z_ZFP_USE_STATIC_LIBS ON)
+
+    # Append the HDF5 ZFP filter path into list of directories searched for
+    # finding the filter headers and library. Since the HDF5 ZFP filter also
+    # requires ZFP, user needs to set ZFP_DIR (along with H5Z_ZFP_DIR &
+    # H5Z_ZFP_PATH) if the filter dir/path is set.
+    list(APPEND CMAKE_PREFIX_PATH "$ENV{H5Z_ZFP_PATH}")
+
+    # Uncomment the line below to debug CMake find_package() paths
+    #set(CMAKE_FIND_DEBUG_MODE TRUE)
+    find_package(H5Z_ZFP)
+    if (H5Z_ZFP_FOUND)
+      message (STATUS "Found ZFP filter for HDF5")
+      target_compile_definitions (pioc PUBLIC _SPIO_HAS_H5Z_ZFP)
+      target_link_libraries (pioc PUBLIC h5z_zfp::h5z_zfp)
+    else ()
+      message (STATUS "Could not find ZFP filter for HDF5, disabling ZFP with HDF5")
+    endif ()
   else ()
     message(STATUS "Could not find HDF5 library, disabling support for HDF5")
     set(PIO_USE_HDF5 0)

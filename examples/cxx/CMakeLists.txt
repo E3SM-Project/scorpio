@@ -33,23 +33,6 @@ if (PIO_ENABLE_TIMING)
   endif ()
 endif ()
 
-#===== HDF5 ZFP compression plugin =========
-if (WITH_HDF5)
-  set(H5Z_ZFP_USE_STATIC_LIBS ON)
-  # Append the HDF5 ZFP plugin path into list of directories searched for
-  # finding the plugin headers and library. Since the HDF5 ZFP plugin also
-  # requires ZFP, user needs to set ZFP_DIR (along with H5Z_ZFP_DIR &
-  # H5Z_ZFP_PATH) if the plugin dir/path is set.
-  list(APPEND CMAKE_PREFIX_PATH "$ENV{H5Z_ZFP_PATH}")
-  #set(CMAKE_FIND_DEBUG_MODE TRUE)
-  find_package(H5Z_ZFP)
-  if (H5Z_ZFP_FOUND)
-    message (STATUS "Found ZFP plugin for HDF5")
-  else ()
-    message (STATUS "Could not find ZFP plugin for HDF5, disabling ZFP with HDF5")
-  endif ()
-endif ()
-
 #==============================================================================
 #  SET THE COMPILER OPTIONS
 #==============================================================================
@@ -71,8 +54,4 @@ add_spio_executable(examplePio_cxx TRUE "" ${SRC})
 if (WITH_HDF5)
   SET(SRC ${PROJECT_SOURCE_DIR}/../util/argparser.cxx hdf5.cpp)
   add_spio_executable(hdf5_example TRUE "" ${SRC})
-  if (H5Z_ZFP_FOUND)
-    target_compile_definitions(hdf5_example PRIVATE _SPIO_HAS_H5Z_ZFP)
-    target_link_libraries(hdf5_example PRIVATE h5z_zfp::h5z_zfp)
-  endif ()
 endif ()
