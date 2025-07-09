@@ -6715,7 +6715,7 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
 {
     hid_t h5_xtype;
     hid_t sid;
-    hid_t dcpl_id;
+    hid_t dcpl_id = H5I_INVALID_HID;
     hsize_t cdim[H5S_MAX_RANK], dims[H5S_MAX_RANK], mdims[H5S_MAX_RANK];
     int i;
 
@@ -6726,7 +6726,14 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
     for (i = 0; i < ndims; i++)
         dims[i] = mdims[i] = file->hdf5_dims[dimidsp[i]].len;
 
-    dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+#ifdef _SPIO_HDF5_USE_COMPRESSION
+    if((ndims > 0) && (dims[0] == PIO_UNLIMITED)){
+      dcpl_id = file->iosystem->cpid;
+    }
+#endif
+    if(dcpl_id == H5I_INVALID_HID){
+      dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    }
     if (dcpl_id == H5I_INVALID_HID)
     {
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
@@ -6835,12 +6842,14 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
                        name, varid, pio_get_fname_from_file(file), file->pio_ncid);
     }
 
-    if (H5Pclose(dcpl_id) < 0)
-    {
-        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Defining variable (%s, varid = %d) in file (%s, ncid=%d) using HDF5 iotype failed. "
-                       "The low level (HDF5) I/O library call failed to close a dataset creation property list",
-                       name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+    if(dcpl_id != file->iosystem->cpid){
+      if (H5Pclose(dcpl_id) < 0)
+      {
+          return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                         "Defining variable (%s, varid = %d) in file (%s, ncid=%d) using HDF5 iotype failed. "
+                         "The low level (HDF5) I/O library call failed to close a dataset creation property list",
+                         name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+      }
     }
 
     /* Write a hidden coordinates attribute (_Netcdf4Coordinates), which lists the dimids of this variable. */
@@ -6931,7 +6940,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
     {
         if (!file->hdf5_dims[i].has_coord_var)
         {
-            hid_t space_id, dcpl_id, dimscale_id;
+            hid_t space_id, dcpl_id = H5I_INVALID_HID, dimscale_id;
             hsize_t dims[1], max_dims[1], chunk_dims[1] = {1};
 
             dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
@@ -7088,6 +7097,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
                                "The low level (HDF5) I/O library call failed to close a dataset creation property list",
                                pio_get_fname_from_file(file), file->pio_ncid);
             }
+
         }
     }
 

@@ -57,6 +57,8 @@ option (ADIOS_BP2NC_TEST     "Enable testing of BP to NetCDF conversion"    OFF)
 option (ADIOS_NO_DECOMPS     "Save no decomposition data to ADIOS BP files" OFF)
 option (ADIOS_USE_COMPRESSION  "Enable data compression methods in ADIOS (e.g., Blosc2, BZip2)" OFF)
 option (ADIOS_USE_LOSSY_COMPRESSION  "Enable lossy compression methods in ADIOS (e.g., SZ, MGARD, ZFP)" OFF)
+option (HDF5_USE_COMPRESSION  "Enable data compression methods in HDF5 (Lossless compression by default. e.g., Blosc2)" OFF)
+option (HDF5_USE_LOSSY_COMPRESSION  "Enable lossy compression methods in HDF5 (e.g., ZFP)" OFF)
 #===== Testing Options =====
 option (PIO_ENABLE_TESTS  "Enable the testing builds"                       OFF)
 option (PIO_ENABLE_LARGE_TESTS  "Enable large (file, processes) tests"      OFF)

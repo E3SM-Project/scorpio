@@ -785,6 +785,11 @@ typedef struct iosystem_desc_t
     #endif
 #endif
 
+#ifdef _HDF5
+    /* Compression filter property list id */
+    hid_t cpid;
+#endif
+
     /** I/O statistics associated with this I/O system */
     struct spio_io_fstats_summary *io_fstats;
 

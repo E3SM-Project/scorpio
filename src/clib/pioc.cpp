@@ -18,6 +18,18 @@
 #include "spio_io_summary.h"
 #include "spio_rearrange_any.h"
 
+/* Include headers for HDF5 compression filters */
+#if PIO_USE_HDF5
+#include <hdf5.h>
+#ifdef _SPIO_HAS_H5Z_ZFP
+#include "H5Zzfp_lib.h"
+#include "H5Zzfp_props.h"
+#endif
+#ifdef _SPIO_HAS_H5Z_BLOSC2
+#include "blosc2_filter.h"
+#endif
+#endif
+
 bool fortran_order = false;
 
 /** The default error handler used when iosystem cannot be located. */
@@ -1444,6 +1456,42 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     }
 #endif
 
+#ifdef _HDF5
+    /* Initialize the compression filter property list */
+    ios->cpid = H5Pcreate(H5P_DATASET_CREATE);
+    assert(ios->cpid != H5I_INVALID_HID);
+
+#ifdef _SPIO_HDF5_USE_COMPRESSION
+
+#ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION
+
+#ifdef _SPIO_HAS_H5Z_ZFP
+    ret = H5Z_zfp_initialize(); assert(ret == 0);
+    /* Lossy compression : absolute error bound = 0.001 */
+    ret = H5Pset_zfp_accuracy(ios->cpid, 0.001);
+#else
+    PIOc_warn(ios, NULL, __FILE__, __LINE__, "User requested lossy compression, but ZFP library was not available. Writing data without compression");
+#endif
+
+#else
+
+#ifdef _SPIO_HAS_H5Z_BLOSC2
+    /* Lossless compression : Default Blosc2 + ZSTD */
+    unsigned int cd_values[7];
+    cd_values[4] = 1; // compression level
+    cd_values[5] = 1; // shuffle on
+    cd_values[6] = BLOSC_ZSTD; // Use ZSTD for compression
+    ret = H5Pset_filter(ios->cpid, FILTER_BLOSC2, H5Z_FLAG_OPTIONAL, 7, cd_values);
+#else
+    PIOc_warn(ios, NULL, __FILE__, __LINE__, "User requested lossless compression, but Blosc2 library not available. Writing data without compression");
+#endif
+    
+#endif
+
+#endif
+
+#endif
+
     /* Copy the computation communicator into comp_comm. */
     if ((mpierr = MPI_Comm_dup(comp_comm, &ios->comp_comm)))
     {
@@ -1741,6 +1789,18 @@ int PIOc_finalize_impl(int iosysid)
         return pio_err(ios, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
                         "PIO Finalize failed on iosytem (%d). Unable to write I/O summary for the iosystem", iosysid);
     }
+
+#ifdef _HDF5
+
+#ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION
+#ifdef _SPIO_HAS_H5Z_ZFP
+    H5Z_zfp_finalize();
+#endif
+#endif
+
+    H5Pclose(ios->cpid);
+#endif
+
     free(ios->io_fstats);
 
     /* Free this memory that was allocated in init_intracomm. */
