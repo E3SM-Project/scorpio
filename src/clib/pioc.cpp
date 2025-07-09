@@ -1466,7 +1466,11 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
 #ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION
 
 #ifdef _SPIO_HAS_H5Z_ZFP
-    ret = H5Z_zfp_initialize(); assert(ret == 0);
+    ret = H5Z_zfp_initialize();
+    if(ret < 0){
+      GPTLstop("PIO:PIOc_Init_Intracomm");
+      return pio_err(ios, NULL, ret, __FILE__, __LINE__, "Initializing ZFP HDF5 filter (for lossless data compression) failed");
+    }
     /* Lossy compression : absolute error bound = 0.001 */
     ret = H5Pset_zfp_accuracy(ios->cpid, 0.001);
 #else
