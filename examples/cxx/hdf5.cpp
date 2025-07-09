@@ -16,6 +16,9 @@
 #include "H5Zzfp_lib.h"
 #include "H5Zzfp_props.h"
 #endif
+#ifdef _SPIO_HAS_H5Z_BLOSC2
+#include "blosc2_filter.h"
+#endif
 #endif
 
 template<typename T>
@@ -173,12 +176,43 @@ int test_hdf5_zfp(MPI_Comm comm, int comm_rank)
   H5Z_zfp_finalize();
 
   if((ret == 0) && (comm_rank == 0)){
-    std::cout << "Testing " << fname.c_str() << " (with compression) : SUCCESS\n";
+    std::cout << "Testing " << fname.c_str() << " (with ZFP compression) : SUCCESS\n";
   }
 
 #else
   if(comm_rank == 1){
     std::cout << "ERROR: HDF5 ZFP plugin not available...\n";
+  }
+#endif
+  return ret;
+}
+
+int test_hdf5_zstd(MPI_Comm comm, int comm_rank)
+{
+  std::string fname("spio_test_hdf5.h5");
+  int ret = -1;
+  herr_t hret;
+
+#ifdef _SPIO_HAS_H5Z_BLOSC2
+  char *version, *date;
+  unsigned int cd_values[7];
+
+  //ret = register_blosc2(&version, &date); check_err(comm_rank, ret, "Registering BLOSC2 with HDF5 library failed", __LINE__);
+  hid_t dcpid = H5Pcreate(H5P_DATASET_CREATE); check_err(comm_rank, (dcpid != H5I_INVALID_HID) ? 0 : -1, "Creating property list for creating varaible failed", __LINE__);
+  cd_values[4] = 1; // compression level
+  cd_values[5] = 1; // shuffle on
+  cd_values[6] = BLOSC_ZSTD; // Use ZSTD for compression
+  hret = H5Pset_filter(dcpid, FILTER_BLOSC2, H5Z_FLAG_OPTIONAL, 7, cd_values); check_err(comm_rank, hret, "Setting the BLOSC2 filter property list failed", __LINE__);
+  ret = test_hdf5_file_ops(comm, comm_rank, fname, dcpid);
+  H5Pclose(dcpid);
+
+  if((ret == 0) && (comm_rank == 0)){
+    std::cout << "Testing " << fname.c_str() << " (with BLOSC2+ZSTD compression) : SUCCESS\n";
+  }
+
+#else
+  if(comm_rank == 1){
+    std::cout << "ERROR: HDF5 BLOSC2 filter not available...\n";
   }
 #endif
   return ret;
@@ -204,6 +238,9 @@ int main(int argc, char *argv[])
   if(ret == NC_NOERR){
     if((argc > 1) && (strcmp(argv[1], "--test-zfp") == 0)){
       ret = test_hdf5_zfp(comm, comm_rank);
+    }
+    if((argc > 1) && (strcmp(argv[1], "--test-zstd") == 0)){
+      ret = test_hdf5_zstd(comm, comm_rank);
     }
   }
 

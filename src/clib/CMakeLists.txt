@@ -231,9 +231,9 @@ if (WITH_HDF5)
 
     # Append the HDF5 ZFP filter path into list of directories searched for
     # finding the filter headers and library. Since the HDF5 ZFP filter also
-    # requires ZFP, user needs to set ZFP_DIR (along with H5Z_ZFP_DIR &
-    # H5Z_ZFP_PATH) if the filter dir/path is set.
-    list(APPEND CMAKE_PREFIX_PATH "$ENV{H5Z_ZFP_PATH}")
+    # requires ZFP, user needs to set ZFP_DIR (along with H5Z_ZFP_DIR)
+    # if the filter dir/path is set.
+    list(APPEND CMAKE_PREFIX_PATH "$ENV{H5Z_ZFP_DIR}")
 
     # Uncomment the line below to debug CMake find_package() paths
     #set(CMAKE_FIND_DEBUG_MODE TRUE)
@@ -244,6 +244,21 @@ if (WITH_HDF5)
       target_link_libraries (pioc PUBLIC h5z_zfp::h5z_zfp)
     else ()
       message (STATUS "Could not find ZFP filter for HDF5, disabling ZFP with HDF5")
+    endif ()
+
+    # BLOSC2 filter library requires the BLOSC2 library to be available
+    # So users need to set Blosc2_DIR (for finding BLOSC2) and
+    # H5Z_BLOSC2_DIR for finding the Blosc2 filter library
+    # Look for Blosc2 (compression library) filter library
+    set(H5Z_BLOSC2_USE_STATIC_LIBS ON)
+    list(APPEND CMAKE_PREFIX_PATH "$ENV{H5Z_BLOSC2_DIR}")
+    find_package(H5Z_BLOSC2)
+    if (H5Z_BLOSC2_FOUND)
+      message (STATUS "Found BLOSC2 filter for HDF5")
+      target_compile_definitions (pioc PUBLIC _SPIO_HAS_H5Z_BLOSC2)
+      target_link_libraries (pioc PUBLIC h5z_blosc2::h5z_blosc2)
+    else ()
+      message (STATUS "Could not find Blosc2 filter, disabling HDF5 filter for Blosc2")
     endif ()
   else ()
     message(STATUS "Could not find HDF5 library, disabling support for HDF5")
@@ -398,6 +413,26 @@ if (ADIOS_USE_LOSSY_COMPRESSION)
   message(WARNING "The SZ or MGARD methods only support float or double types. For other types, lossless compression will be used instead")
   target_compile_definitions (pioc
     PRIVATE _SPIO_ADIOS_USE_LOSSY_COMPRESSION)
+endif ()
+
+if (HDF5_USE_COMPRESSION)
+  message(STATUS "Applying data compression to HDF5 output files")
+  message(STATUS "Currently supported lossless compression methods : Blosc2 (default)")
+  message(STATUS "Blosc2 internal compressor (algorithm: blosclz, lz4, lz4hc, snappy, zlib, zstd) = zstd (default)")
+  message(STATUS "Blosc2 compression level (range: 0 – 9) = 1 (default)")
+  message(STATUS "Blosc2 shuffle mode (option: BLOSC_SHUFFLE, BLOSC_NOSHUFFLE, BLOSC_BITSHUFFLE) = BLOSC_BITSHUFFLE (default)")
+  message(STATUS "These are the default settings for lossless compression. Future versions will support configuration or run-time options")
+  target_compile_definitions (pioc
+    PUBLIC _SPIO_HDF5_USE_COMPRESSION)
+endif ()
+
+if (HDF5_USE_LOSSY_COMPRESSION)
+  message(STATUS "Applying lossy compression to HDF5 output files")
+  message(STATUS "Currently supported lossy compression methods : ZFP (default)")
+  message(STATUS "Lossy compression error bound = 0.001 (default)")
+  message(STATUS "These are the default settings for lossy compression. Future versions will support configuration or run-time options")
+  target_compile_definitions (pioc
+    PRIVATE _SPIO_HDF5_USE_LOSSY_COMPRESSION)
 endif ()
 
 if (PIO_ENABLE_API_TRACING)
