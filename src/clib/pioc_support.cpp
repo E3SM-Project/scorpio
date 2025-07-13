@@ -3196,11 +3196,15 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #ifdef _PNETCDF
             if (ios->io_rank == 0)
             {
-                printf("PIO: WARNING: Creating file %s with PnetCDF instead of ADIOS (matched regex: %s)\n",
+                printf("PIO: WARNING: Creating file %s with PnetCDF (CDF-5 format) instead of ADIOS (matched regex: %s)\n",
                        filename, SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX);
             }
 
             file->iotype = PIO_IOTYPE_PNETCDF;
+
+            /* Use CDF-5 format to support 64 bit dimensions and sizes in PnetCDF fallback */
+            file->mode &= ~(NC_CLASSIC_MODEL | NC_64BIT_OFFSET | NC_NETCDF4);
+            file->mode |= NC_64BIT_DATA;
 #else
             if (ios->io_rank == 0)
             {
