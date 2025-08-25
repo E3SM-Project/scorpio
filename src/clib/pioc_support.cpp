@@ -6628,12 +6628,13 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
                        filename);
     }
 
-    if (H5Tset_size(h5_string_type, asize + 1) < 0)
+    assert(asize > 0);
+    if (H5Tset_size(h5_string_type, asize) < 0)
     {
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                        "Creating file (%s) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to set the total size (%ld bytes) for a derived C-style string datatype",
-                       filename, asize + 1);
+                       filename, asize);
     }
 
     if (H5Tset_strpad(h5_string_type, H5T_STR_NULLTERM) < 0)
@@ -7235,7 +7236,11 @@ int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const 
     if (atttype == NC_CHAR)
     {
         /* String type */
-        space_id = H5Screate(H5S_SCALAR);
+        if (asize == 0)
+            space_id = H5Screate(H5S_NULL);
+        else
+            space_id = H5Screate(H5S_SCALAR);
+
         if (space_id == H5I_INVALID_HID)
         {
             return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
@@ -7254,12 +7259,12 @@ int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const 
         }
 
         /* For empty strings, asize is 0, while H5Tset_size() requires that size must be positive */
-        if (H5Tset_size(h5_xtype, asize + 1) < 0)
+        if (H5Tset_size(h5_xtype, (asize == 0 ? 1 : asize)) < 0)
         {
             return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                            "Writing attribute (%s) associated with variable (varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                            "The low level (HDF5) I/O library call failed to set the total size (%ld bytes) for a derived C-style string datatype",
-                           name, varid, pio_get_fname_from_file(file), file->pio_ncid, asize + 1);
+                           name, varid, pio_get_fname_from_file(file), file->pio_ncid, (asize == 0 ? 1 : asize));
         }
 
         if (H5Tset_strpad(h5_xtype, H5T_STR_NULLTERM) < 0)
