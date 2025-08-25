@@ -340,7 +340,7 @@ int PIOc_setframe_impl(int ncid, int varid, int frame)
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         if (frame >= 0)
         {

@@ -1231,7 +1231,10 @@ enum PIO_IOTYPE
     PIO_IOTYPE_ADIOSC = 7,
 
     /** HDF5 parallel */
-    PIO_IOTYPE_HDF5 = 8
+    PIO_IOTYPE_HDF5 = 8,
+
+    /** HDF5 parallel with compression */
+    PIO_IOTYPE_HDF5C = 9
 };
 
 /**

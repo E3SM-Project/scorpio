@@ -512,6 +512,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     case PIO_IOTYPE_NETCDF4P_NCZARR:
     case PIO_IOTYPE_PNETCDF:
     case PIO_IOTYPE_HDF5:
+    case PIO_IOTYPE_HDF5C:
         if ((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
                                            DARRAY_DATA, frame)))
         {
@@ -2319,7 +2320,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
 
     /* If we don't know the fill value for this var, get it. */
 /* TODO handle fill values for HDF5 type later */
-if (file->iotype != PIO_IOTYPE_HDF5)
+if ((file->iotype != PIO_IOTYPE_HDF5) && (file->iotype != PIO_IOTYPE_HDF5C))
 {
     if (!vdesc->fillvalue)
     {

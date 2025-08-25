@@ -3720,6 +3720,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
 #ifdef _HDF5
         case PIO_IOTYPE_HDF5:
+        case PIO_IOTYPE_HDF5C:
             ierr = spio_hdf5_create(ios, file, filename);
             break;
 #endif
@@ -4883,7 +4884,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         if (H5Fis_hdf5(filename) > 0)
         {
@@ -5739,7 +5740,9 @@ int spio_change_def(int ncid, int is_enddef)
         }
 #endif /* _PNETCDF */
 #ifdef _NETCDF
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC && file->iotype != PIO_IOTYPE_HDF5 && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF &&
+            file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC &&
+            file->iotype != PIO_IOTYPE_HDF5 && file->iotype != PIO_IOTYPE_HDF5C && file->do_io)
         {
             if (is_enddef)
             {
@@ -5786,7 +5789,7 @@ int spio_change_def(int ncid, int is_enddef)
         }
 #endif /* _NETCDF */
 #ifdef _HDF5
-        if (file->iotype == PIO_IOTYPE_HDF5)
+        if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
         {
             if (is_enddef)
             {
@@ -5850,7 +5853,7 @@ int iotype_is_valid(int iotype)
 
     /* Some builds include hdf5. */
 #ifdef _HDF5
-    if (iotype == PIO_IOTYPE_HDF5)
+    if ((iotype == PIO_IOTYPE_HDF5) || (iotype == PIO_IOTYPE_HDF5C))
         ret++;
 #endif /* _HDF5 */
 
@@ -6436,7 +6439,7 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
     int mpierr = MPI_SUCCESS;
 
     assert(ios && file && filename);
-    assert(file->iotype == PIO_IOTYPE_HDF5);
+    assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
     assert(ios->ioproc);
 
     if (file->mode & PIO_NOCLOBBER) /* Check whether HDF5 file exists */
@@ -6720,7 +6723,7 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
     int i;
 
     assert(ios && file && name && ndims >= 0 && varid >= 0);
-    assert(file->iotype == PIO_IOTYPE_HDF5);
+    assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
     assert(ios->ioproc);
 
     for (i = 0; i < ndims; i++)
@@ -6933,7 +6936,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
     int i;
 
     assert(ios && file);
-    assert(file->iotype == PIO_IOTYPE_HDF5);
+    assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
     assert(ios->ioproc);
 
     for (i = 0; i < file->hdf5_num_dims; i++)
@@ -7230,7 +7233,7 @@ int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const 
     hid_t h5_xtype;
 
     assert(ios && file && name && op);
-    assert(file->iotype == PIO_IOTYPE_HDF5);
+    assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
     assert(ios->ioproc);
 
     if (varid == PIO_GLOBAL)
@@ -7385,7 +7388,7 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
     hsize_t mdims[H5S_MAX_RANK];
 
     assert(ios && file && varid >= 0 && buf);
-    assert(file->iotype == PIO_IOTYPE_HDF5);
+    assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
     assert(ios->ioproc);
 
     hid_t file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
@@ -7585,7 +7588,7 @@ int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file)
     int i;
 
     assert(ios && file);
-    assert(file->iotype == PIO_IOTYPE_HDF5);
+    assert((file->iotype == PIO_IOTYPE_HDF5) || ((file->iotype == PIO_IOTYPE_HDF5C)));
     assert(ios->ioproc);
 
     if (H5Pclose(file->dxplid_coll) < 0)

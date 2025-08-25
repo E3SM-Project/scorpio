@@ -121,6 +121,7 @@ module pio_types
 !!   - PIO_iotype_adios : parallel read/write of ADIOS files
 !!   - PIO_iotype_adiosc : parallel read/write of ADIOS files with data compression
 !!   - PIO_iotype_hdf5 : parallel write of HDF5 files
+!!   - PIO_iotype_hdf5c : parallel read/write of HDF5 files with data compression
 !>
     integer(i4), public, parameter ::  &
         PIO_iotype_pnetcdf = 1, &   ! parallel read/write of pNetCDF files
@@ -130,7 +131,8 @@ module pio_types
         PIO_iotype_netcdf4p_nczarr = 5, &  ! netcdf4 (hdf5 format) NCZarr file opened in parallel
         PIO_iotype_adios = 6, &     ! parallel read/write of ADIOS files
         PIO_iotype_adiosc = 7, &    ! parallel read/write of ADIOS files with compression
-        PIO_iotype_hdf5 = 8         ! parallel write of HDF5 files
+        PIO_iotype_hdf5 = 8, &      ! parallel write of HDF5 files
+        PIO_iotype_hdf5c = 9        ! parallel read/write of HDF5 files with compression
 
 
 ! These are for backward compatability and should not be used or expanded upon

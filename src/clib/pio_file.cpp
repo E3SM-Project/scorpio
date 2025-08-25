@@ -405,6 +405,7 @@ static int sync_file(int ncid)
 #endif
 #ifdef _HDF5
             case PIO_IOTYPE_HDF5:
+            case PIO_IOTYPE_HDF5C:
                 ierr = PIO_NOERR;
                 break;
 #endif
@@ -1018,6 +1019,7 @@ int PIOc_closefile_impl(int ncid)
 #endif
 #ifdef _HDF5
         case PIO_IOTYPE_HDF5:
+        case PIO_IOTYPE_HDF5C:
             ierr = spio_hdf5_close(ios, file);
             break;
 #endif
@@ -1055,7 +1057,7 @@ int PIOc_closefile_impl(int ncid)
     }
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         for (int i = 0; i < file->hdf5_num_dims; i++)
         {

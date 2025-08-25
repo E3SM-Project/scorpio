@@ -445,6 +445,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
 #endif
 #ifdef _HDF5
             case PIO_IOTYPE_HDF5:
+            case PIO_IOTYPE_HDF5C:
                 /* Get the total number of data elements we are
                  * writing for this region. */
                 dsize = 1;
