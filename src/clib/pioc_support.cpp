@@ -6734,8 +6734,13 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
      * for variables with chunked layout. Only multidim variables with UNLIMITED dimensions
      * are chunked right now. So only apply the dataset with compression filters for those
      * variables
+     * FIXME:
+     * Some 1D variables, like time(timelevels), are written out in independent mode
+     * (put var) and hence cannot use filters (that requires collective mode for writes).
+     * Some 2D variables, like time_bnds(time, nbnd), are also written out in indep mode
+     * So as a workaround currently restricting filters to > 2D vars
      */
-    if((file->iotype == PIO_IOTYPE_HDF5C) && (ndims > 0) && (dims[0] == PIO_UNLIMITED)){
+    if((file->iotype == PIO_IOTYPE_HDF5C) && (ndims > 2) && (dims[0] == PIO_UNLIMITED)){
       dcpl_id = file->iosystem->cpid;
     }
 #endif
