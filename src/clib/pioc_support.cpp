@@ -6730,7 +6730,12 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
         dims[i] = mdims[i] = file->hdf5_dims[dimidsp[i]].len;
 
 #ifdef _SPIO_HDF5_USE_COMPRESSION
-    if((ndims > 0) && (dims[0] == PIO_UNLIMITED)){
+    /* HDF5 filters, including compression filter (file->iosystem->cpid), can only be used
+     * for variables with chunked layout. Only multidim variables with UNLIMITED dimensions
+     * are chunked right now. So only apply the dataset with compression filters for those
+     * variables
+     */
+    if((file->iotype == PIO_IOTYPE_HDF5C) && (ndims > 0) && (dims[0] == PIO_UNLIMITED)){
       dcpl_id = file->iosystem->cpid;
     }
 #endif
@@ -7546,6 +7551,7 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
         if (H5Dwrite(file->hdf5_vars[varid].hdf5_dataset_id, mem_type_id, mem_space_id,
                      file_space_id, file->dxplid_indep, buf) < 0)
         {
+            H5Eprint2(H5E_DEFAULT, stderr);
             return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                            "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                            "The low level (HDF5) I/O library call failed to write the dataset associated with this variable",
