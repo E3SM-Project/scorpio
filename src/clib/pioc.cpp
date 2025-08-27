@@ -1469,25 +1469,37 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     ret = H5Z_zfp_initialize();
     if(ret < 0){
       GPTLstop("PIO:PIOc_Init_Intracomm");
-      return pio_err(ios, NULL, ret, __FILE__, __LINE__, "Initializing ZFP HDF5 filter (for lossless data compression) failed");
+      return pio_err(ios, NULL, ret, __FILE__, __LINE__, "Initializing HDF5 ZFP filter (for lossy data compression) failed");
     }
     /* Lossy compression : absolute error bound = 0.001 */
     ret = H5Pset_zfp_accuracy(ios->cpid, 0.001);
+    if(ret < 0){
+      PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "Setting HDF5 ZFP filter absolute error bound failed (continuing with the default error bounds)");
+    }
 #else
-    PIOc_warn(ios, NULL, __FILE__, __LINE__, "User requested lossy compression, but ZFP library was not available. Writing data without compression");
+    PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "User requested lossy compression, but ZFP library was not available. Writing data without compression");
 #endif
 
 #else
 
 #ifdef _SPIO_HAS_H5Z_BLOSC2
     /* Lossless compression : Default Blosc2 + ZSTD */
+    ret = register_blosc2(NULL, NULL);
+    if(ret < 0){
+      GPTLstop("PIO:PIOc_Init_Intracomm");
+      return pio_err(ios, NULL, ret, __FILE__, __LINE__, "Registering/Initializing HDF5 Blosc2 filter (for lossless data compression) failed");
+    }
+
     unsigned int cd_values[7];
     cd_values[4] = 1; // compression level
     cd_values[5] = 1; // shuffle on
     cd_values[6] = BLOSC_ZSTD; // Use ZSTD for compression
     ret = H5Pset_filter(ios->cpid, FILTER_BLOSC2, H5Z_FLAG_OPTIONAL, 7, cd_values);
+    if(ret < 0){
+      PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "User requested lossless compression, but setting HDF5 Blosc2 filter failed. Writing data without compression");
+    }
 #else
-    PIOc_warn(ios, NULL, __FILE__, __LINE__, "User requested lossless compression, but Blosc2 library not available. Writing data without compression");
+    PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "User requested lossless compression, but Blosc2 library not available. Writing data without compression");
 #endif
     
 #endif
