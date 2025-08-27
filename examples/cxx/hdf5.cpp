@@ -161,7 +161,7 @@ int test_hdf5(MPI_Comm comm, int comm_rank)
 
 int test_hdf5_zfp(MPI_Comm comm, int comm_rank)
 {
-  std::string fname("spio_test_hdf5.h5");
+  std::string fname("spio_test_hdf5_zfp.h5");
   int ret = -1;
   herr_t hret;
 
@@ -189,7 +189,7 @@ int test_hdf5_zfp(MPI_Comm comm, int comm_rank)
 
 int test_hdf5_zstd(MPI_Comm comm, int comm_rank)
 {
-  std::string fname("spio_test_hdf5.h5");
+  std::string fname("spio_test_hdf5_zstd.h5");
   int ret = -1;
   herr_t hret;
 
@@ -197,7 +197,7 @@ int test_hdf5_zstd(MPI_Comm comm, int comm_rank)
   char *version, *date;
   unsigned int cd_values[7];
 
-  //ret = register_blosc2(&version, &date); check_err(comm_rank, ret, "Registering BLOSC2 with HDF5 library failed", __LINE__);
+  ret = register_blosc2(NULL, NULL); check_err(comm_rank, ret, "Registering HDF5 Blosc2 compression library failed", __LINE__);
   hid_t dcpid = H5Pcreate(H5P_DATASET_CREATE); check_err(comm_rank, (dcpid != H5I_INVALID_HID) ? 0 : -1, "Creating property list for creating varaible failed", __LINE__);
   cd_values[4] = 1; // compression level
   cd_values[5] = 1; // shuffle on
