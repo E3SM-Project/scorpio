@@ -3706,6 +3706,9 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
              */
             MPI_Info_set(ios->info, "nc_ibuf_size", "67108864");
 
+            MPI_Info_set(ios->info, "nc_chunking", "enable");
+            MPI_Info_set(ios->info, "nc_chunk_default_filter", "zlib");
+
             ierr = ncmpi_create(ios->io_comm, filename, file->mode, ios->info, &file->fh);
             if (!ierr)
             {

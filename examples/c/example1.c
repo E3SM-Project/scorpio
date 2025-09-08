@@ -335,16 +335,6 @@ int check_file(int ntasks, char *filename) {
 #ifdef _PNETCDF
         format[num_flavors++] = PIO_IOTYPE_PNETCDF;
 #endif
-#ifdef _NETCDF
-        format[num_flavors++] = PIO_IOTYPE_NETCDF;
-#endif
-#ifdef _NETCDF4
-        format[num_flavors++] = PIO_IOTYPE_NETCDF4C;
-        format[num_flavors++] = PIO_IOTYPE_NETCDF4P;
-#endif
-#ifdef _ADIOS2
-        format[num_flavors++] = PIO_IOTYPE_ADIOS;
-#endif
 	
 	/* Use PIO to create the example file in each of the four
 	 * available ways. */

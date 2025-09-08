@@ -3617,6 +3617,28 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
                 ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
                                 "Defining variable %s (ndims = %d) in file %s (ncid=%d, iotype=%s) failed. %s", name, ndims, pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype), ((ierr2 == PIO_NOERR) ? errmsg : ""));
             }
+
+            PIO_Offset dimlen;
+            int chunk_dim[ndims];
+
+            for (int d = 0; d < ndims; d++) {
+                ncmpi_inq_dimlen(file->fh, dimidsp[d], &dimlen);
+
+                if (d == 0) {
+                    if (dimlen == NC_UNLIMITED)
+                        chunk_dim[d] = 1;
+                    else
+                        chunk_dim[d] = (int)dimlen;
+                }
+                else
+                    chunk_dim[d] = (int)dimlen;
+            }
+
+            // Set chunking
+            ncmpi_var_set_chunk(file->fh, *varidp, chunk_dim);
+
+            /* Use default filter */
+            ncmpi_var_set_filter(file->fh, *varidp, NC_FILTER_DEFLATE);
         }
 #endif /* _PNETCDF */
 
