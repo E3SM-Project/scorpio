@@ -21,6 +21,18 @@
 #include "spio_file_mvcache.h"
 #include "spio_hash.h"
 
+/* Include headers for HDF5 compression filters */
+#if PIO_USE_HDF5
+#include <hdf5.h>
+#ifdef _SPIO_HAS_H5Z_ZFP
+#include "H5Zzfp_lib.h"
+#include "H5Zzfp_props.h"
+#endif
+#ifdef _SPIO_HAS_H5Z_BLOSC2
+#include "blosc2_filter.h"
+#endif
+#endif
+
 #define VERSNO 2001
 
 #if defined(__cplusplus)
@@ -6579,14 +6591,21 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
                        filename);
     }
 
-    if (H5Pset_dxpl_mpio(file->dxplid_indep, H5FD_MPIO_INDEPENDENT) < 0)
+    if (H5Pset_dxpl_mpio(file->dxplid_indep, H5FD_MPIO_COLLECTIVE) < 0)
     {
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                        "Creating file (%s) using HDF5 iotype failed. "
-                       "The low level (HDF5) I/O library call failed to set data transfer mode to independent",
+                       "The low level (HDF5) I/O library call failed to set data transfer mode to collective",
                        filename);
     }
 
+    if (H5Pset_dxpl_mpio_collective_opt(file->dxplid_indep, H5FD_MPIO_INDIVIDUAL_IO) < 0)
+    {
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Creating file (%s) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to set data transfer mode to individual I/O",
+                       filename);
+    }
     /* Writing _NCProperties attribute */
     const char* attr_name = "_NCProperties";
     char nc_properties[PIO_MAX_NAME];
@@ -6713,13 +6732,61 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
     return PIO_NOERR;
 }
 
+/* Create HDF5 dataset property ID */
+static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *file, int ndims)
+{
+  herr_t ret;
+  hid_t dpid = H5I_INVALID_HID;
+
+  assert((ios != NULL) && (file != NULL) && (ndims >= 0));
+
+  /* Initialize the compression filter property list */
+  dpid = H5Pcreate(H5P_DATASET_CREATE);
+  assert(dpid != H5I_INVALID_HID);
+
+  /* We currently support compression for non-scalar data */
+  if((ndims <= 0) || (file->iotype != PIO_IOTYPE_HDF5C)) return dpid;
+
+#ifdef _SPIO_HDF5_USE_COMPRESSION
+
+#ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION
+
+#ifdef _SPIO_HAS_H5Z_ZFP
+  /* Lossy compression : absolute error bound = 0.001 */
+  ret = H5Pset_zfp_accuracy(dpid, 0.001);
+  if(ret < 0){
+    PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "Setting HDF5 ZFP filter absolute error bound failed (continuing with the default error bounds)");
+  }
+#endif
+
+#else /* lossless compression, ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION */
+
+#ifdef _SPIO_HAS_H5Z_BLOSC2
+  /* Lossless compression : Default Blosc2 + ZSTD */
+  unsigned int cd_values[7];
+  cd_values[4] = 1; // compression level
+  cd_values[5] = 1; // shuffle on
+  cd_values[6] = BLOSC_ZSTD; // Use ZSTD for compression
+  ret = H5Pset_filter(dpid, FILTER_BLOSC2, H5Z_FLAG_OPTIONAL, 7, cd_values);
+  if(ret < 0){
+    PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "User requested lossless compression, but setting HDF5 Blosc2 filter failed. Writing data without compression");
+  }
+#endif
+
+#endif /* ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION */
+
+#endif /* ifdef _SPIO_HDF5_USE_COMPRESSION */
+
+  return dpid;
+}
+
 int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
                       nc_type xtype, int ndims, const int *dimidsp, int varid)
 {
     hid_t h5_xtype;
     hid_t sid;
     hid_t dcpl_id = H5I_INVALID_HID;
-    hsize_t cdim[H5S_MAX_RANK], dims[H5S_MAX_RANK], mdims[H5S_MAX_RANK];
+    hsize_t dims[H5S_MAX_RANK], mdims[H5S_MAX_RANK];
     int i;
 
     assert(ios && file && name && ndims >= 0 && varid >= 0);
@@ -6740,13 +6807,8 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
      * Some 2D variables, like time_bnds(time, nbnd), are also written out in indep mode
      * So as a workaround currently restricting filters to > 2D vars
      */
-    if((file->iotype == PIO_IOTYPE_HDF5C) && (ndims > 2) && (dims[0] == PIO_UNLIMITED)){
-      dcpl_id = file->iosystem->cpid;
-    }
 #endif
-    if(dcpl_id == H5I_INVALID_HID){
-      dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
-    }
+    dcpl_id = spio_create_hdf5_dataset_pid(ios, file, ndims);
     if (dcpl_id == H5I_INVALID_HID)
     {
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
@@ -6810,22 +6872,28 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
 
     file->hdf5_vars[varid].hdf5_type = h5_xtype;
 
-    if (ndims > 0 && dims[0] == PIO_UNLIMITED)
-    {
-        mdims[0] = H5S_UNLIMITED;
+    if(ndims > 0){
+      hsize_t cdim[H5S_MAX_RANK];
 
+      for(i = 0; i < ndims; i++){
+        cdim[i] = mdims[i];
+      }
+
+      if(dims[0] == PIO_UNLIMITED){
         /* Chunk size along rec dim is always 1 */
         cdim[0] = 1;
-        for (i = 1; i < ndims; i++)
-            cdim[i] = mdims[i];
+      }
 
-        if (H5Pset_chunk(dcpl_id, ndims, cdim) < 0)
-        {
-            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                           "Defining variable (%s, varid = %d) in file (%s, ncid=%d) using HDF5 iotype failed. "
-                           "The low level (HDF5) I/O library call failed to set the size of the chunks used to store a chunked layout dataset",
-                           name, varid, pio_get_fname_from_file(file), file->pio_ncid);
-        }
+      if(H5Pset_chunk(dcpl_id, ndims, cdim) < 0){
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Defining variable (%s, varid = %d) in file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to set the size of the chunks used to store a chunked layout dataset",
+                       name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+      }
+    }
+
+    if((ndims > 0) && (dims[0] == PIO_UNLIMITED)){
+      mdims[0] = H5S_UNLIMITED;
     }
 
     sid = H5Screate_simple(ndims, dims, mdims);
@@ -6855,14 +6923,12 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
                        name, varid, pio_get_fname_from_file(file), file->pio_ncid);
     }
 
-    if(dcpl_id != file->iosystem->cpid){
-      if (H5Pclose(dcpl_id) < 0)
-      {
-          return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                         "Defining variable (%s, varid = %d) in file (%s, ncid=%d) using HDF5 iotype failed. "
-                         "The low level (HDF5) I/O library call failed to close a dataset creation property list",
-                         name, varid, pio_get_fname_from_file(file), file->pio_ncid);
-      }
+    if (H5Pclose(dcpl_id) < 0)
+    {
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Defining variable (%s, varid = %d) in file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to close a dataset creation property list",
+                       name, varid, pio_get_fname_from_file(file), file->pio_ncid);
     }
 
     /* Write a hidden coordinates attribute (_Netcdf4Coordinates), which lists the dimids of this variable. */
@@ -7451,135 +7517,129 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
         }
     }
 
+    hsize_t hstart[ndims];
+    hsize_t hcount[ndims];
+    hsize_t hstride[ndims];
+
+    for(int i = 0; i < ndims; i++){
+      hstart[i] = hcount[i] = 0;
+      hstride[i] = 1;
+    }
+
     /* Only the IO master does the IO */
-    if (ios->iomaster == MPI_ROOT)
+    if(ios->iomaster == MPI_ROOT){
+      if(start){
+        for(int i = 0; i < ndims; i++){
+          hstart[i] = (hsize_t)start[i];
+        }
+      }
+
+      if(count){
+        for(int i = 0; i < ndims; i++){
+          hcount[i] = (hsize_t)count[i];
+        }
+      }
+      else{
+        for(int i = 0; i < ndims; i++){
+          hcount[i] = dims[i];
+        }
+      }
+
+      if(stride){
+        for(int i = 0; i < ndims; i++){
+          hstride[i] = (hsize_t)stride[i];
+        }
+      }
+    }
+
+    hid_t mem_space_id = H5Screate_simple(ndims, hcount, hcount);
+    if (mem_space_id == H5I_INVALID_HID)
     {
-        hsize_t hstart[H5S_MAX_RANK];
-        hsize_t hcount[H5S_MAX_RANK];
-        hsize_t hstride[H5S_MAX_RANK];
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to create a new simple dataspace",
+                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
 
-        if (start)
-        {
-            for (int i = 0; i < ndims; i++)
-                hstart[i] = (hsize_t)start[i];
-        }
-        else
-        {
-            for (int i = 0; i < ndims; i++)
-                hstart[i] = 0;
-        }
-
-        if (count)
-        {
-            for (int i = 0; i < ndims; i++)
-                hcount[i] = (hsize_t)count[i];
-        }
-        else
-        {
-            for (int i = 0; i < ndims; i++)
-                hcount[i] = dims[i];
-        }
-
-        if (stride)
-        {
-            for (int i = 0; i < ndims; i++)
-                hstride[i] = (hsize_t)stride[i];
-        }
-        else
-        {
-            for (int i = 0; i < ndims; i++)
-                hstride[i] = 1;
-        }
-
-        hid_t mem_space_id = H5Screate_simple(ndims, hcount, hcount);
-        if (mem_space_id == H5I_INVALID_HID)
+    if (ndims > 0)
+    {
+        if (H5Sselect_hyperslab(file_space_id, H5S_SELECT_SET, hstart, hstride, hcount, NULL) < 0)
         {
             return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                            "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
-                           "The low level (HDF5) I/O library call failed to create a new simple dataspace",
+                           "The low level (HDF5) I/O library call failed to select a hyperslab region for a dataspace copied from the dataset associated with this variable",
                            pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
+    }
 
-        if (ndims > 0)
-        {
-            if (H5Sselect_hyperslab(file_space_id, H5S_SELECT_SET, hstart, hstride, hcount, NULL) < 0)
-            {
-                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                               "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
-                               "The low level (HDF5) I/O library call failed to select a hyperslab region for a dataspace copied from the dataset associated with this variable",
-                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-            }
-        }
-
-        hid_t mem_type_id;
-        if (xtype == NC_CHAR)
-        {
-            /* String type */
-            mem_type_id = H5Tcopy(H5T_C_S1);
-            if (mem_type_id == H5I_INVALID_HID)
-            {
-                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                               "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
-                               "The low level (HDF5) I/O library call failed to make a copy of the predefined string datatype in C",
-                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-            }
-
-            if (H5Tset_strpad(mem_type_id, H5T_STR_NULLTERM) < 0)
-            {
-                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                               "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
-                               "The low level (HDF5) I/O library call failed to define the type of padding (NULL-terminated) used for a derived C-style string datatype",
-                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-            }
-
-            if (H5Tset_cset(mem_type_id, H5T_CSET_ASCII) < 0)
-            {
-                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                               "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
-                               "The low level (HDF5) I/O library call failed to set the character set (US ASCII) to be used in a derived C-style string datatype",
-                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-            }
-        }
-        else
-        {
-            mem_type_id = spio_nc_type_to_hdf5_type(xtype);
-            if (mem_type_id == H5I_INVALID_HID)
-            {
-                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                               "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
-                               "Unsupported memory type (type=%x)",
-                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, xtype);
-            }
-        }
-
-        /* Independent write */
-        if (H5Dwrite(file->hdf5_vars[varid].hdf5_dataset_id, mem_type_id, mem_space_id,
-                     file_space_id, file->dxplid_indep, buf) < 0)
-        {
-            H5Eprint2(H5E_DEFAULT, stderr);
-            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
-                           "The low level (HDF5) I/O library call failed to write the dataset associated with this variable",
-                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-        }
-
-        if (H5Sclose(mem_space_id) < 0)
+    hid_t mem_type_id;
+    if (xtype == NC_CHAR)
+    {
+        /* String type */
+        mem_type_id = H5Tcopy(H5T_C_S1);
+        if (mem_type_id == H5I_INVALID_HID)
         {
             return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                            "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
-                           "The low level (HDF5) I/O library call failed to release a simple dataspace",
+                           "The low level (HDF5) I/O library call failed to make a copy of the predefined string datatype in C",
                            pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
 
-        if (xtype == NC_CHAR)
+        if (H5Tset_strpad(mem_type_id, H5T_STR_NULLTERM) < 0)
         {
-            if (H5Tclose(mem_type_id) < 0)
-            {
-                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                               "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
-                               "The low level (HDF5) I/O library call failed to release a derived C-style string datatype used by this variable",
-                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-            }
+            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "The low level (HDF5) I/O library call failed to define the type of padding (NULL-terminated) used for a derived C-style string datatype",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+        }
+
+        if (H5Tset_cset(mem_type_id, H5T_CSET_ASCII) < 0)
+        {
+            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "The low level (HDF5) I/O library call failed to set the character set (US ASCII) to be used in a derived C-style string datatype",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+        }
+    }
+    else
+    {
+        mem_type_id = spio_nc_type_to_hdf5_type(xtype);
+        if (mem_type_id == H5I_INVALID_HID)
+        {
+            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "Unsupported memory type (type=%x)",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, xtype);
+        }
+    }
+
+    /* Independent write */
+    if (H5Dwrite(file->hdf5_vars[varid].hdf5_dataset_id, mem_type_id, mem_space_id,
+                 file_space_id, file->dxplid_indep, buf) < 0)
+    {
+        H5Eprint2(H5E_DEFAULT, stderr);
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to write the dataset associated with this variable",
+                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    if (H5Sclose(mem_space_id) < 0)
+    {
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to release a simple dataspace",
+                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    if (xtype == NC_CHAR)
+    {
+        if (H5Tclose(mem_type_id) < 0)
+        {
+            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "The low level (HDF5) I/O library call failed to release a derived C-style string datatype used by this variable",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
     }
 

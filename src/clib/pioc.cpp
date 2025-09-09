@@ -1457,31 +1457,25 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
 #endif
 
 #ifdef _HDF5
-    /* Initialize the compression filter property list */
-    ios->cpid = H5Pcreate(H5P_DATASET_CREATE);
-    assert(ios->cpid != H5I_INVALID_HID);
 
 #ifdef _SPIO_HDF5_USE_COMPRESSION
+  /* Initialize HDF5 compression libraries */
 
 #ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION
-
+  /* Only ZFP is supported for lossy data comrpession with HDF5 */
 #ifdef _SPIO_HAS_H5Z_ZFP
     ret = H5Z_zfp_initialize();
     if(ret < 0){
       GPTLstop("PIO:PIOc_Init_Intracomm");
       return pio_err(ios, NULL, ret, __FILE__, __LINE__, "Initializing HDF5 ZFP filter (for lossy data compression) failed");
     }
-    /* Lossy compression : absolute error bound = 0.001 */
-    ret = H5Pset_zfp_accuracy(ios->cpid, 0.001);
-    if(ret < 0){
-      PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "Setting HDF5 ZFP filter absolute error bound failed (continuing with the default error bounds)");
-    }
 #else
-    PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "User requested lossy compression, but ZFP library was not available. Writing data without compression");
+    PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "User requested lossy compression, but ZFP library is not available. Writing data without compression");
 #endif
 
-#else
+#else /* lossless compression, ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION */
 
+  /* Only Blosc2+ZSTD is supported for lossless data comrpession with HDF5 */
 #ifdef _SPIO_HAS_H5Z_BLOSC2
     /* Lossless compression : Default Blosc2 + ZSTD */
     ret = register_blosc2(NULL, NULL);
@@ -1489,24 +1483,15 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
       GPTLstop("PIO:PIOc_Init_Intracomm");
       return pio_err(ios, NULL, ret, __FILE__, __LINE__, "Registering/Initializing HDF5 Blosc2 filter (for lossless data compression) failed");
     }
-
-    unsigned int cd_values[7];
-    cd_values[4] = 1; // compression level
-    cd_values[5] = 1; // shuffle on
-    cd_values[6] = BLOSC_ZSTD; // Use ZSTD for compression
-    ret = H5Pset_filter(ios->cpid, FILTER_BLOSC2, H5Z_FLAG_OPTIONAL, 7, cd_values);
-    if(ret < 0){
-      PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "User requested lossless compression, but setting HDF5 Blosc2 filter failed. Writing data without compression");
-    }
 #else
-    PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "User requested lossless compression, but Blosc2 library not available. Writing data without compression");
+    PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "User requested lossless compression, but Blosc2 library is not available. Writing data without compression");
 #endif
     
-#endif
+#endif /* ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION */
 
-#endif
+#endif /* ifdef _SPIO_HDF5_USE_COMPRESSION */
 
-#endif
+#endif /* ifdef _HDF5 */
 
     /* Copy the computation communicator into comp_comm. */
     if ((mpierr = MPI_Comm_dup(comp_comm, &ios->comp_comm)))
@@ -1809,13 +1794,13 @@ int PIOc_finalize_impl(int iosysid)
 #ifdef _HDF5
 
 #ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION
+  /* Finalize HDF5 compression libraries */
 #ifdef _SPIO_HAS_H5Z_ZFP
     H5Z_zfp_finalize();
 #endif
 #endif
 
-    H5Pclose(ios->cpid);
-#endif
+#endif /* ifdef _HDF5 */
 
     free(ios->io_fstats);
 
