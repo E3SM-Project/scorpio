@@ -349,6 +349,10 @@ CONTAINS
 #ifdef _HDF5
       ! hdf5
       num_iotypes = num_iotypes + 1
+#ifdef _SPIO_HDF5_USE_COMPRESSION
+      ! hdf5c
+      num_iotypes = num_iotypes + 1
+#endif
 #endif
 
     ! ALLOCATE with 0 elements ok?
@@ -381,7 +385,14 @@ CONTAINS
       iotypes(i) = PIO_iotype_hdf5
       iotype_descs(i) = "HDF5"
       i = i + 1
+#ifdef _SPIO_HDF5_USE_COMPRESSION
+      ! hdf5c
+      iotypes(i) = PIO_iotype_hdf5c
+      iotype_descs(i) = "HDF5C"
+      i = i + 1
 #endif
+#endif
+
 #ifdef _NETCDF4
       ! netcdf, netcdf4p, netcdf4c
       iotypes(i) = PIO_iotype_netcdf
@@ -494,8 +505,13 @@ CONTAINS
 #endif
 
 #ifndef _HDF5
-      ! hdf5
+      ! hdf5, hdf5c
+      num_iotypes = num_iotypes + 2
+#else
+#ifndef _SPIO_HDF5_USE_COMPRESSION
+      ! hdf5c
       num_iotypes = num_iotypes + 1
+#endif
 #endif
 
     ! ALLOCATE with 0 elements ok?
@@ -551,6 +567,17 @@ CONTAINS
       iotypes(i) = PIO_iotype_hdf5
       iotype_descs(i) = "HDF5"
       i = i + 1
+      ! hdf5c
+      iotypes(i) = PIO_iotype_hdf5c
+      iotype_descs(i) = "HDF5C"
+      i = i + 1
+#else
+#ifndef _SPIO_HDF5_USE_COMPRESSION
+      ! hdf5c
+      iotypes(i) = PIO_iotype_hdf5c
+      iotype_descs(i) = "HDF5C"
+      i = i + 1
+#endif
 #endif
   END SUBROUTINE
 
@@ -597,6 +624,10 @@ CONTAINS
 #ifdef _HDF5
       ! hdf5
       num_iotypes = num_iotypes + 1
+#ifdef _SPIO_HDF5_USE_COMPRESSION
+      ! hdf5c
+      num_iotypes = num_iotypes + 1
+#endif
 #endif
 
     ! ALLOCATE with 0 elements ok?
@@ -627,7 +658,14 @@ CONTAINS
       iotypes(i) = PIO_iotype_hdf5
       iotype_descs(i) = "HDF5"
       i = i + 1
+#ifdef _SPIO_HDF5_USE_COMPRESSION
+      ! hdf5c
+      iotypes(i) = PIO_iotype_hdf5c
+      iotype_descs(i) = "HDF5C"
+      i = i + 1
 #endif
+#endif
+
 #ifdef _NETCDF4
       ! netcdf, netcdf4p, netcdf4c
       iotypes(i) = PIO_iotype_netcdf
@@ -692,8 +730,13 @@ CONTAINS
 #endif
 #endif
 #ifndef _HDF5
-      ! hdf5
+      ! hdf5, hdf5c
+      num_iotypes = num_iotypes + 2
+#else
+#ifndef _SPIO_HDF5_USE_COMPRESSION
+      ! hdf5c
       num_iotypes = num_iotypes + 1
+#endif
 #endif
 
     ! ALLOCATE with 0 elements ok?
@@ -721,11 +764,23 @@ CONTAINS
 #endif
 
 #ifndef _HDF5
-      ! adios
+      ! hdf5
       iotypes(i) = PIO_iotype_hdf5
       iotype_descs(i) = "HDF5"
       i = i + 1
+      ! hdf5c
+      iotypes(i) = PIO_iotype_hdf5c
+      iotype_descs(i) = "HDF5C"
+      i = i + 1
+#else
+#ifndef _SPIO_HDF5_USE_COMPRESSION
+      ! hdf5c
+      iotypes(i) = PIO_iotype_hdf5c
+      iotype_descs(i) = "HDF5C"
+      i = i + 1
 #endif
+#endif
+
 #ifndef _NETCDF
       ! netcdf
       iotypes(i) = PIO_iotype_netcdf
@@ -1407,6 +1462,11 @@ CONTAINS
         (str == "hdf5") .OR.&
         (str == "HDF5")) THEN
       PIO_TF_Iotype_from_str = PIO_IOTYPE_HDF5
+    ELSE IF((str == "PIO_IOTYPE_HDF5C") .OR.&
+        (str == "pio_iotype_hdf5c") .OR.&
+        (str == "hdf5c") .OR.&
+        (str == "HDF5C")) THEN
+      PIO_TF_Iotype_from_str = PIO_IOTYPE_HDF5C
     ELSE
       PRINT *, "PIO_TF: Invalid iotype specified,", trim(iotype_str), "), resetting to PIO_IOTYPE_PNETCDF..."
     END IF
