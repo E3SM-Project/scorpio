@@ -6939,28 +6939,58 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
 
     file->hdf5_vars[varid].hdf5_type = h5_xtype;
 
-    if(ndims > 0){
-      hsize_t cdim[H5S_MAX_RANK];
+    if (ndims > 0)
+    {
+        hsize_t cdim[H5S_MAX_RANK];
+        int unlimdim = 0;
+        PIO_Offset type_size = spio_get_nc_type_size(xtype);
+        size_t suggested_size = 0;
 
-      for(i = 0; i < ndims; i++){
-        cdim[i] = mdims[i];
-      }
+        /* Count unlimited dimensions */
+        for (int d = 0; d < ndims; d++)
+        {
+            if (dims[d] == PIO_UNLIMITED)
+                unlimdim++;
+        }
 
-      if(dims[0] == PIO_UNLIMITED){
-        /* Chunk size along rec dim is always 1 */
-        cdim[0] = 1;
-      }
+        assert(unlimdim <= 1);
 
-      if(H5Pset_chunk(dcpl_id, ndims, cdim) < 0){
-        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Defining variable (%s, varid = %d) in file (%s, ncid=%d) using HDF5 iotype failed. "
-                       "The low level (HDF5) I/O library call failed to set the size of the chunks used to store a chunked layout dataset",
-                       name, varid, pio_get_fname_from_file(file), file->pio_ncid);
-      }
-    }
+        /* Determine base chunk size for fixed dimensions */
+        if (ndims > unlimdim)
+        {
+            double target_elems = (double)(PIO_CHUNK_SIZE) / (double)type_size;
+            suggested_size = (size_t)pow(target_elems, 1.0 / (ndims - unlimdim));
 
-    if((ndims > 0) && (dims[0] == PIO_UNLIMITED)){
-      mdims[0] = H5S_UNLIMITED;
+            if (suggested_size < 1)
+                suggested_size = 1;
+        }
+        else
+        {
+            /* All dimensions are unlimited (we assume only one unlimited dimension) */
+            suggested_size = 1;
+        }
+
+        /* Set chunk size for each dimension */
+        for (int d = 0; d < ndims; d++)
+        {
+            if (dims[d] == PIO_UNLIMITED)
+            {
+                mdims[d] = H5S_UNLIMITED;
+
+                cdim[d] = 1; /* Chunk size along unlimited dimension is always 1 */
+            }
+            else
+                cdim[d] = (suggested_size > dims[d]) ? dims[d] : suggested_size;
+        }
+
+        /* Apply chunking to dataset creation property list */
+        if (H5Pset_chunk(dcpl_id, ndims, cdim) < 0)
+        {
+            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                           "Defining variable (%s, varid = %d) in file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "The low level (HDF5) I/O library call failed to set the size of the chunks used to store a chunked layout dataset",
+                           name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+        }
     }
 
     sid = H5Screate_simple(ndims, dims, mdims);
