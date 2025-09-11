@@ -55,6 +55,9 @@
 /** Extra bytes reserved in the header when creating NetCDF files. */
 #define PIO_RESERVED_FILE_HEADER_SIZE @PIO_RESERVED_FILE_HEADER_SIZE@
 
+/** Set chunk size (in bytes) for HDF5/PnetCDF chunked variables. */
+#define PIO_CHUNK_SIZE @PIO_CHUNK_SIZE@
+
 /** Maximum number of I/O decompositions registered with ADIOS type */
 #define PIO_MAX_ADIOS_DECOMPS @PIO_MAX_ADIOS_DECOMPS@
 

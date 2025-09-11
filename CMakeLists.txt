@@ -229,6 +229,20 @@ else()
   message(STATUS "Reserving some extra space in the header when creating NetCDF files, requested bytes = " ${PIO_RESERVED_FILE_HEADER_SIZE} " (default)")
 endif()
 
+# Set chunk size (in bytes) for HDF5/PnetCDF chunked variables. Default is 4 MB, same as NetCDF4.
+set(DEF_SPIO_CHUNK_SIZE 4194304)
+if(DEFINED PIO_CHUNK_SIZE)
+  if(PIO_CHUNK_SIZE GREATER_EQUAL 1)
+    message(STATUS "Setting chunk size (in bytes) for HDF5/PnetCDF chunked variables, requested bytes = " ${PIO_CHUNK_SIZE})
+  else()
+    message(WARNING "User-defined PIO_CHUNK_SIZE is invalid, setting it to " ${DEF_SPIO_CHUNK_SIZE} " (default)")
+    set(PIO_CHUNK_SIZE ${DEF_SPIO_CHUNK_SIZE})
+  endif()
+else()
+  set(PIO_CHUNK_SIZE ${DEF_SPIO_CHUNK_SIZE})
+  message(STATUS "Setting chunk size (in bytes) for HDF5/PnetCDF chunked variables, requested bytes = " ${PIO_CHUNK_SIZE} " (default)")
+endif()
+
 if(WITH_ADIOS2)
   # Maximum number of I/O decompositions registered with ADIOS type
   set(DEF_SPIO_MAX_ADIOS_DECOMPS 65536)
