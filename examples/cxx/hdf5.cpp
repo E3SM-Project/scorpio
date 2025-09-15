@@ -50,32 +50,15 @@ static inline void check_err_print_rank0(int rank, T ret, int line_num, const ch
 
 #if PIO_USE_HDF5
 
-int test_hdf5_file_ops(MPI_Comm comm, int comm_rank, int comm_sz, const std::string &fname, hid_t dcpid)
+/* Test writing 3d distributed variables */
+int test_hdf5_3d_dist_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t fh, hid_t dcpid)
 {
-  hid_t fh;
   int ret = 0;
   herr_t hret = 0;
   const char *dim_names[NDIMS] = {"time", "lev", "ncols"};
-
-  /* =============== Create the file ================= */
-  hid_t fpid = H5Pcreate(H5P_FILE_ACCESS); check_err(comm_rank, (fpid != H5I_INVALID_HID) ? 0 : -1, "Creating property list for creating file failed", __LINE__);
-  hret = H5Pset_fapl_mpio(fpid, comm, MPI_INFO_NULL); check_err(comm_rank, hret, "Setting file access property list failed", __LINE__);
-  fh = H5Fcreate(fname.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, fpid); check_err(comm_rank, (fh != H5I_INVALID_HID) ? 0 : -1, "Creating file failed", __LINE__);
-  H5Pclose(fpid);
+  hsize_t gdim_sz[NDIMS] = {H5S_UNLIMITED, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
 
   /* =============== Define the variable dimensions ================ */
-  /* Define the dimensions of the variable - as attributes in HDF5 */
-  hid_t sid = H5Screate(H5S_SCALAR); check_err(comm_rank, (sid != H5I_INVALID_HID) ? 0 : -1, "Creating scalar dataspace for defining dimensions failed", __LINE__);
-  //hsize_t gdim_sz[NDIMS] = {DIM_TIME_SZ, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
-  hsize_t gdim_sz[NDIMS] = {H5S_UNLIMITED, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
-  for(int i=0; i < NDIMS; i++){
-    hsize_t sz = gdim_sz[i];
-    hid_t aid = H5Acreate2(fh, dim_names[i], H5T_NATIVE_HSIZE, sid, H5P_DEFAULT, H5P_DEFAULT); check_err(comm_rank, (fh != H5I_INVALID_HID) ? 0 : -1, "Creating attribute for dimension failed", __LINE__);
-    hret = H5Awrite(aid, H5T_NATIVE_HSIZE, &sz); check_err(comm_rank, hret, "Writing attribute for dimension failed", __LINE__);
-    H5Aclose(aid);
-  }
-  H5Sclose(sid);
-
   float var_dist[DIM_TIME_SZ][DIM_LEV_SZ][DIM_NCOLS_SZ_PER_PROC];
   for(int i = 0; i < DIM_TIME_SZ; i++){
     for(int j = 0; j < DIM_LEV_SZ; j++){
@@ -85,6 +68,64 @@ int test_hdf5_file_ops(MPI_Comm comm, int comm_rank, int comm_sz, const std::str
     }
   }
 
+  /* =============== Define the variables ================ */
+
+  /* Define the distributed variable - data distributed across processes */
+  /* Create a property list for chunking across time dimension */
+  hsize_t gchunk_dim_sz[NDIMS] = {1, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hret = H5Pset_chunk(dcpid, NDIMS, gchunk_dim_sz); check_err(comm_rank, hret, "Setting chunking for time dimension of the variable failed", __LINE__);
+
+  /* Define the variable dimensions */
+  /* FIXME: Why does var_gdim_sz differ from gdim_sz : time dim is NOT allowed to be UNLIMITED */
+  hsize_t var_gdim_sz[NDIMS] = {1, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hid_t fsid;
+  fsid = H5Screate_simple(NDIMS, var_gdim_sz, NULL); check_err(comm_rank, (fsid != H5I_INVALID_HID) ? 0 : -1, "Creating dataspace for defining varaible dimensions failed", __LINE__);
+
+  hid_t varid_dist = H5Dcreate2(fh, "tmp_var_dist", H5T_NATIVE_FLOAT, fsid, H5P_DEFAULT, dcpid, H5P_DEFAULT); check_err(comm_rank, (varid_dist != H5I_INVALID_HID) ? 0 : -1, "Defining/Creating variable (distributed) failed", __LINE__);
+
+  H5Sclose(fsid);
+
+  /* =============== Write data ================= */
+
+  hid_t dxpid = H5I_INVALID_HID;
+  H5S_seloper_t op = H5S_SELECT_SET;
+  hsize_t nelems = 0;
+  hid_t msid = H5I_INVALID_HID;
+
+  /* =============== Write distributed variable ================= */
+  dxpid = H5Pcreate(H5P_DATASET_XFER); check_err(comm_rank, (dxpid != H5I_INVALID_HID) ? 0 : -1, "Creating dataset transfer property list for writing data failed", __LINE__);
+  hret = H5Pset_dxpl_mpio(dxpid, H5FD_MPIO_COLLECTIVE); check_err(comm_rank, hret, "Setting dataset transfer property to MPIO Collective mode failed", __LINE__);
+
+  fsid = H5Dget_space(varid_dist); check_err(comm_rank, (fsid != H5I_INVALID_HID) ? 0 : -1, "Getting dataspace associated with variable failed", __LINE__);
+  for(int ilev = 0; ilev < DIM_LEV_SZ; ilev++){
+    hsize_t starts[NDIMS] = {0, ilev, comm_rank * DIM_NCOLS_SZ_PER_PROC};
+    hsize_t counts[NDIMS] = {1, 1, DIM_NCOLS_SZ_PER_PROC};
+    hret = H5Sselect_hyperslab(fsid, op, starts, NULL, counts, NULL); check_err(comm_rank, hret, "Selecting hyperslab of the dataset to write failed", __LINE__);
+    op = H5S_SELECT_OR;
+  }
+
+  nelems = DIM_LEV_SZ * DIM_NCOLS_SZ_PER_PROC;
+  msid = H5Screate_simple(1, &nelems, NULL); check_err(comm_rank, (msid != H5I_INVALID_HID) ? 0 : -1, "Creating memory space for write data failed", __LINE__);
+  for(int tstep = 0; tstep < DIM_TIME_SZ; tstep++){
+    hsize_t var_gdim_sz[NDIMS] = {tstep + 1, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+    hret = H5Dextend(varid_dist, var_gdim_sz); check_err(comm_rank, hret, "Extending, across unlimited time dimension, dataspace for variable failed", __LINE__);
+    hret = H5Dwrite(varid_dist, H5T_NATIVE_FLOAT, msid, fsid, dxpid, var_dist[tstep]); check_err(comm_rank, hret, "Writing data to variable failed", __LINE__);
+  }
+  H5Sclose(msid); H5Sclose(fsid); H5Pclose(dxpid);
+
+  H5Dclose(varid_dist);
+
+  return ret;
+}
+
+int test_hdf5_3d_non_dist_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t fh, hid_t dcpid)
+{
+  int ret = 0;
+  herr_t hret = 0;
+  const char *dim_names[NDIMS] = {"time", "lev", "ncols"};
+  hsize_t gdim_sz[NDIMS] = {H5S_UNLIMITED, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+
+  /* =============== Define the variable dimensions ================ */
   float var_non_dist[DIM_TIME_SZ][DIM_LEV_SZ][DIM_NCOLS_SZ_PER_PROC * comm_sz];
   for(int i = 0; i < DIM_TIME_SZ; i++){
     for(int j = 0; j < DIM_LEV_SZ; j++){
@@ -96,10 +137,9 @@ int test_hdf5_file_ops(MPI_Comm comm, int comm_rank, int comm_sz, const std::str
 
   /* =============== Define the variables ================ */
 
-  /* Define the distributed variable - data distributed across processes */
+  /* Define the non distributed variable - data is NOT distributed across processes (all data in all procs) */
   /* Create a property list for chunking across time dimension */
   hsize_t gchunk_dim_sz[NDIMS] = {1, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
-  //hid_t dcpid = H5Pcreate(H5P_DATASET_CREATE); check_err(comm_rank, (dcpid != H5I_INVALID_HID) ? 0 : -1, "Creating property list for creating varaible failed", __LINE__);
   hret = H5Pset_chunk(dcpid, NDIMS, gchunk_dim_sz); check_err(comm_rank, hret, "Setting chunking for time dimension of the variable failed", __LINE__);
 
   /* Define the variable dimensions */
@@ -108,44 +148,15 @@ int test_hdf5_file_ops(MPI_Comm comm, int comm_rank, int comm_sz, const std::str
   hid_t fsid;
   fsid = H5Screate_simple(NDIMS, var_gdim_sz, NULL); check_err(comm_rank, (fsid != H5I_INVALID_HID) ? 0 : -1, "Creating dataspace for defining varaible dimensions failed", __LINE__);
 
-  hid_t varid_dist = H5Dcreate2(fh, "tmp_var_dist", H5T_NATIVE_FLOAT, fsid, H5P_DEFAULT, dcpid, H5P_DEFAULT); check_err(comm_rank, (varid_dist != H5I_INVALID_HID) ? 0 : -1, "Defining/Creating variable (distributed) failed", __LINE__);
-
   hid_t varid_non_dist = H5Dcreate2(fh, "tmp_var_non_dist", H5T_NATIVE_FLOAT, fsid, H5P_DEFAULT, dcpid, H5P_DEFAULT); check_err(comm_rank, (varid_non_dist != H5I_INVALID_HID) ? 0 : -1, "Defining/Creating variable (not distributed) failed", __LINE__);
 
   H5Sclose(fsid);
-  //H5Pclose(dcpid);
 
   /* =============== Write data ================= */
   hid_t dxpid = H5I_INVALID_HID;
-  /* =============== Write distributed variable ================= */
-  dxpid = H5Pcreate(H5P_DATASET_XFER); check_err(comm_rank, (dxpid != H5I_INVALID_HID) ? 0 : -1, "Creating dataset transfer property list for writing data failed", __LINE__);
-  hret = H5Pset_dxpl_mpio(dxpid, H5FD_MPIO_COLLECTIVE); check_err(comm_rank, hret, "Setting dataset transfer property to MPIO Collective mode failed", __LINE__);
-
-  //int num_reqs = DIM_TIME_SZ;
-
-  /*
-  size_t starts[NDIMS] = {0, 0, comm_rank * DIM_NCOLS_SZ_PER_PROC};
-  size_t counts[NDIMS] = {DIM_TIME_SZ, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC};
-  ret = nc_put_vara_double(fh, varid, starts, counts, (const double *)var); ERR(comm_rank, ret, "Writing variable in parallel failed");
-  */
-
-  fsid = H5Dget_space(varid_dist); check_err(comm_rank, (fsid != H5I_INVALID_HID) ? 0 : -1, "Getting dataspace associated with variable failed", __LINE__);
   H5S_seloper_t op = H5S_SELECT_SET;
-  for(int ilev = 0; ilev < DIM_LEV_SZ; ilev++){
-    hsize_t starts[NDIMS] = {0, ilev, comm_rank * DIM_NCOLS_SZ_PER_PROC};
-    hsize_t counts[NDIMS] = {1, 1, DIM_NCOLS_SZ_PER_PROC};
-    hret = H5Sselect_hyperslab(fsid, op, starts, NULL, counts, NULL); check_err(comm_rank, hret, "Selecting hyperslab of the dataset to write failed", __LINE__);
-    op = H5S_SELECT_OR;
-  }
-
-  hsize_t nelems = DIM_LEV_SZ * DIM_NCOLS_SZ_PER_PROC;
-  hid_t msid = H5Screate_simple(1, &nelems, NULL); check_err(comm_rank, (msid != H5I_INVALID_HID) ? 0 : -1, "Creating memory space for write data failed", __LINE__);
-  for(int tstep = 0; tstep < DIM_TIME_SZ; tstep++){
-    hsize_t var_gdim_sz[NDIMS] = {tstep + 1, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
-    hret = H5Dextend(varid_dist, var_gdim_sz); check_err(comm_rank, hret, "Extending, across unlimited time dimension, dataspace for variable failed", __LINE__);
-    hret = H5Dwrite(varid_dist, H5T_NATIVE_FLOAT, msid, fsid, dxpid, var_dist[tstep]); check_err(comm_rank, hret, "Writing data to variable failed", __LINE__);
-  }
-  H5Sclose(msid); H5Sclose(fsid); H5Pclose(dxpid);
+  hsize_t nelems = 0;
+  hid_t msid = H5I_INVALID_HID;
 
   /* =============== Write non-distributed variable ================= */
   dxpid = H5Pcreate(H5P_DATASET_XFER); check_err(comm_rank, (dxpid != H5I_INVALID_HID) ? 0 : -1, "Creating dataset transfer property list for writing non distributed data failed", __LINE__);
@@ -194,13 +205,54 @@ int test_hdf5_file_ops(MPI_Comm comm, int comm_rank, int comm_sz, const std::str
 
   H5Sclose(msid); H5Sclose(fsid); H5Pclose(dxpid);
 
-  H5Dclose(varid_dist);
-
   H5Dclose(varid_non_dist);
+
+  return ret;
+}
+
+int test_hdf5_3d_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t fh, hid_t dcpid)
+{
+  int ret = 0;
+  herr_t hret = 0;
+  const char *dim_names[NDIMS] = {"time", "lev", "ncols"};
+
+  /* =============== Define the variable dimensions ================ */
+  /* Define the dimensions of the variable - as attributes in HDF5 */
+  hid_t sid = H5Screate(H5S_SCALAR); check_err(comm_rank, (sid != H5I_INVALID_HID) ? 0 : -1, "Creating scalar dataspace for defining dimensions failed", __LINE__);
+  //hsize_t gdim_sz[NDIMS] = {DIM_TIME_SZ, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t gdim_sz[NDIMS] = {H5S_UNLIMITED, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  for(int i=0; i < NDIMS; i++){
+    hsize_t sz = gdim_sz[i];
+    hid_t aid = H5Acreate2(fh, dim_names[i], H5T_NATIVE_HSIZE, sid, H5P_DEFAULT, H5P_DEFAULT); check_err(comm_rank, (fh != H5I_INVALID_HID) ? 0 : -1, "Creating attribute for dimension failed", __LINE__);
+    hret = H5Awrite(aid, H5T_NATIVE_HSIZE, &sz); check_err(comm_rank, hret, "Writing attribute for dimension failed", __LINE__);
+    H5Aclose(aid);
+  }
+  H5Sclose(sid);
+
+  ret = test_hdf5_3d_dist_vars(comm, comm_rank, comm_sz, fh, dcpid); check_err(comm_rank, hret, "Writing 3D distributed variable failed", __LINE__);
+  ret = test_hdf5_3d_non_dist_vars(comm, comm_rank, comm_sz, fh, dcpid); check_err(comm_rank, hret, "Writing 3D non-distributed variable failed", __LINE__);
+
+  return ret;
+}
+
+int test_hdf5_file_ops(MPI_Comm comm, int comm_rank, int comm_sz, const std::string &fname, hid_t dcpid)
+{
+  hid_t fh;
+  int ret = 0;
+  herr_t hret = 0;
+  const char *dim_names[NDIMS] = {"time", "lev", "ncols"};
+
+  /* =============== Create the file ================= */
+  hid_t fpid = H5Pcreate(H5P_FILE_ACCESS); check_err(comm_rank, (fpid != H5I_INVALID_HID) ? 0 : -1, "Creating property list for creating file failed", __LINE__);
+  hret = H5Pset_fapl_mpio(fpid, comm, MPI_INFO_NULL); check_err(comm_rank, hret, "Setting file access property list failed", __LINE__);
+  fh = H5Fcreate(fname.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, fpid); check_err(comm_rank, (fh != H5I_INVALID_HID) ? 0 : -1, "Creating file failed", __LINE__);
+  H5Pclose(fpid);
+
+  /* Test writing the 3d vars */
+  ret = test_hdf5_3d_vars(comm, comm_rank, comm_sz, fh, dcpid); check_err(comm_rank, ret, "Testing writing 3d vars failed", __LINE__);
 
   /* ============== Finalize / close file =============== */
   H5Fclose(fh);
-
 
   return ret;
 }
