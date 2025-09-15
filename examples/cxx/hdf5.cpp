@@ -29,7 +29,7 @@ static inline void check_err(int rank, T ret, const char *err_msg, int line_num)
       + err_msg + std::string(" (err = ") + std::to_string(static_cast<int>(ret))
       + std::string(", line no = ") + std::to_string(line_num) + std::string(")");
 #if PIO_USE_HDF5
-//    H5EPrint(H5E_DEFAULT, stderr);
+    H5Eprint2(H5E_DEFAULT, stderr);
 #endif
     throw std::runtime_error(err_msg.c_str());
   }
@@ -50,16 +50,12 @@ static inline void check_err_print_rank0(int rank, T ret, int line_num, const ch
 
 #if PIO_USE_HDF5
 
-int test_hdf5_file_ops(MPI_Comm comm, int comm_rank, const std::string &fname, hid_t dcpid)
+int test_hdf5_file_ops(MPI_Comm comm, int comm_rank, int comm_sz, const std::string &fname, hid_t dcpid)
 {
   hid_t fh;
   int ret = 0;
   herr_t hret = 0;
-  int comm_sz;
   const char *dim_names[NDIMS] = {"time", "lev", "ncols"};
-
-  ret = MPI_Comm_rank(comm, &comm_rank); assert(ret == MPI_SUCCESS);
-  ret = MPI_Comm_size(comm, &comm_sz); assert(ret == MPI_SUCCESS);
 
   /* =============== Create the file ================= */
   hid_t fpid = H5Pcreate(H5P_FILE_ACCESS); check_err(comm_rank, (fpid != H5I_INVALID_HID) ? 0 : -1, "Creating property list for creating file failed", __LINE__);
@@ -209,12 +205,12 @@ int test_hdf5_file_ops(MPI_Comm comm, int comm_rank, const std::string &fname, h
   return ret;
 }
 
-int test_hdf5(MPI_Comm comm, int comm_rank)
+int test_hdf5(MPI_Comm comm, int comm_rank, int comm_sz)
 {
   std::string fname("spio_test_hdf5.h5");
   int ret = -1;
   hid_t dcpid = H5Pcreate(H5P_DATASET_CREATE); check_err(comm_rank, (dcpid != H5I_INVALID_HID) ? 0 : -1, "Creating property list for creating varaible failed", __LINE__);
-  ret = test_hdf5_file_ops(comm, comm_rank, fname, dcpid);
+  ret = test_hdf5_file_ops(comm, comm_rank, comm_sz, fname, dcpid);
   H5Pclose(dcpid);
 
   if((ret == 0) && (comm_rank == 0)){
@@ -224,7 +220,7 @@ int test_hdf5(MPI_Comm comm, int comm_rank)
   return ret;
 }
 
-int test_hdf5_zfp(MPI_Comm comm, int comm_rank)
+int test_hdf5_zfp(MPI_Comm comm, int comm_rank, int comm_sz)
 {
   std::string fname("spio_test_hdf5_zfp.h5");
   int ret = -1;
@@ -236,7 +232,7 @@ int test_hdf5_zfp(MPI_Comm comm, int comm_rank)
   ret = H5Z_zfp_initialize(); check_err(comm_rank, ret, "Intializing HDF5 ZFP compression library failed", __LINE__);
   hid_t dcpid = H5Pcreate(H5P_DATASET_CREATE); check_err(comm_rank, (dcpid != H5I_INVALID_HID) ? 0 : -1, "Creating property list for creating varaible failed", __LINE__);
   hret = H5Pset_zfp_accuracy(dcpid, acc); check_err(comm_rank, hret, "Setting HDF5 ZFP compression accuracy on property list failed", __LINE__);
-  ret = test_hdf5_file_ops(comm, comm_rank, fname, dcpid);
+  ret = test_hdf5_file_ops(comm, comm_rank, comm_sz, fname, dcpid);
   H5Pclose(dcpid);
   H5Z_zfp_finalize();
 
@@ -252,7 +248,7 @@ int test_hdf5_zfp(MPI_Comm comm, int comm_rank)
   return ret;
 }
 
-int test_hdf5_zstd(MPI_Comm comm, int comm_rank)
+int test_hdf5_zstd(MPI_Comm comm, int comm_rank, int comm_sz)
 {
   std::string fname("spio_test_hdf5_zstd.h5");
   int ret = -1;
@@ -268,7 +264,7 @@ int test_hdf5_zstd(MPI_Comm comm, int comm_rank)
   cd_values[5] = 1; // shuffle on
   cd_values[6] = BLOSC_ZSTD; // Use ZSTD for compression
   hret = H5Pset_filter(dcpid, FILTER_BLOSC2, H5Z_FLAG_OPTIONAL, 7, cd_values); check_err(comm_rank, hret, "Setting the BLOSC2 filter property list failed", __LINE__);
-  ret = test_hdf5_file_ops(comm, comm_rank, fname, dcpid);
+  ret = test_hdf5_file_ops(comm, comm_rank, comm_sz, fname, dcpid);
   H5Pclose(dcpid);
 
   if((ret == 0) && (comm_rank == 0)){
@@ -288,7 +284,7 @@ int test_hdf5_zstd(MPI_Comm comm, int comm_rank)
 int main(int argc, char *argv[])
 {
   MPI_Comm comm = MPI_COMM_WORLD;
-  int comm_rank = -1;
+  int comm_rank = -1, comm_sz = 0;
   int ret = NC_NOERR;
 
 #if PIO_USE_HDF5
@@ -297,15 +293,16 @@ int main(int argc, char *argv[])
 #endif
   MPI_Init(&argc, &argv);
   ret = MPI_Comm_rank(comm, &comm_rank); assert(ret == MPI_SUCCESS);
+  ret = MPI_Comm_size(comm, &comm_sz); assert(ret == MPI_SUCCESS);
 
-  ret = test_hdf5(comm, comm_rank);
+  ret = test_hdf5(comm, comm_rank, comm_sz);
 
   if(ret == NC_NOERR){
     if((argc > 1) && (strcmp(argv[1], "--test-zfp") == 0)){
-      ret = test_hdf5_zfp(comm, comm_rank);
+      ret = test_hdf5_zfp(comm, comm_rank, comm_sz);
     }
     if((argc > 1) && (strcmp(argv[1], "--test-zstd") == 0)){
-      ret = test_hdf5_zstd(comm, comm_rank);
+      ret = test_hdf5_zstd(comm, comm_rank, comm_sz);
     }
   }
 
