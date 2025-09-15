@@ -6733,19 +6733,19 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
 }
 
 /* Create HDF5 dataset property ID */
-static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *file, int ndims)
+static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *file, int var_ndims, bool var_has_unlimited_odim)
 {
   herr_t ret;
   hid_t dpid = H5I_INVALID_HID;
 
-  assert((ios != NULL) && (file != NULL) && (ndims >= 0));
+  assert((ios != NULL) && (file != NULL) && (var_ndims >= 0));
 
   /* Initialize the compression filter property list */
   dpid = H5Pcreate(H5P_DATASET_CREATE);
   assert(dpid != H5I_INVALID_HID);
 
   /* We currently support compression for non-scalar data */
-  if((ndims <= 0) || (file->iotype != PIO_IOTYPE_HDF5C)) return dpid;
+  if((var_ndims <= 0) || (!var_has_unlimited_odim) || (file->iotype != PIO_IOTYPE_HDF5C)) return dpid;
 
 #ifdef _SPIO_HDF5_USE_COMPRESSION
 
@@ -6808,7 +6808,7 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
      * So as a workaround currently restricting filters to > 2D vars
      */
 #endif
-    dcpl_id = spio_create_hdf5_dataset_pid(ios, file, ndims);
+    dcpl_id = spio_create_hdf5_dataset_pid(ios, file, ndims, dims[0] == PIO_UNLIMITED);
     if (dcpl_id == H5I_INVALID_HID)
     {
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
@@ -6872,7 +6872,7 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
 
     file->hdf5_vars[varid].hdf5_type = h5_xtype;
 
-    if(ndims > 0){
+    if((ndims > 0) && (dims[0] == PIO_UNLIMITED)){
       hsize_t cdim[H5S_MAX_RANK];
 
       for(i = 0; i < ndims; i++){
@@ -7517,23 +7517,24 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
         }
     }
 
-    hsize_t hstart[ndims];
-    hsize_t hcount[ndims];
-    hsize_t hstride[ndims];
+    hsize_t hstart[(ndims > 0) ? ndims : 1];
+    hsize_t hcount[(ndims > 0) ? ndims : 1];
+    hsize_t hstride[(ndims > 0) ? ndims : 1];
+    hsize_t nelems = 0;
 
     for(int i = 0; i < ndims; i++){
-      hstart[i] = hcount[i] = 0;
+      if(start){
+        hstart[i] = (hsize_t) start[i];
+      }
+      else{
+        hstart[i] = 0;
+      }
+      hcount[i] = 0;
       hstride[i] = 1;
     }
 
     /* Only the IO master does the IO */
     if(ios->iomaster == MPI_ROOT){
-      if(start){
-        for(int i = 0; i < ndims; i++){
-          hstart[i] = (hsize_t)start[i];
-        }
-      }
-
       if(count){
         for(int i = 0; i < ndims; i++){
           hcount[i] = (hsize_t)count[i];
@@ -7545,9 +7546,14 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
         }
       }
 
+      nelems = (ndims > 0) ? 1 : 0;
+      for(int i = 0; i < ndims; i++){
+        nelems *= hcount[i];
+      }
+
       if(stride){
         for(int i = 0; i < ndims; i++){
-          hstride[i] = (hsize_t)stride[i];
+          hstride[i] = (stride[i] > 0) ? ((hsize_t)stride[i]) : 1 ;
         }
       }
     }
@@ -7565,6 +7571,7 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
     {
         if (H5Sselect_hyperslab(file_space_id, H5S_SELECT_SET, hstart, hstride, hcount, NULL) < 0)
         {
+            H5Eprint2(H5E_DEFAULT, stderr);
             return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                            "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                            "The low level (HDF5) I/O library call failed to select a hyperslab region for a dataspace copied from the dataset associated with this variable",
