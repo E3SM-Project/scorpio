@@ -6733,7 +6733,7 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
 }
 
 /* Create HDF5 dataset property ID */
-static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *file, int var_ndims, bool var_has_unlimited_odim)
+static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *file, int var_ndims, nc_type var_type, bool var_has_unlimited_odim)
 {
   herr_t ret;
   hid_t dpid = H5I_INVALID_HID;
@@ -6745,7 +6745,7 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
   assert(dpid != H5I_INVALID_HID);
 
   /* We currently support compression for non-scalar data */
-  if((var_ndims <= 0) || (!var_has_unlimited_odim) || (file->iotype != PIO_IOTYPE_HDF5C)) return dpid;
+  if((var_ndims <= 0) || (!var_has_unlimited_odim) || (var_type == NC_CHAR) || (file->iotype != PIO_IOTYPE_HDF5C)) return dpid;
 
 #ifdef _SPIO_HDF5_USE_COMPRESSION
 
@@ -6808,7 +6808,7 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
      * So as a workaround currently restricting filters to > 2D vars
      */
 #endif
-    dcpl_id = spio_create_hdf5_dataset_pid(ios, file, ndims, dims[0] == PIO_UNLIMITED);
+    dcpl_id = spio_create_hdf5_dataset_pid(ios, file, ndims, xtype, dims[0] == PIO_UNLIMITED);
     if (dcpl_id == H5I_INVALID_HID)
     {
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
