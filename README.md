@@ -172,3 +172,8 @@ author = {Krishna, Jayesh and Wu, Danqing and Kurc, Tahsin and Edwards, Jim and 
 abstractNote = {The SCORPIO (Software for Caching Output and Reads for Parallel I/O) library provides a portable application programming interface (API) for describing, reading and storing array-oriented data that is distributed in memory across multiple processes. It is used by all the model components in DOE's Energy Exascale Earth System Model (E3SM) for reading input data and writing model output. The library also supports rearranging data distributed across multiple processes before using low-level I/O libraries like PnetCDF, NetCDF, and ADIOS to write the data to the file system. The library was derived from the Parallel I/O library.},
 }
 ```
+
+## License
+
+The SCORPIO library is available under a BSD 3-clause license. Please see
+[LICENSE](https://github.com/E3SM-Project/scorpio/blob/master/LICENSE) for details.
