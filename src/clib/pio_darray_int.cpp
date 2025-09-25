@@ -585,6 +585,16 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                                            nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
                         }
 
+#if SPIO_HDF5_FLUSH_AFTER_COLL_WR
+                        if(H5Fflush(file->hdf5_file_id, H5F_SCOPE_LOCAL) < 0){
+                          H5Eprint2(H5E_DEFAULT, stderr);
+                          return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                         "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                         "The low level (HDF5) I/O library call failed to flush the dataset associated with variable (%s, varid=%d)",
+                                         nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                        }
+#endif
+
                         if (H5Sclose(file_space_id) < 0)
                         {
                             return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
