@@ -6733,7 +6733,7 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
 }
 
 /* Create HDF5 dataset property ID */
-static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *file, int var_ndims, nc_type var_type, bool var_has_unlimited_odim)
+static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *file, const char *var_name, int var_ndims, nc_type var_type, bool var_has_unlimited_odim)
 {
   herr_t ret;
   hid_t dpid = H5I_INVALID_HID;
@@ -6745,8 +6745,25 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
   assert(dpid != H5I_INVALID_HID);
 
   /* We currently support compression for non-scalar data */
-  /* FIXME: Support compression for 1D and 2D variables, and char/strings */
-  if((var_ndims <= 2) || (var_type == NC_CHAR) || (file->iotype != PIO_IOTYPE_HDF5C)) return dpid;
+  /* FIXME: Support compression for 1D and char/strings */
+  if((var_ndims <= 1) || (var_type == NC_CHAR) || (file->iotype != PIO_IOTYPE_HDF5C)) return dpid;
+
+  /* Check if any variables have compression disabled by the user */
+  /* FIXME: Variables written out in a chunk size different from the one defined can cause hangs
+   * e.g. E3SM variables : decomp_type, numlev, hwrt_prec, avgflag, fillvalue,
+   *  meridional_complement, zonal_complement
+   */
+#ifndef SPIO_NO_CXX_REGEX
+  std::regex vname_override_rgx(SPIO_OVERRIDE_HDF5_COMPRESSION_VNAME_REGEX);
+  if(var_name && std::regex_match(std::string(var_name), vname_override_rgx)){
+    std::string msg("Disabling HDF5 compression for variable");
+      msg += std::string("(name=") + std::string(var_name) + std::string(", file=") + std::string(pio_get_fname_from_file(file)) + std::string(")");
+      msg += std::string(" since it matches the user specified regex");
+      msg += std::string(" (SPIO_OVERRIDE_HDF5_COMPRESSION_VNAME_REGEX=\"") + std::string(SPIO_OVERRIDE_HDF5_COMPRESSION_VNAME_REGEX) + std::string("\")");
+    PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, msg.c_str());
+    return dpid;
+  }
+#endif
 
 #ifdef _SPIO_HDF5_USE_COMPRESSION
 
@@ -6756,7 +6773,7 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
   /* Lossy compression : absolute error bound = 0.001 */
   ret = H5Pset_zfp_accuracy(dpid, 0.001);
   if(ret < 0){
-    PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "Setting HDF5 ZFP filter absolute error bound failed (continuing with the default error bounds)");
+    PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, "Setting HDF5 ZFP filter absolute error bound failed (continuing with the default error bounds)");
   }
 #endif
 
@@ -6770,7 +6787,7 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
   cd_values[6] = BLOSC_ZSTD; // Use ZSTD for compression
   ret = H5Pset_filter(dpid, FILTER_BLOSC2, H5Z_FLAG_OPTIONAL, 7, cd_values);
   if(ret < 0){
-    PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "User requested lossless compression, but setting HDF5 Blosc2 filter failed. Writing data without compression");
+    PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, "User requested lossless compression, but setting HDF5 Blosc2 filter failed. Writing data without compression");
   }
 #endif
 
@@ -6809,7 +6826,7 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
      * So as a workaround currently restricting filters to > 2D vars
      */
 #endif
-    dcpl_id = spio_create_hdf5_dataset_pid(ios, file, ndims, xtype, dims[0] == PIO_UNLIMITED);
+    dcpl_id = spio_create_hdf5_dataset_pid(ios, file, name, ndims, xtype, dims[0] == PIO_UNLIMITED);
     if (dcpl_id == H5I_INVALID_HID)
     {
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,

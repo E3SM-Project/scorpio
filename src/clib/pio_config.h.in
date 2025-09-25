@@ -70,6 +70,9 @@
 /** Enable flush after each collective write for HDF5 */
 #define SPIO_HDF5_FLUSH_AFTER_COLL_WR @SPIO_HDF5_FLUSH_AFTER_COLL_WR@
 
+/** Set the regex to override HDF5 compression for variables */
+#define SPIO_OVERRIDE_HDF5_COMPRESSION_VNAME_REGEX "@SPIO_OVERRIDE_HDF5_COMPRESSION_VNAME_REGEX@"
+
 /** Set to 1 if the library is configured to use the PnetCDF library,
  *  0 otherwise */
 #define PIO_USE_PNETCDF @PIO_USE_PNETCDF@
