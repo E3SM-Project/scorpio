@@ -6733,7 +6733,7 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
 }
 
 /* Create HDF5 dataset property ID */
-static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *file, const char *var_name, int var_ndims, nc_type var_type, bool var_has_unlimited_odim)
+static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *file, const char *var_name, int var_ndims, nc_type var_type)
 {
   herr_t ret;
   hid_t dpid = H5I_INVALID_HID;
@@ -6745,8 +6745,7 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
   assert(dpid != H5I_INVALID_HID);
 
   /* We currently support compression for non-scalar data */
-  /* FIXME: Support compression for 1D and char/strings */
-  if((var_ndims <= 1) || (var_type == NC_CHAR) || (file->iotype != PIO_IOTYPE_HDF5C)) return dpid;
+  if((var_ndims < 1) || (var_type == NC_CHAR) || (file->iotype != PIO_IOTYPE_HDF5C)) return dpid;
 
   /* Check if any variables have compression disabled by the user */
   /* FIXME: Variables written out in a chunk size different from the one defined can cause hangs
@@ -6814,19 +6813,8 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
     for (i = 0; i < ndims; i++)
         dims[i] = mdims[i] = file->hdf5_dims[dimidsp[i]].len;
 
-#ifdef _SPIO_HDF5_USE_COMPRESSION
-    /* HDF5 filters, including compression filter (file->iosystem->cpid), can only be used
-     * for variables with chunked layout. Only multidim variables with UNLIMITED dimensions
-     * are chunked right now. So only apply the dataset with compression filters for those
-     * variables
-     * FIXME:
-     * Some 1D variables, like time(timelevels), are written out in independent mode
-     * (put var) and hence cannot use filters (that requires collective mode for writes).
-     * Some 2D variables, like time_bnds(time, nbnd), are also written out in indep mode
-     * So as a workaround currently restricting filters to > 2D vars
-     */
-#endif
-    dcpl_id = spio_create_hdf5_dataset_pid(ios, file, name, ndims, xtype, dims[0] == PIO_UNLIMITED);
+    /* Create HDF5 dataset (and optionally add filters as needed) */
+    dcpl_id = spio_create_hdf5_dataset_pid(ios, file, name, ndims, xtype);
     if (dcpl_id == H5I_INVALID_HID)
     {
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
