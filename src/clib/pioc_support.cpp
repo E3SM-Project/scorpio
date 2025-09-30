@@ -695,7 +695,7 @@ adios2_variable* spio_define_adios2_variable(iosystem_desc_t *ios, file_desc_t *
             if (ios->lossless_compression_operator != NULL)
             {
                 /* Add a compression operation (Blosc2) to this variable */
-                adiosErr = adios2_add_operation(&operation_index, variable, ios->lossless_compression_operator, "compressor", "zstd"); /* Compressor type (e.g., zstd) */
+                adiosErr = adios2_add_operation(&operation_index, variable, ios->lossless_compression_operator, "compressor", SPIO_ADIOS2_BLOSC2_COMPRESSION_LIBRARY); /* Compressor type (e.g., zstd) */
                 if (adiosErr != adios2_error_none)
                 {
                     pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -704,7 +704,7 @@ adios2_variable* spio_define_adios2_variable(iosystem_desc_t *ios, file_desc_t *
                 }
 
                 /* Compression level is an integer between 0 (no compression) and 9 (more compression, more memory consumption) inclusive */
-                adiosErr = adios2_set_operation_parameter(variable, operation_index, "clevel", "1");
+                adiosErr = adios2_set_operation_parameter(variable, operation_index, "clevel", SPIO_ADIOS2_BLOSC2_COMPRESSION_LEVEL);
                 if (adiosErr != adios2_error_none)
                 {
                     pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -713,7 +713,7 @@ adios2_variable* spio_define_adios2_variable(iosystem_desc_t *ios, file_desc_t *
                 }
 
                 /* Shuffle option (BLOSC_SHUFFLE/BLOSC_NOSHUFFLE/BLOSC_BITSHUFFLE) */
-                adiosErr = adios2_set_operation_parameter(variable, operation_index, "doshuffle", "BLOSC_BITSHUFFLE");
+                adiosErr = adios2_set_operation_parameter(variable, operation_index, "doshuffle", SPIO_ADIOS2_BLOSC2_SHUFFLE_METHOD);
                 if (adiosErr != adios2_error_none)
                 {
                     pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -756,7 +756,7 @@ adios2_variable* spio_define_adios2_variable(iosystem_desc_t *ios, file_desc_t *
             if (ios->lossy_compression_operator != NULL)
             {
                 /* Add a lossy compression operation (SZ) to this variable */
-                adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "accuracy", "0.001");
+                adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "accuracy", SPIO_ADIOS2_SZ_ACCURACY);
                 if (adiosErr != adios2_error_none)
                 {
                     pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -770,7 +770,7 @@ adios2_variable* spio_define_adios2_variable(iosystem_desc_t *ios, file_desc_t *
             if (ios->lossy_compression_operator != NULL)
             {
                 /* Add a lossy compression operation (ZFP) to this variable */
-                adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "accuracy", "0.001");
+                adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "accuracy", SPIO_ADIOS2_ZFP_ACCURACY);
                 if (adiosErr != adios2_error_none)
                 {
                     pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -6770,7 +6770,7 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
 
 #ifdef _SPIO_HAS_H5Z_ZFP
   /* Lossy compression : absolute error bound = 0.001 */
-  ret = H5Pset_zfp_accuracy(dpid, 0.001);
+  ret = H5Pset_zfp_accuracy(dpid, SPIO_HDF5_ZFP_ACCURACY);
   if(ret < 0){
     PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, "Setting HDF5 ZFP filter absolute error bound failed (continuing with the default error bounds)");
   }
@@ -6781,9 +6781,9 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
 #ifdef _SPIO_HAS_H5Z_BLOSC2
   /* Lossless compression : Default Blosc2 + ZSTD */
   unsigned int cd_values[7];
-  cd_values[4] = 1; // compression level
-  cd_values[5] = 1; // shuffle on
-  cd_values[6] = BLOSC_ZSTD; // Use ZSTD for compression
+  cd_values[4] = SPIO_HDF5_BLOSC2_COMPRESSION_LEVEL; // compression level
+  cd_values[5] = SPIO_HDF5_BLOSC2_SHUFFLE_METHOD; // shuffle on
+  cd_values[6] = SPIO_HDF5_BLOSC2_COMPRESSION_LIBRARY; // Use ZSTD for compression
   ret = H5Pset_filter(dpid, FILTER_BLOSC2, H5Z_FLAG_OPTIONAL, 7, cd_values);
   if(ret < 0){
     PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, "User requested lossless compression, but setting HDF5 Blosc2 filter failed. Writing data without compression");

@@ -23,6 +23,7 @@ if (DEFINED USER_CMAKE_MODULE_PATH)
     CACHE STRING "Location of the CMake_Fortran_utils")
   list (APPEND CMAKE_MODULE_PATH ${USER_CMAKE_MODULE_PATH})
 endif ()
+include(SPIOCompressionUtils)
 
 #==============================================================================
 #  USER-DEFINED OPTIONS (set with "-DOPT=VAL" from command line)
@@ -308,6 +309,13 @@ if(DEFINED SPIO_OVERRIDE_HDF5_COMPRESSION_VNAME_REGEX)
 else()
   # Use a regex pattern that matches nothing, i.e., do NOT disable compression for any variable
   set(SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX ${CXX_REGEX_MATCHES_NOTHING})
+endif()
+
+# Set the default compression options - HDF5/ADIOS + BLOSC2/ZFP
+spio_set_default_comp_opts()
+if(DEFINED SPIO_COMPRESSION_OPTIONS)
+  message(STATUS "Parsing compression options")
+  spio_parse_comp_opts("${SPIO_COMPRESSION_OPTIONS}")
 endif()
 
 #==============================================================================
