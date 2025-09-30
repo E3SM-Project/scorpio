@@ -767,17 +767,50 @@ adios2_variable* spio_define_adios2_variable(iosystem_desc_t *ios, file_desc_t *
         }
         else if (variable_compression_method == ADIOS_COMPRESSION_METHOD_ZFP)
         {
-            if (ios->lossy_compression_operator != NULL)
-            {
-                /* Add a lossy compression operation (ZFP) to this variable */
-                adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "accuracy", SPIO_ADIOS2_ZFP_ACCURACY);
-                if (adiosErr != adios2_error_none)
-                {
-                    pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                            "Failed to add ZFP compression operation to variable %s (adios2_error=%s)",
-                            name, convert_adios2_error_to_string(adiosErr));
-                }
+          if(ios->lossy_compression_operator != NULL){
+            /* Add a lossy compression operation (ZFP) to this variable */
+            if(SPIO_ADIOS2_ZFP_COMPRESSION_MODE == "ADIOS2_ZFP_MODE_ACCURACY"){
+              /* Fixed Accuracy Mode: User specifies absolute error tolerance between compressed and original value */
+              adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "accuracy", SPIO_ADIOS2_ZFP_ACCURACY);
+              if(adiosErr != adios2_error_none){
+                pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                        "Failed to add ZFP compression operation (accuracy=%s) to variable %s (adios2_error=%s)",
+                        SPIO_ADIOS2_ZFP_ACCURACY, name, convert_adios2_error_to_string(adiosErr));
+              }
             }
+            else if(SPIO_ADIOS2_ZFP_COMPRESSION_MODE == "ADIOS2_ZFP_MODE_PRECISION"){
+              /* Fixed Precision Mode : User specifies the number of bits to use from the original value - before data compression */
+              adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "precision", SPIO_ADIOS2_ZFP_PRECISION);
+              if(adiosErr != adios2_error_none){
+                pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                        "Failed to add ZFP compression operation (precision=%s bits) to variable %s (adios2_error=%s)",
+                        SPIO_ADIOS2_ZFP_PRECISION, name, convert_adios2_error_to_string(adiosErr));
+              }
+            }
+            else if(SPIO_ADIOS2_ZFP_COMPRESSION_MODE == "ADIOS2_ZFP_MODE_RATE"){
+              /* Fixed Rate Mode : User specifies the number of bits to use for each value of the compressed data */
+              adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "rate", SPIO_ADIOS2_ZFP_RATE);
+              if(adiosErr != adios2_error_none){
+                pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                        "Failed to add ZFP compression operation (rate=%s bits) to variable %s (adios2_error=%s)",
+                        SPIO_ADIOS2_ZFP_RATE, name, convert_adios2_error_to_string(adiosErr));
+              }
+            }
+            else if(SPIO_ADIOS2_ZFP_COMPRESSION_MODE == "ADIOS2_ZFP_MODE_REVERSIBLE"){
+              /* Lossless compression */
+              adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "reversible", "true");
+              if(adiosErr != adios2_error_none){
+                pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                        "Failed to add ZFP compression operation (lossless) to variable %s (adios2_error=%s)",
+                        name, convert_adios2_error_to_string(adiosErr));
+              }
+            }
+            else{
+              pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                      "Failed to add ZFP compression operation to variable %s (adios2_error=%s). Invalid compression mode (%s)",
+                      SPIO_ADIOS2_ZFP_RATE, name, convert_adios2_error_to_string(adiosErr), SPIO_ADIOS2_ZFP_COMPRESSION_MODE);
+            }
+          }
         }
         #endif
     }

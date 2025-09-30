@@ -101,7 +101,18 @@
 /** ADIOS2 + Blosc2 compression library to use : e.g. "BLOSC_NOSHUFFLE", "BLOSC_SHUFFLE" (byte shuffle), "BLOSC_BITSHUFFLE" */
 #define SPIO_ADIOS2_BLOSC2_SHUFFLE_METHOD "@SPIO_ADIOS2_BLOSC2_SHUFFLE_METHOD@"
 
-/** The ADIOS2+ZFP max absolute error between compressed and original values. e.g. 0.001 */
+/** The ADIOS2+ZFP compression mode to use : rate, precision, accuracy or lossless
+    Valid values are :
+      "ADIOS2_ZFP_MODE_RATE" (rate : Fixed bit rate. Number of bits in compressed value is fixed),
+      "ADIOS2_ZFP_MODE_PRECISION" (Fixed precision: Number of bits in original value is fixed),
+      "ADIOS2_ZFP_MODE_ACCURACY" (Fixed accuracy: Absolute error between compressed and original value is bound),
+      "ADIOS2_ZFP_MODE_REVERSIBLE" (lossless compression) */
+#define SPIO_ADIOS2_ZFP_COMPRESSION_MODE "@SPIO_ADIOS2_ZFP_COMPRESSION_MODE@"
+/** The ADIOS2+ZFP Fixed bit rate : Number of bits to use for each compressed value is fixed. e.g. : 16 */
+#define SPIO_ADIOS2_ZFP_COMPRESSION_RATE "@SPIO_ADIOS2_ZFP_COMPRESSION_RATE@"
+/** The ADIOS2+ZFP Fixed precision, variable bit rate : Number of bits used for each original value is fixed. e.g. 16 */
+#define SPIO_ADIOS2_ZFP_PRECISION "@SPIO_ADIOS2_ZFP_PRECISION@"
+/** The ADIOS2+ZFP Fixed accuracy : max absolute error between compressed and original values is bound. e.g. 0.001 */
 #define SPIO_ADIOS2_ZFP_ACCURACY "@SPIO_ADIOS2_ZFP_ACCURACY@"
 
 /** The ADIOS2+SZ max absolute error between compressed and original values. e.g. 0.001 */
