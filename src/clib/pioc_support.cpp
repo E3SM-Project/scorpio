@@ -6769,10 +6769,33 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
 #ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION
 
 #ifdef _SPIO_HAS_H5Z_ZFP
-  /* Lossy compression : absolute error bound = 0.001 */
-  ret = H5Pset_zfp_accuracy(dpid, SPIO_HDF5_ZFP_ACCURACY);
-  if(ret < 0){
-    PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, "Setting HDF5 ZFP filter absolute error bound failed (continuing with the default error bounds)");
+  if(SPIO_HDF5_ZFP_COMPRESSION_MODE == "H5Z_ZFP_MODE_RATE"){
+    /* Lossy compression : Fixed bit rate : Number of bits used for compressed values is fixed, e.g. 16 */
+    ret = H5Pset_zfp_rate(dpid, SPIO_HDF5_ZFP_COMPRESSION_RATE);
+    if(ret < 0){
+      PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, "Setting HDF5 ZFP filter compression rate failed (ignoring specific compression bit rate)");
+    }
+  }
+  else if(SPIO_HDF5_ZFP_COMPRESSION_MODE == "H5Z_ZFP_MODE_PRECISION"){
+    /* Lossy compression : Fixed precision Variable bit rate : Number of bits used for original value is fixed. e.g. 16 */
+    ret = H5Pset_zfp_precision(dpid, SPIO_HDF5_ZFP_PRECISION);
+    if(ret < 0){
+      PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, "Setting HDF5 ZFP filter relative error bound failed (continuing with the default error bounds)");
+    }
+  }
+  else if(SPIO_HDF5_ZFP_COMPRESSION_MODE == "H5Z_ZFP_MODE_ACCURACY"){
+    /* Lossy compression : Fixed accuracy Variable bit rate : Absolute error between original and compressed values is bound e.g. 0.001 */
+    ret = H5Pset_zfp_accuracy(dpid, SPIO_HDF5_ZFP_ACCURACY);
+    if(ret < 0){
+      PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, "Setting HDF5 ZFP filter absolute error bound failed (continuing with the default error bounds)");
+    }
+  }
+  else if(SPIO_HDF5_ZFP_COMPRESSION_MODE == "H5Z_ZFP_MODE_REVERSIBLE"){
+    /* Lossless compression */
+    ret = H5Pset_zfp_reversible(dpid);
+    if(ret < 0){
+      PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, "Setting HDF5 ZFP filter for lossless compression failed (ignoring compression option)");
+    }
   }
 #endif
 
@@ -6782,7 +6805,7 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
   /* Lossless compression : Default Blosc2 + ZSTD */
   unsigned int cd_values[7];
   cd_values[4] = SPIO_HDF5_BLOSC2_COMPRESSION_LEVEL; // compression level
-  cd_values[5] = SPIO_HDF5_BLOSC2_SHUFFLE_METHOD; // shuffle on
+  cd_values[5] = SPIO_HDF5_BLOSC2_SHUFFLE_METHOD; // shuffle option
   cd_values[6] = SPIO_HDF5_BLOSC2_COMPRESSION_LIBRARY; // Use ZSTD for compression
   ret = H5Pset_filter(dpid, FILTER_BLOSC2, H5Z_FLAG_OPTIONAL, 7, cd_values);
   if(ret < 0){
