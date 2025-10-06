@@ -18,6 +18,18 @@
 #include "spio_io_summary.h"
 #include "spio_rearrange_any.h"
 
+/* Include headers for HDF5 compression filters */
+#if PIO_USE_HDF5
+#include <hdf5.h>
+#ifdef _SPIO_HAS_H5Z_ZFP
+#include "H5Zzfp_lib.h"
+#include "H5Zzfp_props.h"
+#endif
+#ifdef _SPIO_HAS_H5Z_BLOSC2
+#include "blosc2_filter.h"
+#endif
+#endif
+
 bool fortran_order = false;
 
 /** The default error handler used when iosystem cannot be located. */
@@ -328,7 +340,7 @@ int PIOc_setframe_impl(int ncid, int varid, int frame)
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         if (frame >= 0)
         {
@@ -1444,6 +1456,43 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     }
 #endif
 
+#ifdef _HDF5
+
+#ifdef _SPIO_HDF5_USE_COMPRESSION
+  /* Initialize HDF5 compression libraries */
+
+#ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION
+  /* Only ZFP is supported for lossy data comrpession with HDF5 */
+#ifdef _SPIO_HAS_H5Z_ZFP
+    ret = H5Z_zfp_initialize();
+    if(ret < 0){
+      GPTLstop("PIO:PIOc_Init_Intracomm");
+      return pio_err(ios, NULL, ret, __FILE__, __LINE__, "Initializing HDF5 ZFP filter (for lossy data compression) failed");
+    }
+#else
+    PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "User requested lossy compression, but ZFP library is not available. Writing data without compression");
+#endif
+
+#else /* lossless compression, ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION */
+
+  /* Only Blosc2+ZSTD is supported for lossless data comrpession with HDF5 */
+#ifdef _SPIO_HAS_H5Z_BLOSC2
+    /* Lossless compression : Default Blosc2 + ZSTD */
+    ret = register_blosc2(NULL, NULL);
+    if(ret < 0){
+      GPTLstop("PIO:PIOc_Init_Intracomm");
+      return pio_err(ios, NULL, ret, __FILE__, __LINE__, "Registering/Initializing HDF5 Blosc2 filter (for lossless data compression) failed");
+    }
+#else
+    PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "User requested lossless compression, but Blosc2 library is not available. Writing data without compression");
+#endif
+    
+#endif /* ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION */
+
+#endif /* ifdef _SPIO_HDF5_USE_COMPRESSION */
+
+#endif /* ifdef _HDF5 */
+
     /* Copy the computation communicator into comp_comm. */
     if ((mpierr = MPI_Comm_dup(comp_comm, &ios->comp_comm)))
     {
@@ -1741,6 +1790,18 @@ int PIOc_finalize_impl(int iosysid)
         return pio_err(ios, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
                         "PIO Finalize failed on iosytem (%d). Unable to write I/O summary for the iosystem", iosysid);
     }
+
+#ifdef _HDF5
+
+#ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION
+  /* Finalize HDF5 compression libraries */
+#ifdef _SPIO_HAS_H5Z_ZFP
+    H5Z_zfp_finalize();
+#endif
+#endif
+
+#endif /* ifdef _HDF5 */
+
     free(ios->io_fstats);
 
     /* Free this memory that was allocated in init_intracomm. */

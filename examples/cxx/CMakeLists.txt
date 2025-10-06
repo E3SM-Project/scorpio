@@ -41,7 +41,8 @@ ADD_DEFINITIONS(${PIO_DEFINITIONS})
 
 INCLUDE_DIRECTORIES(${PIO_INCLUDE_DIRS}
                     ${PROJECT_BINARY_DIR}/../src/clib
-                    ${PROJECT_SOURCE_DIR}/../src/clib)
+                    ${PROJECT_SOURCE_DIR}/../src/clib
+                    ${PROJECT_SOURCE_DIR}/../util)
 LINK_DIRECTORIES(${PIO_LIB_DIR})
 
 #==============================================================================
@@ -49,3 +50,8 @@ LINK_DIRECTORIES(${PIO_LIB_DIR})
 #==============================================================================
 SET(SRC examplePio.cxx)
 add_spio_executable(examplePio_cxx TRUE "" ${SRC})
+
+if (WITH_HDF5)
+  SET(SRC ${PROJECT_SOURCE_DIR}/../util/argparser.cxx hdf5.cpp)
+  add_spio_executable(hdf5_example TRUE "" ${SRC})
+endif ()

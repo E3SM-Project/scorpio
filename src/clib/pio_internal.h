@@ -89,6 +89,8 @@ extern "C" {
                 int err_num, const char *fname, int line,
                 const char *uerr_msg_fmt, ...) PIO_ERR_FUNC_ATTR;
 
+    void PIOc_warn(int iosysid, int ncid, const char *fname, int line, const char *uwarn_msg);
+
     /* For async cases, this runs on IO tasks and listens for messages. */
     int pio_msg_handler2(int io_rank, int component_count, iosystem_desc_t **iosys,
                          MPI_Comm io_comm);
