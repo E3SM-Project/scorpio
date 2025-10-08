@@ -356,7 +356,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         int num_attrs = file->hdf5_num_attrs;
         if (num_attrs >= PIO_MAX_ATTRS)
@@ -462,7 +462,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 #endif /* _PNETCDF */
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         if (ios->iomaster == MPI_ROOT)
         {
@@ -474,7 +474,9 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
     }
 #endif /* _HDF5 */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC && file->iotype != PIO_IOTYPE_HDF5 && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF &&
+            file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC &&
+            file->iotype != PIO_IOTYPE_HDF5 && file->iotype != PIO_IOTYPE_HDF5C && file->do_io)
         {
             if (ios->iomaster == MPI_ROOT)
             {
@@ -3392,7 +3394,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 #endif /* _PNETCDF */
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         if (ios->iomaster == MPI_ROOT)
         {
@@ -3404,7 +3406,9 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     }
 #endif /* _HDF5 */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC && file->iotype != PIO_IOTYPE_HDF5 && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF &&
+            file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC &&
+            file->iotype != PIO_IOTYPE_HDF5 && file->iotype != PIO_IOTYPE_HDF5C && file->do_io)
         {
             LOG((2, "spio_put_vars_tc calling netcdf function file->iotype = %d",
                  file->iotype));

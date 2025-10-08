@@ -67,6 +67,57 @@
 /** Set the regex to override ADIOS type with PnetCDF for file creation. */
 #define SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX "@SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX@"
 
+/** Enable flush after each collective write for HDF5 */
+#define SPIO_HDF5_FLUSH_AFTER_COLL_WR @SPIO_HDF5_FLUSH_AFTER_COLL_WR@
+
+/** Set the regex to override HDF5 compression for variables */
+#define SPIO_OVERRIDE_HDF5_COMPRESSION_VNAME_REGEX "@SPIO_OVERRIDE_HDF5_COMPRESSION_VNAME_REGEX@"
+
+/** COMPRESSION OPTIONS */
+/** HDF5 + Blosc2 compression level = [0-9] */
+#define SPIO_HDF5_BLOSC2_COMPRESSION_LEVEL @SPIO_HDF5_BLOSC2_COMPRESSION_LEVEL@
+/** HDF5 + Blosc2 compression library to use : e.g. BLOSC_ZSTD */
+#define SPIO_HDF5_BLOSC2_COMPRESSION_LIBRARY @SPIO_HDF5_BLOSC2_COMPRESSION_LIBRARY@
+/** HDF5 + Blosc2 compression library to use : e.g. "BLOSC_NOSHUFFLE", "BLOSC_SHUFFLE" (byte shuffle), "BLOSC_BITSHUFFLE" */
+#define SPIO_HDF5_BLOSC2_SHUFFLE_METHOD @SPIO_HDF5_BLOSC2_SHUFFLE_METHOD@
+
+/** The HDF5+ZFP compression mode to use : rate, precision, accuracy or lossless
+    Valid values are : "H5Z_ZFP_MODE_RATE" (Fixed rate : Fixed bits per compressed value),
+      "H5Z_ZFP_MODE_PRECISION" (Fixed precision: Fixed bits per original value),
+      "H5Z_ZFP_MODE_ACCURACY" (Fixed accuracy: Max absolute error between original and compressed value is bound),
+      "H5Z_ZFP_MODE_REVERSIBLE" (lossless compression) */
+#define SPIO_HDF5_ZFP_COMPRESSION_MODE "@SPIO_HDF5_ZFP_COMPRESSION_MODE@"
+/** The HDF5+ZFP : Fixed bit rate : Number of bits to use for each compressed value. e.g. : 16 */
+#define SPIO_HDF5_ZFP_COMPRESSION_RATE @SPIO_HDF5_ZFP_COMPRESSION_RATE@
+/** The HDF5+ZFP : Fixed precision : Number of bits to use for each original value. e.g. 16 */
+#define SPIO_HDF5_ZFP_PRECISION @SPIO_HDF5_ZFP_PRECISION@
+/** The HDF5+ZFP : Fixed accuracy : max absolute error between compressed and original values. e.g. 0.001 */
+#define SPIO_HDF5_ZFP_ACCURACY @SPIO_HDF5_ZFP_ACCURACY@
+
+/** ADIOS2 + Blosc2 compression level = [0-9] */
+#define SPIO_ADIOS2_BLOSC2_COMPRESSION_LEVEL "@SPIO_ADIOS2_BLOSC2_COMPRESSION_LEVEL@"
+/** ADIOS2 + Blosc2 compression library to use : e.g. zstd */
+#define SPIO_ADIOS2_BLOSC2_COMPRESSION_LIBRARY "@SPIO_ADIOS2_BLOSC2_COMPRESSION_LIBRARY@"
+/** ADIOS2 + Blosc2 compression library to use : e.g. "BLOSC_NOSHUFFLE", "BLOSC_SHUFFLE" (byte shuffle), "BLOSC_BITSHUFFLE" */
+#define SPIO_ADIOS2_BLOSC2_SHUFFLE_METHOD "@SPIO_ADIOS2_BLOSC2_SHUFFLE_METHOD@"
+
+/** The ADIOS2+ZFP compression mode to use : rate, precision, accuracy or lossless
+    Valid values are :
+      "ADIOS2_ZFP_MODE_RATE" (rate : Fixed bit rate. Number of bits in compressed value is fixed),
+      "ADIOS2_ZFP_MODE_PRECISION" (Fixed precision: Number of bits in original value is fixed),
+      "ADIOS2_ZFP_MODE_ACCURACY" (Fixed accuracy: Absolute error between compressed and original value is bound),
+      "ADIOS2_ZFP_MODE_REVERSIBLE" (lossless compression) */
+#define SPIO_ADIOS2_ZFP_COMPRESSION_MODE "@SPIO_ADIOS2_ZFP_COMPRESSION_MODE@"
+/** The ADIOS2+ZFP Fixed bit rate : Number of bits to use for each compressed value is fixed. e.g. : 16 */
+#define SPIO_ADIOS2_ZFP_COMPRESSION_RATE "@SPIO_ADIOS2_ZFP_COMPRESSION_RATE@"
+/** The ADIOS2+ZFP Fixed precision, variable bit rate : Number of bits used for each original value is fixed. e.g. 16 */
+#define SPIO_ADIOS2_ZFP_PRECISION "@SPIO_ADIOS2_ZFP_PRECISION@"
+/** The ADIOS2+ZFP Fixed accuracy : max absolute error between compressed and original values is bound. e.g. 0.001 */
+#define SPIO_ADIOS2_ZFP_ACCURACY "@SPIO_ADIOS2_ZFP_ACCURACY@"
+
+/** The ADIOS2+SZ max absolute error between compressed and original values. e.g. 0.001 */
+#define SPIO_ADIOS2_SZ_ACCURACY "@SPIO_ADIOS2_SZ_ACCURACY@"
+
 /** Set to 1 if the library is configured to use the PnetCDF library,
  *  0 otherwise */
 #define PIO_USE_PNETCDF @PIO_USE_PNETCDF@

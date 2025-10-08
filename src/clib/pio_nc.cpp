@@ -157,7 +157,7 @@ int PIOc_inq_impl(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdi
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         if (ndimsp)
             *ndimsp = file->hdf5_num_dims;
@@ -607,7 +607,7 @@ int PIOc_inq_type_impl(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         if (sizep)
             *sizep = spio_get_nc_type_size(xtype);
@@ -873,7 +873,7 @@ int PIOc_inq_dim_impl(int ncid, int dimid, char *name, PIO_Offset *lenp)
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         if (0 <= dimid && dimid < file->hdf5_num_dims)
         {
@@ -1115,7 +1115,7 @@ int PIOc_inq_dimid_impl(int ncid, const char *name, int *idp)
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         ierr = PIO_EBADDIM;
         *idp = -1;
@@ -1298,7 +1298,7 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         if (varid < file->hdf5_num_vars)
         {
@@ -1758,7 +1758,7 @@ int PIOc_inq_varid_impl(int ncid, const char *name, int *varidp)
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         ierr = PIO_ENOTVAR;
         for (int i = 0; i < file->hdf5_num_vars; i++)
@@ -1986,7 +1986,7 @@ int PIOc_inq_att_impl(int ncid, int varid, const char *name, nc_type *xtypep,
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         ierr = PIO_ENOTATT;
         for (int i = 0; i < file->hdf5_num_attrs; i++)
@@ -2197,7 +2197,7 @@ int PIOc_inq_attname_impl(int ncid, int varid, int attnum, char *name)
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         if (0 <= attnum && attnum < file->hdf5_num_attrs &&
             file->hdf5_attrs[attnum].att_varid == varid &&
@@ -2378,7 +2378,7 @@ int PIOc_inq_attid_impl(int ncid, int varid, const char *name, int *idp)
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         ierr = PIO_ENOTATT;
         for (int i = 0; i < file->hdf5_num_attrs; i++)
@@ -2934,7 +2934,7 @@ int PIOc_set_fill_impl(int ncid, int fillmode, int *old_modep)
 
 #ifdef _HDF5
     /* Skip PIOc_set_fill() for HDF5 type so far */
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2954,7 +2954,9 @@ int PIOc_set_fill_impl(int ncid, int fillmode, int *old_modep)
 #endif /* _PNETCDF */
 
 #ifdef _NETCDF
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC && file->iotype != PIO_IOTYPE_HDF5 && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF &&
+            file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC &&
+            file->iotype != PIO_IOTYPE_HDF5 && file->iotype != PIO_IOTYPE_HDF5C && file->do_io)
             ierr = nc_set_fill(file->fh, fillmode, old_modep);
 #endif /* _NETCDF */
     }
@@ -3187,7 +3189,7 @@ int PIOc_def_dim_impl(int ncid, const char *name, PIO_Offset len, int *idp)
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         file->hdf5_dims[file->hdf5_num_dims].name = spio_strdup(name);
         if (file->hdf5_dims[file->hdf5_num_dims].name == NULL)
@@ -3216,7 +3218,9 @@ int PIOc_def_dim_impl(int ncid, const char *name, PIO_Offset len, int *idp)
 #endif /* _PNETCDF */
 
 #ifdef _NETCDF
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC && file->iotype != PIO_IOTYPE_HDF5 && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF &&
+            file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC &&
+            file->iotype != PIO_IOTYPE_HDF5 && file->iotype != PIO_IOTYPE_HDF5C && file->do_io)
             ierr = nc_def_dim(file->fh, name, (size_t)len, idp);
 #endif /* _NETCDF */
     }
@@ -3526,7 +3530,7 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
 #endif
 
 #ifdef _HDF5
-    if (file->iotype == PIO_IOTYPE_HDF5)
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
         assert(file->hdf5_num_vars < PIO_MAX_VARS);
         file->hdf5_vars[file->hdf5_num_vars].name = spio_strdup(name);
@@ -3621,7 +3625,9 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
 #endif /* _PNETCDF */
 
 #ifdef _NETCDF
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC && file->iotype != PIO_IOTYPE_HDF5 && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF &&
+            file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC &&
+            file->iotype != PIO_IOTYPE_HDF5 && file->iotype != PIO_IOTYPE_HDF5C && file->do_io)
         {
             ierr = nc_def_var(file->fh, name, xtype, ndims, dimidsp, varidp);
             if (ierr != PIO_NOERR)
@@ -3665,7 +3671,7 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
 #endif /* _NETCDF4 */
 
 #ifdef _HDF5
-        if (file->iotype == PIO_IOTYPE_HDF5)
+        if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
         {
              ierr = spio_hdf5_def_var(ios, file, name, xtype, ndims, dimidsp, *varidp);
              if (ierr != PIO_NOERR)

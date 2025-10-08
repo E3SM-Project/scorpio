@@ -88,8 +88,8 @@ endif ()
 #==============================================================================
 #  DEFINE THE TARGET LIBRARY
 #==============================================================================
-SET(SRC ${SCORPIO_SOURCE_DIR}/tools/util/argparser.cxx adios2pio-nm.cxx)
-add_library(adios2pio-nm-lib ${SCORPIO_SOURCE_DIR}/tools/util/spio_misc_tool_utils.cxx adios2pio-nm-lib.cxx)
+SET(SRC ${SCORPIO_SOURCE_DIR}/util/argparser.cxx adios2pio-nm.cxx)
+add_library(adios2pio-nm-lib ${SCORPIO_SOURCE_DIR}/util/spio_misc_tool_utils.cxx adios2pio-nm-lib.cxx)
 include_directories(
   "${PROJECT_SOURCE_DIR}"   # to find foo/foo.h
   "${PROJECT_BINARY_DIR}")  # to find foo/config.h
@@ -118,7 +118,7 @@ endif ()
 target_include_directories(adios2pio-nm-lib PRIVATE
   ${SCORPIO_SOURCE_DIR}/src/clib
   ${SCORPIO_BINARY_DIR}/src/clib
-  ${SCORPIO_SOURCE_DIR}/tools/util
+  ${SCORPIO_SOURCE_DIR}/util
   ${PnetCDF_C_INCLUDE_DIRS}
   ${NETCDF_C_INCLUDE_DIRS}
   ${HDF5_C_INCLUDE_DIRS}
@@ -127,7 +127,7 @@ target_include_directories(adios2pio-nm-lib PRIVATE
 target_include_directories(adios2pio-nm.exe PRIVATE
   ${SCORPIO_SOURCE_DIR}/src/clib
   ${SCORPIO_BINARY_DIR}/src/clib
-  ${SCORPIO_SOURCE_DIR}/tools/util
+  ${SCORPIO_SOURCE_DIR}/util
   ${PnetCDF_C_INCLUDE_DIRS}
   ${NETCDF_C_INCLUDE_DIRS}
   ${HDF5_C_INCLUDE_DIRS}
