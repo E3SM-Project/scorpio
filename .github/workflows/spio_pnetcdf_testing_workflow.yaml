@@ -47,7 +47,7 @@ jobs:
           conda install conda-forge::mpich \
             conda-forge::mpich-mpicc conda-forge::mpich-mpicxx \
             conda-forge::mpich-mpifort
-          conda-forge::libpnetcdf
+          conda install conda-forge::libpnetcdf
 
       - name: Configure SCORPIO
         shell: bash -l {0}  # Ensure environment is active for configure cmds
