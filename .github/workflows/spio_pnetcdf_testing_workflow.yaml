@@ -1,0 +1,74 @@
+---
+#
+# ========== SCORPIO testing workflow ============
+# The current workflow,
+# 1) Checks out SCORPIO source
+# 2) Installs dependencies using conda : CMake, MPICH & PnetCDF
+# 3) Configures, builds and tests SCORPIO
+# The tests are run on a single node (with PnetCDF)
+#
+name: SCORPIO + PnetCDF - build and test
+
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Branch to run the SCORPIO + PnetCDF tests'
+        required: true
+        default: 'main'
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest  # Or other suitable runner
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: 3.9  # Specify your desired Python version
+          channels: conda-forge,defaults  # Specify your desired channels
+          auto-activate-base: false  # Prevent auto-activation of base env
+
+      - name: Create and activate Conda environment
+        shell: bash -l {0}  # Use bash -l to ensure conda commands are available
+        run: |
+          conda create -n scorpio_env  # Create environment
+          conda activate scorpio_env  # Activate environment
+          conda install conda-forge::cmake
+          conda install conda-forge::mpich \
+            conda-forge::mpich-mpicc conda-forge::mpich-mpicxx \
+            conda-forge::mpich-mpifort
+          conda-forge::libpnetcdf
+
+      - name: Configure SCORPIO
+        shell: bash -l {0}  # Ensure environment is active for configure cmds
+        run: |
+          conda activate scorpio_env  # Activate environment
+          CC=mpicc CXX=mpicxx FC=mpif90 F77=mpif90 \
+            cmake -DWITH_PNETCDF:BOOL=TRUE \
+            -DCMAKE_BUILD_TYPE=Debug -DPIO_USE_MALLOC:BOOL=ON \
+            -DPIO_BUILD_TESTS:BOOL=ON -DPIO_ENABLE_EXAMPLES:BOOL=ON \
+            -DPIO_ENABLE_TESTS:BOOL=ON -DPLATFORM:STRING=linux-gnu \
+            -S . -B scorpio_build_dir -LH
+
+      - name: Build SCORPIO
+        shell: bash -l {0}  # Ensure environment is active for build cmds
+        run: |
+          conda activate scorpio_env  # Activate environment
+          cmake --build scorpio_build_dir
+
+      - name: Run SCORPIO tests
+        shell: bash -l {0}  # Ensure environment is active for test cmds
+        run: |
+          conda activate scorpio_env  # Activate environment
+          cd scorpio_build_dir
+          make test
