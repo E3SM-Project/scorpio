@@ -66,9 +66,12 @@ option (HDF5_USE_LOSSY_COMPRESSION  "Enable lossy compression methods in HDF5 (e
 option (PIO_ENABLE_TESTS  "Enable the testing builds"                       OFF)
 option (PIO_ENABLE_LARGE_TESTS  "Enable large (file, processes) tests"      OFF)
 option (PIO_VALGRIND_CHECK  "Enable memory leak check using valgrind"       OFF)
-#===== Dependent Options =====
-include(CMakeDependentOption)
-cmake_dependent_option (PIO_TEST_CLOSE_OPEN_FOR_SYNC  "SCORPIO fortran tests will close+open for sync" ON "WITH_ADIOS2" OFF)
+option (PIO_TEST_CLOSE_OPEN_FOR_SYNC "Enable close+open to sync file output in tests" OFF)
+
+if (WITH_ADIOS2)
+  message(STATUS "Enabling close+open to sync file output for SCORPIO tests (default since ADIOS is enabled)")
+  set(PIO_TEST_CLOSE_OPEN_FOR_SYNC ON CACHE BOOL "Enable close+open to sync file output in tests" FORCE)
+endif ()
 
 # Get the name of the build host
 cmake_host_system_information (RESULT FQDN_SITENAME QUERY FQDN)
