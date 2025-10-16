@@ -1168,6 +1168,10 @@ void piodie(const char *fname, int line, const char *fmt, ...)
     fprintf(stderr, " (%s: %d)\n", (fname) ? fname : "_", line);
     va_end(argp);
 
+#ifdef _HDF5
+    H5Eprint2(H5E_DEFAULT, stderr);
+#endif
+
     print_trace(stderr);
 #ifdef MPI_SERIAL
     abort();
@@ -1452,6 +1456,9 @@ int pio_err(iosystem_desc_t *ios, file_desc_t *file,
         if (print_err_msg)
         {
             fprintf(stderr, "PIO: ERROR: %s. %s (error num=%d), (%s:%d)\n", uerr_msg, err_msg, err_num, (fname) ? fname : "\0", line);
+#ifdef _HDF5
+            H5Eprint2(H5E_DEFAULT, stderr);
+#endif
             fflush(stderr);
         }
     }
