@@ -73,6 +73,11 @@ if (WITH_ADIOS2)
   set(PIO_TEST_CLOSE_OPEN_FOR_SYNC ON CACHE BOOL "Enable close+open to sync file output in tests" FORCE)
 endif ()
 
+if (WITH_HDF5 AND (NOT PIO_TEST_CLOSE_OPEN_FOR_SYNC))
+  message(STATUS "Enabling close+open to sync file output for SCORPIO tests (default since HDF5 is enabled)")
+  set(PIO_TEST_CLOSE_OPEN_FOR_SYNC ON CACHE BOOL "Enable close+open to sync file output in tests" FORCE)
+endif ()
+
 # Get the name of the build host
 cmake_host_system_information (RESULT FQDN_SITENAME QUERY FQDN)
 
