@@ -48,8 +48,16 @@ LINK_DIRECTORIES(${PIO_LIB_DIR})
 #==============================================================================
 #  BUILD EXECUTABLE
 #==============================================================================
+SET(SRC ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
+add_library(argparser OBJECT ${SRC})
+
 SET(SRC examplePio.cxx)
 add_spio_executable(examplePio_cxx TRUE "" ${SRC})
+target_link_libraries(examplePio_cxx PRIVATE $<TARGET_OBJECTS:argparser>)
+
+SET(SRC e3sm_fgi.cpp e3sm_f.cpp e3sm_g.cpp e3sm_i.cpp)
+add_spio_executable(e3sm_fgi TRUE "" ${SRC})
+target_link_libraries(e3sm_fgi PRIVATE $<TARGET_OBJECTS:argparser>)
 
 if (WITH_HDF5)
   SET(SRC ${PROJECT_SOURCE_DIR}/../util/argparser.cxx hdf5.cpp)
