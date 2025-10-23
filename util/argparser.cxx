@@ -65,9 +65,8 @@ void ArgParser::parse(int argc, char *argv[])
       /* The "--help" option is provided by default */
       if ((argvi == "--help") || (argvi == "-h")){
         print_usage(std::cout);
-        return;
       }
-      else if (std::regex_search(argvi, noval_match, noval_opt_rgx) &&
+      if (std::regex_search(argvi, noval_match, noval_opt_rgx) &&
           (noval_match.size() == 2)){
         /* No value arguments like "--verbose" */
         if (opts_map_.count(noval_match.str(1)) != 1){
