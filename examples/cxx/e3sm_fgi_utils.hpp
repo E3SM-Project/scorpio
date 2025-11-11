@@ -28,18 +28,33 @@ namespace E3SM_FGI{
 
 /* FIXME: Move logging related classes to a util */
 namespace Util{
-  template<typename InputIterator1, typename InputIterator2, typename Func>
-  void zip_for_each(InputIterator1 iter1_begin, InputIterator1 iter1_end, InputIterator2 iter2_begin, InputIterator2 iter2_end, Func f)
-  {
-    for(InputIterator1 iter1 = iter1_begin; iter1 != iter1_end; ++iter1){
-      for(InputIterator2 iter2 = iter2_begin; iter2 != iter2_end; ++iter2){
-        f(*iter1, *iter2);
-      }
-    }
-  }
-
   namespace String{
-    static inline std::string toupper(const std::string &str){
+    template<typename T>
+    inline std::string vec_to_string(const std::vector<T> &vec)
+    {
+      std::string str("[");
+      str += std::accumulate(vec.cbegin(), vec.cend(), std::string(""),
+              [](std::string str, const T &t){
+                return std::to_string(t) + ", " + str;
+              });
+      str += "]";
+      return str;
+    }
+
+    template<>
+    inline std::string vec_to_string<std::string>(const std::vector<std::string> &vec)
+    {
+      std::string str("[");
+      str += std::accumulate(vec.cbegin(), vec.cend(), std::string(""),
+              [](std::string res, const std::string &str){
+                return "\"" + str + "\", " + res;
+              });
+      str += "]";
+      return str;
+    }
+
+    static inline std::string toupper(const std::string &str)
+    {
       std::string res = str;
       std::transform(str.cbegin(), str.cend(), res.begin(),
               [](unsigned char c) { return std::toupper(c); });
@@ -189,15 +204,38 @@ namespace Util{
     static inline Util::Logging::LogLevel str2llevel(const std::string &llevel_str){ return llevels.at(llevel_str); }
 
     extern std::shared_ptr<Util::Logging::Logger> logger;
+  } // namespace GVars
+} //namespace Util
+
+namespace Util{
+  template<typename InputIterator1, typename InputIterator2, typename Func>
+  void zip_for_each(InputIterator1 iter1_begin, InputIterator1 iter1_end, InputIterator2 iter2_begin, InputIterator2 iter2_end, Func f)
+  {
+    for(InputIterator1 iter1 = iter1_begin; iter1 != iter1_end; ++iter1){
+      for(InputIterator2 iter2 = iter2_begin; iter2 != iter2_end; ++iter2){
+        f(*iter1, *iter2);
+      }
+    }
   }
-}
+
+  static inline int check_spio_err(int ret, const std::string &err_msg, const char *fname, int line_num)
+  {
+    if(ret != PIO_NOERR){
+      Util::GVars::logger->log(Util::Logging::LogLevel::ERROR,
+        err_msg + ", file = " + std::string(fname) + ", line no : " + std::to_string(line_num));
+      exit(-1);
+    }
+
+    return ret;
+  }
+} // namespace Util
 
 namespace E3SM_FGI{
-  int test_e3sm_f_case(MPI_Comm comm, const std::vector<int> &iotypes,
+  int test_e3sm_fcase(MPI_Comm comm, const std::vector<int> &iotypes,
         const std::vector<int> &rearrs, int nioprocs);
-  int test_e3sm_g_case(MPI_Comm comm, const std::vector<int> &iotypes,
+  int test_e3sm_gcase(MPI_Comm comm, const std::vector<int> &iotypes,
         const std::vector<int> &rearrs, int nioprocs);
-  int test_e3sm_i_case(MPI_Comm comm, const std::vector<int> &iotypes,
+  int test_e3sm_icase(MPI_Comm comm, const std::vector<int> &iotypes,
         const std::vector<int> &rearrs, int nioprocs);
 }
 #endif // __E3SM_UTILS_FGI_HPP__

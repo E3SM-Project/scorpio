@@ -172,6 +172,7 @@ int main(int argc, char *argv[])
     return ret;
   }
 
+  Util::GVars::logger->set_log_rank(0);
   Util::GVars::logger->set_log_level(log_lvl);
 
   MPI_Barrier(comm_in);
@@ -187,9 +188,9 @@ int main(int argc, char *argv[])
   for(std::vector<E3SM_FGI::Case_Type>::const_iterator citer = cases.cbegin();
       citer != cases.end(); ++citer){
     switch(*citer){
-      case E3SM_FGI::Case_Type::E3SM_F_CASE : ret = E3SM_FGI::test_e3sm_f_case(comm_in, iotypes, rearrs, nioprocs); break;
-      case E3SM_FGI::Case_Type::E3SM_G_CASE : ret = E3SM_FGI::test_e3sm_g_case(comm_in, iotypes, rearrs, nioprocs); break;
-      case E3SM_FGI::Case_Type::E3SM_I_CASE : ret = E3SM_FGI::test_e3sm_i_case(comm_in, iotypes, rearrs, nioprocs); break;
+      case E3SM_FGI::Case_Type::E3SM_F_CASE : ret = E3SM_FGI::test_e3sm_fcase(comm_in, iotypes, rearrs, nioprocs); break;
+      case E3SM_FGI::Case_Type::E3SM_G_CASE : ret = E3SM_FGI::test_e3sm_gcase(comm_in, iotypes, rearrs, nioprocs); break;
+      case E3SM_FGI::Case_Type::E3SM_I_CASE : ret = E3SM_FGI::test_e3sm_icase(comm_in, iotypes, rearrs, nioprocs); break;
     }
     if(ret != PIO_NOERR){
       Util::GVars::logger->log(Util::Logging::LogLevel::ERROR, "Test failed, case=" + Util::GVars::case2str(*citer) + ", ret = " + std::to_string(ret));
