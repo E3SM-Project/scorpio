@@ -1,6 +1,7 @@
 #include "e3sm_fgi_utils.hpp"
 #include "e3sm_fgi_data.hpp"
 
+/* Get unique output file name */
 static inline std::string get_icase_test_fname(const std::string &case_type, int iotype, int rearr)
 {
   const std::string FNAME_PREFIX = "spio_e3sm_fgi_i";
@@ -14,6 +15,7 @@ static inline std::string get_icase_test_fname(const std::string &case_type, int
           + FNAME_SUFFIX;
 }
 
+/* Test pseudo E3SM I case */
 static int test_icase(MPI_Comm comm, int iosysid, const std::string &fname, int iotype,
                       int nlon, int nlat, int nframes)
 {
@@ -32,6 +34,7 @@ static int test_icase(MPI_Comm comm, int iosysid, const std::string &fname, int 
   std::function<float(void )> range_zero_to_inf = [idx] (void ) mutable { return static_cast<float>(idx++); }; 
 
   /* FIXME : Is this the I/O decomp used by the land model ?*/
+  /* Simple 2D decomp, NLON s are divided evenly among all procs */
   std::function<PIO_Offset(void ) > decomp_lon_2d_gen =
     [comm_rank, is_last_proc, nlat, nlat_per_proc, nlon, nlon_per_proc, ilat, ilon](void ) mutable {
 
@@ -54,6 +57,7 @@ static int test_icase(MPI_Comm comm, int iosysid, const std::string &fname, int 
       return static_cast<float>(decomp_lon_2d_gen());
     };
   
+  /* Note: Last process gets the remaining NCOLs */
   int lsz = (!is_last_proc) ? (nlat_per_proc * nlon_per_proc) :
               (nlat_per_proc * (nlon - comm_rank * nlon_per_proc));
   E3SM_FGI::SPIO_decomp decomp_lon_2d("decomp_lon_2d_lat_lon", iosysid, PIO_FLOAT,
@@ -64,6 +68,7 @@ static int test_icase(MPI_Comm comm, int iosysid, const std::string &fname, int 
 
   E3SM_FGI::SPIO_file fh(iosysid, fname, iotype, false);
 
+  /* Define vars/atts/dims */
   ret = fh.def({
             /* Global Attributes */
             std::make_shared<E3SM_FGI::SPIO_att>("title", "ELM History file information"),
@@ -85,6 +90,7 @@ static int test_icase(MPI_Comm comm, int iosysid, const std::string &fname, int 
     return ret;
   }
 
+  /* Write vars/atts */
   ret = fh.put();
   if(ret != PIO_NOERR){
     Util::GVars::logger->log(Util::Logging::LogLevel::ERROR, "Putting file objects failed");
@@ -94,6 +100,7 @@ static int test_icase(MPI_Comm comm, int iosysid, const std::string &fname, int 
   return ret;
 }
 
+/* Large pseudo E3SM I case */
 static int test_icase_large(MPI_Comm comm, int iosysid, const std::string &fname, int iotype)
 {
   const int NLON = 144;
@@ -104,6 +111,7 @@ static int test_icase_large(MPI_Comm comm, int iosysid, const std::string &fname
   return test_icase(comm, iosysid, fname, iotype, NLON, NLAT, NFRAMES);
 }
 
+/* Small pseudo E3SM I case */
 static int test_icase_small(MPI_Comm comm, int iosysid, const std::string &fname, int iotype)
 {
   const int NLON = 16;
@@ -125,6 +133,7 @@ int E3SM_FGI::test_e3sm_icase(MPI_Comm comm, const std::vector<int> &iotypes,
 
   int io_stride = comm_sz / nioprocs;
 
+  /* Test I case for each combination of I/O types and I/O rearrangers */
   Util::zip_for_each(iotypes.cbegin(), iotypes.cend(), rearrs.cbegin(), rearrs.cend(),
     [comm, nioprocs, io_stride](int iotype, int rearr){
       const int IOSYS_START_PROC = 0;

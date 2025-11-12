@@ -1,6 +1,7 @@
 #include "e3sm_fgi_utils.hpp"
 #include "e3sm_fgi_data.hpp"
 
+/* Get unique output file name */
 static inline std::string get_gcase_test_fname(const std::string &case_type, int iotype, int rearr)
 {
   const std::string FNAME_PREFIX = "spio_e3sm_fgi_gcase";
@@ -14,6 +15,7 @@ static inline std::string get_gcase_test_fname(const std::string &case_type, int
           + FNAME_SUFFIX;
 }
 
+/* Test pseudo G case */
 static int test_gcase(MPI_Comm comm, int iosysid, const std::string &fname, int iotype,
   PIO_Offset ncells, PIO_Offset nedges, PIO_Offset nvertices, PIO_Offset nvertlevels,
   int nframes)
@@ -35,6 +37,7 @@ static int test_gcase(MPI_Comm comm, int iosysid, const std::string &fname, int 
   double dlev = 0;
   std::function<double(void )> gen_levels = [dlev] (void ) mutable { double d = dlev; dlev += 0.2; return d; };
 
+  /* 1D decomp : the edges are evenly partitioned across all MPI processes */
   /* FIXME: This is not how MPAS paritions cells */
   std::function<PIO_Offset(void )> decomp_1d_gen_nedges =
                           [comm_rank, comm_sz, nedges, NEDGES_PER_PROC, idx](void ) mutable {
@@ -56,6 +59,7 @@ static int test_gcase(MPI_Comm comm, int iosysid, const std::string &fname, int 
   E3SM_FGI::SPIO_decomp decomp_1d("decomp_1d_nedges", iosysid, PIO_DOUBLE,
                           std::vector<int>({static_cast<int>(nedges)}), static_cast<int>(NEDGES_PER_PROC), decomp_1d_gen_nedges);
 
+  /* 2D decomp : the edges are evenly partitioned across all MPI processes */
   /* FIXME: This is not how MPAS paritions cells */
   std::function<PIO_Offset(void ) > decomp_2d_gen_nedges =
     [comm_rank, is_last_proc, nedges, NEDGES_PER_PROC, nvertlevels, idx](void ) mutable {
@@ -88,6 +92,7 @@ static int test_gcase(MPI_Comm comm, int iosysid, const std::string &fname, int 
 
   E3SM_FGI::SPIO_file fh(iosysid, fname, iotype, false);
 
+  /* Define var/dim/atts */
   ret = fh.def({
             /* Global Attributes */
             std::make_shared<E3SM_FGI::SPIO_att>("title", "MPAS History file information"),
@@ -108,6 +113,7 @@ static int test_gcase(MPI_Comm comm, int iosysid, const std::string &fname, int 
     return ret;
   }
 
+  /* Write var/atts */
   ret = fh.put();
   if(ret != PIO_NOERR){
     Util::GVars::logger->log(Util::Logging::LogLevel::ERROR, "Putting file objects failed");
@@ -117,6 +123,7 @@ static int test_gcase(MPI_Comm comm, int iosysid, const std::string &fname, int 
   return ret;
 }
 
+/* Test small G case */
 static int test_gcase_small(MPI_Comm comm, int iosysid, const std::string &fname, int iotype)
 {
   int comm_rank = 0, comm_sz = 0;
@@ -137,6 +144,7 @@ static int test_gcase_small(MPI_Comm comm, int iosysid, const std::string &fname
 
 }
 
+/* Test large G case : this can be too big to run on a single compute node */
 static int test_gcase_large(MPI_Comm comm, int iosysid, const std::string &fname, int iotype)
 {
   int comm_rank = 0, comm_sz = 0;
@@ -168,6 +176,7 @@ int E3SM_FGI::test_e3sm_gcase(MPI_Comm comm, const std::vector<int> &iotypes,
 
   int io_stride = comm_sz / nioprocs;
 
+  /* Run G case for all combinations of I/O types and I/O rearrangers */
   Util::zip_for_each(iotypes.cbegin(), iotypes.cend(), rearrs.cbegin(), rearrs.cend(),
     [comm, nioprocs, io_stride](int iotype, int rearr){
       const int IOSYS_START_PROC = 0;
@@ -183,6 +192,7 @@ int E3SM_FGI::test_e3sm_gcase(MPI_Comm comm, const std::vector<int> &iotypes,
       ret = test_gcase_small(comm, iosysid, get_gcase_test_fname("small", iotype, rearr), iotype);
       Util::check_spio_err(ret, "Testing G case failed", __FILE__, __LINE__);
 
+      /* FIXME: Uncomment later, and optionally enable it based on user input */
       //ret = test_gcase_large(comm, iosysid, get_gcase_test_fname("large", iotype, rearr), iotype);
       //Util::check_spio_err(ret, "Testing G case failed", __FILE__, __LINE__);
 

@@ -29,6 +29,7 @@ namespace E3SM_FGI{
 /* FIXME: Move logging related classes to a util */
 namespace Util{
   namespace String{
+    /* Util to convert a vactor of C++ types to a single string */
     template<typename T>
     inline std::string vec_to_string(const std::vector<T> &vec)
     {
@@ -41,6 +42,7 @@ namespace Util{
       return str;
     }
 
+    /* Util to convert a vactor of C++ strings to a single string */
     template<>
     inline std::string vec_to_string<std::string>(const std::vector<std::string> &vec)
     {
@@ -53,6 +55,7 @@ namespace Util{
       return str;
     }
 
+    /* toupper() for a string */
     static inline std::string toupper(const std::string &str)
     {
       std::string res = str;
@@ -63,6 +66,7 @@ namespace Util{
   }
 
   namespace Logging{
+    /* Different log levels supported */
     enum class LogLevel{ STATUS, VERBOSE, WARNING, ERROR };
     static inline std::string llevel2str(LogLevel lvl){
       std::string str;
@@ -75,6 +79,7 @@ namespace Util{
       return str;
     }
 
+    /* A message logger : To log/print to stdout, use "STDOUT" for the logger name */
     class Logger{
       public:
         static std::shared_ptr<Logger> get_logger(MPI_Comm comm, const std::string &log_name){
@@ -82,6 +87,7 @@ namespace Util{
           return logger_instance ? logger_instance : std::shared_ptr<Logger>(is_std_logname(log_name) ? new Logger(comm) : new Logger(comm, log_name));
         }
 
+        /* Log message (at level lvl) */
         void log(LogLevel lvl, const std::string &str){
           if(!need_to_log(lvl)) return;
 
@@ -98,6 +104,7 @@ namespace Util{
           }
         }
 
+        /* Set the MPI process rank - that logs the message */
         Logger &set_log_rank(int rank){
           log_rank_ = rank;
           if(!log_fname_.empty()){
@@ -106,6 +113,7 @@ namespace Util{
           return *this;
         }
 
+        /* Set log level */
         Logger &set_log_level(LogLevel lvl) { log_lvl_ = lvl; return *this; }
 
         ~Logger(){
@@ -123,6 +131,7 @@ namespace Util{
           log_fname_ = get_log_fname();
         }
 
+        /* Check if the user wants to log to stdout */
         static bool is_std_logname(const std::string &log_name) { return (Util::String::toupper(log_name) == "STDOUT"); }
         std::string get_log_fname(void ) const { return log_fname_prefix_ + "_" + std::to_string(log_rank_) + ".log"; }
 
@@ -148,12 +157,20 @@ namespace Util{
 } // namespace Util
 
 namespace Util{
+  /* Global variable declarations (see e3sm_fgi.cpp) and
+   * functions to modify them
+   */
   namespace GVars{
+    /* Available I/O types - for parsing user args*/
     extern std::unordered_map<std::string, int> iotypes;
+    /* Available I/O rearrangers - for parsing user args */
     extern std::unordered_map<std::string, int> rearrs;
+    /* E3SM pseudo cases to test - for parsing user args */
     extern std::unordered_map<std::string, E3SM_FGI::Case_Type> cases;
+    /* Available log levels - for parsing user args */
     extern std::unordered_map<std::string, Util::Logging::LogLevel> llevels;
 
+    /* Convert user option to string using the provided "option map", opt_map */
     template<typename T>
     std::string opt_map_to_str(const std::unordered_map<std::string, T> &opt_map)
     {
@@ -166,6 +183,7 @@ namespace Util{
       return str;
     }
 
+    /* Convert option string to option type using provided "option map" */
     template<typename T>
     std::string opt_type_to_str(T opt_type,
                   const std::unordered_map<std::string, T> &opt_map)
@@ -181,6 +199,7 @@ namespace Util{
       }
     }
 
+    /* Copy the available options, the option names, to the destination */
     template<typename T, typename InsertIter>
     void copy_opt_map(const std::unordered_map<std::string, T> &opt_map,
       InsertIter dest)
@@ -189,6 +208,7 @@ namespace Util{
         [](const std::pair<std::string, T> &a) { return a.second; });
     }
 
+    /* Helper utils for parsing user options, converting between types and names */
     static inline std::string iotypes2str(void ){ return opt_map_to_str(iotypes); }
     static inline std::string rearrs2str(void ){ return opt_map_to_str(rearrs); }
     static inline std::string cases2str(void ){ return opt_map_to_str(cases); }
@@ -203,11 +223,13 @@ namespace Util{
     static inline std::string llevel2str(Util::Logging::LogLevel llevel){ return opt_type_to_str(llevel, llevels); }
     static inline Util::Logging::LogLevel str2llevel(const std::string &llevel_str){ return llevels.at(llevel_str); }
 
+    /* Decl for the global logger */
     extern std::shared_ptr<Util::Logging::Logger> logger;
   } // namespace GVars
 } //namespace Util
 
 namespace Util{
+  /* Run function f for each pair from the input iterators */
   template<typename InputIterator1, typename InputIterator2, typename Func>
   void zip_for_each(InputIterator1 iter1_begin, InputIterator1 iter1_end, InputIterator2 iter2_begin, InputIterator2 iter2_end, Func f)
   {
@@ -218,6 +240,7 @@ namespace Util{
     }
   }
 
+  /* Util to check return value from the lib */
   static inline int check_spio_err(int ret, const std::string &err_msg, const char *fname, int line_num)
   {
     if(ret != PIO_NOERR){
@@ -231,6 +254,7 @@ namespace Util{
 } // namespace Util
 
 namespace E3SM_FGI{
+  /* Decls of the pseudo E3SM case functions */
   int test_e3sm_fcase(MPI_Comm comm, const std::vector<int> &iotypes,
         const std::vector<int> &rearrs, int nioprocs);
   int test_e3sm_gcase(MPI_Comm comm, const std::vector<int> &iotypes,

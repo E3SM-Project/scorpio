@@ -1,6 +1,7 @@
 #include "e3sm_fgi_utils.hpp"
 #include "e3sm_fgi_data.hpp"
 
+/* Create a unique name for the test output */
 static inline std::string get_fcase_test_fname(int iotype, int rearr)
 {
   const std::string FNAME_PREFIX = "spio_e3sm_fgi_f";
@@ -13,6 +14,7 @@ static inline std::string get_fcase_test_fname(int iotype, int rearr)
           + FNAME_SUFFIX;
 }
 
+/* Pseudo E3SM F case */
 static int test_fcase(MPI_Comm comm, int iosysid, const std::string &fname, int iotype)
 {
   int comm_rank = 0, comm_sz = 0;
@@ -37,6 +39,7 @@ static int test_fcase(MPI_Comm comm, int iosysid, const std::string &fname, int 
   double dlev = 0;
   std::function<double(void )> gen_levels = [dlev] (void ) mutable { double d = dlev; dlev += 0.2; return d; };
 
+  /* Generates dates for June 2021 starting from date 15/06/21 */
   int start_date = 15;
   std::function<std::string(void )> gen_dates = [start_date] (void ) mutable {
     static const std::string month("06");
@@ -48,6 +51,7 @@ static int test_fcase(MPI_Comm comm, int iosysid, const std::string &fname, int 
     return month + SEP + std::to_string(start_date++) + SEP + year;
   };
 
+  /* Generator for a simple 1D I/O decomposition */
   std::function<PIO_Offset(void )> decomp_1d_gen =
                           [comm_rank, NCOL, NCOL_PER_PROC](void ){
                             static const PIO_Offset INIT_IDX = 0;
@@ -62,6 +66,7 @@ static int test_fcase(MPI_Comm comm, int iosysid, const std::string &fname, int 
   E3SM_FGI::SPIO_decomp decomp_1d("decomp_1d_ncol", iosysid, PIO_DOUBLE,
                           std::vector<int>({static_cast<int>(NCOL)}), NCOL_PER_PROC, decomp_1d_gen);
 
+  /* 2D Decompisition generator : NCOL s are divided evenly among processes */
   std::function<PIO_Offset(void ) > decomp_2d_gen =
     [comm_rank, is_last_proc, NCOL, NCOL_PER_PROC, NLEV, idx, ilev](void ) mutable {
 
@@ -83,6 +88,8 @@ static int test_fcase(MPI_Comm comm, int iosysid, const std::string &fname, int 
     };
   
   int lsz = NLEV * ((!is_last_proc) ? NCOL_PER_PROC : (NCOL - comm_rank * NCOL_PER_PROC));
+
+  /* Create 2D I/O decomposition for unlimited vars */  
   E3SM_FGI::SPIO_decomp decomp_2d("decomp_2d_lev_ncol", iosysid, PIO_DOUBLE,
                           std::vector<int>({NLEV, static_cast<int>(NCOL)}),
                           lsz, decomp_2d_gen);
@@ -91,6 +98,7 @@ static int test_fcase(MPI_Comm comm, int iosysid, const std::string &fname, int 
 
   E3SM_FGI::SPIO_file fh(iosysid, fname, iotype, false);
 
+  /* Define dims/atts/vars */
   ret = fh.def({
             /* Global Attributes */
             std::make_shared<E3SM_FGI::SPIO_att>("ne", NE),
@@ -117,6 +125,7 @@ static int test_fcase(MPI_Comm comm, int iosysid, const std::string &fname, int 
     return ret;
   }
 
+  /* Write variables/atts */
   ret = fh.put();
   if(ret != PIO_NOERR){
     Util::GVars::logger->log(Util::Logging::LogLevel::ERROR, "Putting file objects failed");
@@ -137,6 +146,7 @@ int E3SM_FGI::test_e3sm_fcase(MPI_Comm comm, const std::vector<int> &iotypes,
 
   int io_stride = comm_sz / nioprocs;
 
+  /* Test F case for each combination of I/O type and I/O rearranger */
   Util::zip_for_each(iotypes.cbegin(), iotypes.cend(), rearrs.cbegin(), rearrs.cend(),
     [comm, nioprocs, io_stride](int iotype, int rearr){
       const int IOSYS_START_PROC = 0;

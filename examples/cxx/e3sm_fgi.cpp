@@ -5,6 +5,8 @@
 
 namespace Util{
   namespace GVars{
+    /* Types used for parsing user input */
+    /* Available I/O types */
     std::unordered_map<std::string, int> iotypes = {
       {"PNETCDF", PIO_IOTYPE_PNETCDF},
       {"NETCDF", PIO_IOTYPE_NETCDF},
@@ -15,18 +17,21 @@ namespace Util{
       {"HDF5C", PIO_IOTYPE_HDF5C}
     };
 
+    /* Available I/O rearrangers */
     std::unordered_map<std::string, int> rearrs = {
       {"SUBSET", PIO_REARR_SUBSET},
       {"BOX", PIO_REARR_BOX},
       {"ANY", PIO_REARR_ANY}
     };
 
+    /* E3SM pseudo test cases */
     std::unordered_map<std::string, E3SM_FGI::Case_Type> cases = {
       {"F", E3SM_FGI::Case_Type::E3SM_F_CASE},
       {"G", E3SM_FGI::Case_Type::E3SM_G_CASE},
       {"I", E3SM_FGI::Case_Type::E3SM_I_CASE}
     };
 
+    /* Log levels */
     std::unordered_map<std::string, Util::Logging::LogLevel> llevels = {
       {"STATUS", Util::Logging::LogLevel::STATUS},
       {"VERBOSE", Util::Logging::LogLevel::VERBOSE},
@@ -34,10 +39,12 @@ namespace Util{
       {"ERROR", Util::Logging::LogLevel::ERROR}
     };
 
+    /* The global logger */
     std::shared_ptr<Util::Logging::Logger> logger;
   }
 }
 
+/* Initialize the argparser options - specify the available user opts */
 static void init_user_options(spio_tool_utils::ArgParser &ap)
 {
   ap.add_opt("pio-format", "SCORPIO I/O type (for output data). Supported iotypes: " + Util::GVars::iotypes2str())
@@ -48,6 +55,7 @@ static void init_user_options(spio_tool_utils::ArgParser &ap)
     .add_opt("help", "Print help");
 }
 
+/* Parse the user options */
 static int get_user_options(
               spio_tool_utils::ArgParser &ap,
               int argc, char *argv[],
@@ -172,6 +180,7 @@ int main(int argc, char *argv[])
     return ret;
   }
 
+  /* Only log from rank 0 */
   Util::GVars::logger->set_log_rank(0);
   Util::GVars::logger->set_log_level(log_lvl);
 

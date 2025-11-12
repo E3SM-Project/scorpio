@@ -14,6 +14,7 @@
 namespace E3SM_FGI{
   class SPIO_file;
 
+  /* Interface for classes that have a name & id */
   class IHas_name_id{
     public:
       virtual std::string name(void ) const = 0;
@@ -21,6 +22,7 @@ namespace E3SM_FGI{
       virtual ~IHas_name_id() = default;
   };
 
+  /* All objects added to a file are "File Objects" */
   class SPIO_file_obj : public IHas_name_id{
     public:
       virtual int def(SPIO_file &f) = 0;
@@ -29,14 +31,17 @@ namespace E3SM_FGI{
       virtual ~SPIO_file_obj() = default;
   };
 
+  /* A valid file that has a valid name/id */
   class SPIO_valid_file : public IHas_name_id{
     public:
       virtual ~SPIO_valid_file() = default;
   };
+  /* A valid dim that has a valid name/id */
   class SPIO_valid_dim : public SPIO_file_obj{
     public:
       virtual ~SPIO_valid_dim() = default;
   };
+  /* A valid var that has a valid name/id */
   class SPIO_valid_var : public SPIO_file_obj{
     public:
       virtual ~SPIO_valid_var() = default;
@@ -46,6 +51,12 @@ namespace E3SM_FGI{
   class SPIO_var;
   class SPIO_dim;
 
+  /* SPIO I/O decomposition class. I/O decompositions are used to specify how
+   * data is decomposed across MPI processes for variables with unlimited
+   * dimensions (SPIO_unlimited_var)
+   * The SCORPIO I/O decomposition is created in the constructor and freed
+   * in the desctructor.
+   */
   class SPIO_decomp : public IHas_name_id{
     public:
       SPIO_decomp(const std::string &name, int iosysid, int pio_type,
@@ -60,6 +71,7 @@ namespace E3SM_FGI{
 
         Util::GVars::logger->log(Util::Logging::LogLevel::VERBOSE, "Creating decomp : " + name_ + "\n");
 
+        /* Generate the I/O decomposition */
         decomp_map.reserve(lsz);
         std::generate_n(std::back_inserter(decomp_map), lsz, gen);
 
@@ -78,7 +90,9 @@ namespace E3SM_FGI{
       }
 
       SPIO_decomp(const SPIO_decomp &other) = delete;
+      /* I/O decompositions should not be copied over */
       SPIO_decomp &operator=(const SPIO_decomp &other) = delete;
+      /* Allow "moving" an I/O decompisition */
       SPIO_decomp(SPIO_decomp &&other) :
         name_(std::move(other.name_)), iosysid_(other.iosysid_), pio_type_(other.pio_type_),
         gdim_sz_(std::move(other.gdim_sz_)), lsz_(other.lsz_), id_(other.id_)
@@ -110,16 +124,21 @@ namespace E3SM_FGI{
     private:
       static const int INVALID_ID = -1;
 
+      /* Name of the I/O decomposition */
       const std::string name_;
       int iosysid_;
       int pio_type_;
+      /* Global dimensions of the I/O decomposition */
       std::vector<int> gdim_sz_;
+      /* Local size of the I/O decomposition */
       int lsz_;
+      /* Decomposition ID */
       int id_;
 
       bool has_valid_decomp(void ) const { return id_ > 0; }
   };
 
+  /* Some traits util classes to convert between C++ and PIO types */
   namespace Type_Traits{
     template<typename T>
     struct cxx_to_pio_type : std::false_type {};
@@ -141,6 +160,8 @@ namespace E3SM_FGI{
 
   } // namespace TypeTraits
 
+  /* A File class
+   * The SCORPIO File is created in the constructor and closed/deleted in the destructor */
   class SPIO_file : public SPIO_valid_file{
     public:
       SPIO_file(int iosysid, const std::string &name, int iotype) : iosysid_(iosysid),
@@ -177,6 +198,7 @@ namespace E3SM_FGI{
       int id(void ) const { return fh_; }
       int fh(void ) const { return id(); }
 
+      /* Define all the file objects - dims/vars/atts - associated with this file */
       int def(const std::vector<std::shared_ptr<SPIO_file_obj> > &fobjs){
         int ret = PIO_NOERR;
         assert(fh_ != INVALID_ID);
@@ -200,6 +222,7 @@ namespace E3SM_FGI{
             return ret;
           }
 
+          /* Store the file object in an internal cache */
           dcache_[(*citer)->name()] = *citer;
         }
 
@@ -217,6 +240,7 @@ namespace E3SM_FGI{
         return PIO_NOERR;
       }
 
+      /* Put the file objects - vars/atts - associated with this file */
       int put(void ){
         int ret = PIO_NOERR;
         assert(fh_ != INVALID_ID);
@@ -234,10 +258,12 @@ namespace E3SM_FGI{
         return PIO_NOERR;
       }
 
+      /* Get a pointer to the cached file object */
       std::shared_ptr<const SPIO_file_obj> get(const std::string &name) const{
         return dcache_.at(name);
       }
 
+      /* FIXME: Implement reading/verifying file objects */
       int get_and_verify(void ) { return PIO_NOERR; }
 
       ~SPIO_file(){
@@ -250,12 +276,16 @@ namespace E3SM_FGI{
       }
     private:
       static const int INVALID_ID = -1;
+      /* Id of the I/O System associated with this file */
       int iosysid_;
+      /* Name of this file */
       const std::string name_;
       int iotype_;
+      /* File handle/id of this file */
       int fh_;
       bool is_in_def_mode_;
       bool del_on_close_;
+      /* Local cache of file objects (data) in this file */
       std::map<std::string, std::shared_ptr<SPIO_file_obj> > dcache_;
 
       int create_file(int iosysid, const std::string name, int iotype){
@@ -276,13 +306,16 @@ namespace E3SM_FGI{
       }
   };
 
+  /* File dimension class */
   class SPIO_dim : public SPIO_valid_dim{
     public:
       SPIO_dim(const std::string &name, PIO_Offset sz):name_(name), id_(INVALID_ID),
         sz_(sz), fh_(INVALID_ID) {}
 
-      std::string name(void ) const override { return name_to_dname(name_); }
       /* To avoid collision with variable names, dim names need to be decorated */
+      std::string name(void ) const override { return name_to_dname(name_); }
+
+      /* Convert between decorated (used in app) and internal (used in file) dimension names */
       static std::string name_to_dname(const std::string &name) { return get_dname_prefix() + name; }
       static std::string dname_to_name(const std::string &dname){
         /* FIXME: Use static and move it to cpp */
@@ -298,6 +331,7 @@ namespace E3SM_FGI{
       int id(void ) const override { return id_; }
       PIO_Offset size(void ) const { return sz_; }
 
+      /* Define the file dimension */
       int def(SPIO_file &fh) override {
         int ret = PIO_NOERR;
         
@@ -320,10 +354,12 @@ namespace E3SM_FGI{
         return PIO_NOERR;
       }
 
+      /* Since the dimension is already defined, nothing to be done here */
       int put(void) override {
         return PIO_NOERR;
       }
 
+      /* Read the dimension and verify */
       int get_and_verify(void ) const override {
         int ret = PIO_NOERR;
 
@@ -389,15 +425,22 @@ namespace E3SM_FGI{
     private:
       static const int INVALID_ID = -1;
 
+      /* Name of the dimension. This name is not decorated, however all queries to this
+       * class for the name returns the decorated name (get_dname_prefix() + name_)
+       */
       const std::string name_;
       int id_;
+      /* Size of the dimension */
       PIO_Offset sz_;
+      /* Cached file handle associated with this dimension */
       int fh_;
+      /* Cached name of the file associated with this dimension */
       std::string fname_;
 
       static inline std::string get_dname_prefix(void ) { return std::string("__SPIO_dim__"); }
   };
 
+  /* An attribute class. Only char/int/float/duoble supported for now */
   /* FIXME: Use a variant instead */
   class SPIO_att : public SPIO_file_obj{
     public:
@@ -418,6 +461,7 @@ namespace E3SM_FGI{
       int id(void ) const override { return id_; }
       int type(void ) const { return pio_type_; }
 
+      /* Get the attribute value */
       template<typename T>
       T val(void) const{
         switch(pio_type_){
@@ -429,6 +473,7 @@ namespace E3SM_FGI{
         throw std::runtime_error("Invalid attribute type, getting attribute val failed");
       }
 
+      /* Define a global file attribute */
       int def(SPIO_file &f) override{
         fid_ = f.id();
         fname_ = f.name();
@@ -440,6 +485,7 @@ namespace E3SM_FGI{
         return put(fid_, vid_);
       }
 
+      /* Define a variable attribute */
       int def(SPIO_file &f, SPIO_valid_var &v){
         fid_ = f.id();
         fname_ = f.name();
@@ -451,10 +497,12 @@ namespace E3SM_FGI{
         return put(fid_, vid_);
       }
 
+      /* Attribute is defined already, nothing to do here */
       int put(void ) override{
         return PIO_NOERR;
       }
 
+      /* Read and verify the stored attributes */
       int get_and_verify(void ) const override{
         int ret = PIO_NOERR;
         assert((fid_ != INVALID_ID) && (vid_ != INVALID_ID));
@@ -533,10 +581,15 @@ namespace E3SM_FGI{
       private:
         static const int INVALID_ID = -2;
 
+        /* Name of the attribute */
         const std::string name_;
+        /* Name of file/variable associated with the attribute */
         std::string fname_;
         std::string vname_;
+
+        /* Id of the attribute */
         int id_;
+        /* Id of file/variable associated with the attribute */
         int fid_;
         int vid_;
         int pio_type_;
@@ -570,6 +623,7 @@ namespace E3SM_FGI{
         return PIO_NOERR;
       }
 
+      /* Get a pointer to the stored attribute value */
       const void *val_ptr(void){
         switch(pio_type_){
           case PIO_CHAR: return static_cast<const void *>(sval_.c_str());
@@ -582,6 +636,7 @@ namespace E3SM_FGI{
       }
   };
 
+  /* Generic variable class */
   template<typename T>
   class SPIO_var : public SPIO_valid_var{
     public:
@@ -602,6 +657,7 @@ namespace E3SM_FGI{
       std::string name(void ) const override { return name_; }
       int id(void ) const override { return id_; }
 
+      /* Define a variable */
       int def(SPIO_file &f) override{
         int ret = PIO_NOERR;
 
@@ -636,6 +692,7 @@ namespace E3SM_FGI{
         return PIO_NOERR;
       }
 
+      /* Write the variable data to file */
       int put(void ) override{
         int ret = PIO_NOERR;
 
@@ -659,6 +716,7 @@ namespace E3SM_FGI{
       }
 
       int get_and_verify(void ) const override{
+        /* FIXME: Add code to read and verify the written data */
         /*
         int ret = PIO_NOERR;
 
@@ -682,13 +740,25 @@ namespace E3SM_FGI{
       std::string fname_;
       int id_;
       int fid_;
+      /* Dimension names for the variable */
       std::vector<std::string> dims_;
+      /* Dimension ids of the variable */
       std::vector<int> dim_ids_;
+      /* Dimension sizes of the variable */
       std::vector<PIO_Offset> dim_sz_;
+      /* Size of the variable */
       std::size_t gsz_;
+      /* Variable attributes */
       std::vector<SPIO_att> atts_;
+
+      /* Variable value */
       std::vector<T> val_;
+      /* Since strings are converted to character arrays before
+       * passing it on to SPIO apis we have a cval_[] buffer
+       * (that is only valid for char/string variables)
+       */
       std::vector<char> cval_;
+      /* Fillvalue */
       std::vector<T> fval_;
       std::function<T(void)> val_gen_;
 
@@ -699,6 +769,7 @@ namespace E3SM_FGI{
         }
       }
 
+      /* Initialize the file info - id/name/dims etc */
       void init_file_info(const SPIO_file &f)
       {
         assert(fid_ == INVALID_ID);
@@ -713,7 +784,11 @@ namespace E3SM_FGI{
         gsz_ = 1;
         std::for_each(dims_.cbegin(), dims_.cend(),
           [&f, this](const std::string &dname){
-            std::shared_ptr<const SPIO_dim> pdim = std::dynamic_pointer_cast<const SPIO_dim>(f.get(SPIO_dim::name_to_dname(dname)));
+            /* Note that we always use the decorated dimension name for internal caching
+             * - to avoid colissions with variable names (i.e., name_to_dname(DIM_NAME))
+             */
+            std::shared_ptr<const SPIO_dim> pdim =
+              std::dynamic_pointer_cast<const SPIO_dim>(f.get(SPIO_dim::name_to_dname(dname)));
             assert(pdim);
 
             dim_ids_.push_back(pdim->id());
@@ -725,6 +800,7 @@ namespace E3SM_FGI{
       }
   };
 
+  /* Specialized function to initialize var with strings */
   template<>
   inline void SPIO_var<std::string>::init_val(void ){
     if(val_gen_){
@@ -739,6 +815,7 @@ namespace E3SM_FGI{
       });
   }
 
+  /* Variable class for variables written out with starts/counts */
   template<typename T>
   class SPIO_cs_var : public SPIO_var<T>{
     public:
@@ -758,8 +835,11 @@ namespace E3SM_FGI{
         SPIO_var<T>(name, dims, atts, val_generator),
           starts_(starts), counts_(counts) {}
 
+      /* We use the starts/counts to write the variable here */
       int put(void ) override{
         int ret = PIO_NOERR;
+
+        /* Initialize the variable value */
         SPIO_var<T>::init_val();
 
         Util::GVars::logger->log(Util::Logging::LogLevel::VERBOSE,
@@ -785,6 +865,9 @@ namespace E3SM_FGI{
             return ret;
           }
 
+          /* Update the index/offset, val_idx, in the val_ buffer based on the count[]
+           * written out
+           */
           PIO_Offset nvals = std::accumulate((*citer2).cbegin(), (*citer2).cend(),
                               1, std::multiplies<PIO_Offset>());
           val_idx += nvals;
@@ -806,6 +889,7 @@ namespace E3SM_FGI{
                       const std::vector<PIO_Offset> &count, PIO_Offset val_idx);
   };
 
+  /* Specialized put() functions for different types of variable data */
   template<>
   inline int SPIO_cs_var<std::string>::put(int fid, int vid, const std::vector<PIO_Offset> &start,
                                     const std::vector<PIO_Offset> &count,
@@ -838,6 +922,7 @@ namespace E3SM_FGI{
       return PIOc_put_vars_double(fid, vid, start.data(), count.data(), NULL, &val_[val_idx]);
   }
 
+  /* Variable with unlimited dimension */
   template<typename T>
   class SPIO_unlimited_var : public SPIO_var<T>{
     public:
@@ -857,6 +942,7 @@ namespace E3SM_FGI{
                           std::function<T(void )> &val_generator):
         SPIO_var<T>(name, dims, atts, val_generator), pdecomp_(pdecomp), nframes_(nframes){}
 
+      /* Write/Put using associated I/O decomp */
       int put(void ) override{
         int ret = PIO_NOERR;
 
@@ -865,7 +951,9 @@ namespace E3SM_FGI{
           " in file " + SPIO_var<T>::fname_ + "\n");
         SPIO_var<T>::init_val();
 
+        /* Data is written out one frame (unlimited dim) at a time */
         for(int iframe=0; iframe < nframes_; iframe++){
+          /* Set the frame being written out */
           ret = PIOc_setframe(SPIO_var<T>::fid_, SPIO_var<T>::id_, iframe);
           if(ret != PIO_NOERR){
             std::string err_msg("PIOc_setframe");
@@ -901,7 +989,9 @@ namespace E3SM_FGI{
       }
 
     private:
+      /* I/O decomposition associated with this variable */
       std::shared_ptr<const SPIO_decomp> pdecomp_;
+      /* Number of frames in this variable */
       int nframes_;
   };
 
