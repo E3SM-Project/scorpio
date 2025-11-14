@@ -15,6 +15,93 @@ MODULE spio_misc_api_cint
 
 INTERFACE
 !> @private
+!! @brief Fortran interface to C function to get SCORPIO major version
+!!
+!! @returns Returns the PIO major version
+  INTEGER FUNCTION PIOc_get_version_major()&
+                          bind(C,name="PIOc_get_version_major")
+    USE iso_c_binding
+  END FUNCTION PIOc_get_version_major
+END INTERFACE
+
+INTERFACE
+!> @private
+!! @brief Fortran interface to C function to get SCORPIO minor version
+!!
+!! @returns Returns the PIO minor version
+  INTEGER FUNCTION PIOc_get_version_minor()&
+                          bind(C,name="PIOc_get_version_minor")
+    USE iso_c_binding
+  END FUNCTION PIOc_get_version_minor
+END INTERFACE
+
+INTERFACE
+!> @private
+!! @brief Fortran interface to C function to get SCORPIO patch version
+!!
+!! @returns Returns the PIO patch version
+  INTEGER FUNCTION PIOc_get_version_patch()&
+                          bind(C,name="PIOc_get_version_patch")
+    USE iso_c_binding
+  END FUNCTION PIOc_get_version_patch
+END INTERFACE
+
+INTERFACE
+!> @private
+!! @brief Fortran interface to C function to get SCORPIO version string
+!!
+!! @param[out] vstr Pointer to the buffer to store the version string
+!! @param[in] len   Length of the buffer (vstr)
+!! @returns PIO_NOERR on success and error code otherwise
+  INTEGER FUNCTION PIOc_get_version_string(vstr, len)&
+                          bind(C,name="PIOc_get_version_string")
+    USE iso_c_binding
+
+    CHARACTER(C_CHAR), DIMENSION(*) :: vstr
+    INTEGER(C_INT), VALUE :: len
+  END FUNCTION PIOc_get_version_string
+END INTERFACE
+
+INTERFACE
+!> @private
+!! @brief Fortran interface to C function to get SCORPIO git hash
+!!
+!! @param[out] vstr Pointer to the buffer to store the version hash
+!! @param[in] len   Length of the buffer (vstr)
+!! @returns PIO_NOERR on success and error code otherwise
+  INTEGER FUNCTION PIOc_get_version_hash(vstr, len)&
+                          bind(C,name="PIOc_get_version_hash")
+    USE iso_c_binding
+
+    CHARACTER(C_CHAR), DIMENSION(*) :: vstr
+    INTEGER(C_INT), VALUE :: len
+  END FUNCTION PIOc_get_version_hash
+END INTERFACE
+
+INTERFACE
+!> @private
+!! @brief Fortran interface to C function to get SCORPIO version info
+!!
+!! @param[out] major (Optional) Version major number is returned via this arg
+!! @param[out] minor (Optional) Version minor number is returned via this arg
+!! @param[out] patch (Optional) Version patch number is returned via this arg
+!! @param[out] vstr (Optional) Pointer to the buffer to store the version string
+!! @param[in] len   Length of the buffer (vstr)
+!! @returns PIO_NOERR on success and error code otherwise
+  INTEGER FUNCTION PIOc_get_version(major, minor, patch, vstr, len)&
+                          bind(C,name="PIOc_get_version")
+    USE iso_c_binding
+
+    INTEGER(C_INT) :: major
+    INTEGER(C_INT) :: minor
+    INTEGER(C_INT) :: patch
+    CHARACTER(C_CHAR), DIMENSION(*) :: vstr
+    INTEGER(C_INT), VALUE :: len
+  END FUNCTION PIOc_get_version
+END INTERFACE
+
+INTERFACE
+!> @private
 !! @brief Fortran interface to C function to set the upper limit
 !! for the internal buffer used to cache data written by the user
 !!

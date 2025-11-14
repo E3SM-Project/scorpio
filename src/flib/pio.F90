@@ -19,7 +19,6 @@ module pio
   use spio_file, only : pio_openfile, pio_createfile, pio_closefile,&
                         pio_deletefile, pio_setframe, pio_advanceframe,&
                         pio_syncfile, pio_file_is_open, pio_set_fill
-  use spio_misc_api, only : pio_set_buffer_size_limit, pio_iotype_available
   use spio_err, only : pio_setdebuglevel, pio_seterrorhandling, pio_strerror, pio_set_log_level
 
   use pio_types, only : io_desc_t, file_desc_t, var_desc_t, iosystem_desc_t, &
@@ -42,7 +41,10 @@ module pio
 
   use spio_misc_api, only : pio_set_buffer_size_limit,  pio_iotype_available,&
                             pio_set_chunk_cache, pio_get_chunk_cache,&
-                            pio_copy_att
+                            pio_copy_att, pio_get_version_major,&
+                            pio_get_version_minor, pio_get_version_patch,&
+                            pio_get_version_string, pio_get_version_hash,&
+                            pio_get_version
   use spio_darray, only : pio_read_darray, pio_write_darray
 
   use spio_def_file, only : pio_enddef, pio_redef

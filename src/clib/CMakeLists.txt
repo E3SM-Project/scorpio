@@ -10,6 +10,7 @@ message(STATUS "===== Configuring SCORPIO C library... =====")
 #==============================================================================
 # PIO API source
 set (pio_api_src
+  api/spio_lib_api.cpp
   api/spio_ddata_api.cpp
   api/spio_dim_api.cpp
   api/spio_err_api.cpp

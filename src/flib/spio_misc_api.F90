@@ -11,7 +11,7 @@
 
 MODULE spio_misc_api
   USE iso_c_binding
-  USE pio_types, ONLY : file_desc_t, io_desc_t, var_desc_t
+  USE pio_types, ONLY : PIO_NOERR, PIO_MAX_NAME, file_desc_t, io_desc_t, var_desc_t
   USE pio_kinds, ONLY : PIO_OFFSET_KIND, PIO_OFFSET_F2C_TYPE_KIND
   USE spio_misc_api_cint
   IMPLICIT NONE
@@ -19,7 +19,10 @@ MODULE spio_misc_api
   PRIVATE
   PUBLIC :: pio_set_buffer_size_limit, pio_iotype_available,&
             pio_set_chunk_cache, pio_get_chunk_cache,&
-            pio_copy_att
+            pio_copy_att, pio_get_version_major,&
+            pio_get_version_minor, pio_get_version_patch,&
+            pio_get_version_string, pio_get_version_hash,&
+            pio_get_version
 
 CONTAINS
 
@@ -186,5 +189,118 @@ CONTAINS
                           to_file%fh, INT(to_varid, C_INT) - 1)
 
   END FUNCTION pio_copy_att
+
+!> @defgroup PIO_get_version_major PIO_get_version_major
+!! @public
+!! @brief Get SCORPIO major version
+!!
+!! @details
+!! @returns Returns the SCORPIO major version
+  INTEGER FUNCTION pio_get_version_major() RESULT(ver)
+    ver = INT(PIOc_get_version_major())
+  END FUNCTION pio_get_version_major
+
+!> @defgroup PIO_get_version_minor PIO_get_version_minor
+!! @public
+!! @brief Get SCORPIO minor version
+!!
+!! @details
+!! @returns Returns the SCORPIO minor version
+  INTEGER FUNCTION pio_get_version_minor() RESULT(ver)
+    ver = INT(PIOc_get_version_minor())
+  END FUNCTION pio_get_version_minor
+
+!> @defgroup PIO_get_version_patch PIO_get_version_patch
+!! @public
+!! @brief Get SCORPIO patch version
+!!
+!! @details
+!! @returns Returns the SCORPIO patch version
+  INTEGER FUNCTION pio_get_version_patch() RESULT(ver)
+    ver = INT(PIOc_get_version_patch())
+  END FUNCTION pio_get_version_patch
+
+!> @defgroup PIO_get_version_string PIO_get_version_string
+!! @public
+!! @brief Get SCORPIO version string
+!!
+!! @details
+!! @param[out] vstr String to store the version string
+!! @retval ierr @copydoc error_return
+  INTEGER FUNCTION pio_get_version_string(vstr) RESULT(ierr)
+    CHARACTER(LEN=*), INTENT(OUT) :: vstr
+
+    CHARACTER(C_CHAR) :: cvstr(PIO_MAX_NAME)
+    INTEGER :: i
+
+    ierr = PIOc_get_version_string(cvstr, PIO_MAX_NAME)
+    IF(ierr == PIO_NOERR) THEN
+      DO i=1,MIN(LEN(vstr), PIO_MAX_NAME)
+        IF(cvstr(i) == C_NULL_CHAR) THEN
+          EXIT
+        ENDIF
+        vstr(i:i) = cvstr(i)
+      END DO
+    ENDIF
+  END FUNCTION pio_get_version_string
+
+!> @defgroup PIO_get_version_hash PIO_get_version_hash
+!! @public
+!! @brief Get SCORPIO version hash (GIT hash)
+!!
+!! @details
+!! @param[out] vstr String to store the version hash
+!! @retval ierr @copydoc error_return
+  INTEGER FUNCTION pio_get_version_hash(vstr) RESULT(ierr)
+    CHARACTER(LEN=*), INTENT(OUT) :: vstr
+
+    CHARACTER(C_CHAR) :: cvstr(PIO_MAX_NAME)
+    INTEGER :: i
+
+    ierr = PIOc_get_version_hash(cvstr, PIO_MAX_NAME)
+    IF(ierr == PIO_NOERR) THEN
+      DO i=1,MIN(LEN(vstr), PIO_MAX_NAME)
+        IF(cvstr(i) == C_NULL_CHAR) THEN
+          EXIT
+        ENDIF
+        vstr(i:i) = cvstr(i)
+      END DO
+    ENDIF
+  END FUNCTION pio_get_version_hash
+
+!> @defgroup PIO_get_version PIO_get_version
+!! @public
+!! @brief Get SCORPIO version info
+!!
+!! @details
+!! Get SCORPIO version major/minor/patch version and git hash
+!! @param[out] major (Optional) The major version number is returned in this arg
+!! @param[out] minor (Optional) The minor version number is returned in this arg
+!! @param[out] patch (Optional) The patch version number is returned in this arg
+!! @param[out] vstr (Optional) String to store the version string
+!! @retval ierr @copydoc error_return
+  INTEGER FUNCTION pio_get_version(major, minor, patch, vstr) RESULT(ierr)
+    INTEGER, OPTIONAL, INTENT(OUT) :: major
+    INTEGER, OPTIONAL, INTENT(OUT) :: minor
+    INTEGER, OPTIONAL, INTENT(OUT) :: patch
+    CHARACTER(LEN=*), OPTIONAL, INTENT(OUT) :: vstr
+
+    ierr = PIO_NOERR
+    IF(PRESENT(major)) THEN
+      major = pio_get_version_major()
+    END IF
+
+    IF(PRESENT(minor)) THEN
+      minor = pio_get_version_minor()
+    END IF
+
+    IF(PRESENT(patch)) THEN
+      patch = pio_get_version_patch()
+    END IF
+
+    IF(PRESENT(vstr)) THEN
+      ierr = pio_get_version_string(vstr)
+    END IF
+  END FUNCTION pio_get_version
 
 END MODULE spio_misc_api
