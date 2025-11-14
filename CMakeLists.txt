@@ -285,6 +285,23 @@ if(WITH_ADIOS2)
 endif()
 
 #==============================================================================
+#  Get and store GIT hash
+#==============================================================================
+execute_process(
+  COMMAND git -C ${PROJECT_SOURCE_DIR} rev-parse --short HEAD
+  OUTPUT_VARIABLE SCORPIO_GIT_HASH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  RESULT_VARIABLE GIT_RETVAL
+)
+
+if(GIT_RETVAL EQUAL 0)
+  message(STATUS "Git hash : ${SCORPIO_GIT_HASH}")
+  set(PIO_VERSION_HASH ${SCORPIO_GIT_HASH})
+else()
+  set(PIO_VERSION_HASH "UNKNOWN")
+endif()
+
+#==============================================================================
 #  DETECT SYSTEM/COMPILERS (and set compiler specific options)
 #==============================================================================
 
