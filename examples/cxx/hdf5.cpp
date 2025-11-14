@@ -56,7 +56,7 @@ int test_hdf5_3d_dist_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t fh, 
   int ret = 0;
   herr_t hret = 0;
   const char *dim_names[NDIMS] = {"time", "lev", "ncols"};
-  hsize_t gdim_sz[NDIMS] = {H5S_UNLIMITED, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t gdim_sz[NDIMS] = {H5S_UNLIMITED, DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
 
   /* =============== Define the variable dimensions ================ */
   float var_dist[DIM_TIME_SZ][DIM_LEV_SZ][DIM_NCOLS_SZ_PER_PROC];
@@ -72,12 +72,12 @@ int test_hdf5_3d_dist_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t fh, 
 
   /* Define the distributed variable - data distributed across processes */
   /* Create a property list for chunking across time dimension */
-  hsize_t gchunk_dim_sz[NDIMS] = {1, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t gchunk_dim_sz[NDIMS] = {1, DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
   hret = H5Pset_chunk(dcpid, NDIMS, gchunk_dim_sz); check_err(comm_rank, hret, "Setting chunking for time dimension of the variable failed", __LINE__);
 
   /* Define the variable dimensions */
   /* FIXME: Why does var_gdim_sz differ from gdim_sz : time dim is NOT allowed to be UNLIMITED */
-  hsize_t var_gdim_sz[NDIMS] = {1, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t var_gdim_sz[NDIMS] = {1, DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
   hid_t fsid;
   fsid = H5Screate_simple(NDIMS, var_gdim_sz, NULL); check_err(comm_rank, (fsid != H5I_INVALID_HID) ? 0 : -1, "Creating dataspace for defining varaible dimensions failed", __LINE__);
 
@@ -98,7 +98,7 @@ int test_hdf5_3d_dist_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t fh, 
 
   fsid = H5Dget_space(varid_dist); check_err(comm_rank, (fsid != H5I_INVALID_HID) ? 0 : -1, "Getting dataspace associated with variable failed", __LINE__);
   for(int ilev = 0; ilev < DIM_LEV_SZ; ilev++){
-    hsize_t starts[NDIMS] = {0, ilev, comm_rank * DIM_NCOLS_SZ_PER_PROC};
+    hsize_t starts[NDIMS] = {0, static_cast<hsize_t>(ilev), static_cast<hsize_t>(comm_rank * DIM_NCOLS_SZ_PER_PROC)};
     hsize_t counts[NDIMS] = {1, 1, DIM_NCOLS_SZ_PER_PROC};
     hret = H5Sselect_hyperslab(fsid, op, starts, NULL, counts, NULL); check_err(comm_rank, hret, "Selecting hyperslab of the dataset to write failed", __LINE__);
     op = H5S_SELECT_OR;
@@ -107,7 +107,7 @@ int test_hdf5_3d_dist_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t fh, 
   nelems = DIM_LEV_SZ * DIM_NCOLS_SZ_PER_PROC;
   msid = H5Screate_simple(1, &nelems, NULL); check_err(comm_rank, (msid != H5I_INVALID_HID) ? 0 : -1, "Creating memory space for write data failed", __LINE__);
   for(int tstep = 0; tstep < DIM_TIME_SZ; tstep++){
-    hsize_t var_gdim_sz[NDIMS] = {tstep + 1, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+    hsize_t var_gdim_sz[NDIMS] = {static_cast<hsize_t>(tstep + 1), DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
     hret = H5Dextend(varid_dist, var_gdim_sz); check_err(comm_rank, hret, "Extending, across unlimited time dimension, dataspace for variable failed", __LINE__);
     hret = H5Dwrite(varid_dist, H5T_NATIVE_FLOAT, msid, fsid, dxpid, var_dist[tstep]); check_err(comm_rank, hret, "Writing data to variable failed", __LINE__);
   }
@@ -123,7 +123,7 @@ int test_hdf5_3d_non_dist_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t 
   int ret = 0;
   herr_t hret = 0;
   const char *dim_names[NDIMS] = {"time", "lev", "ncols"};
-  hsize_t gdim_sz[NDIMS] = {H5S_UNLIMITED, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t gdim_sz[NDIMS] = {H5S_UNLIMITED, DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
 
   /* =============== Define the variable dimensions ================ */
   float var_non_dist[DIM_TIME_SZ][DIM_LEV_SZ][DIM_NCOLS_SZ_PER_PROC * comm_sz];
@@ -139,12 +139,12 @@ int test_hdf5_3d_non_dist_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t 
 
   /* Define the non distributed variable - data is NOT distributed across processes (all data in all procs) */
   /* Create a property list for chunking across time dimension */
-  hsize_t gchunk_dim_sz[NDIMS] = {1, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t gchunk_dim_sz[NDIMS] = {1, DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
   hret = H5Pset_chunk(dcpid, NDIMS, gchunk_dim_sz); check_err(comm_rank, hret, "Setting chunking for time dimension of the variable failed", __LINE__);
 
   /* Define the variable dimensions */
   /* FIXME: Why does var_gdim_sz differ from gdim_sz : time dim is NOT allowed to be UNLIMITED */
-  hsize_t var_gdim_sz[NDIMS] = {1, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t var_gdim_sz[NDIMS] = {1, DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
   hid_t fsid;
   fsid = H5Screate_simple(NDIMS, var_gdim_sz, NULL); check_err(comm_rank, (fsid != H5I_INVALID_HID) ? 0 : -1, "Creating dataspace for defining varaible dimensions failed", __LINE__);
 
@@ -174,8 +174,8 @@ int test_hdf5_3d_non_dist_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t 
   op = H5S_SELECT_SET;
   if(comm_rank == 0){
     for(int ilev = 0; ilev < DIM_LEV_SZ; ilev++){
-      hsize_t starts[NDIMS] = {0, ilev, 0};
-      hsize_t counts[NDIMS] = {1, 1, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+      hsize_t starts[NDIMS] = {0, static_cast<hsize_t>(ilev), 0};
+      hsize_t counts[NDIMS] = {1, 1, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
       hret = H5Sselect_hyperslab(fsid, op, starts, NULL, counts, NULL); check_err(comm_rank, hret, "Selecting hyperslab of the dataset to write failed", __LINE__);
       op = H5S_SELECT_OR;
     }
@@ -198,7 +198,7 @@ int test_hdf5_3d_non_dist_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t 
 
   msid = H5Screate_simple(1, &nelems, NULL); check_err(comm_rank, (msid != H5I_INVALID_HID) ? 0 : -1, "Creating memory space for write data failed", __LINE__);
   for(int tstep = 0; tstep < DIM_TIME_SZ; tstep++){
-    hsize_t var_gdim_sz[NDIMS] = {tstep + 1, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+    hsize_t var_gdim_sz[NDIMS] = {static_cast<hsize_t>(tstep + 1), DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
     hret = H5Dextend(varid_non_dist, var_gdim_sz); check_err(comm_rank, hret, "Extending, across unlimited time dimension, dataspace for variable failed", __LINE__);
     hret = H5Dwrite(varid_non_dist, H5T_NATIVE_FLOAT, msid, fsid, dxpid, var_non_dist[tstep]); check_err(comm_rank, hret, "Writing data to variable failed", __LINE__);
   }
@@ -229,7 +229,7 @@ int test_hdf5_2d_non_dist_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t 
   assert(NDIMS >= NDIMS2);
 
   const char *dim_names[NDIMS2] = {"lev", "ncols"};
-  hsize_t gdim_sz[NDIMS2] = {DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t gdim_sz[NDIMS2] = {DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
 
   /* =============== Define the variable dimensions ================ */
   float var_non_dist[DIM_LEV_SZ][DIM_NCOLS_SZ_PER_PROC * comm_sz];
@@ -243,12 +243,12 @@ int test_hdf5_2d_non_dist_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t 
 
   /* Define the non distributed variable - data is NOT distributed across processes (all data in all procs) */
   /* Create a property list for chunking across lev dimension */
-  hsize_t gchunk_dim_sz[NDIMS2] = {DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t gchunk_dim_sz[NDIMS2] = {DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
   hret = H5Pset_chunk(dcpid, NDIMS2, gchunk_dim_sz); check_err(comm_rank, hret, "Setting chunking for lev dimension of the variable failed", __LINE__);
 
   /* Define the variable dimensions */
   /* FIXME: Why does var_gdim_sz differ from gdim_sz : time dim is NOT allowed to be UNLIMITED */
-  hsize_t var_gdim_sz[NDIMS2] = {DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t var_gdim_sz[NDIMS2] = {DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
   hid_t fsid;
   fsid = H5Screate_simple(NDIMS2, var_gdim_sz, NULL); check_err(comm_rank, (fsid != H5I_INVALID_HID) ? 0 : -1, "Creating dataspace for defining varaible dimensions failed", __LINE__);
 
@@ -278,8 +278,8 @@ int test_hdf5_2d_non_dist_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t 
   op = H5S_SELECT_SET;
   if(comm_rank == 0){
     for(int ilev = 0; ilev < DIM_LEV_SZ; ilev++){
-      hsize_t starts[NDIMS2] = {ilev, 0};
-      hsize_t counts[NDIMS2] = {1, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+      hsize_t starts[NDIMS2] = {static_cast<hsize_t>(ilev), 0};
+      hsize_t counts[NDIMS2] = {1, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
       hret = H5Sselect_hyperslab(fsid, op, starts, NULL, counts, NULL); check_err(comm_rank, hret, "Selecting hyperslab of the dataset to write failed", __LINE__);
       op = H5S_SELECT_OR;
     }
@@ -319,7 +319,7 @@ int test_hdf5_2d_non_dist_vars_slice(MPI_Comm comm, int comm_rank, int comm_sz, 
   assert(NDIMS >= NDIMS2);
 
   const char *dim_names[NDIMS2] = {"lev", "ncols"};
-  hsize_t gdim_sz[NDIMS2] = {DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t gdim_sz[NDIMS2] = {DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
 
   /* =============== Define the variable dimensions ================ */
   float var_non_dist[DIM_LEV_SZ][DIM_NCOLS_SZ_PER_PROC * comm_sz];
@@ -333,12 +333,12 @@ int test_hdf5_2d_non_dist_vars_slice(MPI_Comm comm, int comm_rank, int comm_sz, 
 
   /* Define the non distributed variable - data is NOT distributed across processes (all data in all procs) */
   /* Create a property list for chunking across lev dimension */
-  hsize_t gchunk_dim_sz[NDIMS2] = {DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t gchunk_dim_sz[NDIMS2] = {DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
   hret = H5Pset_chunk(dcpid, NDIMS2, gchunk_dim_sz); check_err(comm_rank, hret, "Setting chunking for lev dimension of the variable failed", __LINE__);
 
   /* Define the variable dimensions */
   /* FIXME: Why does var_gdim_sz differ from gdim_sz : time dim is NOT allowed to be UNLIMITED */
-  hsize_t var_gdim_sz[NDIMS2] = {DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t var_gdim_sz[NDIMS2] = {DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
   hid_t fsid;
   fsid = H5Screate_simple(NDIMS2, var_gdim_sz, NULL); check_err(comm_rank, (fsid != H5I_INVALID_HID) ? 0 : -1, "Creating dataspace for defining varaible dimensions failed", __LINE__);
 
@@ -368,8 +368,8 @@ int test_hdf5_2d_non_dist_vars_slice(MPI_Comm comm, int comm_rank, int comm_sz, 
     fsid = H5Dget_space(varid_non_dist); check_err(comm_rank, (fsid != H5I_INVALID_HID) ? 0 : -1, "Getting dataspace associated with variable failed", __LINE__);
     op = H5S_SELECT_SET;
     if(comm_rank == 0){
-      hsize_t starts[NDIMS2] = {ilev, 0};
-      hsize_t counts[NDIMS2] = {1, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+      hsize_t starts[NDIMS2] = {static_cast<hsize_t>(ilev), 0};
+      hsize_t counts[NDIMS2] = {1, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
       hret = H5Sselect_hyperslab(fsid, op, starts, NULL, counts, NULL); check_err(comm_rank, hret, "Selecting hyperslab of the dataset to write failed", __LINE__);
       op = H5S_SELECT_OR;
     }
@@ -420,7 +420,7 @@ int test_hdf5_vars(MPI_Comm comm, int comm_rank, int comm_sz, hid_t fh, hid_t dc
   /* Define the dimensions of the variable - as attributes in HDF5 */
   hid_t sid = H5Screate(H5S_SCALAR); check_err(comm_rank, (sid != H5I_INVALID_HID) ? 0 : -1, "Creating scalar dataspace for defining dimensions failed", __LINE__);
   //hsize_t gdim_sz[NDIMS] = {DIM_TIME_SZ, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
-  hsize_t gdim_sz[NDIMS] = {H5S_UNLIMITED, DIM_LEV_SZ, DIM_NCOLS_SZ_PER_PROC * comm_sz};
+  hsize_t gdim_sz[NDIMS] = {H5S_UNLIMITED, DIM_LEV_SZ, static_cast<hsize_t>(DIM_NCOLS_SZ_PER_PROC * comm_sz)};
   for(int i=0; i < NDIMS; i++){
     hsize_t sz = gdim_sz[i];
     hid_t aid = H5Acreate2(fh, dim_names[i], H5T_NATIVE_HSIZE, sid, H5P_DEFAULT, H5P_DEFAULT); check_err(comm_rank, (fh != H5I_INVALID_HID) ? 0 : -1, "Creating attribute for dimension failed", __LINE__);
