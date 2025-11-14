@@ -90,6 +90,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "NAG")
 endif ()
 
 if (PIO_TEST_CLOSE_OPEN_FOR_SYNC)
+  message(STATUS "Turning on Close+Open for syncing file output in tests")
   add_definitions(-DPIO_TEST_CLOSE_OPEN_FOR_SYNC)
 endif()
 
