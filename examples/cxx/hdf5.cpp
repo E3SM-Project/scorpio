@@ -26,7 +26,7 @@ static inline void check_err(int rank, T ret, const char *err_msg, int line_num)
 {
   if(ret < 0){
     std::string err_msg = std::string("[") + std::to_string(rank) + std::string("]: FATAL ERROR : ")
-      + err_msg + std::string(" (err = ") + std::to_string(static_cast<int>(ret))
+      + std::string(" (err = ") + std::to_string(static_cast<int>(ret))
       + std::string(", line no = ") + std::to_string(line_num) + std::string(")");
 #if PIO_USE_HDF5
     H5Eprint2(H5E_DEFAULT, stderr);
