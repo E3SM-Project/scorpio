@@ -22,6 +22,8 @@
 #endif
 #include "spio_io_summary.h"
 
+const char spio_nc_fillvalue_aname[] = "_FillValue";
+
 #ifdef _ADIOS2
 int get_adios2_type_size(adios2_type type, const void *var)
 {
@@ -3895,7 +3897,7 @@ int PIOc_def_var_fill(int ncid, int varid, int fill_mode, const void *fill_value
 #ifdef _NETCDF
             LOG((2, "defining fill value attribute for netCDF classic file"));
             if (file->do_io)            
-                ierr = nc_put_att(file->fh, varid, _FillValue, xtype, 1, fill_valuep);
+                ierr = nc_put_att(file->fh, varid, spio_nc_fillvalue_aname, xtype, 1, fill_valuep);
 #endif /* _NETCDF */
         }
         else
@@ -4052,7 +4054,7 @@ int PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
 
             if (!ierr && fill_valuep)
             {
-                ierr = nc_get_att(file->fh, varid, _FillValue, fill_valuep);
+                ierr = nc_get_att(file->fh, varid, spio_nc_fillvalue_aname, fill_valuep);
                 if (ierr == NC_ENOTATT)
                 {
                     char char_fill_value = NC_FILL_CHAR;
