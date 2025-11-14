@@ -15,13 +15,13 @@ on:  # yamllint disable-line rule:truthy
       branch_name:
         description: 'Branch to run the SCORPIO + PnetCDF tests'
         required: true
-        default: 'main'
+        default: 'master'
   push:
     branches:
-      - main
+      - master
   pull_request:
     branches:
-      - main
+      - master
 
 jobs:
   build_and_test:
