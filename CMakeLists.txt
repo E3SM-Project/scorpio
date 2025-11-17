@@ -66,9 +66,17 @@ option (HDF5_USE_LOSSY_COMPRESSION  "Enable lossy compression methods in HDF5 (e
 option (PIO_ENABLE_TESTS  "Enable the testing builds"                       OFF)
 option (PIO_ENABLE_LARGE_TESTS  "Enable large (file, processes) tests"      OFF)
 option (PIO_VALGRIND_CHECK  "Enable memory leak check using valgrind"       OFF)
-#===== Dependent Options =====
-include(CMakeDependentOption)
-cmake_dependent_option (PIO_TEST_CLOSE_OPEN_FOR_SYNC  "SCORPIO fortran tests will close+open for sync" ON "WITH_ADIOS2" OFF)
+option (PIO_TEST_CLOSE_OPEN_FOR_SYNC "Enable close+open to sync file output in tests" OFF)
+
+if (WITH_ADIOS2)
+  message(STATUS "Enabling close+open to sync file output for SCORPIO tests (default since ADIOS is enabled)")
+  set(PIO_TEST_CLOSE_OPEN_FOR_SYNC ON CACHE BOOL "Enable close+open to sync file output in tests" FORCE)
+endif ()
+
+if (WITH_HDF5 AND (NOT PIO_TEST_CLOSE_OPEN_FOR_SYNC))
+  message(STATUS "Enabling close+open to sync file output for SCORPIO tests (default since HDF5 is enabled)")
+  set(PIO_TEST_CLOSE_OPEN_FOR_SYNC ON CACHE BOOL "Enable close+open to sync file output in tests" FORCE)
+endif ()
 
 # Get the name of the build host
 cmake_host_system_information (RESULT FQDN_SITENAME QUERY FQDN)
@@ -227,6 +235,20 @@ if(DEFINED PIO_RESERVED_FILE_HEADER_SIZE)
 else()
   set(PIO_RESERVED_FILE_HEADER_SIZE ${DEF_SPIO_RESERVED_FILE_HDR_SZ})
   message(STATUS "Reserving some extra space in the header when creating NetCDF files, requested bytes = " ${PIO_RESERVED_FILE_HEADER_SIZE} " (default)")
+endif()
+
+# Set chunk size (in bytes) for HDF5/PnetCDF chunked variables. Default is 4 MB, same as NetCDF4.
+set(DEF_SPIO_CHUNK_SIZE 4194304)
+if(DEFINED PIO_CHUNK_SIZE)
+  if(PIO_CHUNK_SIZE GREATER_EQUAL 1)
+    message(STATUS "Setting chunk size (in bytes) for HDF5/PnetCDF chunked variables, requested bytes = " ${PIO_CHUNK_SIZE})
+  else()
+    message(WARNING "User-defined PIO_CHUNK_SIZE is invalid, setting it to " ${DEF_SPIO_CHUNK_SIZE} " (default)")
+    set(PIO_CHUNK_SIZE ${DEF_SPIO_CHUNK_SIZE})
+  endif()
+else()
+  set(PIO_CHUNK_SIZE ${DEF_SPIO_CHUNK_SIZE})
+  message(STATUS "Setting chunk size (in bytes) for HDF5/PnetCDF chunked variables, requested bytes = " ${PIO_CHUNK_SIZE} " (default)")
 endif()
 
 if(WITH_ADIOS2)
