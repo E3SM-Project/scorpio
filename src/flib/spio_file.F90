@@ -28,7 +28,7 @@ MODULE spio_file
 
 CONTAINS
 
-!> @defgroup pio_openfile pio_openfile
+!> @defgroup PIO_openfile PIO_openfile
 !! @public
 !! @brief Open an existing file
 !!
@@ -87,7 +87,7 @@ CONTAINS
 
   END FUNCTION pio_openfile
 
-!> @defgroup pio_createfile pio_createfile
+!> @defgroup PIO_createfile PIO_createfile
 !! @public
 !! @brief Create a new file
 !!
@@ -145,7 +145,7 @@ CONTAINS
 
   END FUNCTION pio_createfile
 
-!> @defgroup pio_closefile pio_closefile
+!> @defgroup PIO_closefile PIO_closefile
 !! @public
 !! @brief Close a file
 !!
@@ -176,7 +176,7 @@ CONTAINS
 
   END SUBROUTINE pio_closefile
 
-!> @defgroup pio_deletefile pio_deletefile
+!> @defgroup PIO_deletefile PIO_deletefile
 !! @public
 !! @brief Delete a file
 !!
@@ -207,7 +207,7 @@ CONTAINS
 
   END SUBROUTINE pio_deletefile
 
-!> @defgroup pio_setframe pio_setframe
+!> @defgroup PIO_setframe PIO_setframe
 !! @public
 !! @brief Sets the frame number (the value of the record dimension) for a
 !! variable. When data is written out one record at a time (e.g. writing
@@ -247,7 +247,7 @@ CONTAINS
 
   END SUBROUTINE pio_setframe
 
-!> @defgroup pio_advanceframe pio_advanceframe
+!> @defgroup PIO_advanceframe PIO_advanceframe
 !! @public
 !! @brief Advance the frame number (the value of the record dimension) for a
 !! variable. When data is written out one record at a time (e.g. writing
@@ -285,7 +285,7 @@ CONTAINS
 
   END SUBROUTINE pio_advanceframe
 
-!> @defgroup pio_syncfile pio_syncfile
+!> @defgroup PIO_syncfile PIO_syncfile
 !! @public
 !! @brief Synchronize a file. The data written to the file is flushed to the
 !! disk (before the call returns to the user)
@@ -315,7 +315,7 @@ CONTAINS
 
   END SUBROUTINE pio_syncfile
 
-!> @defgroup pio_file_is_open pio_file_is_open
+!> @defgroup PIO_file_is_open PIO_file_is_open
 !! @public
 !! @brief Check if a file is open
 !!
@@ -348,7 +348,7 @@ CONTAINS
 
   END FUNCTION pio_file_is_open
 
-!> @defgroup pio_set_fill pio_set_fill
+!> @defgroup PIO_set_fill PIO_set_fill
 !! @public
 !! @brief Set the fillmode for a file
 !!

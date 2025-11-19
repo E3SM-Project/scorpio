@@ -317,7 +317,7 @@ CONTAINS
 
   END SUBROUTINE pio_seterrorhandling_file
 
-!> @defgroup PIO_strerror
+!> @defgroup PIO_strerror PIO_strerror
 !!
 !! @brief Get a descriptive string/text for an error code
 !!
@@ -347,7 +347,7 @@ CONTAINS
 
   END FUNCTION pio_strerror
 
-!> @defgroup PIO_set_log_level
+!> @defgroup PIO_set_log_level PIO_set_log_level
 !!
 !! @brief Set the log level for the I/O library
 !!

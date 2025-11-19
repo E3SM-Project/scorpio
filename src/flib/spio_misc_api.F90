@@ -26,7 +26,7 @@ MODULE spio_misc_api
 
 CONTAINS
 
-!> @defgroup pio_set_buffer_size_limit pio_set_buffer_size_limit
+!> @defgroup PIO_set_buffer_size_limit PIO_set_buffer_size_limit
 !! @public
 !! @brief Sets the limit for the internal buffer used to cache data written
 !! by the user
