@@ -1,14 +1,10 @@
 var searchData=
 [
-  ['var_5fdesc_5ft_980',['var_desc_t',['../structpio__types_1_1var__desc__t.html',1,'pio_types::var_desc_t'],['../structvar__desc__t.html',1,'var_desc_t'],['../pio_8h.html#ad63a8f3a1085899153efb8f1bae50187',1,'var_desc_t():&#160;pio.h']]],
-  ['var_5fname_981',['VAR_NAME',['../example2_8c.html#a73de0b1772c59096554d6a846feff376',1,'VAR_NAME():&#160;example2.c'],['../example1_8c.html#a73de0b1772c59096554d6a846feff376',1,'VAR_NAME():&#160;example1.c'],['../darray__no__async_8c.html#a73de0b1772c59096554d6a846feff376',1,'VAR_NAME():&#160;darray_no_async.c'],['../darray__async_8c.html#a73de0b1772c59096554d6a846feff376',1,'VAR_NAME():&#160;darray_async.c']]],
-  ['var_5fname_5fd0_982',['VAR_NAME_D0',['../put__var_8c.html#aeb4f959fbd13b3f6a528a0303c7216ec',1,'put_var.c']]],
-  ['var_5fname_5fd1_983',['VAR_NAME_D1',['../put__var_8c.html#a2a4ac56ad53684dc20775844e8b5d529',1,'put_var.c']]],
-  ['var_5fname_5fd2_984',['VAR_NAME_D2',['../put__var_8c.html#a3d1a54dc9dba5ea337b63d139eca7f61',1,'put_var.c']]],
-  ['varid_985',['varid',['../structvar__desc__t.html#a3739e4db8db58d425106daa33649956a',1,'var_desc_t::varid()'],['../structpio__types_1_1var__desc__t.html#a7a78cf2fb5cc4fde75aec7fb27da33d6',1,'pio_types::var_desc_t::varid()']]],
-  ['varlist_986',['varlist',['../structfile__desc__t.html#acee23027c33ce296ec6f48694716ba95',1,'file_desc_t']]],
-  ['vdesc_987',['vdesc',['../structvar__desc__t.html#ad6bb8fd574d171b49ff55211f9e57e06',1,'var_desc_t']]],
-  ['vid_988',['vid',['../structwmulti__buffer.html#aee096a9cf8b6affe737fb39cb4cddfdc',1,'wmulti_buffer']]],
-  ['vname_989',['vname',['../structvar__desc__t.html#a4c906ad9984b46cf0df257943576faf8',1,'var_desc_t']]],
-  ['vrsize_990',['vrsize',['../structvar__desc__t.html#a4598bcf56473456a813beac7a51f2fca',1,'var_desc_t']]]
+  ['union_5fcomm_0',['union_comm',['../structiosystem__desc__t.html#a5d23f90564ab0753aed17688cf6d9263',1,'iosystem_desc_t']]],
+  ['union_5frank_1',['union_rank',['../structiosystem__desc__t.html#a433a4b6c0b7cc17930425a7e00429ac3',1,'iosystem_desc_t']]],
+  ['unlim_5fdimids_2',['unlim_dimids',['../structfile__desc__t.html#a79f90ee9bc072721009861ec9927609d',1,'file_desc_t']]],
+  ['usage_20overview_3',['SCORPIO Usage Overview',['../intro.html#autotoc_md8',1,'']]],
+  ['use_5ffill_4',['use_fill',['../structvar__desc__t.html#a0584853fd605989970363c62494bab5d',1,'var_desc_t']]],
+  ['user_20interface_5',['SCORPIO user interface',['../api.html',1,'']]],
+  ['utility_20routines_6',['Misc Utility routines',['../api.html#utility',1,'']]]
 ];

@@ -1,3 +1,4 @@
 <map id="wmulti_buffer" name="wmulti_buffer">
-<area shape="rect" id="node1" title="The multi buffer holds data from one or more variables." alt="" coords="5,5,119,32"/>
+<area shape="rect" id="Node000001" title="The multi buffer holds data from one or more variables." alt="" coords="5,5,117,31"/>
+<area shape="poly" id="edge1_Node000001_Node000001" title=" " alt="" coords="132,12,144,18,118,25,117,20,139,18,130,17"/>
 </map>
