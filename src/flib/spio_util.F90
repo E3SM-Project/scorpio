@@ -44,7 +44,7 @@ MODULE spio_util
 !!                          end of each converted C string, if set to .FALSE. no
 !!                          string delimiter is added at the end of each converted
 !!                          C string
-!! @returns The error code. @copydoc error_code
+!! @returns The error code. @copydoc error_return
   INTERFACE f2cstring
     MODULE PROCEDURE f2cstring_0d
     MODULE PROCEDURE f2cstring_1d
@@ -68,7 +68,7 @@ MODULE spio_util
 !!                      buffer, @p cstr
 !! @param[out] fstr The converted fortran string (or array of Fortran strings)
 !!                  is returned via this arg
-!! @returns The error code. @copydoc error_code
+!! @returns The error code. @copydoc error_return
   INTERFACE c2fstring
     MODULE PROCEDURE c2fstring_0d
     MODULE PROCEDURE c2fstring_1d
@@ -967,7 +967,7 @@ CONTAINS
 !! @param var_ndims (Optional) The number of dimensions in the variable
 !! @param var_dim_sz  (Optional) The dimension sizes of the variable is
 !!                      returned in this arg
-!! @returns @copydoc error_code
+!! @returns @copydoc error_return
 !!
   INTEGER FUNCTION get_text_var_sz(file, varid, var_slen,&
                                     var_nstrs, var_ndims, var_dim_sz) RESULT(ierr)
@@ -1096,7 +1096,7 @@ CONTAINS
 !! @param var_ndims (Optional) The number of dimensions in the variable
 !! @param var_dim_sz  (Optional) The dimension sizes of the variable is
 !!                      returned in this arg
-!! @returns @copydoc error_code
+!! @returns @copydoc error_return
 !!
   INTEGER FUNCTION get_var_dim_sz(file, varid, var_sz, var_ndims, var_dim_sz) RESULT(ierr)
     TYPE(file_desc_t), INTENT(IN) :: file

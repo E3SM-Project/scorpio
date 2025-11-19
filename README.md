@@ -148,3 +148,32 @@ make install
 If the internal GPTL libraries were built (because GPTL could not be found
 and the `PIO_ENABLE_TIMING` variable is set to `ON`), then these libraries
 will be installed with SCORPIO.
+
+## Acknowledgement
+
+The SCORPIO library can be acknowledged in publications by referring to the
+publication and software below,
+
+```
+@inproceedings{inproceedings,
+author = {Krishna, Jayesh and Wu, Danqing and Jacob, Robert and Ganyushin, Dmitry},
+year = {2025},
+month = {06},
+pages = {712-721},
+title = {SCORPIO: A Parallel I/O library for Exascale Earth System Models},
+doi = {10.1109/IPDPSW66978.2025.00112}
+}
+```
+
+```
+@misc{ doecode_36752,
+title = {SCORPIO},
+author = {Krishna, Jayesh and Wu, Danqing and Kurc, Tahsin and Edwards, Jim and Hartnett, Edward},
+abstractNote = {The SCORPIO (Software for Caching Output and Reads for Parallel I/O) library provides a portable application programming interface (API) for describing, reading and storing array-oriented data that is distributed in memory across multiple processes. It is used by all the model components in DOE's Energy Exascale Earth System Model (E3SM) for reading input data and writing model output. The library also supports rearranging data distributed across multiple processes before using low-level I/O libraries like PnetCDF, NetCDF, and ADIOS to write the data to the file system. The library was derived from the Parallel I/O library.},
+}
+```
+
+## License
+
+The SCORPIO library is available under a BSD 3-clause license. Please see
+[LICENSE](https://github.com/E3SM-Project/scorpio/blob/master/LICENSE) for details.

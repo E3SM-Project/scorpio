@@ -1,21 +1,23 @@
  /*!  \page api SCORPIO user interface
-  This is a list of all user interface routines:
+  The user API is closely related to the NetCDF API. Please refer to 
+  http://www.unidata.ucar.edu/software/netcdf/docs for more information on NetCDF APIs.
+  The SCORPIO API is listed below:
 
-  \section api_fileops PIO file Operations
+  \section api_fileops Routines for file operations
      - \ref PIO_openfile
      - \ref PIO_createfile
      - \ref PIO_syncfile
      - \ref PIO_closefile
-  \section api_system PIO startup and shutdown routines
+  \section api_system Library init/finalize routines
      - \ref PIO_init
      - \ref PIO_finalize
-  \section api_decomp PIO decomposition routines
+  \section api_decomp I/O decomposition routines
     - \ref PIO_initdecomp
     - \ref PIO_freedecomp
   \section readwrite Reading and Writing distributed variables
     - \ref PIO_read_darray
     - \ref PIO_write_darray
-  \section utility Utility routines
+  \section utility Misc Utility routines
     - \ref PIO_set_hint
     - \ref PIO_setframe
     - \ref PIO_advanceframe
@@ -24,24 +26,22 @@
     - \ref PIO_get_local_array_size
     - \ref PIO_getnumiotasks
     - \ref PIO_set_blocksize
-  \section netcdf NetCDF format specific routines 
-     Also see: http://www.unidata.ucar.edu/software/netcdf/docs/ for more information on the NetCDF file format and API.
-     \subsection putget Reading/Writing NetCDF metadata  
+  \section netcdf Non-distributed data routines
+     \subsection putget Reading/Writing metadata
          - \ref PIO_get_att
          - \ref PIO_put_att
          - \ref PIO_get_var
          - \ref PIO_put_var
-     \subsection utilnc NetCDF utility routines
+     \subsection utilnc Routines for defining variables and metadata
     - \ref PIO_enddef
     - \ref PIO_redef
     - \ref PIO_def_dim 
     - \ref PIO_def_var
-     \subsection inqnc NetCDF file inquiry routines
+     \subsection inqnc Routines to inquire information about data in a file
     - \ref PIO_inquire
     - \ref PIO_inq_attname
     - \ref PIO_inq_att
     - \ref PIO_inq_attlen
-    - \ref PIO_inq_var
     - \ref PIO_inq_varid
     - \ref PIO_inq_varname
     - \ref PIO_inq_vartype

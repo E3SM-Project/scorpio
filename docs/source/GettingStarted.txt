@@ -19,20 +19,15 @@
 \tableofcontents
 
 /*! \page intro Introduction 
+The Software for Caching Output and Reads for Parallel I/O (SCORPIO) is a high level parallel I/O library for MPI applications that use structured and unstructured grids. The library includes software abstractions to represent how the application data is decomposed in memory across multiple MPI processes and algorithms to optimize reading and writing this data to the file system. The library allows developers to easily switch between using different low-level I/O libraries ([NetCDF](https://www.unidata.ucar.edu/software/netcdf), [PnetCDF](https://parallel-netcdf.github.io/), [HDF5](https://www.hdfgroup.org/solutions/hdf5/) and [ADIOS2](https://adios2.readthedocs.io/en/latest/)) in their applications.
 
-SCORPIO is a software interface layer designed to encapsolate the complexities of parallel IO and make it easier to replace the lower level software backend.  It currently supports <a href=http://www.unidata.ucar.edu/software/netcdf/docs/html_guide/index.html#user_guide>NetCDF</a>, <a href=http://trac.mcs.anl.gov/projects/parallel-netcdf>PnetCDF</a> and <a href=https://www.olcf.ornl.gov/center-projects/adios>ADIOS</a>.
-
-SCORPIO calls are collective.  A MPI communicator is set in a call to \ref PIO_init and all tasks associated with that communicator must participate in all subsequent calls to PIO.  An application can make multiple calls to \ref PIO_init in order to support multiple MPI communicators.
-
-Begin by checking out a copy from [gitHub](https://github.com/E3SM-Project/ParallelIO) and installing on your system as per the instructions in the [Installation](@ref install) document. Take a look at examples of PIO usage in both complex and simple test programs in the [Examples](@ref examp) document. Finally, read through the [FAQ](@ref faq) to see if any remaining questions can be answered. 
-
-### Using SCORPIO has three basic steps. ###
-
-1. Your program should call the \ref PIO_init function, and provide the MPI communicator (and the rank within that communicator) of the calling task. This call initializes an IO system type structure that will be used in subsequent file and decomposition functions.
-
-2. You can open a file for reading or writing with a call to \ref PIO_createfile or \ref PIO_openfile. In this call you will specify the file type: pio_iotype_netcdf, pio_iotype_pnetcdf, pio_iotype_netcdf4c or pio_iotype_netcdf4p; along with the file name and optionally the netcdf mode.
-
-3. Finally, you can read or write decomposed data to the output file. You must describe the mapping between the organization of data in the file and that same data in the application space.  This is done in a call to \ref PIO_initdecomp. In the simplest call to this function, a one dimensional integer array is passed from each task, the values in the array represent the offset from the beginning of the array on file. (what happens next?)
-
+### SCORPIO Usage Overview ###
+<ol>
+<li> Initialize the SCORPIO library using the \ref PIO_init API. The API returns an "I/O system" that is associated with the MPI communicator passed by the user. All calls on this I/O system are collective. The application can initialize the library multiple times, if needed.  </li>
+<li> Create a SCORPIO I/O decomposition, that describes how the data is laid out in memory, using the \ref PIO_initdecomp API  </li>
+<li> Create/Open files using the \ref PIO_createfile / \ref PIO_openfile APIs. The I/O type specified in this API allows users to choose between low-level I/O libraries (PnetCDF, NetCDF, HDF5, ADIOS)  </li>
+<li> Read/Write data using the \ref PIO_get_var / \ref PIO_put_var APIs for data that is not decomposed across multiple MPI processes and using the \ref PIO_read_darray / \ref PIO_write_darray for data that is decomposed across multiple MPI processes  </li>
+<li> Close files (\ref PIO_closefile) and finalize the SCORPIO library (\ref PIO_finalize)  </li>
+</ol>
 
 */

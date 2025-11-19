@@ -16,146 +16,137 @@
  */ /*! \page install Installing SCORPIO
 
 
-The SCORPIO code is currently stored on github at <https://github.com/E3SM-Project/ParallelIO>. For questions about downloading or developing this code please email <mailto:jayesh@anl.gov>.
+The SCORPIO code is available on github at <https://github.com/E3SM-Project/scorpio>. For questions about downloading or developing this code please email jayesh@anl.gov. Spack package for the SCORPIO library is available [here](https://packages.spack.io/package.html?name=e3sm-scorpio).
 
 ### Dependencies ###
 
-SCORPIO can use NetCDF (version 4.3.3+) and/or PnetCDF (version 1.6.1+) for I/O.
-Ideally, the NetCDF version should be built with MPI, which requires that it
-be linked with an MPI-enabled version of HDF5.  Optionally, NetCDF can be 
-built with DAP support, which introduces a dependency on CURL.  Additionally,
-HDF5, itself, introduces dependencies on LIBZ and (optionally) SZIP.
+SCORPIO uses CMake for configuring the library. The library requires a C, C++ and Fortran compiler and an MPI library.
+
+SCORPIO can use NetCDF (version 4.3.3+), PnetCDF (version 1.6.1+), HDF5 or ADIOS2 for I/O. To use parallel I/O with NetCDF the NetCDF library should be built with MPI, which requires that it be linked with an MPI-enabled version of HDF5. Optionally, NetCDF can be built with DAP support, which introduces a dependency on CURL. Additionally, HDF5 introduces dependencies on LIBZ and (optionally) SZIP libraries. I/O libraries like HDF5 and ADIOS2 support data compression using other libraries like BLOSC2 (lossless data compression) and ZFP (lossy data compression). SCORPIO supports data compression using NetCDF, HDF5 and ADIOS2 I/O libraries.
 
 ### Configuring with CMake ###
 
-To configure the build, SCORPIO requires CMake version 3.7+.  The typical
-configuration with CMake can be done as follows:
+To configure the build, SCORPIO requires CMake version 3.7+. The typical configuration with CMake can be done as follows,
+<pre>
+  > CC=mpicc CXX=mpicxx FC=mpif90 cmake [-DOPTION1=value1 -DOPTION2=value2 ...] /path/to/scorpio/source
+</pre>
 
+where mpicc, mpicxx and mpif90 are the appropriate MPI-enabled compiler wrappers for your system.
 
-    > CC=mpicc CXX=mpicxx FC=mpif90 cmake [-DOPTION1=value1 -DOPTION2=value2 ...] /path/to/pio/source
+The OPTIONS section typically should consist of pointers to the install locations for various dependencies, assuming these dependencies are not located in canonical search locations.
 
-
-where `mpicc`, `mpicxx` and `mpif90` are the appropriate MPI-enabled compiler wrappers
-for your system.
-
-The `OPTIONS` section typically should consist of pointers to the install
-locations for various dependencies, assuming these dependencies are not 
-located in *canonical* search locations.  
-
-For each dependency `XXX`, one can specify the location of its 
-installation path with the CMake variable `XXX_PATH`.  If the `C` and
-`Fortran` libraries for the dependency are installed in different locations
-(such as can be done with NetCDF), then you can specify individually
-`XXX_C_PATH` and `XXX_Fortran_PATH`.  Hence, you can specify the locations
-of both NetCDF-C and NetCDF-Fortran, as well as PnetCDF, with the following
-CMake configuration line:
-
-
-    > CC=mpicc CXX=mpicxx FC=mpif90 cmake -DNetCDF_C_PATH=/path/to/netcdf-c \
+For each dependency XXX, one can specify the location of its installation path with the CMake variable XXX_PATH. You can specify the install directory for the different dependencies using the CMake configuration options as shown below
+<pre>
+CC=mpicc CXX=mpicxx FC=mpif90 cmake -DNetCDF_C_PATH=/path/to/netcdf-c \
                -DNetCDF_Fortran_PATH=/path/to/netcdf-fortran \
                -DPnetCDF_PATH=/path/to/pnetcdf \
-               /path/to/pio/source
-
-
-This works for the dependencies: `NetCDF`, `PnetCDF`, `HDF5`, `LIBZ`, `SZIP`.
+               -DHDF5_PATH=/path/to/hdf5 \
+               /path/to/scorpio/source
+</pre>
+This works for the dependencies: NetCDF, PnetCDF, HDF5, LIBZ, SZIP. For adding support for ADIOS2, set the environment variable ADIOS2_DIR to point to the installation directory.
 
 For specific instructions to install on various commonly used super computers, please read the [walk-through guide to SCORPIO Installation](@ref mach_walkthrough). 
 
-### Additional CMake Options ###
+### CMake configuration options ###
+CMake configuration options are specified in the "-DCONFIG_OPTION1=CONFIG_OPTION1_VAL" format
+<pre>
+> cmake [-DCONFIG_OPTION1=CONFIG_OPTION1_VALUE1 -DCONFIG_OPTION2=CONFIG_OPTION2_VALUE2 ...] /path/to/scorpio/source
+</pre>
 
-Additional configuration options can be specified on the command line.
 
-The `PIO_ENABLE_TIMING` option can be set to `ON` or `OFF` to enable or
-disable the use of GPTL timing in the SCORPIO libraries.  This feature requires
-the GPTL C library for the SCORPIO `C` library and the GPTL Fortran library with
-the `perf_mod.mod` and `perf_utils.mod` interface modules.  If these GPTL
-libraries are already installed on the system, the user can point SCORPIO to the
-location of these libraries with the `GPTL_PATH` variable (or, individually,
-`GPTL_C_PATH` and `GPTL_Fortran_Perf_PATH` variables).  However, if these
-GPTL libraries are not installed on the system, and GPTL cannot be found,
-then SCORPIO will build its own internal version of GPTL.  
+#### Common CMake configuration options ####
+<ul>
+<li> <b>PIO_ENABLE_FORTRAN</b>: Enable the Fortran library interface (default ON)  </li>
+<li> <b>PIO_ENABLE_TIMING</b>: Collect timing statistics using the GPTL timing library. The application needs to initialize/finalize the GPTL library (default ON) </li>
+<li> <b>PIO_ENABLE_INTERNAL_TIMING</b>: Gather and ouput timing statistics using GPTL within the library. The timing statistics is available in "piorwinfo*.dat". The library initializes/finalizes the GPTL library (default OFF) </li>
+<li> <b>PIO_ENABLE_API_TRACING</b>: Enable tracing of SCORPIO APIsi (default OFF) </li>
+<li> <b>PIO_ENABLE_IO_STATS</b>: Enable SCORPIO I/O performance statistics. The I/O statistics is available in "io_perf_summary*"(default ON) </li>
+<li> <b>PIO_ENABLE_LOGGING</b>: Enable debug logging. The log files, "pio_log*", are created per MPI process (and these files can be large) (default OFF)  </li>
+<li> <b>PIO_ENABLE_DOC</b>: Build SCORPIO documentation (default ON) </li>
+<li> <b>PIO_ENABLE_COVERAGE</b>: Enable code coverage using gcov (default OFF) </li>
+<li> <b>PIO_ENABLE_TOOLS</b>: Build SCORPIO utilities (convert between file formats, get file information etc) (default ON) </li>
+<li> <b>PIO_ENABLE_EXAMPLES</b>: Build SCORPIO examples available in SCORPIO_SOURCE/examples directory (default OFF) </li>
+<li> <b>PIO_INTERNAL_DOC</b>: BuildSCORPIO developer documentation (default OFF) </li>
+<li> <b>PIO_USE_MPISERIAL</b>: Build SCORPIO with the mpi-serial library instead of an MPI library (default OFF) </li>
+<li> <b>PIO_USE_MALLOC</b>: Use native malloc (instead of the BGET libarry) for memory allocations (default OFF) </li>
+<li> <b>PIO_USE_INDEP_MODE</b>: Enable PnetCDF independent data mode for non-distributed data, allowing MPI processes to write data independently (default ON) </li>
+<li> <b>WITH_PNETCDF</b>: Require the use of the PnetCDF library (default ON) </li>
+<li> <b>WITH_NETCDF</b>: Require the use of the NetCDF library (default ON) </li>
+<li> <b>PIO_ENABLE_NCZARR</b>: Enable support for NCZarr in the NetCDF library (default OFF) </li>
+<li> <b>WITH_ADIOS2</b>: Require the use of the ADIOS2 library (default OFF) </li>
+<li> <b>WITH_HDF5</b>: Require the use of the HDF5 library (default OFF) </li>
+</ul>
 
-If PnetCDF is not installed on the system, the user can disable its use by
-setting `-DWITH_PNETCDF=OFF`.  This will disable the search for PnetCDF on the
-system and disable the use of PnetCDF from within SCORPIO.
+#### CMake Configuration Options for data compression ####
+<ul>
+<li> <b>ADIOS_USE_COMPRESSION</b>: Enable data compression using ADIOS. By default lossless data compression is used. (default OFF) </li>
+<li> <b>ADIOS_USE_LOSSY_COMPRESSION</b>: Enable lossy data compression using ADIOS (default OFF) </li>
+<li> <b>HDF5_USE_COMPRESSION</b>: Enable data compression using HDF5. By default lossless data compression is used. (default OFF) </li>
+<li> <b>HDF5_USE_LOSSY_COMPRESSION</b>: Enable lossy data compression using HDF5 (default OFF) </li>
+</ul>
 
-NetCDF is optional if PnetCDF is used, and the user can disable its use by
-setting `-DWITH_NETCDF=OFF`.  This will disable the search for NetCDF on the
-system and disable the use of NetCDF from within SCORPIO.
+#### CMake Configuration Options related to Testing ####
+<ul>
+<li> <b>ADIOS_BP2NC_TEST</b>: Enable testing of conversion of the ADIOS2 BP file format to the NetCDF format (default OFF)  </li>
+<li> <b>PIO_ENABLE_TESTS</b>: Configure/Enable the SCORPIO tests (default OFF) </li>
+<li> <b>PIO_ENABLE_LARGE_TESTS</b>: Configure/Enable SCORPIO tests that write a large amount of data (default OFF)  </li>
+<li> <b>PIO_VALGRIND_CHECK</b>: Enable memory leak check using valgrind (default OFF)  </li>
+</ul>
 
-If the user wishes to disable the SCORPIO tests, then the user can set the
-variable `-DPIO_ENABLE_TESTS=OFF`.  This will entirely disable the CTest 
-testing suite, as well as remove all of the test build targets.
-
-If you wish to install SCORPIO in a safe location for use later with other
-software, you may set the `CMAKE_INSTALL_PREFIX` variable to point to the
-desired install location.
+#### Advanced CMake Configuration Options ####
+<ul>
+<li> <b>PIO_ENABLE_API_VAR_TRACING</b>: Enable tracing of variables when tracing SCORPIO APIs (default OFF) </li>
+<li> <b>PIO_USE_FORTRAN_LEGACY_LIB</b>: Use the legacy Fortran library interface (for backward compatibility with old sources, default OFF)  </li>
+<li> <b>PIO_MICRO_TIMING</b>: Enable internal micro timers (default OFF) </li>
+<li> <b>PIO_SAVE_DECOMPS</b>: Output the I/O decomposition information (default OFF) </li>
+<li> <b>PIO_LIMIT_CACHED_IO_REGIONS</b>: Limit the number of non-contiguous regions cached in an IO process. If enabled, by default the library caches 64K I/O regions (default OFF) </li>
+<li> <b>PIO_MAX_CACHED_IO_REGIONS</b>: The number of non-contiguous regions cached in an I/O process (default UNSET) </li>
+<li> <b>PIO_MAX_LUSTRE_OSTS</b>: The number of Lustre OSTs to use for I/O (This value is set by default for LCF machines) </li>
+<li> <b>PIO_STRIPING_UNIT</b>: The Lustre striping unit for I/O (Tihs value is set by default for LCF machines) </li>
+<li> <b>PIO_RESERVED_FILE_HEADER_SIZE</b>: The size (in bytes) reserved for the NetCDF header (default 10KB) </li>
+<li> <b>PIO_CHUNK_SIZE</b>: The size of each chunk of output data for NetCDF and HDF5 files (default 4MB) </li>
+<li> <b>PIO_MAX_ADIOS_DECOMPS</b>: The maximum number of I/O decompositions registered with ADIOS (default 64K)  </li>
+<li> <b>PIO_MAX_CACHED_STEPS_FOR_ADIOS</b>: The maximum number of ADIOS steps of data cached before syncing the data to file (default 128)  </li>
+<li> <b>PIO_REARR_ANY_SUBSET_RANGE</b>: The range of lengths (max across all procs) of the local decomposition map for the ANY rearranger before switching from BOX to SUBSET (default : (512K, inf) )  </li>
+<li> <b>ADIOS_NO_DECOMPS</b>: Save no I/O decomposition data to ADIOS BP files. The I/O decomposition information is required for converting ADIOS2 BP files output to NetCDF (default OFF) </li>
+<li> <b>SPIO_HDF5_FLUSH_AFTER_COLL_WR</b>: Flush file buffers after each collective write using HDF5 (default OFF) </li>
+<li> <b>SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX</b>: Regular expression for filenames that need to use PnetCDF instead of the default ADIOS I/O type </li>
+<li> <b>SPIO_OVERRIDE_HDF5_COMPRESSION_VNAME_REGEX</b>: Regular expression for variable names that need to override (disable) the default compression options  </li>
+<li> <b>SPIO_COMPRESSION_OPTIONS</b>: Data compression settings to override defaults (default UNSET). e.g. cmake -DSPIO_COMPRESSION_OPTIONS="COMPRESSION_LIBRARY=ADIOS2:Blosc2:Zstd; SPIO_ADIOS2_BLOSC2_COMPRESSION_LEVEL=2; SPIO_ADIOS2_BLOSC2_SHUFFLE_METHOD=BLOSC_BITSHUFFLE; COMPRESSION_LIBRARY=HDF5:Blosc2:Zstd; SPIO_HDF5_BLOSC2_COMPRESSION_LEVEL=2; SPIO_HDF5_BLOSC2_SHUFFLE_METHOD=BLOSC_BITSHUFFLE;" ...  </li>
+</ul>
 
 ### Building ###
-
-Once you have successfully configured SCORPIO with CMake in a build directory.
-From within the build directory, build SCORPIO with:
-
-
+After configuring SCORPIO using CMake as mentioned above the library can be built using the make command
+<pre>
     > make
+</pre>
 
-
-This will build the `pioc` and `piof` libraries.
 
 ### Testing ###
-
-If you desire to do testing, and `PIO_ENABLE_TESTS=ON` (which is the default
-setting), you may build the test executables with:
-
-
+The tests can be be built using the tests target.
+<pre>
     > make tests
-
-
-Once the tests have been built, you may run tests with:
-
-
+</pre>
+Once the tests have been built, you may run tests using the CMake test driver, ctest
+<pre>
     > ctest
-
-
-_Note: If you have not run `make tests` before you run `ctest`, then you will see
-all of the tests fail._
-
-Alternatively, you may build the test executables and then run tests 
-immediately with:
-
-
+</pre>
+Alternatively, you may build the test executables and then run tests using the check target
+<pre>
     > make check
-
-
-(similar to the typical `make check` Autotools target).
-
-*ANOTHER NOTE:* These tests are designed to run in parallel.
-If you are on one of the supported supercomputing platforms (i.e., NERSC, NWSC, ALCF, 
-etc.), then the `ctest` command will assume that the tests will be run in an appropriately configured and scheduled parallel job.  This can be done by requesting an interactive session from the login nodes and then running `ctest` from within the interactive terminal.  Alternatively, this can be done by running the `ctest` command from a job submission script.  It is important to understand, however, that `ctest` itself will preface all of the test executable commands with the appropriate `mpirun`/`mpiexec`/`runjob`/etc. Hence, you should not further preface the `ctest` command with these MPI launchers.
+</pre>
+The tests can be run from the build directory on the command line on machines that do not use a batch job scheduler. For machines that use a batch job scheduler these commands need to be run from a batch job. Please refer to the appropriate user guides for information on how to create run executables from a batch job.
 
 ### Installing ###
-
-Once you have built the SCORPIO libraries, you may install them in the location
-specified by the `CMAKE_INSTALL_PREFIX`.  To do this, simply type:
-
-
+The install directory is specified using the CMAKE_INSTALL_PREFIX CMake configuration option. To install the library use the install target
+<pre>
     > make install
+</pre>
 
-
-If the internal GPTL libraries were built (because GPTL could not be found
-and the `PIO_ENABLE_TIMING` variable is set to `ON`), then these libraries
-will be installed with SCORPIO.
 
 ### Examples ###
-
-From within the build directory, build the SCORPIO examples with:
-
-
+To build the examples use the examples target
+<pre>
     > make examples
-
-
-This will build the C and Fortran examples in under the examples
-subdirectory.
-
-
+</pre>
 */

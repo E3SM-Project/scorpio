@@ -6,8 +6,8 @@ message(STATUS "===== Configuring SCORPIO... =====")
 
 # The project version number.
 set(VERSION_MAJOR   1   CACHE STRING "Project major version number.")
-set(VERSION_MINOR   8   CACHE STRING "Project minor version number.")
-set(VERSION_PATCH   2   CACHE STRING "Project patch version number.")
+set(VERSION_MINOR   9   CACHE STRING "Project minor version number.")
+set(VERSION_PATCH   0   CACHE STRING "Project patch version number.")
 mark_as_advanced(VERSION_MAJOR VERSION_MINOR VERSION_PATCH)
 
 #==============================================================================
@@ -339,6 +339,23 @@ spio_set_default_comp_opts()
 if(DEFINED SPIO_COMPRESSION_OPTIONS)
   message(STATUS "Parsing compression options")
   spio_parse_comp_opts("${SPIO_COMPRESSION_OPTIONS}")
+endif()
+
+#==============================================================================
+#  Get and store GIT hash
+#==============================================================================
+execute_process(
+  COMMAND git -C ${PROJECT_SOURCE_DIR} rev-parse --short HEAD
+  OUTPUT_VARIABLE SCORPIO_GIT_HASH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  RESULT_VARIABLE GIT_RETVAL
+)
+
+if(GIT_RETVAL EQUAL 0)
+  message(STATUS "Git hash : ${SCORPIO_GIT_HASH}")
+  set(PIO_VERSION_HASH ${SCORPIO_GIT_HASH})
+else()
+  set(PIO_VERSION_HASH "UNKNOWN")
 endif()
 
 #==============================================================================

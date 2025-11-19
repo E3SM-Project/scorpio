@@ -27,7 +27,7 @@ MODULE spio_inq_file
   PUBLIC :: pio_inq_nvars, pio_inq_ndims, pio_inq_natts, pio_inq_unlimdim,&
             pio_inquire
 
-!! @defgroup pio_inq_nvars pio_inq_nvars
+!> @defgroup PIO_inq_nvars PIO_inq_nvars
 !! @public
 !! @brief Inquire the number of variables in a file
 !! @details
@@ -40,7 +40,7 @@ MODULE spio_inq_file
     MODULE PROCEDURE pio_inq_nvars_fh
   END INTERFACE
 
-!! @defgroup pio_inq_ndims pio_inq_ndims
+!> @defgroup PIO_inq_ndims PIO_inq_ndims
 !! @public
 !! @brief Inquire the number of dimensions in a file
 !! @details
@@ -53,7 +53,7 @@ MODULE spio_inq_file
     MODULE PROCEDURE pio_inq_ndims_fh
   END INTERFACE
 
-!! @defgroup pio_inq_natts pio_inq_natts
+!> @defgroup PIO_inq_natts PIO_inq_natts
 !! @public
 !! @brief Inquire the number of attributes in a file
 !! @details
@@ -87,7 +87,7 @@ MODULE spio_inq_file
     MODULE PROCEDURE pio_inq_unlimdim_fh
   END INTERFACE
 
-!! @defgroup pio_inquire pio_inquire
+!> @defgroup PIO_inquire PIO_inquire
 !! @public
 !! @brief Inquire the meta-data information from a file
 !! @details

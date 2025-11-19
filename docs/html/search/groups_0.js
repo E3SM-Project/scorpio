@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['c2fstring_1913',['c2fstring',['../group__c2fstring.html',1,'']]],
-  ['copy_5fpio_5fvar_1914',['copy_pio_var',['../group__copy__pio__var.html',1,'']]]
+  ['a_20file_0',['a file',['../group__create__file__modes.html',1,'Supported modes for creating a file'],['../group__open__file__modes.html',1,'Supported modes for opening a file']]]
 ];

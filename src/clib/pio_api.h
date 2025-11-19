@@ -472,6 +472,14 @@ int PIOc_put_varm_schar(int ncid, int varid, const PIO_Offset *start, const PIO_
 int PIOc_put_varm_longlong(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                            const PIO_Offset *stride, const PIO_Offset *imap, const long long *op);
 
+/* ========== SCORPIO Library APIs =========== */
+int PIOc_get_version_major(void );
+int PIOc_get_version_minor(void );
+int PIOc_get_version_patch(void );
+int PIOc_get_version_string(char *vstr, int len);
+int PIOc_get_version_hash(char *vstr, int len);
+int PIOc_get_version(int *major, int *minor, int *patch, char *vstr, int vstr_len);
+
 #if defined(__cplusplus)
 }
 #endif
