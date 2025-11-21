@@ -1,6 +1,24 @@
 PIO_TF_AUTO_TEST_SUB_BEGIN init_finalize
+  implicit none
+
   ! The default test driver should initialize and finalize PIO
-  PRINT *, "Hello world"
+  integer :: major, minor, patch
+  character(LEN=PIO_MAX_NAME) :: vstr = ' '
+  character(LEN=PIO_MAX_NAME) :: hstr = ' '
+  integer :: ret
+
+  ret = pio_get_version(major, minor, patch, vstr)
+  PIO_TF_CHECK_ERR(ret, "Unable to retrieve version info")
+
+  ret = pio_get_version_hash(hstr)
+  PIO_TF_CHECK_ERR(ret, "Unable to retrieve version hash")
+
+  PRINT *, "SCORPIO : ", "MAJOR VERSION : ", major,&
+            ", MINOR VERSION : ", minor,&
+            ", PATCH VERSION : ", patch,&
+            ", VERSION STRING : '", trim(vstr), "'",&
+            ", VERSION HASH : '", trim(hstr), "'"
+
 PIO_TF_AUTO_TEST_SUB_END init_finalize
 
 

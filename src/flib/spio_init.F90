@@ -33,7 +33,7 @@ MODULE spio_init
             pio_getnumiotasks, pio_get_numiotasks, pio_set_hint,&
             pio_set_rearr_opts, pio_set_blocksize
 
-!> @defgroup pio_init
+!> @defgroup PIO_init PIO_init
 !! @public
 !! @brief Initialize the I/O subsystem
 !!
@@ -55,13 +55,17 @@ END INTERFACE
 INTERFACE pio_getnumiotasks
   MODULE PROCEDURE pio_getnumiotasks_
 END INTERFACE
+!> @ingroup PIO_getnumiotasks
+!! @public
+!! @brief Get the number of I/O processes/tasks in an I/O subsystem
+!!
 INTERFACE pio_get_numiotasks
   MODULE PROCEDURE pio_getnumiotasks_
 END INTERFACE
 
 CONTAINS
 
-!> @ingroup pio_init
+!> @ingroup PIO_init
 !! @public
 !! @brief Initialize the I/O subsystem that is defined using an MPI
 !! intra-communicator. This is a collective call on the MPI communicator,
@@ -156,7 +160,7 @@ CONTAINS
 #endif
   END SUBROUTINE pio_init_intracomm
 
-!> @ingroup pio_init
+!> @ingroup PIO_init
 !! @public
 !! @brief Initialize the I/O subsystem that is defined using an MPI
 !! inter-communicator. The I/O subsystem is created using one or more
@@ -266,7 +270,7 @@ CONTAINS
 #endif
   END SUBROUTINE pio_init_intercomm
 
-!> @ingroup pio_init
+!> @ingroup PIO_init
 !! @public
 !! @brief Initialize the I/O subsystem that is defined using an MPI
 !! inter-communicator. The I/O subsystem is created using one or more
@@ -333,7 +337,7 @@ CONTAINS
 
   END SUBROUTINE pio_init_intercomm_v2
 
-!> @defgroup pio_finalize
+!> @defgroup PIO_finalize PIO_finalize
 !! @public
 !! @brief Finalize the I/O subsystem
 !!
@@ -364,7 +368,7 @@ CONTAINS
 #endif
   END SUBROUTINE pio_finalize
 
-!> @defgroup PIO_iosystem_is_active
+!> @defgroup PIO_iosystem_is_active PIO_iosystem_is_active
 !! @public
 !! @brief Query if an I/O subsystem is active
 !!
@@ -400,7 +404,7 @@ CONTAINS
 #endif
   END SUBROUTINE pio_iosystem_is_active
 
-!> @defgroup PIO_iotask_rank
+!> @defgroup PIO_iotask_rank PIO_iotask_rank
 !! @public
 !! @brief Query the rank of the current process in the I/O system
 !!
@@ -433,7 +437,7 @@ CONTAINS
 #endif
   END FUNCTION pio_iotask_rank
 
-!> @defgroup PIO_iam_iotask
+!> @defgroup PIO_iam_iotask PIO_iam_iotask
 !! @public
 !! @brief Query if the current process is an I/O process/task in the I/O system
 !!
@@ -590,7 +594,7 @@ CONTAINS
 !! @param[in] enable_hs_i2c Enable handshake (I/O procs to compute procs)
 !! @param[in] enable_isend_i2c  Enable isends (I/O procs to compute procs)
 !! @param[in] max_pend_req_i2c  Maximum pending requests (I/O procs to compute procs)
-!! @returns @copydoc error_code
+!! @returns @copydoc error_return
 !!
 !! @copydoc PIO_rearr_comm_fc_options
 !!
@@ -619,7 +623,7 @@ CONTAINS
 
   END FUNCTION pio_set_rearr_opts
 
-!> @defgroup PIO_set_blocksize
+!> @defgroup PIO_set_blocksize PIO_set_blocksize
 !! @public
 !! @brief Set the size of the blocks used by the BOX rearranger.
 !!

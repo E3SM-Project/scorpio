@@ -1,9 +1,18 @@
 <map id="file_desc_t" name="file_desc_t">
-<area shape="rect" id="node1" title="File descriptor structure." alt="" coords="200,303,292,329"/>
-<area shape="rect" id="node2" href="$structwmulti__buffer.html" title="The multi buffer holds data from one or more variables." alt="" coords="5,213,119,240"/>
-<area shape="rect" id="node3" href="$structvar__desc__t.html" title="Variable description structure." alt="" coords="200,213,292,240"/>
-<area shape="rect" id="node4" href="$structiosystem__desc__t.html" title="IO system descriptor structure." alt="" coords="317,213,447,240"/>
-<area shape="rect" id="node5" href="$structiosystem__desc__t_1_1async__ios__msg__info__.html" title="Async I/O service message info." alt="" coords="211,109,388,151"/>
-<area shape="rect" id="node6" href="$structrearr__opt.html" title="Rearranger options." alt="" coords="425,117,507,143"/>
-<area shape="rect" id="node7" href="$structrearr__comm__fc__opt.html" title="Rearranger comm flow control options." alt="" coords="392,5,540,32"/>
+<area shape="rect" id="Node000001" title="File descriptor structure." alt="" coords="325,299,415,324"/>
+<area shape="poly" id="edge9_Node000001_Node000001" title=" " alt="" coords="430,302,438,305,442,312,433,320,416,322,415,317,431,315,437,311,435,309,428,307"/>
+<area shape="rect" id="Node000002" href="$structiosystem__desc__t.html" title="IO system descriptor structure." alt="" coords="111,211,242,236"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="216,239,345,296,343,301,214,244"/>
+<area shape="poly" id="edge5_Node000002_Node000002" title=" " alt="" coords="257,215,269,223,260,231,242,234,242,228,258,226,263,223,254,220"/>
+<area shape="rect" id="Node000003" href="$structiosystem__desc__t_1_1async__ios__msg__info__.html" title="Async I/O service message info." alt="" coords="5,108,183,148"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="91,162,93,174,98,185,111,199,128,208,126,213,108,203,93,188,88,176,86,163"/>
+<area shape="rect" id="Node000004" href="$structrearr__opt.html" title="Rearranger options." alt="" coords="220,115,301,141"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="254,155,233,188,202,213,198,208,229,185,249,152"/>
+<area shape="rect" id="Node000005" href="$structrearr__comm__fc__opt.html" title="Rearranger comm flow control options." alt="" coords="187,5,335,31"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="263,44,263,115,258,115,258,44"/>
+<area shape="rect" id="Node000006" href="$structvar__desc__t.html" title="Variable description structure." alt="" coords="324,211,416,236"/>
+<area shape="poly" id="edge6_Node000001_Node000006" title=" " alt="" coords="373,250,373,298,367,298,367,250"/>
+<area shape="rect" id="Node000007" href="$structwmulti__buffer.html" title="The multi buffer holds data from one or more variables." alt="" coords="441,211,553,236"/>
+<area shape="poly" id="edge7_Node000001_Node000007" title=" " alt="" coords="470,246,389,301,386,296,467,242"/>
+<area shape="poly" id="edge8_Node000007_Node000007" title=" " alt="" coords="568,215,579,223,571,231,553,234,552,229,569,226,574,223,565,219"/>
 </map>

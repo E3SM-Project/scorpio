@@ -15,489 +15,373 @@
  *
  */ /*! \page mach_walkthrough Install Walk-through
 
-This document provides specific instructions for installing SCORPIO using a variety of compilers on a few commonly used super computers. Click on the link below to go directly to the machine of interest.
+### Downloading Source
+The SCORPIO library source can be download from [github](https://github.com/E3SM-Project/scorpio).
 
--    <a href="#Yellowstone">Yellowstone</a> (NCAR's 1.5-petaflop IBM Supercomputer)
--    <a href="#Edison">Edison</a> (A NERSC Cray XC30 Supercomputer)
--    <a href="#Mira">Mira</a> (IBM Blue Gene Supercomputer at ALCF)
--    <a href="#BlueWat">Blue Waters</a> (NCSA's 1.3-petaflop Cray Supercomputer)
--    <a href="#Hobart">Hobart</a> (The NCAR CGD local cluster)
--    <a href="#Linux">Linux with MPICH</a> (Standard Linux box with MPICH)
+<pre>
+git clone https://github.com/E3SM-Project/scorpio.git
+</pre>
 
-<a name="Yellowstone"></a>
-### Yellowstone ###
+
+### Prerequisites
+The SCORPIO library requires a working C/C++ and Fortran compiler and an MPI library (e.g. [MPICH](https://www.mpich.org/)).
+SCORPIO uses CMake for configuring the source, so the [CMake](https://cmake.org/) software package needs to be available
+on the system. Since SCORPIO uses low level I/O libraries for I/O either NetCDF or PnetCDF libraries need to be installed
+on the system. SCORPIO includes support for [NetCDF](https://www.unidata.ucar.edu/software/netcdf),
+[PnetCDF](https://parallel-netcdf.github.io/), [HDF5](https://www.hdfgroup.org/solutions/hdf5/) and
+[ADIOS2](https://adios2.readthedocs.io/en/latest/) I/O libraries.
+
+### Building and Installing
+SCORPIO has been built using multiple compilers and installed on a variety of supercomputers. To enable support for the NetCDF library
+specify the path to the NetCDF C and Fortran installations using NetCDF_C_PATH and NetCDF_Fortran_PATH configuration options. To
+enable support for the PnetCDF library specify the path to the library via the PnetCDF_PATH configuration option. Similarly to enable
+support for the HDF5 library specify the install path of the HDF5 library using the HDF5_PATH configuration option. To enable support
+for ADIOS2 ensure that the environment variable ADIOS2_DIR is set to the ADIOS2 install directory. On some machines where compression
+support is enabled ADIOS2 and HDF5 might depend on paths to the compression libraries. For example to add support for compression
+using Blosc2 in ADIOS2 and HDF5 set the environment variable Blosc2_DIR to the Blosc2 library install directory. The compiler (or
+compiler wrapper) used for the build can be set by setting the environment variables CC, CXX and FC for the C, Fortran and C++
+compilers. The library is configured by running cmake (CMake configure) and built using make. Please see the instructions below
+on how to build and install SCORPIO on some of the commonly used machines (Please note that the modules installed on these machines
+may change after machine updates).
+
+-    <a href="#Aurora">Aurora</a> : [Aurora](https://www.alcf.anl.gov/aurora) is a 10,624-node HPE Cray-Ex based system with 21,248 Intel Xeon CPUs at the ALCF (Argonne Leadership Computing Facility at Argonne National Laboratory). The system supports a 230 PB [DAOS](https://docs.alcf.anl.gov/aurora/data-management/daos/daos-overview) file system and a 100 PB Lustre file system.
+-    <a href="#Frontier">Frontier</a> : [Frontier](https://www.olcf.ornl.gov/frontier/) is a 9408-node supercomputer with 9408 AMD EPYC CPUs at the OLCF (Oak Ridge Leadership Computing Facility at Oak Ridge National Laboratory). The system supports a 679 PB Lustre file system.
+-    <a href="#Perlmutter">Perlmutter</a> : [Perlmutter](https://docs.nersc.gov/systems/perlmutter/architecture/) is a 3072-node supercomputer (CPU partition) with 6144 AMD EPYC CPUs at NERSC (National Energy Research Scientific Computing Center at Lawrence Berkeley National Laboratory). The system supports a 44 PB Lustre file system.
+-    <a href="#Linux">Linux</a> : A generic Linux desktop/laptop
+
+<a name="Aurora"></a>
+### Aurora ###
+The E3SM project has installed modules for NetCDF, PnetCDF and ADIOS2 libraries on Aurora. To use these modules, 
+<pre>
+module use /lus/flare/projects/E3SMinput/soft/modulefiles
+</pre>
+On Aurora the modules include support for NetCDF, PnetCDF, HDF5 and ADIOS2 I/O libraries.
 
 <ol>
-<li>Directory setup
-
-Download a copy of the SCORPIO source into a sub-directory of your working directory (refered to here as the PIO_source directory). Create another sub-directory for the build (refered to here as the PIO_build directory) and 'cd' into it. 
-
 <li>Modules
 
-Modules required for installation depend on your prefered compiler. Issue the commands below to set the module environment for building SCORPIO on Yellowstone. 
+Modules loaded for dependent software libraries depend on the compiler. The modules listed below are for the [Intel OneAPI compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/overview.html).
 
-+ Intel
++ Intel OneAPI compiler
 
-   %> module reset<br>
-   %> module unload netcdf<br>
-   %> module swap intel intel/15.0.3<br>
-   %> module load git/2.3.0<br>
-   %> module load cmake/3.0.2<br>
-   %> module load netcdf-mpi/4.3.3.1<br>
-   %> module load pnetcdf/1.6.1<br>
+  %> module use /lus/flare/projects/E3SMinput/soft/modulefiles<br>
+  %> module load cmake/3.31.8<br>
+  %> module load oneapi/release/2025.2.0<br>
+  %> module load netcdf/4.9.3c-4.6.2f<br>
+  %> module load pnetcdf/1.14.0<br>
+  %> module load adios2/2.10.2<br>
+  %> module load hdf5/1.14.6<br>
 
-+ GNU
-
-   %> module reset<br>
-   %> module unload netcdf<br>
-   %> module swap intel gnu/4.8.2<br>
-   %> module load git/2.3.0<br>
-   %> module load cmake/3.0.2<br>
-   %> module load netcdf-mpi/4.3.3.1<br>
-   %> module load pnetcdf/1.6.1<br>
-
-+ PGI
-
-   %> module reset<br>
-   %> module unload netcdf<br>
-   %> module swap intel pgi/13.3<br>
-   %> module load git/2.3.0<br>
-   %> module load cmake/3.0.2<br>
-   %> module load netcdf-mpi/4.3.3.1<br>
-   %> module load pnetcdf/1.6.1<br>
-
+</li>
 <li>Environment Variables
 
-The appropriate compiler wrappers must be chosen for cmake, so the environment variables CC, CXX and FC must be set as:<br>
-    CC=mpicc<br>
-    CXX=mpicxx<br>
-    FC=mpif90<br>
+    Set the CC, CXX, FC environment variables to point to the compiler wrappers. Set Blosc2_DIR, ADIOS2_DIR environment variables to point to the Blosc2 and ADIOS2 install directories.
+    <pre>
+    CC=mpicc
+    CXX=mpicxx
+    FC=mpif90
+    Blosc2_DIR=$BLOSC2_ROOT
+    ADIOS2_DIR=$ADIOS2_ROOT
+    </pre>
+</li>
+<li>Downloading & Building the library
 
-<li>Build
+  The script below downloads (clones) the SCORPIO library and builds it
+  <pre><code>
+#!/bin/bash
+source /usr/share/lmod/lmod/init/sh
+module use /lus/flare/projects/E3SMinput/soft/modulefiles
+module load cmake/3.31.8
+module load oneapi/release/2025.2.0
+module load netcdf/4.9.3c-4.6.2f
+module load pnetcdf/1.14.0
+module load adios2/2.10.2
+module load hdf5/1.14.6
 
-Building SCORPIO requires running the CMake configure and then make. In the PIO_build directory type<br>
-    %> cmake ../PIO_source/<br>
-    %> make<br>
+export Blosc2_DIR=$BLOSC2_ROOT
+export ADIOS2_DIR=$ADIOS2_ROOT
+export HDF5_PATH=$HDF5_ROOT
+
+export LIBOMPTARGET_DEBUG=0
+export OMP_TARGET_OFFLOAD=DISABLED
+export MPIR_CVAR_ENABLE_GPU=0
+
+export CC=mpicc
+export CXX=mpicxx
+export FC=mpifort
+export F77=mpifort
+
+git clone https://github.com/E3SM-Project/scorpio.git
+cd scorpio
+mkdir scorpio_build
+cd scorpio_build
+
+cmake \
+-DPIO_BUILD_STATIC_LIBS=TRUE \
+-DWITH_ADIOS2:BOOL=TRUE \
+-DWITH_HDF5:BOOL=TRUE \
+-DWITH_PNETCDF:BOOL=TRUE \
+-DPIO_USE_MALLOC:BOOL=ON \
+-DPIO_BUILD_TESTS:BOOL=ON \
+-DPIO_ENABLE_EXAMPLES:BOOL=ON \
+-DPIO_ENABLE_TESTS:BOOL=ON \
+-DPIO_ENABLE_TIMING:BOOL=ON \
+-DPnetCDF_PATH=$PNETCDF_PATH \
+-DNetCDF_C_PATH=$NETCDF_PATH \
+-DNetCDF_Fortran_PATH=$NETCDF_PATH \
+-DHDF5_PATH=$HDF5_PATH \
+-LH \
+.. |& tee configure.log
+
+make -j4 |& tee make.log
+  </code></pre>
+</li>
 </ol>
 
-<a name="Edison"></a>
-### Edison ###
+<a name="Frontier"></a>
+### Frontier ###
+On Frontier the modules below include support for NetCDF, PnetCDF, HDF5 and ADIOS2 I/O libraries.
 
 <ol>
-<li>Directory setup
-
-Download a copy of the SCORPIO source into a sub-directory of your working directory (refered to here as the PIO_source directory). Create another sub-directory for the build (refered to here as the PIO_build directory) and 'cd' into it. 
-
 <li>Modules
 
-Modules required for installation depend on your prefered compiler. Issue the commands below to set the module environment for building SCORPIO on Edison. 
+Modules loaded for dependent software libraries depend on the compiler. The modules listed below are for the GNU compiler.
 
-+ Intel 
++ Cray Programming environment + GNU compiler
 
-  %> module purge<br>
-  %> module load PrgEnv-intel<br>
-  %> module load craype-ivybridge<br>
-  %> module load cray-shmem<br>
-  %> module load cray-mpich<br>
-  %> module load torque<br>
-  %> module load git/2.4.6 <br>
-  %> module load cmake/3.0.0<br>
-  %> module load cray-hdf5-parallel/1.8.14<br>
-  %> module load cray-netcdf-hdf5parallel/4.3.3.1<br>
-  %> module load cray-parallel-netcdf/1.6.1<br>
-
-+ GNU
-
-  %> module purge<br>
+  %> module reset<br>
+  %> module load Core/25.03<br>
   %> module load PrgEnv-gnu<br>
-  %> module load craype-ivybridge<br>
-  %> module load cray-shmem<br>
-  %> module load cray-mpich<br>
-  %> module load torque<br>
-  %> module load git/2.4.6<br>
-  %> module load cmake/3.0.0<br>
-  %> module load cray-hdf5-parallel/1.8.14<br>
-  %> module load cray-netcdf-hdf5parallel/4.3.3.1<br>
-  %> module load cray-parallel-netcdf/1.6.1<br>
+  %> module load cpe/24.11<br>
+  %> module load libunwind/1.8.1 cray-python/3.11.7<br>
+  %> module load subversion git cmake<br>
+  %> module load cray-hdf5-parallel/1.14.3.3<br>
+  %> module load cray-netcdf-hdf5parallel/4.9.0.15<br>
+  %> module load cray-parallel-netcdf/1.12.3.15<br>
+  %> module load adios2/2.10.2-mpi<br>
 
-+ Cray
-
-  %> module purge<br>
-  %> module load PrgEnv-cray<br>
-  %> module load craype-ivybridge<br>
-  %> module load cray-shmem<br>
-  %> module load cray-mpich<br>
-  %> module swap cce cce/8.4.0.223<br>
-  %> module load torque<br>
-  %> module load git/2.4.6 <br>
-  %> module load cmake/3.0.0<br>
-  %> module load cray-hdf5-parallel/1.8.14<br>
-  %> module load cray-netcdf-hdf5parallel/4.3.3.1<br>
-  %> module load cray-parallel-netcdf/1.6.1<br>
-
+</li>
 <li>Environment Variables
 
-The appropriate compiler wrappers must be chosen for cmake, so the environment variables CC and FC must be set as:<br>
-    CC=cc<br>
-    CXX=CC<br>
-    FC=ftn<br>
+    Set the CC, CXX, FC environment variables to point to the compiler wrappers. Set ADIOS2_DIR environment variable to point to the ADIOS2 install directory.
+    <pre>
+    CC=cc
+    CXX=CC
+    FC=ftn
+    ADIOS2_DIR=$OLCF_ADIOS2_ROOT
+    </pre>
+</li>
+<li>Downloading & Building the library
 
-<li>Build
+  The script below downloads (clones) the SCORPIO library and builds it
+  <pre><code>
+#!/bin/bash
+source /opt/cray/pe/lmod/lmod/init/sh
+module reset
+module load Core/25.03
+module load PrgEnv-gnu
+module load cpe/24.11
+module load libunwind/1.8.1
+module load cray-python/3.11.7
+module load subversion
+module load git
+module load cmake
+module load cray-hdf5-parallel/1.14.3.3
+module load cray-netcdf-hdf5parallel/4.9.0.15
+module load cray-parallel-netcdf/1.12.3.15
+module load adios2/2.10.2-mpi
 
-Building SCORPIO requires running the CMake configure and then make. In the PIO_build directory type<br>
-  %> cmake -DCMAKE_VERBOSE_MAKEFILE=TRUE \\<br>
-     -DPREFER_STATIC=TRUE \\<br>
-     -DNetCDF_PATH=${NETCDF_DIR} \\<br>
-     -DPnetCDF_PATH=${PARALLEL_NETCDF_DIR} \\<br>
-     -DHDF5_PATH=${HDF5_DIR} \\<br>
-     -DMPI_C_INCLUDE_PATH=${MPICH_DIR}/include \\<br>
-     -DMPI_Fortran_INCLUDE_PATH=${MPICH_DIR}/include \\<br>
-     -DMPI_C_LIBRARIES=${MPICH_DIR}/lib/libmpich.a \\<br>
-     -DMPI_Fortran_LIBRARIES=${MPICH_DIR}/lib/libmpichf90.a \\<br>
-     -DCMAKE_SYSTEM_NAME=Catamount \\<br>
-     ../PIO_source/<br>
-  %> make
+export NETCDF_PATH=$NETCDF_DIR
+export PNETCDF_PATH=$PNETCDF_DIR
+export ADIOS2_DIR=$OLCF_ADIOS2_ROOT
 
+export CC=cc
+export CXX=CC
+export FC=ftn
+export F77=ftn
+
+git clone https://github.com/E3SM-Project/scorpio.git
+cd scorpio
+mkdir scorpio_build
+cd scorpio_build
+
+cmake \
+-DPIO_BUILD_STATIC_LIBS=TRUE \
+-DWITH_PNETCDF:BOOL=TRUE \
+-DWITH_ADIOS2:BOOL=ON \
+-DADIOS_BP2NC_TEST=ON \
+-DPIO_ENABLE_FORTRAN:BOOL=ON \
+-DPIO_USE_MALLOC:BOOL=ON \
+-DPIO_BUILD_TESTS:BOOL=ON \
+-DPIO_ENABLE_EXAMPLES:BOOL=ON \
+-DPIO_ENABLE_TESTS:BOOL=ON \
+-DPIO_ENABLE_TIMING:BOOL=ON \
+-DPLATFORM:STRING=linux-gnu \
+-DPnetCDF_PATH=$PNETCDF_PATH \
+-DNetCDF_C_PATH=$NETCDF_PATH \
+-DNetCDF_Fortran_PATH=$NETCDF_PATH \
+-LH \
+.. |& tee configure.log
+
+make -j4 |& tee make.log
+  </code></pre>
+</li>
 </ol>
 
-<a name="Mira"></a>
-### Mira/Cetus ###
+<a name="Perlmutter"></a>
+### Perlmutter ###
+On Perlmutter the modules below include support for NetCDF and PnetCDF I/O libraries.
 
 <ol>
-<li>Directory setup
-
-Download a copy of the SCORPIO source into a sub-directory of your working directory (refered to here as the PIO_source directory). Create another sub-directory for the build (refered to here as the PIO_build directory) and 'cd' into it. 
-
-<li> Softenv packages and environment variables
-
-It is not necessary to edit your .soft file on Mira inorder to build SCORPIO. Execute the following commands to temporarily load packages into your softenv. These packages use the IBM/XL compiler.<br>
-  %> soft add +mpiwrapper-xl (or switch from the default in your softenv)<br>
-  %> soft add @ibm-compilers-2015-02<br>
-  %> soft add +cmake<br>
-  %> soft add +git<br>
-
-And then set the following environment variables to add in the rest of the library paths.<br>
-  %> setenv LIBZ /soft/libraries/alcf/current/xl/ZLIB<br>
-  %> setenv HDF5 /soft/libraries/hdf5/1.8.14/cnk-xl/V1R2M2-20150213<br>
-  %> setenv NETCDF /soft/libraries/netcdf/4.3.3-f4.4.1/cnk-xl/V1R2M2-20150213<br>
-  %> setenv PNETCDF /soft/libraries/pnetcdf/1.6.1/cnk-xl/V1R2M2-20150213<br>
-  %> setenv CC /soft/compilers/wrappers/xl/mpixlc_r<br>
-  %> setenv FC /soft/compilers/wrappers/xl/mpixlf90_r<br>
-
-<li>Build
-
-Building SCORPIO requires running the CMake configure and then make. In the PIO_build directory type<br>
-  %> cmake -DPREFER_STATIC=TRUE ../PIO_source/<br>
-  %> make
-
-</ol>
-
-<a name="BlueWat"></a>
-### Blue Waters ###
-<ol>
-<li>Directory setup
-
-Download a copy of the SCORPIO source into a sub-directory of your working directory (refered to here as the PIO_source directory). Create another sub-directory for the build (refered to here as the PIO_build directory) and 'cd' into it. 
-
 <li>Modules
 
-Modules required for installation depend on your prefered compiler. Issue the commands below to set the module environment for building SCORPIO on Hobart. 
+Modules loaded for dependent software libraries depend on the compiler. The modules listed below are for the Intel compiler.
 
-+ Intel
++ Cray Programming environment + Intel compiler
 
-  %> module swap PrgEnv-cray PrgEnv-intel<br>
-  %> module load torque<br>
-  %> module load git<br>
-  %> module load cmake<br>
-  %> module load cray-hdf5-parallel/1.8.14<br>
-  %> module load cray-netcdf-hdf5parallel/4.3.3.1<br>
-  %> module load cray-parallel-netcdf/1.6.1<br>
+  %> module reset<br>
+  %> module load PrgEnv-intel/8.5.0<br>
+  %> module load intel/2024.1.0<br>
+  %> module load craype-accel-host<br>
+  %> module load craype/2.7.32<br>
+  %> module load cray-mpich/8.1.30<br>
+  %> module load cray-hdf5-parallel/1.12.2.9<br>
+  %> module load cray-netcdf-hdf5parallel/4.9.0.9<br>
+  %> module load cray-parallel-netcdf/1.12.3.13<br>
+  %> module load cmake/3.30.2<br>
 
-+ PGI
-
-  %> module swap PrgEnv-cray PrgEnv-pgi<br>
-  %> module load torque<br>
-  %> module load git<br>
-  %> module load cmake<br>
-  %> module load cray-hdf5-parallel/1.8.14<br>
-  %> module load cray-netcdf-hdf5parallel/4.3.3.1<br>
-  %> module load cray-parallel-netcdf/1.6.1<br>
-
+</li>
 <li>Environment Variables
 
-The appropriate compiler wrappers must be chosen for cmake, so the environment variables CC and FC must be set as:<br>
-    CC=cc<br>
-    CXX=CC<br>
-    FC=ftn<br>
+    Set the CC, CXX, FC environment variables to point to the compiler wrappers.
+    <pre>
+    CC=cc
+    CXX=CC
+    FC=ftn
+    </pre>
+</li>
+<li>Downloading & Building the library
 
-<li>Build
+  The script below downloads (clones) the SCORPIO library and builds it
+  <pre><code>
+#!/bin/bash
 
-Building SCORPIO requires running the CMake configure and then make. In the PIO_build directory type<br>
-  %> cmake -DCMAKE_VERBOSE_MAKEFILE=TRUE \\<br>
-     -DPREFER_STATIC=TRUE \\<br>
-     -DNetCDF_PATH=${NETCDF_DIR} \\<br>
-     -DPnetCDF_PATH=${PARALLEL_NETCDF_DIR} \\<br>
-     -DHDF5_PATH=${HDF5_DIR} \\<br>
-     -DMPI_C_INCLUDE_PATH=${MPICH_DIR}/include \\<br>
-     -DMPI_Fortran_INCLUDE_PATH=${MPICH_DIR}/include \\<br>
-     -DMPI_C_LIBRARIES=${MPICH_DIR}/lib/libmpich.a \\<br>
-     -DMPI_Fortran_LIBRARIES=${MPICH_DIR}/lib/libmpichf90.a \\<br>
-     -DCMAKE_SYSTEM_NAME=Catamount \\<br>
-     ../PIO_source/<br>
-  %> make
+source /usr/share/lmod/8.3.1/init/sh
+module reset
 
+module load PrgEnv-intel/8.5.0
+module load intel/2024.1.0
+
+module load craype-accel-host
+module load craype/2.7.32
+module load cray-mpich/8.1.30
+module load cray-hdf5-parallel/1.12.2.9
+module load cray-netcdf-hdf5parallel/4.9.0.9
+module load cray-parallel-netcdf/1.12.3.13
+module load cmake/3.30.2
+
+export CC=cc
+export CXX=CC
+export F77=ftn
+export FC=ftn
+
+git clone https://github.com/E3SM-Project/scorpio.git
+cd scorpio
+mkdir scorpio_build
+cd scorpio_build
+
+cmake \
+-DNetCDF_PATH=${CRAY_NETCDF_HDF5PARALLEL_PREFIX} \
+-DPnetCDF_PATH=${CRAY_PARALLEL_NETCDF_PREFIX} \
+-LH \
+.. |& tee configure.log
+
+make -j 4 |& tee make.log
+  </code></pre>
+</li>
 </ol>
 
+<a name="Linux desktop"></a>
+### Linux Desktop ###
+On a Linux desktop install an MPI library and the PnetCDF or NetCDF library.
 
-
-<a name="Hobart"></a>
-### Hobart ###
 <ol>
-<li>Directory setup
+<li>Installing dependencies
 
-Download a copy of the SCORPIO source into a sub-directory of your working directory (refered to here as the PIO_source directory). Create another sub-directory for the build (refered to here as the PIO_build directory) and 'cd' into it. 
-
-<li>Modules
-
-Modules required for installation depend on your prefered compiler. Issue the commands below to set the module environment for building SCORPIO on Hobart. 
-
-+ Intel
-
-  %> module purge<br>
-  %> module load compiler/intel/15.0.2.164<br>
-  %> module load tool/parallel-netcdf/1.6.1/intel<br>
-
-+ Nag
-
-  %> module purge<br>
-  %> module load compiler/nag/6.0<br>
-  %> module load tool/parallel-netcdf/1.6.1/nag/openmpi<br>
-  
-+ PGI
-
-  %> module purge<br>
-  %> module load compiler/pgi/15.1<br>
-  %> module load tool/parallel-netcdf/1.6.1/pgi/mvapich2<br>
-
+  <ol>
+  <li>Download and install the [MPICH library](https://www.mpich.org/downloads/) (Or an MPI library of your choice)</li>
+  <li>Download and install the [PnetCDF library](https://parallel-netcdf.github.io/wiki/Download.html)</li>
+  </ol>
+</li>
 <li>Environment Variables
 
-The appropriate compiler wrappers must be chosen for cmake, so the environment variables CC, CXX and FC must be set as:<br>
-    CC=mpicc<br>
-    CXX=mpicxx<br>
-    FC=mpif90<br>
+    Set the CC, CXX, FC environment variables to point to the MPICH (MPI library) compiler wrappers.
+    <pre>
+    CC=mpicc
+    CXX=mpicxx
+    FC=mpif90
+    </pre>
+</li>
+<li>Downloading & Building the library
 
-<li>Build
+  Assuming MPICH and PnetCDF libraries were installed in /usr/local/mpich/4.2.3/install and /usr/local/pnetcdf/1.14.0/install respectively,
+the script below downloads (clones) the SCORPIO library and builds it
+  <pre><code>
+#!/bin/bash
 
-Building SCORPIO requires running the CMake configure and then make. In the PIO_build directory type<br>
-  %> cmake -DNETCDF_DIR=$NETCDF_PATH -DPNETCDF_DIR=$PNETCDF_PATH ../PIO_source/<br>
-  %> make
+export PATH=/usr/local/mpich/4.2.3/install/bin:$PATH
+export PNETCDF_PATH=/usr/local/pnetcdf/1.14.0/install
 
-ParallelIO does not require Parallel netcdf to run, so if you decide to use the GNU compiler on Hobart (not described here) without the parallel-netcdf library, use the cmake configure flags:<br>
-  %> cmake -DNETCDF_DIR=$NETCDF_PATH -DWITH_PNETCDF=FALSE ../PIO_source/<br>
-  %> make
+export CC=mpicc
+export CXX=mpicxx
+export FC=mpif90
 
+git clone https://github.com/E3SM-Project/scorpio.git
+cd scorpio
+mkdir scorpio_build
+cd scorpio_build
+
+cmake \
+-DPIO_BUILD_STATIC_LIBS=TRUE \
+-DWITH_PNETCDF:BOOL=TRUE \
+-DPIO_ENABLE_FORTRAN:BOOL=ON \
+-DPIO_USE_MALLOC:BOOL=ON \
+-DPIO_BUILD_TESTS:BOOL=ON \
+-DPIO_ENABLE_EXAMPLES:BOOL=ON \
+-DPIO_ENABLE_TESTS:BOOL=ON \
+-DPIO_ENABLE_TIMING:BOOL=ON \
+-DPLATFORM:STRING=linux-gnu \
+-DPnetCDF_PATH=$PNETCDF_PATH \
+-LH \
+.. |& tee configure.log
+
+make -j4 |& tee make.log
+  </code></pre>
+</li>
 </ol>
 
-<a name="Linux"></a>
-### Linux with MPICH ###
-<ol>
-<li>Installing MPICH
-
-<p>Download from the <a href="http://www.mpich.org/downloads/">MPICH2
-downloads page</a>. (These instructions were tested using version
-3.2). Untar with:
-<pre>tar zxf mpich-3.2.tar.gz</pre>
-
-<p>Build with:
-<pre>cd mpich-3.2 && ./configure --prefix=/usr/local && make all check
-&& sudo make install </pre>
-
-<p>Now you should be able to access mpicc, mpicxx, mpifort, and mpirun from
-the command line. (If not, make sure /usr/local/bin is in path.)
-
-<p>Note that if you wish to use valgrind on your programs, you should
-configure MPICH like this:
-<pre>CPPFLAGS=-I/usr/include/valgrind ./configure --prefix=/usr/local --enable-g=mem,meminit</pre>
-
-<p>For this to work you must have packages valgrind and valgrind-devel
-installed.
-
-<li>Installing Zlib
-
-<p>Download from the <a href="http://www.zlib.net/">zlib
-downloads page</a>. (These instructions were tested using version
-1.2.11). Untar with:
-<pre>tar zxf zlib-1.2.11.tar.gz</pre>
-
-
-<p>Build with:
-<pre>cd zlib-1.2.11
-CC=mpicc ./configure --prefix=/usr/local/zlib-1.2.11_mpich-3.2
-make all check
-sudo make install </pre>
-
-<li>Installing SZlib
-
-<p>Download szlib from the <a
-href="https://www.hdfgroup.org/doc_resource/SZIP/">HDF5 szlib
-page</a>. (These instructions were tested using version 2.1). Untar
-with: <pre>tar zxf szip-2.1.tar.gz</pre>
-
-
-<p>Build with:
-<pre>cd slib-2.1
-CC=mpicc ./configure --prefix=/usr/local/szip-2.1_mpich-3.2
-make all check
-sudo make install </pre>
-
-<li>Installing pNetCDF
-
-<p>Download parallel-netcdf from the <a
-href="http://cucis.ece.northwestern.edu/projects/PnetCDF/download.html">parallel-netcdf
-download page</a>. (These instructions were tested using version
-1.8.1). Untar with: <pre>tar zxf parallel-netcdf-1.8.1.tar.gz</pre>
-
-<p>Build with:
-<pre>cd parallel-netcdf-1.8.1
-FC=mpifort CC=mpicc CFLAGS=-fPIC ./configure --prefix=/usr/local/pnetcdf-1.8.1_mpich-3.2
-make all check
-sudo make install </pre>
-
-<li>Installing HDF5
-
-<p>Download HDF5 from the <a
-href="https://www.hdfgroup.org/downloads/hdf5/source-code/">HDF5 download
-page</a>.
-
-<p>These instructions were tested using version 1.10.1. Untar with:
-<pre>tar zxf hdf5-1.10.1.tar.gz</pre>. Note that in my case I need to
-add /usr/local/bin to the PATH for su, because that is where mpicc is
-found.
-
-<p>Build with:
-<pre>cd hdf5-1.10.1
-CC=mpicc ./configure --with-zlib=/usr/local/zlib-1.2.11_mpich-3.2 --with-szlib=/usr/local/szip-2.1_mpich-3.2 --prefix=/usr/local/hdf5-1.10.1_mpich-3.2 --enable-parallel
-make all check
-sudo PATH=$PATH:/usr/local/bin make install
-
-<li>Installing NetCDF-4 C Library
-
-<p>Download the netcdf C library from the <a
-href="http://www.unidata.ucar.edu/downloads/netcdf/index.jsp">NetCDF download
-page</a>. Untar with: <pre>tar zxf netcdf-c-4.5.0-rc1.tar.gz</pre>
-
-
-<p>Build with:
-<pre>cd netcdf-c-4.5.0-rc1
-CPPFLAGS='-I/usr/local/zlib-1.2.11_mpich-3.2 -I/usr/local/szip-2.1_mpich-3.2/include -I/usr/local/hdf5-1.10.1_mpich-3.2/include' LDFLAGS='-L/usr/local/zlib-1.2.11_mpich-3.2/lib -L/usr/local/szip-2.1_mpich-3.2/lib -L/usr/local/hdf5-1.10.1_mpich-3.2/lib' CC=mpicc ./configure --enable-parallel-tests --prefix=/usr/local/netcdf-c-4.5.0-rc1_mpich-3.2
-make all check
-sudo make install </pre>
-
-<p>Note that you may not build netCDF with it's built-in
-parallel-netCDF support, if you are also planning to use the
-parallel-netCDF library with SCORPIO. For SCORPIO, parallel-netCDF must be
-installed independently of netCDF.
-
-<li>Installing NetCDF-4 Fortran Library
-
-<p>Download the netcdf Fortran library from the <a
-href="http://www.unidata.ucar.edu/downloads/netcdf/index.jsp">NetCDF download
-page</a>. Untar
-with: <pre>tar zxf netcdf-fortran-4.4.4.tar.gz</pre>
-
-
-<p>Build with:
-<pre>cd netcdf-fortran-4.4.4
-CC=mpicc LD_LIBRARY_PATH=/usr/local/netcdf-c-4.5.0-rc1_mpich-3.2/lib FC=mpifort CPPFLAGS=-I/usr/local/netcdf-c-4.5.0-rc1_mpich-3.2/include LDFLAGS=-L/usr/local/netcdf-c-4.5.0-rc1_mpich-3.2/lib ./configure --enable-parallel-tests --prefix=/usr/local/netcdf-fortran-4.4.4_mpich-3.2
-make all
-sudo make install </pre>
-
-<p>Note that make check did not work because of a failure in a
-test. This has been reported to the netCDF team.
-
-<li>Installing ParallelIO Library
-
-<p>Clone the ParallelIO library.
-
-<p>Create a build directory and run cmake.
+### Building and running examples
+Once the library is built you can build SCORPIO examples (In the SCORPIO_SOURCE/examples directory) using the <em>examples</em> target
 <pre>
-cd ParallelIO
-mkdir build
-cd build
-CC=mpicc CXX=mpicxx FC=mpifort cmake -DNetCDF_C_PATH=/usr/local/netcdf-c-4.5.0-rc1_mpich-3.2 -DNetCDF_Fortran_PATH=/usr/local/netcdf-fortran-4.4.4_mpich-3.2 -DPnetCDF_PATH=/usr/local/pnetcdf-1.8.1_mpich-3.2 -DPIO_HDF5_LOGGING=On -DPIO_USE_MALLOC=On ..
-make
-make check
-sudo make install
+make -j 4 examples
+</pre>
+The examples can be run using the mpiexec (or the appropriate MPI program launcher) command.
+
+### Building and running tests
+After building the library you can build SCORPIO tests using the <em>tests</em> target
+<pre>
+make -j 4 tests
+</pre>
+On machines with a batch job scheduler ([Aurora](https://docs.alcf.anl.gov/aurora/running-jobs-aurora/), [Frontier](https://docs.olcf.ornl.gov/systems/frontier_user_guide.html#running-jobs), [Perlmutter](https://docs.nersc.gov/getting-started/)) refer to the appropriate user manual for information on how to run programs in batch jobs.
+The tests can be run from the build directory using the <em>test</em> target or using the CMake test driver <em>ctest</em> (from the command line on a Linux desktop and within a
+batch job on machines using a batch job scheduler)
+<pre>
+make test
+</pre>
+or
+<pre>
+ctest
 </pre>
 
-<p>When debugging build issues, it's helpful to be able to do a clean
-build from the command line, including tests:
-
-<pre>
-cd build
-rm -rf * && CFLAGS='-Wall -g' CXXFLAGS='-Wall -g' FFLAGS=-g CC=mpicc CXX=mpicxx FC=mpifort cmake -DNetCDF_C_PATH=/usr/local/netcdf-c-4.5.0-rc1_mpich-3.2 -DNetCDF_Fortran_PATH=/usr/local/netcdf-fortran-4.4.4_mpich-3.2 -DPnetCDF_PATH=/usr/local/pnetcdf-1.8.1_mpich-3.2 -DPIO_HDF5_LOGGING=On -DPIO_USE_MALLOC=On .. && make VERBOSE=1 all tests check
-</pre>
-
-<p>Note the optional CFLAGS=-g which allows the use of a debugger
-with this code. Also note the optional VERBOSE=1 provided to make,
-which causes the build commands to be made visible.
-
-<p>Note also the -DPIO_ENABLE_LOGGING=On which is helpful for debugging but should probably not be used in production builds.
-
-<li>Building and Running Performance Tests
-
-<p>Download a decomp file from our <a
-href="http://parallelio.googlecode.com/svn/perfdecomps/trunk/30/">google
-code page</a>. You can use any of those files, save them to
-build/test/performance. (These instructions were tested with the first
-one in the list.)
-
-<p>Create a namelist file, named "pioperf.nl". Save this file in the
-subdirectory (note that it is in the BUILD directory):
-<pre>
-build/tests/performance/
-</pre>
-
-<p>The contents of the namelist file should look like:
-<pre>
-&pioperf
-decompfile = "/u/sciteam/thayerca/scratch/pio_work/piodecomp30tasks01dims06.dat"
-pio_typenames = 'pnetcdf'
-niotasks = 30
-rearrangers = 1
-nvars = 2
-/
-</pre>
-
-<p>You should change the path to your decomp file to wherever you
-saved it. You can add items to the list to run more tests, so, for
-instance, to test all of the types of io, your pio_typenames would
-look like: pio_typenames = 'pnetcdf','netcdf','netcdf4p','netcdf4c'
-
-<p>HDF5 is netcdf4p, and Parallel-Netcdf is pnetcdf.
-
-<p>Example to test with different numbers of tasks, you could do:
-niotasks = 30,15,5
-
-<p>Example to test with both of the rearranger algorithms:
-rearrangers = 1,2
-
-<p>Example to test with different numbers of variables:
-nvars = 8,5,3,2
-
-<p>Once you have your decomp file and your namelist set up, run like this:
-
-<pre>
-mpiexec -n 30 ./pioperf
-</pre>
-
-<p>If you run the most basic performance tests (as in the first
-pioperf.nl example), this script should only take a few minutes (less
-than 5) to complete. The output and results will be written to your
-pioperf.o$PBS_JOBID file. Adding more iotypes and rearrangers and
-variables to these tests will increase the time significantly.
-
-</ol>
-
-_Last updated: 05-16-2016_
+_Last updated: 11-17-2025_
 */

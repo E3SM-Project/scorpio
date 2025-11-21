@@ -13,7 +13,7 @@ module piolib_mod
   !--------------
   use pio_types, only : file_desc_t, iosystem_desc_t, var_desc_t, io_desc_t, &
         pio_iotype_netcdf, pio_iotype_pnetcdf, pio_iotype_netcdf4p, pio_iotype_netcdf4c, &
-        pio_noerr, pio_rearr_subset, pio_rearr_box, pio_rearr_opt_t
+        pio_noerr, pio_rearr_subset, pio_rearr_box, pio_rearr_opt_t, pio_max_name
   !--------------
   use pio_support, only : piodie, debug, debugio, debugasync, checkmpireturn,&
                           Fstring2Cstring
@@ -54,7 +54,13 @@ module piolib_mod
        PIO_get_numiotasks, &
        PIO_iotype_available, &
        PIO_set_rearr_opts, &
-       PIO_set_fill
+       PIO_set_fill, &
+       PIO_get_version_major, &
+       PIO_get_version_minor, &
+       PIO_get_version_patch, &
+       PIO_get_version_string, &
+       PIO_get_version_hash, &
+       PIO_get_version
 
 #ifdef MEMCHK
 !> this is an internal variable for memory leak debugging
@@ -1242,6 +1248,167 @@ contains
 
   end function pio_set_fill
 
+
+!> @defgroup PIO_get_version_major PIO_get_version_major
+!! @public
+!! @brief Get SCORPIO major version
+!!
+!! @details
+!! @returns Returns the SCORPIO major version
+  INTEGER FUNCTION pio_get_version_major() RESULT(ver)
+    IMPLICIT NONE
+    INTERFACE
+      INTEGER(C_INT) FUNCTION PIOc_get_version_major() &
+                              bind(C,name="PIOc_get_version_major")
+        USE iso_c_binding
+      END FUNCTION PIOc_get_version_major
+    END INTERFACE
+
+    ver = INT(PIOc_get_version_major())
+  END FUNCTION pio_get_version_major
+
+!> @defgroup PIO_get_version_minor PIO_get_version_minor
+!! @public
+!! @brief Get SCORPIO minor version
+!!
+!! @details
+!! @returns Returns the SCORPIO minor version
+  INTEGER FUNCTION pio_get_version_minor() RESULT(ver)
+    IMPLICIT NONE
+    INTERFACE
+      INTEGER(C_INT) FUNCTION PIOc_get_version_minor() &
+                              bind(C,name="PIOc_get_version_minor")
+        USE iso_c_binding
+      END FUNCTION PIOc_get_version_minor
+    END INTERFACE
+
+    ver = INT(PIOc_get_version_minor())
+  END FUNCTION pio_get_version_minor
+
+!> @defgroup PIO_get_version_patch PIO_get_version_patch
+!! @public
+!! @brief Get SCORPIO patch version
+!!
+!! @details
+!! @returns Returns the SCORPIO patch version
+  INTEGER FUNCTION pio_get_version_patch() RESULT(ver)
+    IMPLICIT NONE
+    INTERFACE
+      INTEGER(C_INT) FUNCTION PIOc_get_version_patch() &
+                              bind(C,name="PIOc_get_version_patch")
+        USE iso_c_binding
+      END FUNCTION PIOc_get_version_patch
+    END INTERFACE
+
+    ver = INT(PIOc_get_version_patch())
+  END FUNCTION pio_get_version_patch
+
+!> @defgroup PIO_get_version_string PIO_get_version_string
+!! @public
+!! @brief Get SCORPIO version string
+!!
+!! @details
+!! @param[out] vstr String to store the version string
+!! @retval ierr @copydoc error_return
+  INTEGER FUNCTION pio_get_version_string(vstr) RESULT(ierr)
+    IMPLICIT NONE
+    CHARACTER(LEN=*), INTENT(OUT) :: vstr
+
+    CHARACTER(C_CHAR) :: cvstr(PIO_MAX_NAME)
+    INTEGER :: i
+
+    INTERFACE
+      INTEGER(C_INT) FUNCTION PIOc_get_version_string(vstr, len)&
+                              bind(C,name="PIOc_get_version_string")
+        USE iso_c_binding
+
+        CHARACTER(C_CHAR), DIMENSION(*) :: vstr
+        INTEGER(C_INT), VALUE :: len
+      END FUNCTION PIOc_get_version_string
+    END INTERFACE
+
+    ierr = PIOc_get_version_string(cvstr, PIO_MAX_NAME)
+    IF(ierr == PIO_NOERR) THEN
+      DO i=1,MIN(LEN(vstr), PIO_MAX_NAME)
+        IF(cvstr(i) == C_NULL_CHAR) THEN
+          EXIT
+        ENDIF
+        vstr(i:i) = cvstr(i)
+      END DO
+    ENDIF
+  END FUNCTION pio_get_version_string
+
+!> @defgroup PIO_get_version_hash PIO_get_version_hash
+!! @public
+!! @brief Get SCORPIO version hash (GIT hash)
+!!
+!! @details
+!! @param[out] vstr String to store the version hash
+!! @retval ierr @copydoc error_return
+  INTEGER FUNCTION pio_get_version_hash(vstr) RESULT(ierr)
+    IMPLICIT NONE
+    CHARACTER(LEN=*), INTENT(OUT) :: vstr
+
+    CHARACTER(C_CHAR) :: cvstr(PIO_MAX_NAME)
+    INTEGER :: i
+
+    INTERFACE
+      INTEGER(C_INT) FUNCTION PIOc_get_version_hash(vstr, len)&
+                              bind(C,name="PIOc_get_version_hash")
+        USE iso_c_binding
+
+        CHARACTER(C_CHAR), DIMENSION(*) :: vstr
+        INTEGER(C_INT), VALUE :: len
+      END FUNCTION PIOc_get_version_hash
+    END INTERFACE
+
+
+    ierr = PIOc_get_version_hash(cvstr, PIO_MAX_NAME)
+    IF(ierr == PIO_NOERR) THEN
+      DO i=1,MIN(LEN(vstr), PIO_MAX_NAME)
+        IF(cvstr(i) == C_NULL_CHAR) THEN
+          EXIT
+        ENDIF
+        vstr(i:i) = cvstr(i)
+      END DO
+    ENDIF
+  END FUNCTION pio_get_version_hash
+
+!> @defgroup PIO_get_version PIO_get_version
+!! @public
+!! @brief Get SCORPIO version info
+!!
+!! @details
+!! Get SCORPIO version major/minor/patch version and git hash
+!! @param[out] major (Optional) The major version number is returned in this arg
+!! @param[out] minor (Optional) The minor version number is returned in this arg
+!! @param[out] patch (Optional) The patch version number is returned in this arg
+!! @param[out] vstr (Optional) String to store the version string
+!! @retval ierr @copydoc error_return
+  INTEGER FUNCTION pio_get_version(major, minor, patch, vstr) RESULT(ierr)
+    IMPLICIT NONE
+    INTEGER, OPTIONAL, INTENT(OUT) :: major
+    INTEGER, OPTIONAL, INTENT(OUT) :: minor
+    INTEGER, OPTIONAL, INTENT(OUT) :: patch
+    CHARACTER(LEN=*), OPTIONAL, INTENT(OUT) :: vstr
+
+    ierr = PIO_NOERR
+    IF(PRESENT(major)) THEN
+      major = pio_get_version_major()
+    END IF
+
+    IF(PRESENT(minor)) THEN
+      minor = pio_get_version_minor()
+    END IF
+
+    IF(PRESENT(patch)) THEN
+      patch = pio_get_version_patch()
+    END IF
+
+    IF(PRESENT(vstr)) THEN
+      ierr = pio_get_version_string(vstr)
+    END IF
+  END FUNCTION pio_get_version
 
 end module piolib_mod
 

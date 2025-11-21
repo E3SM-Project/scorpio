@@ -1,6 +1,11 @@
 <map id="io_desc_t" name="io_desc_t">
-<area shape="rect" id="node1" title="IO descriptor structure." alt="" coords="91,213,174,240"/>
-<area shape="rect" id="node2" href="$structrearr__opt.html" title="Rearranger options." alt="" coords="39,109,120,136"/>
-<area shape="rect" id="node3" href="$structrearr__comm__fc__opt.html" title="Rearranger comm flow control options." alt="" coords="5,5,153,32"/>
-<area shape="rect" id="node4" href="$structio__region.html" title="IO region structure." alt="" coords="145,109,227,136"/>
+<area shape="rect" id="Node000001" title="IO descriptor structure." alt="" coords="87,211,169,236"/>
+<area shape="poly" id="edge5_Node000001_Node000001" title=" " alt="" coords="184,213,192,216,196,224,188,233,170,235,169,230,185,228,191,223,189,220,182,218"/>
+<area shape="rect" id="Node000002" href="$structio__region.html" title="IO region structure." alt="" coords="5,108,88,133"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="66,143,99,185,120,209,116,212,95,188,62,146"/>
+<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="103,110,111,114,115,121,106,130,89,133,88,128,104,125,109,120,107,118,101,115"/>
+<area shape="rect" id="Node000003" href="$structrearr__opt.html" title="Rearranger options." alt="" coords="170,108,251,133"/>
+<area shape="poly" id="edge3_Node000001_Node000003" title=" " alt="" coords="198,146,166,188,143,212,139,209,162,185,193,143"/>
+<area shape="rect" id="Node000004" href="$structrearr__comm__fc__opt.html" title="Rearranger comm flow control options." alt="" coords="137,5,285,31"/>
+<area shape="poly" id="edge4_Node000003_Node000004" title=" " alt="" coords="213,45,213,108,208,108,208,45"/>
 </map>

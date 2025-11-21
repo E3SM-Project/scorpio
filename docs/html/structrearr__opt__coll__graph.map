@@ -1,4 +1,5 @@
 <map id="rearr_opt" name="rearr_opt">
-<area shape="rect" id="node1" title="Rearranger options." alt="" coords="39,109,120,136"/>
-<area shape="rect" id="node2" href="$structrearr__comm__fc__opt.html" title="Rearranger comm flow control options." alt="" coords="5,5,153,32"/>
+<area shape="rect" id="Node000001" title="Rearranger options." alt="" coords="39,108,120,133"/>
+<area shape="rect" id="Node000002" href="$structrearr__comm__fc__opt.html" title="Rearranger comm flow control options." alt="" coords="5,5,153,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="82,45,82,108,77,108,77,45"/>
 </map>

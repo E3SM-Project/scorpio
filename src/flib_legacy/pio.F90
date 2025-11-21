@@ -17,7 +17,9 @@ module pio
        pio_freedecomp, pio_syncfile, &
        pio_finalize, pio_set_hint, pio_getnumiotasks, pio_file_is_open, &
        PIO_deletefile, PIO_get_numiotasks, PIO_iotype_available, &
-       pio_set_rearr_opts, pio_set_fill
+       pio_set_rearr_opts, pio_set_fill, pio_get_version_major, pio_get_version_minor, &
+       pio_get_version_patch, pio_get_version_string, pio_get_version_hash, &
+       pio_get_version
 
   use pio_types, only : io_desc_t, file_desc_t, var_desc_t, iosystem_desc_t, &
        pio_rearr_opt_t, pio_rearr_comm_fc_opt_t, pio_rearr_comm_fc_2d_enable,&

@@ -34,6 +34,8 @@ MODULE spio_decomp
     ! TYPE int,offset
     MODULE PROCEDURE pio_initdecomp_{TYPE}
   END INTERFACE
+!> @ingroup PIO_initdecomp PIO_initdecomp
+!! @brief Initialize an I/O decomposition
   INTERFACE pio_initdecomp
     MODULE PROCEDURE pio_initdecomp_bc
   END INTERFACE
