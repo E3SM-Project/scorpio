@@ -759,7 +759,7 @@ static void init_iodesc_contig_rearr_fields(iosystem_desc_t *ios, io_desc_t *iod
       prev_region = cur_region;
       cur_region = cur_region->next;
     }
-    iodesc->maxregions = off_ranges.size();
+    iodesc->maxregions = iodesc->rearr->get_rearr_decomp_map_contig_max_nranges();
   }
 }
 

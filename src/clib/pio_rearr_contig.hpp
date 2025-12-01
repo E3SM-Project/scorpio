@@ -104,6 +104,15 @@ namespace SPIO{
           return get_rearr_decomp_map_contig_ranges(rearr_comm_rank_);
         }
 
+        std::size_t get_rearr_decomp_map_contig_max_nranges(void )
+        {
+          std::size_t max_nranges = 0;
+          for(int i = 0; i < rearr_comm_sz_; i++){
+            max_nranges = std::max(max_nranges, get_rearr_decomp_map_nranges(i));
+          }
+          return max_nranges;
+        }
+
         void off_range_to_dim_range(PIO_Offset start_off, PIO_Offset end_off,
                                     PIO_Offset *start, PIO_Offset *count) const;
 
@@ -195,7 +204,7 @@ namespace SPIO{
         }
 
         void convert_off_to_start_dim_idx(PIO_Offset start_off, std::vector<PIO_Offset> &start_dim_idx,
-                                          std::size_t &last_contig_dim)
+                                          std::size_t &last_contig_dim) const
         {
           last_contig_dim = 0;
           for(std::size_t i = 0; i < start_dim_idx.size(); i++){
@@ -225,8 +234,23 @@ namespace SPIO{
           return std::make_pair(start, end);
         }
 
+        std::size_t get_rearr_decomp_map_nranges(int iorank) const
+        {
+          assert(gdecomp_sz_ > 0);
+          assert(rearr_comm_iochunk_sz_ > 0);
+
+          PIO_Offset iochunk = rearr_comm_iochunk_sz_;
+          PIO_Offset start = iorank * iochunk;
+          PIO_Offset end = start + iochunk;
+          if(iorank == (rearr_comm_sz_ - 1)){
+            end = gdecomp_sz_;
+          }
+          return get_ncontig_ranges_from_off_range(start, end - start);
+        }
+
         void get_contig_ranges_from_off_range(std::vector<std::pair<PIO_Offset, PIO_Offset> > &contig_map_ranges,
                                               PIO_Offset start_off, PIO_Offset count);
+        std::size_t get_ncontig_ranges_from_off_range(PIO_Offset start_off, PIO_Offset count) const;
         int create_agg_comm(void );
         static void get_non_fval_lcompmap_counts_displs(const PIO_Offset *lcompmap,
               std::size_t lcompmap_sz,
