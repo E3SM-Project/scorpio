@@ -3204,6 +3204,7 @@ int PIOc_def_dim_impl(int ncid, const char *name, PIO_Offset len, int *idp)
 
         file->hdf5_dims[file->hdf5_num_dims].len = len;
         file->hdf5_dims[file->hdf5_num_dims].has_coord_var = false;
+        file->hdf5_dims[file->hdf5_num_dims].hdf5_dataset_id = H5I_INVALID_HID;
         *idp = file->hdf5_num_dims;
         file->hdf5_num_dims++;
     }
@@ -3548,6 +3549,7 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
         file->hdf5_vars[file->hdf5_num_vars].nc_type = xtype;
         file->hdf5_vars[file->hdf5_num_vars].ndims = ndims;
         file->hdf5_vars[file->hdf5_num_vars].is_coord_var = false;
+        file->hdf5_vars[file->hdf5_num_vars].hdf5_dataset_id = H5I_INVALID_HID;
 
         file->hdf5_vars[file->hdf5_num_vars].hdf5_dimids = (int*)malloc(ndims * sizeof(int));
         if (file->hdf5_vars[file->hdf5_num_vars].hdf5_dimids == NULL)
