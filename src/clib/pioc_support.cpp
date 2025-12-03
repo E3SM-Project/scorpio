@@ -23,6 +23,7 @@
 #include <algorithm>
 #include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
+#include "spio_dt_converter.hpp"
 #include "spio_hash.h"
 
 /* Include headers for HDF5 compression filters */
@@ -3850,6 +3851,11 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
      */
     spio_file_mvcache_init(file);
 
+#ifdef _HDF5
+    /* A datatype converter for converting user buffer to a "file type" buffer */
+    file->dt_converter = static_cast<void *>(new SPIO_Util::File_Util::DTConverter());
+#endif
+
     *ncidp = pio_add_to_file_list(file, comm);
 
     LOG((2, "Created file %s file->fh = %d file->pio_ncid = %d", filename,
@@ -5532,6 +5538,11 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
      */
     spio_file_mvcache_init(file);
 
+#ifdef _HDF5
+    /* A datatype converter for converting user buffer to a "file type" buffer */
+    file->dt_converter = static_cast<void *>(new SPIO_Util::File_Util::DTConverter());
+#endif
+
     *ncidp = pio_add_to_file_list(file, comm);
 
     LOG((2, "Opened file %s file->pio_ncid = %d file->fh = %d ierr = %d",
@@ -6492,6 +6503,29 @@ hid_t spio_nc_type_to_hdf5_type(nc_type xtype)
     }
 
     return H5I_INVALID_HID;
+}
+
+int spio_hdf5_type_to_pio_type(hid_t ntype)
+{
+//  hid_t ntype = H5Tget_native_type(xtype, H5T_DIR_DEFAULT);
+
+  /* switch() does not work with HDF5 "types" */
+  if(H5Tequal(ntype, H5T_NATIVE_UINT8)) { return PIO_BYTE; }
+  else if(H5Tequal(ntype, H5T_NATIVE_UCHAR)) { return PIO_UBYTE; }
+  else if(H5Tequal(ntype, H5T_NATIVE_CHAR)) { return PIO_CHAR; }
+  else if(H5Tequal(ntype, H5T_NATIVE_SHORT)) { return PIO_SHORT; }
+  else if(H5Tequal(ntype, H5T_NATIVE_USHORT)) { return PIO_USHORT; }
+  else if(H5Tequal(ntype, H5T_NATIVE_INT)) { return PIO_INT; }
+  else if(H5Tequal(ntype, H5T_NATIVE_UINT)) { return PIO_UINT; }
+  else if(H5Tequal(ntype, H5T_NATIVE_FLOAT)) { return PIO_FLOAT; }
+  else if(H5Tequal(ntype, H5T_NATIVE_DOUBLE)) { return PIO_DOUBLE; }
+  else if(H5Tequal(ntype, H5T_NATIVE_INT64)) { return PIO_INT64; }
+  else if(H5Tequal(ntype, H5T_NATIVE_UINT64)) { return PIO_UINT64; }
+  else{
+    assert(0);
+  }
+
+  return PIO_NAT;
 }
 
 int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filename)

@@ -407,6 +407,7 @@ extern "C" {
 
 #ifdef _HDF5
     hid_t nc_type_to_hdf5_type(nc_type xtype);
+    int spio_hdf5_type_to_pio_type(hid_t xtype);
     PIO_Offset hdf5_get_nc_type_size(nc_type xtype);
 #endif
 
