@@ -19,6 +19,7 @@
 #include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
 #include "spio_dbg_utils.hpp"
+#include "spio_dt_converter.hpp"
 
 /* 10MB default limit. */
 extern PIO_Offset pio_buffer_size_limit;
@@ -577,8 +578,38 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                                            nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
                         }
 
-                        if (H5Dwrite(file->hdf5_vars[varids[nv]].hdf5_dataset_id, mem_type_id, mem_space_id, file_space_id,
-                                     file->dxplid_coll, bufptr) < 0)
+                        hid_t file_var_type_id = H5Dget_type(file->hdf5_vars[varids[nv]].hdf5_dataset_id);
+                        if(file_var_type_id == H5I_INVALID_HID){
+                          return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                         "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                         "Unable to query the type of variable (%s, varid=%d)",
+                                         nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                        }
+
+                        hid_t file_var_ntype_id = H5Tget_native_type(file_var_type_id, H5T_DIR_DEFAULT);
+                        assert(file_var_ntype_id != H5I_INVALID_HID);
+
+                        /* When HDF5 filters (e.g. data compression) are enabled collective writes fail when datatype conversion is required for writing user data.
+                         * So we manually perform the data conversion here before passing it to HDF5. When filters are not enabled the write might succeed but HDF5
+                         * might be switching off collective writes (hurts performance) when datatype conversion is required
+                         * FIXME: Disable datatype conversion when filters are not enabled on the dataset
+                         */
+                        void *wbuf = bufptr;
+                        if((dsize_all > 0) && !H5Tequal(mem_type_id, file_var_ntype_id)){
+                          assert(file->dt_converter);
+                          wbuf = static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->convert(iodesc->ioid, bufptr, iodesc->mpitype_size * dsize_all,
+                                  iodesc->piotype, spio_hdf5_type_to_pio_type(file_var_ntype_id));
+                          if(wbuf == NULL){
+                            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                                           "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                                           "Unable to convert the type (from %d to %d) of variable (%s, varid=%d)",
+                                           nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype,
+                                           spio_hdf5_type_to_pio_type(file_var_ntype_id), pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                          }
+                        }
+
+                        if (H5Dwrite(file->hdf5_vars[varids[nv]].hdf5_dataset_id, file_var_ntype_id, mem_space_id, file_space_id,
+                                     file->dxplid_coll, wbuf) < 0)
                         {
                             return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                                            "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
@@ -2291,6 +2322,12 @@ int flush_output_buffer(file_desc_t *file, bool force, PIO_Offset addsize)
 
         /* Release resources. */
         spio_file_mvcache_clear(file);
+
+#ifdef _HDF5
+        assert(file->dt_converter);
+        static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->clear();
+#endif
+
         for (int i = 0; i < PIO_MAX_VARS; i++)
         {
             vdesc = file->varlist + i;

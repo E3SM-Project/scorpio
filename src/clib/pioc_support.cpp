@@ -24,6 +24,7 @@
 #include <algorithm>
 #include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
+#include "spio_dt_converter.hpp"
 #include "spio_hash.h"
 #include "pio_rearr_contig.hpp"
 #include "spio_decomp_logger.hpp"
@@ -3867,6 +3868,11 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
      */
     spio_file_mvcache_init(file);
 
+#ifdef _HDF5
+    /* A datatype converter for converting user buffer to a "file type" buffer */
+    file->dt_converter = static_cast<void *>(new SPIO_Util::File_Util::DTConverter());
+#endif
+
     *ncidp = pio_add_to_file_list(file, comm);
 
     LOG((2, "Created file %s file->fh = %d file->pio_ncid = %d", filename,
@@ -5549,6 +5555,11 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
      */
     spio_file_mvcache_init(file);
 
+#ifdef _HDF5
+    /* A datatype converter for converting user buffer to a "file type" buffer */
+    file->dt_converter = static_cast<void *>(new SPIO_Util::File_Util::DTConverter());
+#endif
+
     *ncidp = pio_add_to_file_list(file, comm);
 
     LOG((2, "Opened file %s file->pio_ncid = %d file->fh = %d ierr = %d",
@@ -6511,6 +6522,29 @@ hid_t spio_nc_type_to_hdf5_type(nc_type xtype)
     return H5I_INVALID_HID;
 }
 
+int spio_hdf5_type_to_pio_type(hid_t ntype)
+{
+//  hid_t ntype = H5Tget_native_type(xtype, H5T_DIR_DEFAULT);
+
+  /* switch() does not work with HDF5 "types" */
+  if(H5Tequal(ntype, H5T_NATIVE_UINT8)) { return PIO_BYTE; }
+  else if(H5Tequal(ntype, H5T_NATIVE_UCHAR)) { return PIO_UBYTE; }
+  else if(H5Tequal(ntype, H5T_NATIVE_CHAR)) { return PIO_CHAR; }
+  else if(H5Tequal(ntype, H5T_NATIVE_SHORT)) { return PIO_SHORT; }
+  else if(H5Tequal(ntype, H5T_NATIVE_USHORT)) { return PIO_USHORT; }
+  else if(H5Tequal(ntype, H5T_NATIVE_INT)) { return PIO_INT; }
+  else if(H5Tequal(ntype, H5T_NATIVE_UINT)) { return PIO_UINT; }
+  else if(H5Tequal(ntype, H5T_NATIVE_FLOAT)) { return PIO_FLOAT; }
+  else if(H5Tequal(ntype, H5T_NATIVE_DOUBLE)) { return PIO_DOUBLE; }
+  else if(H5Tequal(ntype, H5T_NATIVE_INT64)) { return PIO_INT64; }
+  else if(H5Tequal(ntype, H5T_NATIVE_UINT64)) { return PIO_UINT64; }
+  else{
+    assert(0);
+  }
+
+  return PIO_NAT;
+}
+
 int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filename)
 {
     int mpierr = MPI_SUCCESS;
@@ -7115,7 +7149,10 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
 
     for (i = 0; i < file->hdf5_num_dims; i++)
     {
-        if (!file->hdf5_dims[i].has_coord_var)
+        /* For dimensions without an associated coordinate var, define them here. However since the
+         * the user can call redef() multiple times define it only its not already defined/valid
+         */
+        if (!file->hdf5_dims[i].has_coord_var && (file->hdf5_dims[i].hdf5_dataset_id == H5I_INVALID_HID))
         {
             hid_t space_id, dcpl_id = H5I_INVALID_HID, dimscale_id;
             hsize_t dims[1], max_dims[1], chunk_dims[1] = {1};
@@ -7278,119 +7315,104 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
         }
     }
 
-    for (i = 0; i < file->hdf5_num_vars; i++)
-    {
-        /* Upgrade the dataset of a coordinate variable to a dimension scale */
-        if (file->hdf5_vars[i].is_coord_var)
-        {
-            if (H5DSset_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_vars[i].name) < 0)
-            {
-                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                               "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
-                               "The low level (HDF5) I/O library call failed to convert a dataset (for coordinate variable %s) to a dimension scale",
-                               pio_get_fname_from_file(file), file->pio_ncid, file->hdf5_vars[i].name);
-            }
+    for(i = 0; i < file->hdf5_num_vars; i++){
+      /* Upgrade the dataset of a coordinate variable to a dimension scale */
+      if(file->hdf5_vars[i].is_coord_var){
+        /* Write a special attribute (_Netcdf4Dimid) for the netCDF-4 dimension ID. */
+        hid_t dimscale_id = file->hdf5_vars[i].hdf5_dataset_id;
+        hid_t dimid_att_id;
+        htri_t attr_exists;
 
-            assert(file->hdf5_vars[i].ndims > 0);
-            int dimid = file->hdf5_vars[i].hdf5_dimids[0];
-            file->hdf5_dims[dimid].hdf5_dataset_id = file->hdf5_vars[i].hdf5_dataset_id;
+        /* Writing _Netcdf4Dimid attribute */
+        const char* attr_name = "_Netcdf4Dimid";
 
-            /* Write a special attribute (_Netcdf4Dimid) for the netCDF-4 dimension ID. */
-            hid_t dimscale_id = file->hdf5_vars[i].hdf5_dataset_id;
-            hid_t dimid_att_id;
-            htri_t attr_exists;
-
-            hid_t dimid_space_id = H5Screate(H5S_SCALAR);
-            if (dimid_space_id == H5I_INVALID_HID)
-            {
-                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                               "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
-                               "The low level (HDF5) I/O library call failed to create a new scalar dataspace",
-                               pio_get_fname_from_file(file), file->pio_ncid);
-            }
-
-            /* Writing _Netcdf4Dimid attribute */
-            const char* attr_name = "_Netcdf4Dimid";
-
-            attr_exists = H5Aexists(dimscale_id, attr_name);
-            if (attr_exists > 0)
-            {
-                assert(0);
-            }
-            else if (attr_exists == 0)
-            {
-                dimid_att_id = H5Acreate2(dimscale_id, attr_name,
-                                          H5T_NATIVE_INT, dimid_space_id, H5P_DEFAULT, H5P_DEFAULT);
-                if (dimid_att_id == H5I_INVALID_HID)
-                {
-                    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                                   "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
-                                   "The low level (HDF5) I/O library call failed to create a new attribute (%s) attached to a dimension scale (%s)",
-                                   pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_vars[i].name);
-                }
-            }
-            else
-            {
-                /* Error determining whether an attribute with a given name exists on an object */
-                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                               "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
-                               "The low level (HDF5) I/O library call failed to determine whether an attribute (%s) exists on a dimension scale (%s)",
-                               pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_vars[i].name);
-            }
-
-            if (H5Awrite(dimid_att_id, H5T_NATIVE_INT, &dimid) < 0)
-            {
-                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                               "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
-                               "The low level (HDF5) I/O library call failed to write an attribute (%s) attached to a dimension scale (%s)",
-                               pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_vars[i].name);
-            }
-
-            if (H5Sclose(dimid_space_id) < 0)
-            {
-                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                               "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
-                               "The low level (HDF5) I/O library call failed to release a scalar dataspace",
-                               pio_get_fname_from_file(file), file->pio_ncid);
-            }
-
-            if (H5Aclose(dimid_att_id) < 0)
-            {
-                return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                               "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
-                               "The low level (HDF5) I/O library call failed to close an attribute (%s) attached to a dimension scale (%s)",
-                               pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_vars[i].name);
-            }
+        attr_exists = H5Aexists(dimscale_id, attr_name);
+        if(attr_exists < 0){
+          /* Error determining whether an attribute with a given name exists on an object */
+          return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                         "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                         "The low level (HDF5) I/O library call failed to determine whether an attribute (%s) exists on a dimension scale (%s)",
+                         pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_vars[i].name);
         }
-    }
 
-    for (i = 0; i < file->hdf5_num_vars; i++)
-    {
-        if (!file->hdf5_vars[i].is_coord_var)
-        {
-            int ndims = file->hdf5_vars[i].ndims;
-            if (ndims > 0)
-            {
-                int* dimids = file->hdf5_vars[i].hdf5_dimids;
-                for (int j = 0; j < ndims; j++)
-                {
-                    if (H5DSattach_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_dims[dimids[j]].hdf5_dataset_id, j) < 0)
-                    {
-                        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
-                                       "The low level (HDF5) I/O library call failed to attach a dimension scale (for dimension %s) to %dth dimension of a dataset (for variable %s)",
-                                       pio_get_fname_from_file(file), file->pio_ncid, file->hdf5_dims[dimids[j]].name, j, file->hdf5_vars[i].name);
-                    }
-
-                    /* According to HDF5 developers, the H5DS routines are not parallel, so all the ranks are going to be
-                     * doing the same operations. At some point, with enough iterations of the loop, HDF5 might get out of
-                     * step between the ranks.
-                     * Workaround: place a barrier to sync H5DSattach_scale calls.
-                     */
-                    MPI_Barrier(ios->io_comm);
-                }
-            }
+        if(attr_exists > 0){
+          /* If redef/enddef is called, potentially multiple times,
+           * this attribute might already have been created
+           */
+          continue;
         }
+
+        if(H5DSset_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_vars[i].name) < 0){
+          return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                         "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                         "The low level (HDF5) I/O library call failed to convert a dataset (for coordinate variable %s) to a dimension scale",
+                         pio_get_fname_from_file(file), file->pio_ncid, file->hdf5_vars[i].name);
+        }
+
+        assert(file->hdf5_vars[i].ndims > 0);
+        int dimid = file->hdf5_vars[i].hdf5_dimids[0];
+        file->hdf5_dims[dimid].hdf5_dataset_id = file->hdf5_vars[i].hdf5_dataset_id;
+
+        hid_t dimid_space_id = H5Screate(H5S_SCALAR);
+        if(dimid_space_id == H5I_INVALID_HID){
+          return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                         "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                         "The low level (HDF5) I/O library call failed to create a new scalar dataspace",
+                         pio_get_fname_from_file(file), file->pio_ncid);
+        }
+
+        dimid_att_id = H5Acreate2(dimscale_id, attr_name,
+                                  H5T_NATIVE_INT, dimid_space_id, H5P_DEFAULT, H5P_DEFAULT);
+        if(dimid_att_id == H5I_INVALID_HID){
+          return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                         "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                         "The low level (HDF5) I/O library call failed to create a new attribute (%s) attached to a dimension scale (%s)",
+                         pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_vars[i].name);
+        }
+
+        if(H5Awrite(dimid_att_id, H5T_NATIVE_INT, &dimid) < 0){
+          return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                         "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                         "The low level (HDF5) I/O library call failed to write an attribute (%s) attached to a dimension scale (%s)",
+                         pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_vars[i].name);
+        }
+
+        if(H5Aclose(dimid_att_id) < 0){
+          return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                         "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                         "The low level (HDF5) I/O library call failed to close an attribute (%s) attached to a dimension scale (%s)",
+                         pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_vars[i].name);
+        }
+
+        if(H5Sclose(dimid_space_id) < 0){
+          return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                         "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                         "The low level (HDF5) I/O library call failed to release a scalar dataspace",
+                         pio_get_fname_from_file(file), file->pio_ncid);
+        }
+      }
+      else{
+        /* Not a coordinate var */
+        int ndims = file->hdf5_vars[i].ndims;
+        if(ndims > 0){
+          int* dimids = file->hdf5_vars[i].hdf5_dimids;
+          for(int j = 0; j < ndims; j++){
+            if(H5DSattach_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_dims[dimids[j]].hdf5_dataset_id, j) < 0){
+              return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                             "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                             "The low level (HDF5) I/O library call failed to attach a dimension scale (for dimension %s) to %dth dimension of a dataset (for variable %s)",
+                             pio_get_fname_from_file(file), file->pio_ncid, file->hdf5_dims[dimids[j]].name, j, file->hdf5_vars[i].name);
+            }
+
+            /* According to HDF5 developers, the H5DS routines are not parallel, so all the ranks are going to be
+             * doing the same operations. At some point, with enough iterations of the loop, HDF5 might get out of
+             * step between the ranks.
+             * Workaround: place a barrier to sync H5DSattach_scale calls.
+             */
+            MPI_Barrier(ios->io_comm);
+          }
+        }
+      }
     }
 
     return PIO_NOERR;

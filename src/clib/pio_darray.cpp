@@ -23,6 +23,7 @@
 #include "pio_rearr_contig.hpp"
 #include "spio_decomp_map_info_pool.hpp"
 #include "spio_decomp_logger.hpp"
+#include "spio_dt_converter.hpp"
 
 /* uint64_t definition */
 #ifdef _ADIOS2
@@ -429,6 +430,10 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     if(mv_iobuf){
       LOG((3,"freeing variable buffer in pio_darray"));
       spio_file_mvcache_free(file, ioid);
+    }
+    if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+      assert(file->dt_converter);
+      static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->free(ioid);
     }
   }
 
