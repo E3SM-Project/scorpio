@@ -885,6 +885,9 @@ typedef struct file_desc_t
 
     /** Number of global attrs defined */
     int hdf5_num_gattrs;
+
+    /** A datatype converter for user buffers */
+    void *dt_converter;
 #endif /* _HDF5 */
 
     /* File name - cached */

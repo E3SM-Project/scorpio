@@ -15,6 +15,7 @@
 #include "spio_file_mvcache.h"
 #include "spio_io_summary.h"
 #include "spio_hash.h"
+#include "spio_dt_converter.hpp"
 
 namespace SPIO_Util{
   namespace SPIO_Lists{
@@ -131,6 +132,12 @@ int pio_free_file(file_desc_t *file)
   free(file->unlim_dimids);
   free(file->io_fstats);
   spio_file_mvcache_finalize(file);
+
+#ifdef _HDF5
+  if(file->dt_converter != NULL){
+    delete(static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter));
+  }
+#endif
 
 #ifdef _ADIOS2
   if (file->cache_data_blocks != NULL){
