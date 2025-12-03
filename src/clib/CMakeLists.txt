@@ -44,7 +44,7 @@ add_library (pioc ${pio_api_src}
   pio_darray.cpp pio_darray_int.cpp spio_hash.cpp pio_sdecomps_regex.cpp spio_io_summary.cpp
   spio_ltimer.cpp spio_serializer.cpp spio_file_mvcache.cpp
   spio_tracer.cpp spio_tracer_mdata.cpp spio_tracer_decomp.cpp
-  spio_rearrange_any.cpp)
+  spio_rearrange_any.cpp spio_dt_converter.cpp)
 
 #==============================================================================
 #  FIND EXTERNAL LIBRARIES/DEPENDENCIES

@@ -106,8 +106,10 @@ add_spio_executable (test_spio_tree TRUE "" test_spio_tree.cpp)
 add_spio_executable (test_spio_file_mvcache TRUE "" test_spio_file_mvcache.cpp)
 add_spio_executable (test_sdecomp_regex TRUE "" test_sdecomp_regex.cpp test_common.c)
 add_spio_executable(test_req_block_wait TRUE "" test_req_block_wait.c test_common.c)
+add_spio_executable(test_spio_dt_converter TRUE "" test_spio_dt_converter.cpp)
 add_dependencies (tests test_spmd test_spio_ltimer test_spio_serializer test_spio_tree
-                  test_spio_file_mvcache test_sdecomp_regex test_req_block_wait)
+                  test_spio_file_mvcache test_sdecomp_regex test_req_block_wait
+                  test_spio_dt_converter)
 
 # Test Timeout in seconds.
 if (PIO_VALGRIND_CHECK)
@@ -127,6 +129,7 @@ add_test(NAME test_spio_ltimer COMMAND test_spio_ltimer)
 add_test(NAME test_spio_serializer COMMAND test_spio_serializer)
 add_test(NAME test_spio_tree COMMAND test_spio_tree)
 add_test(NAME test_spio_file_mvcache COMMAND test_spio_file_mvcache)
+add_test(NAME test_spio_dt_converter COMMAND test_spio_dt_converter)
 add_test(NAME test_sdecomp_regex COMMAND test_sdecomp_regex)
 
 if (PIO_USE_MPISERIAL)
