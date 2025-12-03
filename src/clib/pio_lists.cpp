@@ -13,6 +13,7 @@
 #include "spio_file_mvcache.h"
 #include "spio_io_summary.h"
 #include "spio_hash.h"
+#include "spio_dt_converter.hpp"
 
 static io_desc_t *pio_iodesc_list = NULL;
 static io_desc_t *current_iodesc = NULL;
@@ -165,6 +166,13 @@ int pio_delete_file_from_list(int ncid)
             free(cfile->unlim_dimids);
             free(cfile->io_fstats);
             spio_file_mvcache_finalize(cfile);
+
+#ifdef _HDF5
+            if(cfile->dt_converter != NULL){
+              delete(static_cast<SPIO_Util::File_Util::DTConverter *>(cfile->dt_converter));
+            }
+#endif
+
             /* Free the memory used for this file. */
 #ifdef _ADIOS2
             if (cfile->cache_data_blocks != NULL)
