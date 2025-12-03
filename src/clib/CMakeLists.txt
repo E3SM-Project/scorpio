@@ -45,7 +45,7 @@ set (pio_lib_src
   spio_decomp_map_info_pool.cpp spio_decomp_nc_logger.cpp spio_decomp_txt_logger.cpp
   spio_ltimer.cpp spio_serializer.cpp spio_file_mvcache.cpp
   spio_tracer.cpp spio_tracer_mdata.cpp spio_tracer_decomp.cpp
-  spio_rearrange_any.cpp)
+  spio_rearrange_any.cpp spio_dt_converter.cpp)
 
 if(PIO_USE_ASYNC_WR_THREAD)
   list(APPEND pio_lib_src spio_async_tpool.cpp spio_async_utils.cpp)
