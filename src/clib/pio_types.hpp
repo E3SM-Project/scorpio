@@ -47,6 +47,9 @@ extern "C" {
 #include <unistd.h>
 #endif
 
+#include <atomic>
+#include <mutex>
+
 #ifdef PIO_MICRO_TIMING
 /** Some fwd declarations to avoid including internal headers */
 typedef struct mtimer_info *mtimer_t;
@@ -333,6 +336,9 @@ typedef struct io_desc_t
     /* FIXME: Once we have classes for subset/box this ptr should be to a base rearr class */
     SPIO::DataRearr::Contig_rearr *rearr;
 
+    /* Number of pending async ops using this I/O desc */
+    std::atomic_int nasync_pend_ops;
+
     /** Pointer to the next io_desc_t in the list. */
     struct io_desc_t *next;
 } io_desc_t;
@@ -345,7 +351,9 @@ typedef enum pio_async_op_type
     PIO_ASYNC_INVALID_OP = 0,
     PIO_ASYNC_REARR_OP,
     PIO_ASYNC_PNETCDF_WRITE_OP,
+    PIO_ASYNC_HDF5_WRITE_OP,
     PIO_ASYNC_FILE_WRITE_OPS,
+    PIO_ASYNC_FILE_CLOSE_OP,
     PIO_ASYNC_NUM_OP_TYPES
 } pio_async_op_type_t;
 
@@ -941,7 +949,9 @@ typedef struct file_desc_t
       * npend_ops shows any other pending ops (e.g. non-blocking
       * write done of rearranged data, still need to wait 
       * on it) */
-    int npend_ops;
+    std::atomic<int> npend_ops;
+    std::atomic<bool> is_hard_closed;
+    std::mutex *pmtx;
 
     /** Pointer to the next file_desc_t in the list of open files. */
     struct file_desc_t *next;

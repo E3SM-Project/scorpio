@@ -17,14 +17,19 @@ extern "C"{
 #include <unistd.h>
 #endif /* PIO_ENABLE_LOGGING */
 #include <pio.h>
-#include <pio_internal.h>
-#include "pio_timer.h"
+} // extern "C"
 #if PIO_USE_ASYNC_WR_THREAD
 #include "spio_async_tpool_cint.h"
 #endif
+#include "pio_timer.h"
+#include <pio_internal.h>
 #include "spio_async_utils.hpp"
+#include "spio_async_tpool.hpp"
+#include "spio_file_mvcache.h"
+#include "spio_dbg_utils.hpp"
+#include "spio_dt_converter.hpp"
+#include "spio_async_tpool_cint.h"
 
-} // extern "C"
 
 std::string pio_async_op_type_to_string(pio_async_op_type_t op)
 {
@@ -32,7 +37,9 @@ std::string pio_async_op_type_to_string(pio_async_op_type_t op)
     case PIO_ASYNC_INVALID_OP: return "PIO_ASYNC_INVALID_OP";
     case PIO_ASYNC_REARR_OP:  return "PIO_ASYNC_REARR_OP";
     case PIO_ASYNC_PNETCDF_WRITE_OP: return "PIO_ASYNC_PNETCDF_WRITE_OP";
+    case PIO_ASYNC_HDF5_WRITE_OP: return "PIO_ASYNC_HDF5_WRITE_OP";
     case PIO_ASYNC_FILE_WRITE_OPS: return "PIO_ASYNC_FILE_WRITE_OPS";
+    case PIO_ASYNC_FILE_CLOSE_OP: return "PIO_ASYNC_FILE_CLOSE_OP";
     default : return "UNKNOWN";
   }
 }
@@ -51,7 +58,7 @@ int pio_async_wait_func_unavail(void *pdata)
 
 /* Use this function for op kinds with no poke function
  * Some asynchronous operations have no poke/test functions
- * so any generic code that uses the poke function must
+ *pio_iosys_async_op_hdf5_write so any generic code that uses the poke function must
  * check the existence of this function before using it
  */
 int pio_async_poke_func_unavail(void *pdata, int *flag)
@@ -463,6 +470,11 @@ int pio_async_rearr_kwait(void *f)
   return PIO_NOERR;
 }
 
+int pio_async_hdf5_write_kwait(void *file)
+{
+  assert(0);
+}
+
 /* Optimized wait functions for different async op kinds/types on a file */
 typedef int (*file_async_pend_ops_kwait_func_t) (void *file);
 static file_async_pend_ops_kwait_func_t
@@ -472,7 +484,13 @@ static file_async_pend_ops_kwait_func_t
     /* PIO_ASYNC_REARR_OP */
     pio_async_rearr_kwait,
     /* PIO_ASYNC_PNETCDF_WRITE_OP */
-    pio_async_pnetcdf_write_kwait
+    pio_async_pnetcdf_write_kwait,
+    /* PIO_ASYNC_HDF5_WRITE_OP */
+    pio_async_hdf5_write_kwait,
+    /* PIO_ASYNC_FILE_WRITE_OPS */
+    pio_async_wait_func_unavail,
+    /* PIO_ASYNC_FILE_CLOSE_OP */
+    pio_async_wait_func_unavail
   };
 
 /* Wait for pending asynchronous operations of kind, op_kind, on this file
@@ -857,7 +875,7 @@ void pio_file_close_and_free(void *pdata)
 
   file_desc_t *file = (file_desc_t *)pdata;
   bool sync_with_ioprocs = false;
-  ret = PIO_hard_closefile(file->iosystem, file, sync_with_ioprocs);
+  ret = spio_hard_closefile(file->iosystem, file, sync_with_ioprocs);
   if(ret != PIO_NOERR){
     LOG((1, "Closing file (id=%d) failed (ignoring the error)", file->pio_ncid));
   }
@@ -943,3 +961,446 @@ int pio_tpool_async_pend_op_add(iosystem_desc_t *iosys,
   return PIO_NOERR;
 }
 #endif // PIO_USE_ASYNC_WR_THREAD
+
+struct Hdf5_wcache{
+  file_desc_t *file;
+  int nvars;
+  int fndims;
+  std::vector<int> varids;
+  io_desc_t *iodesc;
+  std::vector<int> frame;
+
+  bool wr_fillbuf;
+  void *iobuf;
+  std::size_t iobuf_sz;
+  void *fillbuf;
+  std::size_t fillbuf_sz;
+};
+
+int spio_alloc_starts_counts_for_all_regions(iosystem_desc_t *ios, PIO_Offset **&startlist, PIO_Offset **&countlist, int num_regions, int fndims)
+{
+  int ret = PIO_NOERR;
+
+  startlist = (PIO_Offset**)calloc(num_regions, sizeof(PIO_Offset*));
+  if(startlist == NULL){
+    return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                    "Unable to allocate memory (%lld bytes) for storing starts/counts when writing data", static_cast<long long int>(num_regions * sizeof(PIO_Offset *)));
+  }
+
+  countlist = (PIO_Offset**)calloc(num_regions, sizeof(PIO_Offset*));
+  if(countlist == NULL){
+    return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                    "Unable to allocate memory (%lld bytes) for storing starts/counts when writing data", static_cast<long long int>(num_regions * sizeof(PIO_Offset *)));
+  }
+
+  /* Allocate storage for start/count arrays for each region. */
+  for(int iregion = 0; iregion < num_regions; iregion++){
+    startlist[iregion] = (PIO_Offset *) calloc(fndims, sizeof(PIO_Offset));
+    if(!startlist[iregion]){
+      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Unable to allocate memory (%lld bytes) for storing starts/counts when writing data", static_cast<long long int>(fndims * sizeof(PIO_Offset)));
+    }
+    countlist[iregion] = (PIO_Offset *) calloc(fndims, sizeof(PIO_Offset));
+    if(!countlist[iregion]){
+      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Unable to allocate memory (%lld bytes) for storing starts/counts when writing data", static_cast<long long int>(fndims * sizeof(PIO_Offset)));
+    }
+  }
+
+  return ret;
+}
+
+int spio_free_starts_counts_for_all_regions(iosystem_desc_t *ios, PIO_Offset **&startlist, PIO_Offset **&countlist, int num_regions)
+{
+  for(int iregion=0; iregion < num_regions; iregion++){
+    free(startlist[iregion]);
+    free(countlist[iregion]);
+  }
+  free(startlist);
+  free(countlist);
+
+  startlist = NULL;
+  countlist = NULL;
+
+  return PIO_NOERR;
+}
+
+int pio_iosys_async_op_hdf5_write(void *pdata)
+{
+  /* FIXME: Add futures */
+  int ret = PIO_NOERR;
+  Hdf5_wcache *wcache = static_cast<struct Hdf5_wcache *>(pdata);
+  assert(wcache);
+
+  file_desc_t *file = wcache->file;
+  int nvars = wcache->nvars;
+  int fndims = wcache->fndims;
+  io_desc_t *iodesc = wcache->iodesc;
+
+  assert(file && (nvars > 0) && (fndims >= 0) && iodesc);
+  assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
+
+  iosystem_desc_t *ios = file->iosystem;
+  var_desc_t *v1desc = file->varlist + wcache->varids[0];
+
+  assert(ios && v1desc && ios->ioproc);
+
+  bool wr_fillbuf = wcache->wr_fillbuf;
+
+  int num_regions = (wr_fillbuf) ? iodesc->maxfillregions : iodesc->maxregions;
+  io_region *region = (wr_fillbuf) ? iodesc->fillregion : iodesc->firstregion;
+  PIO_Offset llen = (wr_fillbuf) ? iodesc->holegridsize : iodesc->llen;
+  void *iobuf = (wr_fillbuf) ? (wcache->fillbuf) : (wcache->iobuf);
+  std::size_t iobuf_sz = (wr_fillbuf) ? (wcache->fillbuf_sz) : (wcache->iobuf_sz);
+
+  assert((num_regions > 0) && region && (nvars * llen * iodesc->mpitype_size == static_cast<PIO_Offset>(iobuf_sz)) && iobuf);
+
+  /* Collect starts/counts for all regions to write */
+  PIO_Offset **startlist = NULL, **countlist = NULL;
+  ret = spio_alloc_starts_counts_for_all_regions(ios, startlist, countlist, num_regions, fndims);
+  if(ret != PIO_NOERR){
+    return pio_err(ios, file, ret, __FILE__, __LINE__,
+                    "Writing variables (number of variables = %d) to file (%s, ncid=%d) failed. Internal error, allocating memory for start/count for the I/O regions written out from the I/O process", nvars, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  std::size_t dsize = 0, dsize_all = 0;
+  for(int iregion = 0; iregion < num_regions; iregion++){
+    std::size_t start[fndims], count[fndims];
+
+    ret = spio_find_start_count(iodesc->ndims, iodesc->dimlen, fndims, v1desc, region, start, count);
+    if(ret != PIO_NOERR){
+      return pio_err(ios, file, ret, __FILE__, __LINE__,
+                      "Writing variables (number of variables = %d) to file (%s, ncid=%d) failed. Internal error, finding start/count for the I/O regions written out from the I/O process failed", nvars, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    /* Get the total number of data elements we are
+     * writing for this region. */
+    dsize = 1;
+    for(int i = 0; i < fndims; i++) { dsize *= count[i]; }
+    LOG((3, "dsize = %d", dsize));
+
+    if(dsize > 0){
+      dsize_all += dsize;
+
+      /* Copy the start/count arrays for this region. */
+      for(int i = 0; i < fndims; i++){
+        startlist[iregion][i] = start[i];
+        countlist[iregion][i] = count[i];
+        LOG((3, "startlist[%d][%d] = %d countlist[%d][%d] = %d", iregion, i,
+             startlist[iregion][i], iregion, i, countlist[iregion][i]));
+      }
+    }
+
+    /* Go to next region. */
+    if(region){ region = region->next; }
+  }
+
+  /* Write data - one variable at a time (all regions for a variable written out in a single call) */
+  var_desc_t *vdesc = NULL;
+  void *bufptr = NULL;
+  for(int nv = 0; nv < nvars; nv++){
+    hid_t file_space_id = H5Dget_space(file->hdf5_vars[wcache->varids[nv]].hdf5_dataset_id);
+    if(file_space_id == H5I_INVALID_HID){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to make a copy of the dataspace of the dataset associated with variable (%s, varid=%d)",
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+    }
+
+    hid_t mem_space_id = H5I_INVALID_HID;
+    if(dsize_all > 0){
+      /* Get the var info. */
+      vdesc = file->varlist + wcache->varids[nv];
+
+      /* If this is a record (or quasi-record) var, set the start for
+       * the record dimension. */
+      if(vdesc->record >= 0 && fndims > 1){
+        for(int rc = 0; rc < num_regions; rc++){ startlist[rc][0] = wcache->frame[nv]; }
+      }
+
+      H5S_seloper_t op = H5S_SELECT_SET;
+      for(int i = 0; i < num_regions; i++){
+        /* Union hyperslabs of all regions */
+        if(H5Sselect_hyperslab(file_space_id, op, (hsize_t*)startlist[i], NULL, (hsize_t*)countlist[i], NULL) < 0){
+          return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                         "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                         "The low level (HDF5) I/O library call failed to select a hyperslab region for a dataspace copied from the dataset associated with variable (%s, varid=%d)",
+                         nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+        }
+
+        op = H5S_SELECT_OR;
+      }
+
+      mem_space_id = H5Screate_simple(1, &dsize_all, NULL);
+      if(mem_space_id == H5I_INVALID_HID){
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to create a new simple dataspace for variable (%s, varid=%d)",
+                       nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+      }
+
+      /* Get a pointer to the data. */
+      bufptr = (void *)((char *)iobuf + nv * iodesc->mpitype_size * llen);
+    }
+    else{
+      /* No data to write on this IO task. */
+      if(H5Sselect_none(file_space_id) < 0){
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to reset the selection region for a dataspace copied from the dataset associated with variable (%s, varid=%d)",
+                       nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+      }
+
+      mem_space_id = H5Screate(H5S_NULL);
+      if(mem_space_id == H5I_INVALID_HID){
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to create a new NULL dataspace for variable (%s, varid=%d)",
+                       nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+      }
+
+      bufptr = NULL;
+    }
+
+    /* Collective write */
+    hid_t mem_type_id = spio_nc_type_to_hdf5_type(iodesc->piotype);
+    if(mem_type_id == H5I_INVALID_HID){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Unsupported memory type (type=%x) for variable (%s, varid=%d)",
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+    }
+
+    hid_t file_var_type_id = H5Dget_type(file->hdf5_vars[wcache->varids[nv]].hdf5_dataset_id);
+    if(file_var_type_id == H5I_INVALID_HID){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Unable to query the type of variable (%s, varid=%d)",
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+    }
+
+    hid_t file_var_ntype_id = H5Tget_native_type(file_var_type_id, H5T_DIR_DEFAULT);
+    assert(file_var_ntype_id != H5I_INVALID_HID);
+
+    /* When HDF5 filters (e.g. data compression) are enabled collective writes fail when datatype conversion is required for writing user data.
+     * So we manually perform the data conversion here before passing it to HDF5. When filters are not enabled the write might succeed but HDF5
+     * might be switching off collective writes (hurts performance) when datatype conversion is required
+     * FIXME: Disable datatype conversion when filters are not enabled on the dataset
+     */
+    void *wbuf = bufptr;
+    if((dsize_all > 0) && !H5Tequal(mem_type_id, file_var_ntype_id)){
+      assert(file->dt_converter);
+      wbuf = static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->convert(iodesc->ioid, bufptr, iodesc->mpitype_size * dsize_all,
+              iodesc->piotype, spio_hdf5_type_to_pio_type(file_var_ntype_id));
+      if(wbuf == NULL){
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Unable to convert the type (from %d to %d) of variable (%s, varid=%d)",
+                       nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype,
+                       spio_hdf5_type_to_pio_type(file_var_ntype_id), pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+      }
+    }
+
+    if(H5Dwrite(file->hdf5_vars[wcache->varids[nv]].hdf5_dataset_id, file_var_ntype_id, mem_space_id, file_space_id,
+                 file->dxplid_coll, wbuf) < 0){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to write the dataset associated with variable (%s, varid=%d)",
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+    }
+
+#if SPIO_HDF5_FLUSH_AFTER_COLL_WR
+    if(H5Fflush(file->hdf5_file_id, H5F_SCOPE_LOCAL) < 0){
+      H5Eprint2(H5E_DEFAULT, stderr);
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to flush the dataset associated with variable (%s, varid=%d)",
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+    }
+#endif
+
+    if(H5Sclose(file_space_id) < 0){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to release a dataspace copied from the dataset associated with variable (%s, varid=%d)",
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+    }
+
+    if(H5Sclose(mem_space_id) < 0){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to release a simple (or NULL) dataspace for variable (%s, varid=%d)",
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+    }
+  }
+
+  /* FIXME: Ignoring error for now - use futures */
+  ret = spio_free_starts_counts_for_all_regions(ios, startlist, countlist, num_regions);
+
+  MPI_Barrier(ios->io_comm);
+
+  iodesc->nasync_pend_ops--;
+  file->npend_ops--;
+
+  return PIO_NOERR;
+}
+
+void pio_iosys_async_op_hdf5_free(void *pdata)
+{
+  Hdf5_wcache *wcache = static_cast<struct Hdf5_wcache *>(pdata);
+  assert(wcache);
+
+  //wcache->varids.clear();
+  std::vector<int>().swap(wcache->varids);
+  //wcache->frame.clear();
+  std::vector<int>().swap(wcache->frame);
+  if(wcache->iobuf){ brel(wcache->iobuf); }
+  if(wcache->fillbuf){ brel(wcache->fillbuf); }
+
+  free(wcache);
+}
+
+int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
+      const int *varids, io_desc_t *iodesc, int fill, const int *frame)
+{
+  int ret = PIO_NOERR;
+
+  assert(file && (nvars > 0) && (fndims > 0) && varids && iodesc);
+
+  iosystem_desc_t *ios = file->iosystem;
+  assert(ios);
+
+  if(!ios->ioproc){
+    return PIO_NOERR;
+  }
+
+  std::vector<int> vids(varids, varids + nvars);
+  std::vector<int> frms;
+  if(frame){
+    frms.resize(nvars);
+    std::copy(frame, frame + nvars, frms.begin());
+  }
+
+  Hdf5_wcache *wcache = static_cast<Hdf5_wcache *>(calloc(1, sizeof(Hdf5_wcache)));
+  *wcache = {file, nvars, fndims, vids, iodesc, frms, (fill) ? true : false, NULL, 0, NULL, 0};
+
+  /* We need to copy the iobuf/fillbuf since the mvcache gets reused for future writes */
+  /* Copy iobuf/fillvalue */
+  var_desc_t *v1desc = file->varlist + varids[0];
+  //PIO_Offset llen = fill ? iodesc->holegridsize : iodesc->llen;
+  if(fill){
+    std::size_t fillbuf_sz = iodesc->holegridsize * iodesc->mpitype_size;
+    wcache->fillbuf = bget(fillbuf_sz);
+    if(!wcache->fillbuf){
+      return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Queuing asynchronous op/task for writing fillvalue for variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for caching variable fillvalue", nvars, pio_get_fname_from_file(file), file->pio_ncid, static_cast<long long int>(fillbuf_sz));
+    }
+
+    std::memcpy(wcache->fillbuf, v1desc->fillbuf, fillbuf_sz);
+    wcache->fillbuf_sz = fillbuf_sz;
+  }
+  else{
+    /* Copy buffer, with rearranged data, for nvars */
+    std::size_t iobuf_sz = nvars * iodesc->llen * iodesc->mpitype_size;
+    wcache->iobuf = bget(iobuf_sz);
+    if(!wcache->iobuf){
+      return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Queuing asynchronous op/task for writing fillvalue for variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for caching variable data for all the variables", nvars, pio_get_fname_from_file(file), file->pio_ncid, static_cast<long long int>(iobuf_sz));
+    }
+
+    void *iobuf = spio_file_mvcache_get(file, iodesc->ioid);
+    assert(iobuf);
+    std::memcpy(wcache->iobuf, iobuf, iobuf_sz);
+    wcache->iobuf_sz = iobuf_sz;
+  }
+
+  /* Create async task */
+  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
+  if(pnew == NULL){
+    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Queuing asynchronous op/task for writing fillvalue for variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for async task internal struct", nvars, pio_get_fname_from_file(file), file->pio_ncid, static_cast<long long int>(sizeof(pio_async_op_t)));
+  }
+
+  pnew->op_type = PIO_ASYNC_HDF5_WRITE_OP;
+  pnew->pdata = static_cast<void *>(wcache);
+  pnew->wait = pio_iosys_async_op_hdf5_write;
+  pnew->poke = pio_async_poke_func_unavail;
+  pnew->free = pio_iosys_async_op_hdf5_free;
+
+  /* Get the mt queue and queue the async task */
+  ret = pio_async_tpool_op_add(pnew);
+  if(ret != PIO_NOERR){
+    LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
+    return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                    "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", ios->iosysid);
+  }
+
+  /* One more pending op using this iodesc & file */
+  iodesc->nasync_pend_ops++;
+  file->npend_ops++;
+
+  return PIO_NOERR;
+}
+
+int pio_iosys_async_file_close_op_wait(void *pdata)
+{
+  int ret = PIO_NOERR;
+  file_desc_t *file = static_cast<file_desc_t *>(pdata);
+  assert(file);
+
+  if(file->npend_ops == 0){
+    ret = spio_hard_closefile(file->iosystem, file, false);
+    if(ret != PIO_NOERR){
+      return pio_err(file->iosystem, file, ret, __FILE__, __LINE__,
+                      "Closing file (%s, ncid=%d) asynchronously failed",
+                      pio_get_fname_from_file(file), file->pio_ncid);
+    }
+  }
+  else{
+    ret = pio_iosys_async_file_close_op_add(file);
+    if(ret != PIO_NOERR){
+      return pio_err(file->iosystem, file, ret, __FILE__, __LINE__,
+                      "Requeuing async op to close file (%s, ncid=%d) asynchronously failed",
+                      pio_get_fname_from_file(file), file->pio_ncid);
+    }
+  }
+
+  return PIO_NOERR;
+}
+
+void pio_iosys_async_file_close_op_free_no_op(void *pdata)
+{
+  /* The file and associated structures should be freed during a "hard close"
+   * in the wait function
+   * Nothing to do here
+   */
+  return;
+}
+
+int pio_iosys_async_file_close_op_add(file_desc_t *file)
+{
+  int ret = PIO_NOERR;
+
+  /* Create async task */
+  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
+  if(pnew == NULL){
+    return pio_err(file->iosystem, file, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Queuing asynchronous op/task for closing file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Allocating memory for async op task (%zu bytes)", pio_get_fname_from_file(file), file->pio_ncid, sizeof(pio_async_op_t));
+  }
+
+  pnew->op_type = PIO_ASYNC_FILE_CLOSE_OP;
+  pnew->pdata = static_cast<void *>(file);
+  pnew->wait = pio_iosys_async_file_close_op_wait;
+  pnew->poke = pio_async_poke_func_unavail;
+  pnew->free = pio_iosys_async_file_close_op_free_no_op;
+
+  /* Get the mt queue and queue the async task */
+  ret = pio_async_tpool_op_add(pnew);
+  if(ret != PIO_NOERR){
+    LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
+    return pio_err(file->iosystem, file, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Queuing asynchronous op/task for closing file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Adding async op to thread pool failed", pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  return PIO_NOERR;
+}

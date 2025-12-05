@@ -24,6 +24,7 @@
 #include "spio_decomp_map_info_pool.hpp"
 #include "spio_decomp_logger.hpp"
 #include "spio_dt_converter.hpp"
+#include "spio_async_utils.hpp"
 
 /* uint64_t definition */
 #ifdef _ADIOS2
@@ -402,13 +403,28 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     case PIO_IOTYPE_NETCDF4P:
     case PIO_IOTYPE_NETCDF4P_NCZARR:
     case PIO_IOTYPE_PNETCDF:
-    case PIO_IOTYPE_HDF5:
-    case PIO_IOTYPE_HDF5C:
         if((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
                                            DARRAY_DATA, frame))){
           return pio_err(ios, file, ierr, __FILE__, __LINE__,
                           "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable data in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
         }
+        break;
+    case PIO_IOTYPE_HDF5:
+    case PIO_IOTYPE_HDF5C:
+#if PIO_USE_ASYNC_WR_THREAD
+        ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, iodesc,
+                                                  DARRAY_DATA, frame);
+        if(ierr != PIO_NOERR){
+          return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                          "Writing multiple variables to file (%s, ncid=%d) failed. Internal error queing async task to write variable data in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
+        }
+#else
+        if((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
+                                           DARRAY_DATA, frame))){
+          return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                          "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable data in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
+        }
+#endif
         break;
     case PIO_IOTYPE_NETCDF4C:
     case PIO_IOTYPE_NETCDF:
@@ -431,10 +447,12 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
       LOG((3,"freeing variable buffer in pio_darray"));
       spio_file_mvcache_free(file, ioid);
     }
+#if !PIO_USE_ASYNC_WR_THREAD
     if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
       assert(file->dt_converter);
       static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->free(ioid);
     }
+#endif
   }
 
   /* The box rearranger will always have data (it could be fill
@@ -482,6 +500,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
                         "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable fillvalues in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
           }
           break;
+      /* FIXME: Handle fillvalues for HDF5 */
       case PIO_IOTYPE_NETCDF4C:
       case PIO_IOTYPE_NETCDF:
           if((ierr = write_darray_multi_serial(file, nvars, fndims, varids, iodesc,
@@ -517,6 +536,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     }
   }
   else{
+    /* FIXME: Fix logic here to handle async HDF5 writes */
     for(int i=0; i<nvars; i++){
       file->varlist[varids[i]].wb_pend = 0;
 #ifdef PIO_MICRO_TIMING

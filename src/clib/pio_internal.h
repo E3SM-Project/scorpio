@@ -118,10 +118,13 @@ extern "C" {
     int  pio_add_to_iodesc_list(io_desc_t *iodesc, MPI_Comm comm);
     io_desc_t *pio_get_iodesc_from_id(int ioid);
     int pio_delete_iodesc_from_list(int ioid);
+    int pio_delete_all_iodescs(void );
     int pio_num_iosystem(int *niosysid);
 
     int pio_get_file(int ncid, file_desc_t **filep);
     int pio_delete_file_from_list(int ncid);
+    int spio_close_all_files_and_delete_from_list(int iosysid);
+    int spio_close_soft_closed_file(const char *filename);
     int pio_add_to_file_list(file_desc_t *file, MPI_Comm comm);
 
     /* Get a description of the variable represented by varid */
@@ -140,7 +143,9 @@ extern "C" {
                      int mode, int retry);
 
     /* Close the file ("hard close") */
-    int PIO_hard_closefile(iosystem_desc_t *ios, file_desc_t *file, bool sync_with_ioprocs);
+    int spio_wait_on_hard_close(iosystem_desc_t *ios, file_desc_t *file);
+    int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file, bool sync_with_ioprocs);
+    int spio_soft_closefile(iosystem_desc_t *ios, file_desc_t *file);
 
     iosystem_desc_t *pio_get_iosystem_from_id(int iosysid);
     int pio_add_to_iosystem_list(iosystem_desc_t *ios, MPI_Comm comm);
@@ -728,6 +733,9 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
 
 int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file);
 #endif
+
+int spio_find_start_count(int ndims, const int *dimlen, int fndims, var_desc_t *vdesc,
+                     io_region *region, size_t *start, size_t *count);
 
 #if defined(__cplusplus)
 }

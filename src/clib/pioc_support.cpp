@@ -32,6 +32,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <mutex>
 
 /* Include headers for HDF5 compression filters */
 #if PIO_USE_HDF5
@@ -3103,12 +3104,23 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     LOG((1, "PIOc_createfile iosysid = %d iotype = %d filename = %s mode = %d",
          iosysid, *iotype, filename, mode));
 
+#if PIO_USE_ASYNC_WR_THREAD
+    ierr = spio_close_soft_closed_file(filename);
+    if(ierr != PIO_NOERR){
+      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Creating file (%s) failed. Error closing previous soft closed file", filename);
+    }
+#endif
+
     /* Allocate space for the file info. */
     if (!(file = (file_desc_t *) calloc(sizeof(file_desc_t), 1)))
     {
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "Creating file (%s) failed. Out of memory allocating %lld bytes for the file descriptor", filename, (unsigned long long) (sizeof(file_desc_t)));
     }
+
+    file->pmtx = new std::mutex();
+    assert(file->pmtx);
 
     file->io_fstats = (spio_io_fstats_summary_t *) calloc(sizeof(spio_io_fstats_summary_t), 1);
     if(!(file->io_fstats))
@@ -4799,6 +4811,14 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
     LOG((2, "PIOc_openfile_retry iosysid = %d iotype = %d filename = %s mode = %d retry = %d",
          iosysid, *iotype, filename, mode, retry));
 
+#if PIO_USE_ASYNC_WR_THREAD
+    ierr = spio_close_soft_closed_file(filename);
+    if(ierr != PIO_NOERR){
+      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Creating file (%s) failed. Error closing previous soft closed file", filename);
+    }
+#endif
+
     /* Allocate space for the file info. */
     if (!(file = (file_desc_t *) calloc(sizeof(file_desc_t), 1)))
     {
@@ -4807,6 +4827,9 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "Opening file (%s) failed. Out of memory allocating %lld bytes for the file structure", filename, (unsigned long long) (sizeof(*file)));
     }
+
+    file->pmtx = new std::mutex();
+    assert(file->pmtx);
 
     file->io_fstats = (spio_io_fstats_summary_t *) calloc(sizeof(spio_io_fstats_summary_t), 1);
     if(!(file->io_fstats))
