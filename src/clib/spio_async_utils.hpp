@@ -4,6 +4,7 @@
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
+#include <string>
 
 int pio_file_async_pend_ops_wait(file_desc_t *file);
 int pio_file_async_pend_op_add(file_desc_t *file,
@@ -22,6 +23,8 @@ int pio_iosys_async_pend_op_add(iosystem_desc_t *iosys,
 int pio_tpool_async_pend_op_add(iosystem_desc_t *iosys,
       pio_async_op_type_t op_type, void *pdata);
 #endif // PIO_USE_ASYNC_WR_THREAD
+
+std::string pio_async_op_type_to_string(pio_async_op_type_t op);
 
 #endif // _SPIO_ASYNC_UTILS_HPP_
 

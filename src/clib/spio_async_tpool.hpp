@@ -5,8 +5,9 @@
 #include <thread>
 #include <vector>
 #include "spio_async_mtq.hpp"
-extern "C"{
+#include "spio_async_utils.hpp"
 #include "pio_internal.h"
+extern "C"{
 #include "spio_async_tpool_cint.h"
 } // extern "C"
 
