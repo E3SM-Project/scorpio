@@ -159,8 +159,10 @@ else()
   message (STATUS "Disabling saving I/O decompositions (default)")
 endif()
 
+set(USE_ASYNC_WR_THREAD 0)
 if(PIO_USE_ASYNC_WR_THREAD)
   message(STATUS "Using asynchronous I/O thread for writes")
+  set(USE_ASYNC_WR_THREAD 1)
 endif()
 
 if(PIO_LIMIT_CACHED_IO_REGIONS)
