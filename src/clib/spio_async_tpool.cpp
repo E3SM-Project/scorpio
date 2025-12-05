@@ -6,8 +6,8 @@ extern "C"{
 } // extern "C"
 #include "spio_async_mtq.hpp"
 #include "spio_async_tpool.hpp"
-extern "C"{
 #include "pio_internal.h"
+extern "C"{
 #include "spio_async_tpool_cint.h"
 } // extern "C"
 
@@ -18,11 +18,7 @@ static PIO_Util::PIO_async_tpool_manager tpool_mgr;
 void PIO_Util::PIO_async_tpool::enqueue(pio_async_op_t *op)
 {
   assert(op);
-  LOG((2, "PIO_async_tpool:enqueue: Enqueing async op, kind = %s",
-      (op->op_type == PIO_ASYNC_REARR_OP) ? "PIO_ASYNC_REARR_OP" :
-      ((op->op_type == PIO_ASYNC_PNETCDF_WRITE_OP) ? "PIO_ASYNC_PNETCDF_WRITE_OP" :
-      ((op->op_type == PIO_ASYNC_FILE_WRITE_OPS) ? "PIO_ASYNC_FILE_WRITE_OPS" :
-      "UNKNOWN"))));
+  LOG((2, "PIO_async_tpool:enqueue: Enqueing async op, kind = %s", pio_async_op_type_to_string(op->op_type).c_str()));
   mtq_.enqueue(op);
 }
 
@@ -64,11 +60,7 @@ int PIO_Util::PIO_async_tpool::dequeue_and_process(
     pio_async_op_t *op = NULL;
     ret = tpool->mtq_.dequeue(op);
     if(ret == 0){
-      LOG((2, "Tpool processing async op, kind = %s",
-          (op->op_type == PIO_ASYNC_REARR_OP) ? "PIO_ASYNC_REARR_OP" :
-          ((op->op_type == PIO_ASYNC_PNETCDF_WRITE_OP) ? "PIO_ASYNC_PNETCDF_WRITE_OP" :
-          ((op->op_type == PIO_ASYNC_FILE_WRITE_OPS) ? "PIO_ASYNC_FILE_WRITE_OPS" :
-          "UNKNOWN"))));
+      LOG((2, " Tpool processing async op, kind = %s", pio_async_op_type_to_string(op->op_type).c_str()));
       /* We currently support only file write ops here */
       assert(op->op_type == PIO_ASYNC_FILE_WRITE_OPS);
       ret = op->wait(op->pdata);
