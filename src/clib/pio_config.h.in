@@ -169,4 +169,8 @@
  *  0 otherwise */
 #define PIO_USE_INDEP_MODE @USE_INDEP_MODE@
 
+/** Set to 1 if the library is configured to use asynchronous I/O
+ *  0 otherwise */
+#define PIO_USE_ASYNC_WR_THREAD @USE_ASYNC_WR_THREAD@
+
 #endif /* _PIO_CONFIG_ */
