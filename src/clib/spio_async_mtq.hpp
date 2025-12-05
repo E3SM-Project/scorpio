@@ -7,9 +7,7 @@
 #include <chrono>
 #include <mutex>
 #include <condition_variable>
-extern "C"{
 #include "pio_internal.h"
-} // extern "C"
 
 namespace PIO_Util{
 
