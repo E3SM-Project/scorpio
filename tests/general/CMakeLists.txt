@@ -55,13 +55,24 @@ SET(GENERATED_SRCS pio_file_simple_tests.F90
   pio_iosystem_tests3.F90)
 
 foreach (SRC_FILE IN LISTS GENERATED_SRCS)
-  add_custom_command (
-    OUTPUT ${SRC_FILE}
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/util/pio_tf_f90gen.pl
-    --annotate-source
-    --out=${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in)
+  if(PIO_USE_ASYNC_WR_THREAD)
+    add_custom_command (
+      OUTPUT ${SRC_FILE}
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/util/pio_tf_f90gen.pl
+      --annotate-source
+      --threaded
+      --out=${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in)
+  else()
+    add_custom_command (
+      OUTPUT ${SRC_FILE}
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/util/pio_tf_f90gen.pl
+      --annotate-source
+      --out=${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}.in)
+  endif()
 endforeach ()
 
 set(DEF_SPIO_TIMING_DIR ${CMAKE_CURRENT_BINARY_DIR}/spio_stats)
