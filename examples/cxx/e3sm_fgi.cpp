@@ -154,9 +154,13 @@ static int get_user_options(
 
 int main(int argc, char *argv[])
 {
-  int ret = 0, rank = 0;
+  int ret = 0, rank = 0, tmode;
 
+#if PIO_USE_ASYNC_WR_THREAD
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &tmode);
+#else
   MPI_Init(&argc, &argv);
+#endif
 
   Util::GVars::logger = Util::Logging::Logger::get_logger(MPI_COMM_WORLD, "STDOUT");
   Util::GVars::logger->set_log_level(Util::Logging::LogLevel::STATUS);
