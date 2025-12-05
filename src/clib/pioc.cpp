@@ -1808,6 +1808,10 @@ int PIOc_set_hint_impl(int iosysid, const char *hint, const char *hintval)
     return PIO_NOERR;
 }
 
+int spio_close_soft_closed_files(iosystem_desc_t *iosys)
+{
+}
+
 /**
  * Clean up internal data structures, free MPI resources, and exit the
  * pio library.
@@ -1857,6 +1861,14 @@ int PIOc_finalize_impl(int iosysid)
         }
     }
 
+#if PIO_USE_ASYNC_WR_THREAD
+    ierr = spio_close_all_files_and_delete_from_list(iosysid);
+    if(ierr != PIO_NOERR){
+      return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                      "PIO Finalize failed on iosytem (%d). Error closing files on this I/O system", iosysid);
+    }
+#endif
+
 #if PIO_SAVE_DECOMPS
     SPIO_Util::Decomp_Util::serialize_decomp_map_info_pool(ios);
 #endif
@@ -1895,6 +1907,16 @@ int PIOc_finalize_impl(int iosysid)
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                         "PIO Finalize failed on iosystem (%d). Unable to get the number of open I/O systems", iosysid);
     }
+
+#if PIO_USE_ASYNC_WR_THREAD
+    if(niosysid == 1){
+      ierr = pio_delete_all_iodescs();
+      if(ierr != PIO_NOERR){
+        return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                        "PIO Finalize failed on iosytem (%d). Error deleting I/O decomps on this I/O system", iosysid);
+      }
+    }
+#endif
 
     LOG((2, "%d iosystems are still open.", niosysid));
 

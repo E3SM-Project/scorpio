@@ -16,6 +16,7 @@
 #include "spio_io_summary.h"
 #include "spio_hash.h"
 #include "spio_dt_converter.hpp"
+#include <mutex>
 
 namespace SPIO_Util{
   namespace SPIO_Lists{
@@ -129,6 +130,8 @@ int pio_free_file(file_desc_t *file)
 #endif
   }
 
+  delete(file->pmtx);
+
   free(file->unlim_dimids);
   free(file->io_fstats);
   spio_file_mvcache_finalize(file);
@@ -182,6 +185,69 @@ int pio_delete_file_from_list(int ncid)
   SPIO_Util::SPIO_Lists::GVars::pio_file_list.erase(iter);
 
   return pio_free_file(file);
+}
+
+int spio_close_all_files_and_delete_from_list(int iosysid)
+{
+  int ret = PIO_NOERR;
+  std::vector<int> ncids_to_del_from_list;
+  for(std::map<int, file_desc_t *>::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_file_list.begin();
+      iter != SPIO_Util::SPIO_Lists::GVars::pio_file_list.end(); ++iter){
+    file_desc_t *file = iter->second;
+    assert(file);
+    if(file->iosystem->iosysid == iosysid){
+      //ret = spio_hard_closefile(file->iosystem, file, true);
+      ret = spio_wait_on_hard_close(file->iosystem, file);
+      if(ret != PIO_NOERR){
+        return pio_err(file->iosystem, file, PIO_EINTERNAL, __FILE__, __LINE__,
+                        "Error closing file (hard close failed)");
+      }
+      ncids_to_del_from_list.push_back(file->pio_ncid);
+    }
+  }
+  for(std::vector<int>::iterator iter = ncids_to_del_from_list.begin();
+        iter != ncids_to_del_from_list.end(); ++iter){
+    ret = pio_delete_file_from_list(*iter);
+    if(ret != PIO_NOERR){
+      return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
+                      "Error deleting file from global list");
+    }
+  }
+
+  return PIO_NOERR;
+}
+
+/* Check if the file is still open - due to async ops */
+int spio_close_soft_closed_file(const char *filename)
+{
+  int ret = PIO_NOERR;
+  std::vector<int> ncids_to_del_from_list;
+
+  assert(filename);
+  for(std::map<int, file_desc_t *>::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_file_list.begin();
+      iter != SPIO_Util::SPIO_Lists::GVars::pio_file_list.end(); ++iter){
+    file_desc_t *file = iter->second;
+    if(std::string(file->fname) == std::string(filename)){
+      //ret = spio_hard_closefile(file->iosystem, file, true);
+      ret = spio_wait_on_hard_close(file->iosystem, file);
+      if(ret != PIO_NOERR){
+        return pio_err(file->iosystem, file, PIO_EINTERNAL, __FILE__, __LINE__,
+                        "Error closing file (hard close failed)");
+      }
+      ncids_to_del_from_list.push_back(file->pio_ncid);
+    }
+  }
+
+  for(std::vector<int>::iterator iter = ncids_to_del_from_list.begin();
+        iter != ncids_to_del_from_list.end(); ++iter){
+    ret = pio_delete_file_from_list(*iter);
+    if(ret != PIO_NOERR){
+      return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
+                      "Error deleting file from global list");
+    }
+  }
+
+  return PIO_NOERR;
 }
 
 /** Print I/O stats for all files in the iosystem
@@ -390,12 +456,28 @@ int pio_delete_iodesc_from_list(int ioid)
   std::map<int, io_desc_t *>::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.find(ioid);
   if(iter != SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.end()){
     io_desc_t *iodesc = (*iter).second;
-    free(iodesc);
-    SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.erase(iter);
+    assert(iodesc);
+    if(iodesc->nasync_pend_ops == 0){
+      free(iodesc);
+      SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.erase(iter);
+    }
   }
   else{
     return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
                   "Deleting I/O descriptor info (ioid=%d) from internal global list failed. Invalid I/O descriptor id provided", ioid);
   }
+  return PIO_NOERR;
+}
+
+int pio_delete_all_iodescs(void )
+{
+  for(std::map<int, io_desc_t *>::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.begin();
+        iter != SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.end(); ++iter){
+    io_desc_t *iodesc = (*iter).second;
+    assert(iodesc && (iodesc->nasync_pend_ops == 0));
+    free(iodesc);
+  }
+
+  SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.clear();
   return PIO_NOERR;
 }
