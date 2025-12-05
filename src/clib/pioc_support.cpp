@@ -794,11 +794,11 @@ adios2_variable* spio_define_adios2_variable(iosystem_desc_t *ios, file_desc_t *
             }
             else if(SPIO_ADIOS2_ZFP_COMPRESSION_MODE == "ADIOS2_ZFP_MODE_RATE"){
               /* Fixed Rate Mode : User specifies the number of bits to use for each value of the compressed data */
-              adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "rate", SPIO_ADIOS2_ZFP_RATE);
+              adiosErr = adios2_add_operation(&operation_index, variable, ios->lossy_compression_operator, "rate", SPIO_ADIOS2_ZFP_COMPRESSION_RATE);
               if(adiosErr != adios2_error_none){
                 pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                         "Failed to add ZFP compression operation (rate=%s bits) to variable %s (adios2_error=%s)",
-                        SPIO_ADIOS2_ZFP_RATE, name, convert_adios2_error_to_string(adiosErr));
+                        SPIO_ADIOS2_ZFP_COMPRESSION_RATE, name, convert_adios2_error_to_string(adiosErr));
               }
             }
             else if(SPIO_ADIOS2_ZFP_COMPRESSION_MODE == "ADIOS2_ZFP_MODE_REVERSIBLE"){
@@ -813,7 +813,7 @@ adios2_variable* spio_define_adios2_variable(iosystem_desc_t *ios, file_desc_t *
             else{
               pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                       "Failed to add ZFP compression operation to variable %s (adios2_error=%s). Invalid compression mode (%s)",
-                      SPIO_ADIOS2_ZFP_RATE, name, convert_adios2_error_to_string(adiosErr), SPIO_ADIOS2_ZFP_COMPRESSION_MODE);
+                      SPIO_ADIOS2_ZFP_COMPRESSION_RATE, name, convert_adios2_error_to_string(adiosErr), SPIO_ADIOS2_ZFP_COMPRESSION_MODE);
             }
           }
         }
