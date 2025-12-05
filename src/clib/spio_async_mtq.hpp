@@ -25,7 +25,7 @@ class PIO_mtq{
     void enqueue(const T& val);
     int dequeue(T &val);
     void signal(SigTypes_t sig);
-    int size(void ) const;
+    int size(void );
 
     template<typename U>
     friend std::ostream & operator<<(std::ostream &ostr, PIO_mtq<U> &mtq);
@@ -122,7 +122,7 @@ void PIO_mtq<T>::signal(PIO_mtq<T>::SigTypes_t sig)
 }
 
 template<typename T>
-int PIO_mtq<T>::size(void ) const
+int PIO_mtq<T>::size(void )
 {
   int sz = 0;
   std::unique_lock<std::mutex> lk(mtx_);
