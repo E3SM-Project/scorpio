@@ -3105,11 +3105,13 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
          iosysid, *iotype, filename, mode));
 
 #if PIO_USE_ASYNC_WR_THREAD
+    /*
     ierr = spio_close_soft_closed_file(filename);
     if(ierr != PIO_NOERR){
       return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                       "Creating file (%s) failed. Error closing previous soft closed file", filename);
     }
+    */
 #endif
 
     /* Allocate space for the file info. */
@@ -4812,11 +4814,13 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
          iosysid, *iotype, filename, mode, retry));
 
 #if PIO_USE_ASYNC_WR_THREAD
+    /*
     ierr = spio_close_soft_closed_file(filename);
     if(ierr != PIO_NOERR){
       return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                       "Creating file (%s) failed. Error closing previous soft closed file", filename);
     }
+    */
 #endif
 
     /* Allocate space for the file info. */
