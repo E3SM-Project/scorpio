@@ -2,9 +2,10 @@
 
 A high-level Parallel I/O Library for structured grid applications. This library was derived from the [Parallel I/O library](https://github.com/NCAR/ParallelIO).
 
-## Website
+## Documentation
 
-For complete documentation, see the HTML documentation in the docs/html directory.
+The latest documentation is available [here](https://docs.e3sm.org/scorpio/html/index.html).
+For complete documentation, also see the HTML documentation in the docs/html directory.
 
 ## Nightly Tests
 
