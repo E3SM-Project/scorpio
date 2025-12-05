@@ -8,6 +8,7 @@ use File::Basename;
 use Getopt::Long;
 
 my($verbose);
+my($threaded);
 my($nargs);
 my($template_fname, $output_fname);
 # If the template source has PIO_TF_AUTO_TEST* and the test
@@ -38,6 +39,7 @@ my (%template_predef_typename_types);
 
 # Initializing global vars
 $verbose = 0;
+$threaded = 0;
 $nargs = 0;
 $template_fname = '';
 $output_fname = '';
@@ -602,19 +604,26 @@ sub update_auto_func_list_with_gen_templ
 # Returns the default test main code
 sub get_default_test_main
 {
+  my($threaded) = @_;
   my($out_line);
   $out_line = "\n\n";
   $out_line = $out_line . "  PROGRAM PIO_TF_Test_main_\n";
   $out_line = $out_line . "    USE pio_tutil\n";
+  $out_line = $out_line . "    USE mpi\n";
   $out_line = $out_line . "    IMPLICIT NONE\n";
   $out_line = $out_line . "    INTEGER, PARAMETER :: NREARRS = 3\n";
   $out_line = $out_line . "    INTEGER :: rearrs(NREARRS) = (/pio_rearr_contig,pio_rearr_box,pio_rearr_subset/)\n";
   $out_line = $out_line . "    CHARACTER(LEN=PIO_TF_MAX_STR_LEN) :: rearrs_info(NREARRS) = (/\"PIO_REARR_CONTIG\",\"PIO_REARR_BOX   \",\"PIO_REARR_SUBSET\"/)\n";
-  $out_line = $out_line . "    INTEGER i, ierr\n";
+  $out_line = $out_line . "    INTEGER i, ierr, provided\n";
   $out_line = $out_line . "\n";
   $out_line = $out_line . "    pio_tf_nerrs_total_=0\n";
   $out_line = $out_line . "    pio_tf_retval_utest_=0\n";
-  $out_line = $out_line . "    CALL MPI_Init(ierr)\n";
+  if($threaded){
+    $out_line = $out_line . "    CALL MPI_Init_thread(MPI_THREAD_MULTIPLE, provided, ierr)\n";
+  }
+  else{
+    $out_line = $out_line . "    CALL MPI_Init(ierr)\n";
+  }
   $out_line = $out_line . "    DO i=1,SIZE(rearrs)\n";
   $out_line = $out_line . "      CALL PIO_TF_Init_(rearrs(i))\n";
   $out_line = $out_line . "      IF (pio_tf_world_rank_ == 0) THEN\n";
@@ -705,14 +714,14 @@ sub get_header
 # been appended the driver
 sub get_footer
 {
-  my($ref_auto_funcs_list) = @_;
+  my($ref_auto_funcs_list, $threaded) = @_;
   my($out_line);
   if($template_has_test_driver == 0){
     # Add default test driver
     $out_line = &get_default_test_driver($ref_auto_funcs_list);
   }
 
-  $out_line = $out_line . &get_default_test_main();
+  $out_line = $out_line . &get_default_test_main($threaded);
   return $out_line;
 }
 
@@ -721,7 +730,7 @@ sub get_footer
 # * Also does some basic processing of inputs
 sub process_template_file
 {
-  my($ifname, $ofname) = @_;
+  my($ifname, $ofname, $threaded) = @_;
   # The var below keeps track of input file line number
   my($ifline_num);
   my($ifline);
@@ -856,13 +865,13 @@ sub process_template_file
     $ifline_num += 1;
   }
 
-  $footer = &get_footer(\@auto_funcs_list);
+  $footer = &get_footer(\@auto_funcs_list, $threaded);
   print OUTPUT_FILE $footer;
 }
 
 sub print_usage_and_exit()
 {
-  print "\n\nUsage: ./pio_tf_f90gen.pl --annotate-source --out=<OUTPUT_FILE_NAME> <INPUT_TEMPLATE_FILE_NAME> \n\n";
+  print "\n\nUsage: ./pio_tf_f90gen.pl --annotate-source --threaded --out=<OUTPUT_FILE_NAME> <INPUT_TEMPLATE_FILE_NAME> \n\n";
   print "eg: ./pio_tf_f90gen.pl --annotate-source --out=pio_init_finalize.F90 pio_init_finalize.F90.in\n";
   exit;
 }
@@ -874,6 +883,7 @@ GetOptions(
   # Annotate generated source with template line numbers etc
   "annotate-source"             =>      \$annotate_source,
   "out=s"                                     =>        \$output_fname,
+  "threaded"           =>  \$threaded,
   "verbose"           =>  \$verbose
 );
 
@@ -895,4 +905,4 @@ if(!stat($template_fname)){
 &init_predef_types();
 
 if($verbose){ print "Reading input args complete\n" }
-&process_template_file($template_fname, $output_fname);
+&process_template_file($template_fname, $output_fname, $threaded);
