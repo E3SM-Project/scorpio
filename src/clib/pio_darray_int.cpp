@@ -90,7 +90,7 @@ int compute_buffer_init(iosystem_desc_t *ios)
  * @ingroup PIO_write_darray
  * @author Ed Hartnett
  */
-int find_start_count(int ndims, const int *dimlen, int fndims, var_desc_t *vdesc,
+int spio_find_start_count(int ndims, const int *dimlen, int fndims, var_desc_t *vdesc,
                      io_region *region, size_t *start, size_t *count)
 {
     assert((ndims > 0) && dimlen && (fndims > 0) && vdesc &&
@@ -236,7 +236,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
         for (int regioncnt = 0; regioncnt < num_regions; regioncnt++)
         {
             /* Fill the start/count arrays. */
-            if ((ierr = find_start_count(iodesc->ndims, iodesc->dimlen, fndims, vdesc, region, start, count)))
+            if ((ierr = spio_find_start_count(iodesc->ndims, iodesc->dimlen, fndims, vdesc, region, start, count)))
             {
                 ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
                                 "Writing variables (number of variables = %d) to file (%s, ncid=%d) failed. Internal error, finding start/count for the I/O regions written out from the I/O process failed", nvars, pio_get_fname_from_file(file), file->pio_ncid);
