@@ -4,6 +4,8 @@
 
 #include <iostream>
 #include <cassert>
+#include <cstring>
+#include <string>
 
 extern "C"{
 
@@ -23,6 +25,17 @@ extern "C"{
 #include "spio_async_utils.hpp"
 
 } // extern "C"
+
+std::string pio_async_op_type_to_string(pio_async_op_type_t op)
+{
+  switch(op){
+    case PIO_ASYNC_INVALID_OP: return "PIO_ASYNC_INVALID_OP";
+    case PIO_ASYNC_REARR_OP:  return "PIO_ASYNC_REARR_OP";
+    case PIO_ASYNC_PNETCDF_WRITE_OP: return "PIO_ASYNC_PNETCDF_WRITE_OP";
+    case PIO_ASYNC_FILE_WRITE_OPS: return "PIO_ASYNC_FILE_WRITE_OPS";
+    default : return "UNKNOWN";
+  }
+}
 
 /* Use this function for op kinds with no wait functions
  * We use it to indicate,
