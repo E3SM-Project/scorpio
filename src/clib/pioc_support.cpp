@@ -6816,19 +6816,36 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
 }
 
 /* Create HDF5 dataset property ID */
-static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *file, const char *var_name, int var_ndims, nc_type var_type)
+static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *file, const char *var_name, const std::vector<hsize_t> &max_dim_sz, nc_type var_type)
 {
   herr_t ret;
   hid_t dpid = H5I_INVALID_HID;
 
+  std::size_t var_ndims = max_dim_sz.size();
+
   assert((ios != NULL) && (file != NULL) && (var_ndims >= 0));
+
+  bool var_has_only_unlimited_dims = true;
+  for(std::vector<hsize_t>::const_iterator citer = max_dim_sz.cbegin(); citer != max_dim_sz.cend(); ++citer){
+    if(*citer != H5S_UNLIMITED){
+      var_has_only_unlimited_dims = false;
+      break;
+    }
+  }
 
   /* Initialize the compression filter property list */
   dpid = H5Pcreate(H5P_DATASET_CREATE);
   assert(dpid != H5I_INVALID_HID);
 
   /* We currently support compression for non-scalar data */
-  if((var_ndims < 1) || (var_type == NC_CHAR) || (file->iotype != PIO_IOTYPE_HDF5C)) return dpid;
+  if(file->iotype != PIO_IOTYPE_HDF5C) return dpid;
+  if((var_ndims < 1) || (var_type == NC_CHAR)){
+    std::string msg("Disabling HDF5 compression for variable");
+      msg += std::string("(name=") + std::string(var_name) + std::string(", file=") + std::string(pio_get_fname_from_file(file)) + std::string(")");
+      msg += (var_ndims < 1) ? std::string(" since its a scalar variable") : std::string(" since its a string/char variable");
+    PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, msg.c_str());
+    return dpid;
+  }
 
   /* Check if any variables have compression disabled by the user */
   /* FIXME: Variables written out in a chunk size different from the one defined can cause hangs
@@ -6852,6 +6869,15 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
 #ifdef _SPIO_HDF5_USE_LOSSY_COMPRESSION
 
 #ifdef _SPIO_HAS_H5Z_ZFP
+  /* Avoid ZFP compression for vars with only unlimited dims */
+  if(var_has_only_unlimited_dims){
+    std::string msg("Disabling HDF5 compression for variable");
+      msg += std::string("(name=") + std::string(var_name) + std::string(", file=") + std::string(pio_get_fname_from_file(file)) + std::string(")");
+      msg += std::string(" since it only has unlimited dims");
+    PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, msg.c_str());
+    return dpid;
+  }
+
   if(SPIO_HDF5_ZFP_COMPRESSION_MODE == "H5Z_ZFP_MODE_RATE"){
     /* Lossy compression : Fixed bit rate : Number of bits used for compressed values is fixed, e.g. 16 */
     ret = H5Pset_zfp_rate(dpid, SPIO_HDF5_ZFP_COMPRESSION_RATE);
@@ -7056,7 +7082,7 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
   }
 
   /* Create HDF5 dataset (and optionally add filters as needed) */
-  hid_t dcpl_id = spio_create_hdf5_dataset_pid(ios, file, name, ndims, xtype);
+  hid_t dcpl_id = spio_create_hdf5_dataset_pid(ios, file, name, max_dim_sz, xtype);
   if(dcpl_id == H5I_INVALID_HID){
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                    "Defining variable (%s, varid = %d) in file (%s, ncid=%d) using HDF5 iotype failed. "
