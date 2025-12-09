@@ -3360,6 +3360,21 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     case NC_DOUBLE:
                         ierr = ncmpi_bput_vars_double(file->fh, varid, start, count, fake_stride, (const double *) buf, request);
                         break;
+                    case NC_UBYTE:
+                        ierr = ncmpi_bput_vars_uchar(file->fh, varid, start, count, fake_stride, (const unsigned char *) buf, request);
+                        break;
+                    case NC_USHORT:
+                        ierr = ncmpi_bput_vars_ushort(file->fh, varid, start, count, fake_stride, (const unsigned short int *) buf, request);
+                        break;
+                    case NC_UINT:
+                        ierr = ncmpi_bput_vars_uint(file->fh, varid, start, count, fake_stride, (const unsigned int *) buf, request);
+                        break;
+                    case NC_INT64:
+                        ierr = ncmpi_bput_vars_longlong(file->fh, varid, start, count, fake_stride, (const long long int *) buf, request);
+                        break;
+                    case NC_UINT64:
+                        ierr = ncmpi_bput_vars_ulonglong(file->fh, varid, start, count, fake_stride, (const unsigned long long int *) buf, request);
+                        break;
                     default:
                         GPTLstop("PIO:spio_put_vars_tc");
                         GPTLstop("PIO:write_total");
