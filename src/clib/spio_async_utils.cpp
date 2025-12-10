@@ -6,6 +6,8 @@
 #include <cassert>
 #include <cstring>
 #include <string>
+#include <numeric>
+#include <functional>
 
 extern "C"{
 
@@ -975,52 +977,33 @@ struct Hdf5_wcache{
   std::size_t fillbuf_sz;
 };
 
-int spio_alloc_starts_counts_for_all_regions(iosystem_desc_t *ios, PIO_Offset **&startlist, PIO_Offset **&countlist, int num_regions, int fndims)
+namespace Util{
+  /* Each variable writes out one or more regions of data. However all variables have the
+   * same I/O decomposition and write the same regions (within the variable) of data. The
+   * region info is the same across all variables
+   * Note: Different variables (among nvars variables) could be writing out different
+   * timesteps/records (while still writing the same region - within the record)
+   */
+  struct RInfo{
+    /* The starts(:) for this region - local to this process */
+    std::vector<hsize_t> starts;
+    /* The counts(:) for this region - local to this process */
+    std::vector<hsize_t> counts;
+    /* Total number of elements written out, locally, for this region */
+    std::size_t nelems;
+  };
+} // namespace Util
+
+/* Update the the start frame for all regions in reg_infos, based on the variable's current frame */
+static inline void update_reg_infos_start_frame(std::vector<Util::RInfo> &reg_infos, const var_desc_t *vdesc, const int frame)
 {
-  int ret = PIO_NOERR;
-
-  startlist = (PIO_Offset**)calloc(num_regions, sizeof(PIO_Offset*));
-  if(startlist == NULL){
-    return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                    "Unable to allocate memory (%lld bytes) for storing starts/counts when writing data", static_cast<long long int>(num_regions * sizeof(PIO_Offset *)));
-  }
-
-  countlist = (PIO_Offset**)calloc(num_regions, sizeof(PIO_Offset*));
-  if(countlist == NULL){
-    return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                    "Unable to allocate memory (%lld bytes) for storing starts/counts when writing data", static_cast<long long int>(num_regions * sizeof(PIO_Offset *)));
-  }
-
-  /* Allocate storage for start/count arrays for each region. */
-  for(int iregion = 0; iregion < num_regions; iregion++){
-    startlist[iregion] = (PIO_Offset *) calloc(fndims, sizeof(PIO_Offset));
-    if(!startlist[iregion]){
-      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Unable to allocate memory (%lld bytes) for storing starts/counts when writing data", static_cast<long long int>(fndims * sizeof(PIO_Offset)));
-    }
-    countlist[iregion] = (PIO_Offset *) calloc(fndims, sizeof(PIO_Offset));
-    if(!countlist[iregion]){
-      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Unable to allocate memory (%lld bytes) for storing starts/counts when writing data", static_cast<long long int>(fndims * sizeof(PIO_Offset)));
+  /* If the variable has records/frames then update the starts(:) to the provided frame/record number */
+  if(vdesc->record >= 0){
+    for(std::vector<Util::RInfo>::iterator iter = reg_infos.begin(); iter != reg_infos.end(); ++iter){
+      assert(iter->starts.size() > 0);
+      iter->starts[0] = frame;
     }
   }
-
-  return ret;
-}
-
-int spio_free_starts_counts_for_all_regions(iosystem_desc_t *ios, PIO_Offset **&startlist, PIO_Offset **&countlist, int num_regions)
-{
-  for(int iregion=0; iregion < num_regions; iregion++){
-    free(startlist[iregion]);
-    free(countlist[iregion]);
-  }
-  free(startlist);
-  free(countlist);
-
-  startlist = NULL;
-  countlist = NULL;
-
-  return PIO_NOERR;
 }
 
 int pio_iosys_async_op_hdf5_write(void *pdata)
@@ -1035,7 +1018,7 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
   int fndims = wcache->fndims;
   io_desc_t *iodesc = wcache->iodesc;
 
-  assert(file && (nvars > 0) && (fndims >= 0) && iodesc);
+  assert(file && (nvars > 0) && (fndims > 0) && iodesc);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
 
   iosystem_desc_t *ios = file->iosystem;
@@ -1045,108 +1028,109 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
 
   bool wr_fillbuf = wcache->wr_fillbuf;
 
-  int num_regions = (wr_fillbuf) ? iodesc->maxfillregions : iodesc->maxregions;
+  //int num_regions = (wr_fillbuf) ? iodesc->maxfillregions : iodesc->maxregions;
   io_region *region = (wr_fillbuf) ? iodesc->fillregion : iodesc->firstregion;
   PIO_Offset llen = (wr_fillbuf) ? iodesc->holegridsize : iodesc->llen;
   void *iobuf = (wr_fillbuf) ? (wcache->fillbuf) : (wcache->iobuf);
   std::size_t iobuf_sz = (wr_fillbuf) ? (wcache->fillbuf_sz) : (wcache->iobuf_sz);
 
-  assert((num_regions > 0) && region && (nvars * llen * iodesc->mpitype_size == static_cast<PIO_Offset>(iobuf_sz)) && iobuf);
+  assert(region && (nvars * llen * iodesc->mpitype_size == static_cast<PIO_Offset>(iobuf_sz)) && iobuf);
 
-  /* Collect starts/counts for all regions to write */
-  PIO_Offset **startlist = NULL, **countlist = NULL;
-  ret = spio_alloc_starts_counts_for_all_regions(ios, startlist, countlist, num_regions, fndims);
-  if(ret != PIO_NOERR){
-    return pio_err(ios, file, ret, __FILE__, __LINE__,
-                    "Writing variables (number of variables = %d) to file (%s, ncid=%d) failed. Internal error, allocating memory for start/count for the I/O regions written out from the I/O process", nvars, pio_get_fname_from_file(file), file->pio_ncid);
-  }
+  /* Info on all regions */
+  std::vector<Util::RInfo> vreg_infos;
+  /* Total number of elements written out for all the regions. Since all variables write
+   * out the same regions - since they use the same I/O decomposition - the total number
+   * of elements written out for each variable will be the same (reg_nelems)
+   */
+  hsize_t reg_nelems = 0;
 
-  std::size_t dsize = 0, dsize_all = 0;
-  for(int iregion = 0; iregion < num_regions; iregion++){
+  /* Collect region info, starts/counts etc, for all regions */
+  while(region){
     std::size_t start[fndims], count[fndims];
 
     ret = spio_find_start_count(iodesc->ndims, iodesc->dimlen, fndims, v1desc, region, start, count);
     if(ret != PIO_NOERR){
       return pio_err(ios, file, ret, __FILE__, __LINE__,
-                      "Writing variables (number of variables = %d) to file (%s, ncid=%d) failed. Internal error, finding start/count for the I/O regions written out from the I/O process failed", nvars, pio_get_fname_from_file(file), file->pio_ncid);
+                      "Writing variables (number of variables = %d) to file (%s, ncid=%d) failed. Internal error finding start/count for the I/O regions written out from the I/O process", nvars, pio_get_fname_from_file(file), file->pio_ncid);
     }
 
-    /* Get the total number of data elements we are
-     * writing for this region. */
-    dsize = 1;
-    for(int i = 0; i < fndims; i++) { dsize *= count[i]; }
-    LOG((3, "dsize = %d", dsize));
+    std::size_t nelems = std::accumulate(count, count + fndims, 1, std::multiplies<std::size_t>());
 
-    if(dsize > 0){
-      dsize_all += dsize;
-
-      /* Copy the start/count arrays for this region. */
-      for(int i = 0; i < fndims; i++){
-        startlist[iregion][i] = start[i];
-        countlist[iregion][i] = count[i];
-        LOG((3, "startlist[%d][%d] = %d countlist[%d][%d] = %d", iregion, i,
-             startlist[iregion][i], iregion, i, countlist[iregion][i]));
-      }
+    /* Note: The region info is tied to the first variable, we need to update the variable specific
+     * sections, start(:) based on the record/frame being written out, later
+     */
+    if(nelems > 0){
+      std::vector<hsize_t> tmp_start(start, start + fndims);
+      std::vector<hsize_t> tmp_count(count, count + fndims);
+      vreg_infos.push_back({tmp_start, tmp_count, nelems});
+      reg_nelems += static_cast<hsize_t>(nelems);
     }
-
-    /* Go to next region. */
-    if(region){ region = region->next; }
+    region = region->next;
   }
+
+  std::size_t num_regions = vreg_infos.size();
 
   /* Write data - one variable at a time (all regions for a variable written out in a single call) */
   var_desc_t *vdesc = NULL;
   void *bufptr = NULL;
-  for(int nv = 0; nv < nvars; nv++){
-    hid_t file_space_id = H5Dget_space(file->hdf5_vars[wcache->varids[nv]].hdf5_dataset_id);
+  for(int vidx = 0; vidx < nvars; vidx++){
+    hid_t file_space_id = H5Dget_space(file->hdf5_vars[wcache->varids[vidx]].hdf5_dataset_id);
     if(file_space_id == H5I_INVALID_HID){
       return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                      "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                      "The low level (HDF5) I/O library call failed to make a copy of the dataspace of the dataset associated with variable (%s, varid=%d)",
-                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
     }
 
     hid_t mem_space_id = H5I_INVALID_HID;
-    if(dsize_all > 0){
+    if(reg_nelems > 0){
       /* Get the var info. */
-      vdesc = file->varlist + wcache->varids[nv];
+      vdesc = file->varlist + wcache->varids[vidx];
 
+      /* Update the generic region info with variable-specific info */
       /* If this is a record (or quasi-record) var, set the start for
        * the record dimension. */
-      if(vdesc->record >= 0 && fndims > 1){
-        for(int rc = 0; rc < num_regions; rc++){ startlist[rc][0] = wcache->frame[nv]; }
+      if((fndims > 1) && (vdesc->record > 0)){
+        assert(static_cast<int>(wcache->frame.size()) == nvars);
+        update_reg_infos_start_frame(vreg_infos, vdesc, wcache->frame[vidx]);
       }
+      
 
+      /* Create a hyperslab of all the regions written out for a variable */
       H5S_seloper_t op = H5S_SELECT_SET;
-      for(int i = 0; i < num_regions; i++){
+      for(std::size_t ireg = 0; ireg < num_regions; ireg++){
         /* Union hyperslabs of all regions */
-        if(H5Sselect_hyperslab(file_space_id, op, (hsize_t*)startlist[i], NULL, (hsize_t*)countlist[i], NULL) < 0){
+        if(H5Sselect_hyperslab(file_space_id, op, static_cast<hsize_t *>(vreg_infos[ireg].starts.data()), NULL, static_cast<hsize_t *>(vreg_infos[ireg].counts.data()), NULL) < 0){
           return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                          "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                          "The low level (HDF5) I/O library call failed to select a hyperslab region for a dataspace copied from the dataset associated with variable (%s, varid=%d)",
-                         nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+                         nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
         }
 
         op = H5S_SELECT_OR;
       }
 
-      mem_space_id = H5Screate_simple(1, &dsize_all, NULL);
+      /* Total number of elements across all regions = 
+       *  total number of elements written out with this hyperslab = reg_nelems
+       */
+      mem_space_id = H5Screate_simple(1, &reg_nelems, NULL);
       if(mem_space_id == H5I_INVALID_HID){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to create a new simple dataspace for variable (%s, varid=%d)",
-                       nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+                       nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
       }
 
-      /* Get a pointer to the data. */
-      bufptr = (void *)((char *)iobuf + nv * iodesc->mpitype_size * llen);
+      /* Get a pointer to the data. This buffer points to data from all the regions written out for this variable */
+      bufptr = (void *)((char *)iobuf + vidx * iodesc->mpitype_size * llen);
     }
     else{
-      /* No data to write on this IO task. */
+      /* No data, across all regions, to write on this IO task */
       if(H5Sselect_none(file_space_id) < 0){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to reset the selection region for a dataspace copied from the dataset associated with variable (%s, varid=%d)",
-                       nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+                       nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
       }
 
       mem_space_id = H5Screate(H5S_NULL);
@@ -1154,27 +1138,27 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to create a new NULL dataspace for variable (%s, varid=%d)",
-                       nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+                       nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
       }
 
       bufptr = NULL;
     }
 
-    /* Collective write */
+    /* Collective write - for all regions in a single variable */
     hid_t mem_type_id = spio_nc_type_to_hdf5_type(iodesc->piotype);
     if(mem_type_id == H5I_INVALID_HID){
       return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                      "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                      "Unsupported memory type (type=%x) for variable (%s, varid=%d)",
-                     nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype, pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
     }
 
-    hid_t file_var_type_id = H5Dget_type(file->hdf5_vars[wcache->varids[nv]].hdf5_dataset_id);
+    hid_t file_var_type_id = H5Dget_type(file->hdf5_vars[wcache->varids[vidx]].hdf5_dataset_id);
     if(file_var_type_id == H5I_INVALID_HID){
       return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                      "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                      "Unable to query the type of variable (%s, varid=%d)",
-                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
     }
 
     hid_t file_var_ntype_id = H5Tget_native_type(file_var_type_id, H5T_DIR_DEFAULT);
@@ -1186,25 +1170,25 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
      * FIXME: Disable datatype conversion when filters are not enabled on the dataset
      */
     void *wbuf = bufptr;
-    if((dsize_all > 0) && !H5Tequal(mem_type_id, file_var_ntype_id)){
+    if((reg_nelems > 0) && !H5Tequal(mem_type_id, file_var_ntype_id)){
       assert(file->dt_converter);
-      wbuf = static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->convert(iodesc->ioid, bufptr, iodesc->mpitype_size * dsize_all,
+      wbuf = static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->convert(iodesc->ioid, bufptr, iodesc->mpitype_size * reg_nelems,
               iodesc->piotype, spio_hdf5_type_to_pio_type(file_var_ntype_id));
       if(wbuf == NULL){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                        "Unable to convert the type (from %d to %d) of variable (%s, varid=%d)",
                        nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype,
-                       spio_hdf5_type_to_pio_type(file_var_ntype_id), pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+                       spio_hdf5_type_to_pio_type(file_var_ntype_id), pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
       }
     }
 
-    if(H5Dwrite(file->hdf5_vars[wcache->varids[nv]].hdf5_dataset_id, file_var_ntype_id, mem_space_id, file_space_id,
+    if(H5Dwrite(file->hdf5_vars[wcache->varids[vidx]].hdf5_dataset_id, file_var_ntype_id, mem_space_id, file_space_id,
                  file->dxplid_coll, wbuf) < 0){
       return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                      "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                      "The low level (HDF5) I/O library call failed to write the dataset associated with variable (%s, varid=%d)",
-                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
     }
 
 #if SPIO_HDF5_FLUSH_AFTER_COLL_WR
@@ -1213,7 +1197,7 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
       return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                      "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                      "The low level (HDF5) I/O library call failed to flush the dataset associated with variable (%s, varid=%d)",
-                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
     }
 #endif
 
@@ -1221,20 +1205,18 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
       return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                      "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                      "The low level (HDF5) I/O library call failed to release a dataspace copied from the dataset associated with variable (%s, varid=%d)",
-                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
     }
 
     if(H5Sclose(mem_space_id) < 0){
       return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                      "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                      "The low level (HDF5) I/O library call failed to release a simple (or NULL) dataspace for variable (%s, varid=%d)",
-                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[nv]), wcache->varids[nv]);
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
     }
   }
 
-  /* FIXME: Ignoring error for now - use futures */
-  ret = spio_free_starts_counts_for_all_regions(ios, startlist, countlist, num_regions);
-
+  /* FIXME: Is this barrier needed ? */
   MPI_Barrier(ios->io_comm);
 
   iodesc->nasync_pend_ops--;
@@ -1248,10 +1230,14 @@ void pio_iosys_async_op_hdf5_free(void *pdata)
   Hdf5_wcache *wcache = static_cast<struct Hdf5_wcache *>(pdata);
   assert(wcache);
 
+  /* Using swap trick to free vectors
+   * - swap vector with an empty local/temp vector that gets deallocated when func exits
+   */
   //wcache->varids.clear();
   std::vector<int>().swap(wcache->varids);
   //wcache->frame.clear();
   std::vector<int>().swap(wcache->frame);
+
   if(wcache->iobuf){ brel(wcache->iobuf); }
   if(wcache->fillbuf){ brel(wcache->fillbuf); }
 
