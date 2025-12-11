@@ -2067,19 +2067,33 @@ int test_cdf5_new_data_types(int iosysid, int num_flavors, int *flavor, int my_r
     int ncid;
     int ret;
 
-    int varid_ubyte;
-    int varid_ushort;
-    int varid_uint;
-    int varid_int64;
-    int varid_uint64;
+    const int ARR_SZ = 10;
 
-    unsigned char ubyte_data_in;
-    unsigned short ushort_data_in;
-    unsigned int uint_data_in;
-    long long int64_data_in;
-    unsigned long long uint64_data_in;
+    int dimid_arr;
+
+    int varid_ubyte, varid_ubyte_arr;
+    int varid_ushort, varid_ushort_arr;
+    int varid_uint, varid_uint_arr;
+    int varid_int64, varid_int64_arr;
+    int varid_uint64, varid_uint64_arr;
+
+    unsigned char ubyte_data_in, ubyte_arr[ARR_SZ];
+    unsigned short ushort_data_in, ushort_arr[ARR_SZ];
+    unsigned int uint_data_in, uint_arr[ARR_SZ];
+    long long int64_data_in, int64_arr[ARR_SZ];
+    unsigned long long uint64_data_in, uint64_arr[ARR_SZ];
+
+    PIO_Offset start = 0, count = ARR_SZ;
 
     char filename[PIO_MAX_NAME];
+
+    for(int i = 0; i < ARR_SZ; i++){
+      ubyte_arr[i] = ubyte_data;
+      ushort_arr[i] = ushort_data;
+      uint_arr[i] = uint_data;
+      int64_arr[i] = int64_data;
+      uint64_arr[i] = uint64_data;
+    }
 
     for (int fmt = 0; fmt < num_flavors; fmt++)
     {
@@ -2106,19 +2120,37 @@ int test_cdf5_new_data_types(int iosysid, int num_flavors, int *flavor, int my_r
         if ((ret = PIOc_put_att_ulonglong(ncid, PIO_GLOBAL, "att_uint64", PIO_UINT64, 1, &uint64_data)))
             ERR(ret);
 
+        if ((ret = PIOc_def_dim(ncid, "test_dim_sz_10", ((PIO_Offset) ARR_SZ), &dimid_arr)))
+            ERR(ret);
+
         if ((ret = PIOc_def_var(ncid, "var_ubyte", PIO_UBYTE, 0, NULL, &varid_ubyte)))
+            ERR(ret);
+
+        if ((ret = PIOc_def_var(ncid, "var_ubyte_arr", PIO_UBYTE, 1, &dimid_arr, &varid_ubyte_arr)))
             ERR(ret);
 
         if ((ret = PIOc_def_var(ncid, "var_ushort", PIO_USHORT, 0, NULL, &varid_ushort)))
             ERR(ret);
 
+        if ((ret = PIOc_def_var(ncid, "var_ushort_arr", PIO_USHORT, 1, &dimid_arr, &varid_ushort_arr)))
+            ERR(ret);
+
         if ((ret = PIOc_def_var(ncid, "var_uint", PIO_UINT, 0, NULL, &varid_uint)))
+            ERR(ret);
+
+        if ((ret = PIOc_def_var(ncid, "var_uint_arr", PIO_UINT, 1, &dimid_arr, &varid_uint_arr)))
             ERR(ret);
 
         if ((ret = PIOc_def_var(ncid, "var_int64", PIO_INT64, 0, NULL, &varid_int64)))
             ERR(ret);
 
+        if ((ret = PIOc_def_var(ncid, "var_int64_arr", PIO_INT64, 1, &dimid_arr, &varid_int64_arr)))
+            ERR(ret);
+
         if ((ret = PIOc_def_var(ncid, "var_uint64", PIO_UINT64, 0, NULL, &varid_uint64)))
+            ERR(ret);
+
+        if ((ret = PIOc_def_var(ncid, "var_uint64_arr", PIO_UINT64, 1, &dimid_arr, &varid_uint64_arr)))
             ERR(ret);
 
         if ((ret = PIOc_enddef(ncid)))
@@ -2127,20 +2159,43 @@ int test_cdf5_new_data_types(int iosysid, int num_flavors, int *flavor, int my_r
         if ((ret = PIOc_put_var_uchar(ncid, varid_ubyte, &ubyte_data)))
             ERR(ret);
 
+        if ((ret = PIOc_put_vars_uchar(ncid, varid_ubyte_arr, &start, &count, NULL, ubyte_arr)))
+            ERR(ret);
+
         if ((ret = PIOc_put_var_ushort(ncid, varid_ushort, &ushort_data)))
+            ERR(ret);
+
+        if ((ret = PIOc_put_vars_ushort(ncid, varid_ushort_arr, &start, &count, NULL, ushort_arr)))
             ERR(ret);
 
         if ((ret = PIOc_put_var_uint(ncid, varid_uint, &uint_data)))
             ERR(ret);
 
+        if ((ret = PIOc_put_vars_uint(ncid, varid_uint_arr, &start, &count, NULL, uint_arr)))
+            ERR(ret);
+
         if ((ret = PIOc_put_var_longlong(ncid, varid_int64, &int64_data)))
+            ERR(ret);
+
+        if ((ret = PIOc_put_vars_longlong(ncid, varid_int64_arr, &start, &count, NULL, int64_arr)))
             ERR(ret);
 
         if ((ret = PIOc_put_var_ulonglong(ncid, varid_uint64, &uint64_data)))
             ERR(ret);
 
+        if ((ret = PIOc_put_vars_ulonglong(ncid, varid_uint64_arr, &start, &count, NULL, uint64_arr)))
+            ERR(ret);
+
         if ((ret = PIOc_closefile(ncid)))
             ERR(ret);
+
+        for(int i = 0; i < ARR_SZ; i++){
+          ubyte_arr[i] = 0;
+          ushort_arr[i] = 0;
+          uint_arr[i] = 0;
+          int64_arr[i] = 0;
+          uint64_arr[i] = 0;
+        }
 
         if ((ret = PIOc_openfile2(iosysid, &ncid, &(flavor[fmt]), filename, PIO_NOWRITE)))
             ERR(ret);
@@ -2191,6 +2246,17 @@ int test_cdf5_new_data_types(int iosysid, int num_flavors, int *flavor, int my_r
         if (ubyte_data_in != ubyte_data)
             ERR(ERR_WRONG);
 
+        varid_ubyte_arr = -1;
+        if ((ret = PIOc_inq_varid(ncid, "var_ubyte_arr", &varid_ubyte_arr)))
+            ERR(ret);
+
+        if ((ret = PIOc_get_vars_uchar(ncid, varid_ubyte_arr, &start, &count, NULL, ubyte_arr)))
+            ERR(ret);
+
+        for(int i = 0; i < ARR_SZ; i++){
+          if(ubyte_arr[i] != ubyte_data) { ERR(ERR_WRONG); }
+        }
+
         varid_ushort = -1;
         if ((ret = PIOc_inq_varid(ncid, "var_ushort", &varid_ushort)))
             ERR(ret);
@@ -2201,6 +2267,17 @@ int test_cdf5_new_data_types(int iosysid, int num_flavors, int *flavor, int my_r
 
         if (ushort_data_in != ushort_data)
             ERR(ERR_WRONG);
+
+        varid_ushort_arr = -1;
+        if ((ret = PIOc_inq_varid(ncid, "var_ushort_arr", &varid_ushort_arr)))
+            ERR(ret);
+
+        if ((ret = PIOc_get_vars_ushort(ncid, varid_ushort_arr, &start, &count, NULL, ushort_arr)))
+            ERR(ret);
+
+        for(int i = 0; i < ARR_SZ; i++){
+          if (ushort_arr[i] != ushort_data) { ERR(ERR_WRONG); }
+        }
 
         varid_uint = -1;
         if ((ret = PIOc_inq_varid(ncid, "var_uint", &varid_uint)))
@@ -2213,6 +2290,17 @@ int test_cdf5_new_data_types(int iosysid, int num_flavors, int *flavor, int my_r
         if (uint_data_in != uint_data)
             ERR(ERR_WRONG);
 
+        varid_uint_arr = -1;
+        if ((ret = PIOc_inq_varid(ncid, "var_uint_arr", &varid_uint_arr)))
+            ERR(ret);
+
+        if ((ret = PIOc_get_vars_uint(ncid, varid_uint_arr, &start, &count, NULL, uint_arr)))
+            ERR(ret);
+
+        for(int i = 0; i < ARR_SZ; i++){
+          if (uint_arr[i] != uint_data) { ERR(ERR_WRONG); }
+        }
+
         varid_int64 = -1;
         if ((ret = PIOc_inq_varid(ncid, "var_int64", &varid_int64)))
             ERR(ret);
@@ -2224,6 +2312,17 @@ int test_cdf5_new_data_types(int iosysid, int num_flavors, int *flavor, int my_r
         if (int64_data_in != int64_data)
             ERR(ERR_WRONG);
 
+        varid_int64_arr = -1;
+        if ((ret = PIOc_inq_varid(ncid, "var_int64_arr", &varid_int64_arr)))
+            ERR(ret);
+
+        if ((ret = PIOc_get_vars_longlong(ncid, varid_int64_arr, &start, &count, NULL, int64_arr)))
+            ERR(ret);
+
+        for(int i = 0; i < ARR_SZ; i++){
+          if (int64_arr[i] != int64_data) { ERR(ERR_WRONG); }
+        }
+
         varid_uint64 = -1;
         if ((ret = PIOc_inq_varid(ncid, "var_uint64", &varid_uint64)))
             ERR(ret);
@@ -2234,6 +2333,17 @@ int test_cdf5_new_data_types(int iosysid, int num_flavors, int *flavor, int my_r
 
         if (uint64_data_in != uint64_data)
             ERR(ERR_WRONG);
+
+        varid_uint64_arr = -1;
+        if ((ret = PIOc_inq_varid(ncid, "var_uint64_arr", &varid_uint64_arr)))
+            ERR(ret);
+
+        if ((ret = PIOc_get_vars_ulonglong(ncid, varid_uint64_arr, &start, &count, NULL, uint64_arr)))
+            ERR(ret);
+
+        for(int i = 0; i < ARR_SZ; i++){
+          if (uint64_arr[i] != uint64_data) { ERR(ERR_WRONG); }
+        }
 
         if ((ret = PIOc_closefile(ncid)))
             ERR(ret);
