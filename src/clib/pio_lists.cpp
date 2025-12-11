@@ -17,6 +17,8 @@
 #include "spio_hash.h"
 #include "spio_dt_converter.hpp"
 #include <mutex>
+#include <thread>
+#include <chrono>
 
 namespace SPIO_Util{
   namespace SPIO_Lists{
@@ -469,13 +471,32 @@ int pio_delete_iodesc_from_list(int ioid)
   return PIO_NOERR;
 }
 
-int pio_delete_all_iodescs(void )
+static int spio_wait_async_iodesc_ops(io_desc_t *iodesc)
 {
+  const int SLEEP_TIME_IN_MILLISECONDS = 500;
+  while(iodesc->nasync_pend_ops > 0){
+    std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME_IN_MILLISECONDS));
+  }
+
+  return PIO_NOERR;
+}
+
+int pio_delete_all_iodescs(int iosysid)
+{
+  int ret = PIO_NOERR;
   for(std::map<int, io_desc_t *>::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.begin();
         iter != SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.end(); ++iter){
     io_desc_t *iodesc = (*iter).second;
-    assert(iodesc && (iodesc->nasync_pend_ops == 0));
-    free(iodesc);
+    ret = spio_wait_async_iodesc_ops(iodesc);
+    if(ret != PIO_NOERR){
+      return pio_err(NULL, NULL, ret, __FILE__, __LINE__,
+                      "Deleting I/O descriptor (ioid = %d) failed. Error while waiting for async ops on I/O descriptor", iodesc->ioid);
+    }
+    ret = PIOc_freedecomp_impl(iosysid, iodesc->ioid);
+    if(ret != PIO_NOERR){
+      return pio_err(NULL, NULL, ret, __FILE__, __LINE__,
+                      "Deleting I/O descriptor (ioid = %d) failed. Error when freeing I/O decomp after waiting for async ops on I/O descriptor", iodesc->ioid);
+    }
   }
 
   SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.clear();

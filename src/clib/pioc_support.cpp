@@ -1805,6 +1805,11 @@ int PIOc_freedecomp_impl(int iosysid, int ioid)
         }
     }
 
+    if(iodesc->nasync_pend_ops > 0){
+      /* Let I/O desc be freed during finalize */
+      return PIO_NOERR;
+    }
+
     /* Free the map. */
     free(iodesc->map);
 

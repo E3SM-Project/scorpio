@@ -118,7 +118,7 @@ extern "C" {
     int  pio_add_to_iodesc_list(io_desc_t *iodesc, MPI_Comm comm);
     io_desc_t *pio_get_iodesc_from_id(int ioid);
     int pio_delete_iodesc_from_list(int ioid);
-    int pio_delete_all_iodescs(void );
+    int pio_delete_all_iodescs(int iosysid);
     int pio_num_iosystem(int *niosysid);
 
     int pio_get_file(int ncid, file_desc_t **filep);
