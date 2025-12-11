@@ -1034,7 +1034,8 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
   void *iobuf = (wr_fillbuf) ? (wcache->fillbuf) : (wcache->iobuf);
   std::size_t iobuf_sz = (wr_fillbuf) ? (wcache->fillbuf_sz) : (wcache->iobuf_sz);
 
-  assert(region && (nvars * llen * iodesc->mpitype_size == static_cast<PIO_Offset>(iobuf_sz)) && iobuf);
+  assert(region && (nvars * llen * iodesc->mpitype_size == static_cast<PIO_Offset>(iobuf_sz)));
+  assert(((iobuf_sz == 0) && !iobuf) || ((iobuf_sz != 0) && iobuf));
 
   /* Info on all regions */
   std::vector<Util::RInfo> vreg_infos;
@@ -1274,28 +1275,34 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
   //PIO_Offset llen = fill ? iodesc->holegridsize : iodesc->llen;
   if(fill){
     std::size_t fillbuf_sz = iodesc->holegridsize * iodesc->mpitype_size;
-    wcache->fillbuf = bget(fillbuf_sz);
-    if(!wcache->fillbuf){
-      return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Queuing asynchronous op/task for writing fillvalue for variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for caching variable fillvalue", nvars, pio_get_fname_from_file(file), file->pio_ncid, static_cast<long long int>(fillbuf_sz));
-    }
+    /* On I/O processes with no data (after rearrangement) to write the fillbuf_sz will be 0 */
+    if(fillbuf_sz > 0){
+      wcache->fillbuf = bget(fillbuf_sz);
+      if(!wcache->fillbuf){
+        return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Queuing asynchronous op/task for writing fillvalue for variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for caching variable fillvalue", nvars, pio_get_fname_from_file(file), file->pio_ncid, static_cast<long long int>(fillbuf_sz));
+      }
 
-    std::memcpy(wcache->fillbuf, v1desc->fillbuf, fillbuf_sz);
-    wcache->fillbuf_sz = fillbuf_sz;
+      std::memcpy(wcache->fillbuf, v1desc->fillbuf, fillbuf_sz);
+      wcache->fillbuf_sz = fillbuf_sz;
+    }
   }
   else{
     /* Copy buffer, with rearranged data, for nvars */
     std::size_t iobuf_sz = nvars * iodesc->llen * iodesc->mpitype_size;
-    wcache->iobuf = bget(iobuf_sz);
-    if(!wcache->iobuf){
-      return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Queuing asynchronous op/task for writing fillvalue for variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for caching variable data for all the variables", nvars, pio_get_fname_from_file(file), file->pio_ncid, static_cast<long long int>(iobuf_sz));
-    }
+    /* On I/O processes with no data (after rearrangement) to write the iobuf_sz will be 0 */
+    if(iobuf_sz > 0){
+      wcache->iobuf = bget(iobuf_sz);
+      if(!wcache->iobuf){
+        return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Queuing asynchronous op/task for writing fillvalue for variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for caching variable data for all the variables", nvars, pio_get_fname_from_file(file), file->pio_ncid, static_cast<long long int>(iobuf_sz));
+      }
 
-    void *iobuf = spio_file_mvcache_get(file, iodesc->ioid);
-    assert(iobuf);
-    std::memcpy(wcache->iobuf, iobuf, iobuf_sz);
-    wcache->iobuf_sz = iobuf_sz;
+      void *iobuf = spio_file_mvcache_get(file, iodesc->ioid);
+      assert(iobuf);
+      std::memcpy(wcache->iobuf, iobuf, iobuf_sz);
+      wcache->iobuf_sz = iobuf_sz;
+    }
   }
 
   /* Create async task */
