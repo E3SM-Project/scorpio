@@ -19,6 +19,10 @@ const char *pio_iotype_to_string(int iotype)
                               return "PIO_IOTYPE_ADIOS";
     case PIO_IOTYPE_ADIOSC:
                               return "PIO_IOTYPE_ADIOSC";
+    case PIO_IOTYPE_HDF5:
+                              return "PIO_IOTYPE_HDF5";
+    case PIO_IOTYPE_HDF5C:
+                              return "PIO_IOTYPE_HDF5C";
     default:
                               return "UNKNOWN";
   }
