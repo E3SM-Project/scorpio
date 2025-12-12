@@ -11,6 +11,7 @@
 #include <mutex>
 #include <thread>
 #include <chrono>
+#include <string>
 
 #ifdef _ADIOS2
 #include "../../tools/adios2pio-nm/adios2pio-nm-lib-c.h"
@@ -442,9 +443,28 @@ static int sync_file(int ncid)
 
 int spio_wait_on_hard_close(iosystem_desc_t *ios, file_desc_t *file)
 {
+  /* FIXME: Make the max time configurable */
+  const int MAX_SLEEP_TIME_IN_MILLISECONDS = 5000;
   const int SLEEP_TIME_IN_MILLISECONDS = 500;
-  while(!file->is_hard_closed){
+
+  /* For files that will never be closed, due to user error for ex, we cannot wait
+   * indefenitely. On the other hand we do want to have enough time to finish async ops
+   */
+  const int max_tries = (MAX_SLEEP_TIME_IN_MILLISECONDS > SLEEP_TIME_IN_MILLISECONDS) ?
+                        (MAX_SLEEP_TIME_IN_MILLISECONDS/SLEEP_TIME_IN_MILLISECONDS) : 1;
+  int i = 0;
+  while(!file->is_hard_closed && (i++ < max_tries)){
     std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME_IN_MILLISECONDS));
+  }
+
+  if(!file->is_hard_closed && (i > max_tries)){
+    std::string msg = std::string("Waiting on a close on file aborted due to exceeding max timelimit") +
+                        std::string(" (") +
+                        std::string("ncid = ") + std::to_string(file->pio_ncid) +
+                        std::string(", file = ") + std::string(file->fname) +
+                        std::string(", max timeout limit(milli secs) = ") + std::to_string(MAX_SLEEP_TIME_IN_MILLISECONDS) +
+                        std::string(")");
+    PIOc_warn(ios->iosysid, file->pio_ncid, __FILE__, __LINE__, msg.c_str());
   }
 
   return PIO_NOERR;
