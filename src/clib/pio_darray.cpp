@@ -18,6 +18,7 @@
 #include "spio_io_summary.h"
 #include "spio_file_mvcache.h"
 #include "spio_hash.h"
+#include "spio_dt_converter.hpp"
 
 /* uint64_t definition */
 #ifdef _ADIOS2
@@ -551,14 +552,16 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     }
 
     /* For PNETCDF the iobuf is freed in flush_output_buffer() */
-    if (file->iotype != PIO_IOTYPE_PNETCDF)
-    {
-        /* Release resources. */
-        if (mv_iobuf)
-        {
-            LOG((3,"freeing variable buffer in pio_darray"));
-            spio_file_mvcache_free(file, ioid);
-        }
+    if(file->iotype != PIO_IOTYPE_PNETCDF){
+      /* Release resources. */
+      if(mv_iobuf){
+        LOG((3,"freeing variable buffer in pio_darray"));
+        spio_file_mvcache_free(file, ioid);
+      }
+      if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+        assert(file->dt_converter);
+        static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->free(ioid);
+      }
     }
 
     /* The box rearranger will always have data (it could be fill
