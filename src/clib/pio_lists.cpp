@@ -142,6 +142,26 @@ int pio_free_file(file_desc_t *file)
   if(file->dt_converter != NULL){
     delete(static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter));
   }
+
+  if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+    for(int i = 0; i < file->hdf5_num_dims; i++){
+      if(file->hdf5_dims[i].name) { free(file->hdf5_dims[i].name); }
+    }
+    file->hdf5_num_dims = 0;
+
+    for(int i = 0; i < file->hdf5_num_vars; i++){
+      if(file->hdf5_vars[i].name) { free(file->hdf5_vars[i].name); }
+      if(file->hdf5_vars[i].alt_name) { free(file->hdf5_vars[i].alt_name); }
+      if(file->hdf5_vars[i].hdf5_dimids) { free(file->hdf5_vars[i].hdf5_dimids); }
+    }
+    file->hdf5_num_vars = 0;
+
+    for(int i = 0; i < file->hdf5_num_attrs; i++) {
+      if(file->hdf5_attrs[i].att_name) { free(file->hdf5_attrs[i].att_name); }
+    }
+    file->hdf5_num_attrs = 0;
+    file->hdf5_num_gattrs = 0;
+  }
 #endif
 
 #ifdef _ADIOS2
