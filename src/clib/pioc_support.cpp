@@ -6826,10 +6826,11 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
   assert((ios != NULL) && (file != NULL) && (var_ndims >= 0));
 
   bool var_has_only_unlimited_dims = true;
+  bool var_is_scalar = true;
   for(std::vector<hsize_t>::const_iterator citer = max_dim_sz.cbegin(); citer != max_dim_sz.cend(); ++citer){
     if(*citer != H5S_UNLIMITED){
       var_has_only_unlimited_dims = false;
-      break;
+      if(*citer != 1) { var_is_scalar = false; }
     }
   }
 
@@ -6870,10 +6871,10 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
 
 #ifdef _SPIO_HAS_H5Z_ZFP
   /* Avoid ZFP compression for vars with only unlimited dims */
-  if(var_has_only_unlimited_dims){
+  if(var_has_only_unlimited_dims || var_is_scalar){
     std::string msg("Disabling HDF5 compression for variable");
       msg += std::string("(name=") + std::string(var_name) + std::string(", file=") + std::string(pio_get_fname_from_file(file)) + std::string(")");
-      msg += std::string(" since it only has unlimited dims");
+      msg += (var_has_only_unlimited_dims) ? std::string(" since it only has unlimited dims") : std::string(" since it is essentially a scalar variable");
     PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, msg.c_str());
     return dpid;
   }
