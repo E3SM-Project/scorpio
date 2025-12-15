@@ -249,7 +249,8 @@ int spio_close_soft_closed_file(const char *filename)
   for(std::map<int, file_desc_t *>::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_file_list.begin();
       iter != SPIO_Util::SPIO_Lists::GVars::pio_file_list.end(); ++iter){
     file_desc_t *file = iter->second;
-    if(std::string(file->fname) == std::string(filename)){
+    /* No need to worry about "read only" files */
+    if((std::string(file->fname) == std::string(filename)) && (file->mode & PIO_WRITE)){
       //ret = spio_hard_closefile(file->iosystem, file, true);
       ret = spio_wait_on_hard_close(file->iosystem, file);
       if(ret != PIO_NOERR){
