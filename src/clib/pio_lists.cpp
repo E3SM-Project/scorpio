@@ -505,8 +505,9 @@ static int spio_wait_async_iodesc_ops(io_desc_t *iodesc)
 int pio_delete_all_iodescs(int iosysid)
 {
   int ret = PIO_NOERR;
-  for(std::map<int, io_desc_t *>::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.begin();
-        iter != SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.end(); ++iter){
+  /* Delete the head of the list, one at a time - to delete all I/O descs */
+  std::map<int, io_desc_t *>::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.begin();
+  while(iter != SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.end()){
     io_desc_t *iodesc = (*iter).second;
     ret = spio_wait_async_iodesc_ops(iodesc);
     if(ret != PIO_NOERR){
@@ -518,6 +519,9 @@ int pio_delete_all_iodescs(int iosysid)
       return pio_err(NULL, NULL, ret, __FILE__, __LINE__,
                       "Deleting I/O descriptor (ioid = %d) failed. Error when freeing I/O decomp after waiting for async ops on I/O descriptor", iodesc->ioid);
     }
+
+    /* Get the latest head */
+    iter = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.begin();
   }
 
   SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.clear();
