@@ -28,6 +28,7 @@
 #include "spio_hash.h"
 #include "pio_rearr_contig.hpp"
 #include "spio_decomp_logger.hpp"
+#include "spio_async_utils.hpp"
 #include <typeinfo>
 #include <vector>
 #include <string>
@@ -3115,6 +3116,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
       return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                       "Creating file (%s) failed. Error closing previous soft closed file", filename);
     }
+
 #endif
 
     /* Allocate space for the file info. */
@@ -4819,8 +4821,16 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #if PIO_USE_ASYNC_WR_THREAD
     ierr = spio_close_soft_closed_file(filename);
     if(ierr != PIO_NOERR){
-      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+      return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                       "Creating file (%s) failed. Error closing previous soft closed file", filename);
+    }
+
+    if((*iotype == PIO_IOTYPE_HDF5) || (*iotype == PIO_IOTYPE_HDF5C)){
+      ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+      if(ierr != PIO_NOERR){
+        return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                        "Creating file (%s) failed. Error waiting on all pending asynchronous HDF5 ops", filename);
+      }
     }
 #endif
 
@@ -6575,11 +6585,18 @@ int spio_hdf5_type_to_pio_type(hid_t ntype)
 
 int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filename)
 {
-    int mpierr = MPI_SUCCESS;
+    int mpierr = MPI_SUCCESS, ret = PIO_NOERR;
 
     assert(ios && file && filename);
     assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
     assert(ios->ioproc);
+
+    /* FIXME: Relax this wait */
+    ret = spio_wait_all_hdf5_async_ops(ios->iosysid);
+    if(ret != PIO_NOERR){
+      return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                      "Creating file (%s) failed. Error waiting on all pending asynchronous HDF5 ops", filename);
+    }
 
     if (file->mode & PIO_NOCLOBBER) /* Check whether HDF5 file exists */
     {
@@ -7112,10 +7129,21 @@ static inline int spio_add_nc_hidden_coord(iosystem_desc_t *ios, file_desc_t *fi
 int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
                       nc_type xtype, int ndims, const int *dimidsp, int varid)
 {
+  int ret = PIO_NOERR;
+
   assert(ios && file && name && ndims >= 0 && varid >= 0);
   assert((ndims == 0) || dimidsp);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
   assert(ios->ioproc);
+
+  /* FIXME: Relax this wait */
+  ret = spio_wait_all_hdf5_async_ops(ios->iosysid);
+  if(ret != PIO_NOERR){
+    return pio_err(ios, file, ret, __FILE__, __LINE__,
+                   "Defining variable (%s, varid = %d) in file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "Error waiting on all pending asynchronous HDF5 ops",
+                   name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
 
   /* Cache the dim sizes for HDF5 calls */
   std::vector<hsize_t> dim_sz(ndims), max_dim_sz(ndims);
@@ -7198,11 +7226,20 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
 
 int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
 {
-    int i;
+    int i = 0, ret = PIO_NOERR;
 
     assert(ios && file);
     assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
     assert(ios->ioproc);
+
+    /* FIXME: Relax this wait */
+    ret = spio_wait_all_hdf5_async_ops(ios->iosysid);
+    if(ret != PIO_NOERR){
+      return pio_err(ios, file, ret, __FILE__, __LINE__,
+                     "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Error waiting on all pending asynchronous HDF5 ops",
+                     pio_get_fname_from_file(file), file->pio_ncid);
+    }
 
     for (i = 0; i < file->hdf5_num_dims; i++)
     {
@@ -7478,6 +7515,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
 int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const char *name,
                       nc_type atttype, PIO_Offset len, const void *op)
 {
+    int ret = PIO_NOERR;
     hid_t attr_id;
     hid_t space_id;
     hsize_t asize = len;
@@ -7488,6 +7526,15 @@ int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const 
     assert(ios && file && name && op);
     assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
     assert(ios->ioproc);
+
+    /* FIXME: Relax this wait */
+    ret = spio_wait_all_hdf5_async_ops(ios->iosysid);
+    if(ret != PIO_NOERR){
+      return pio_err(ios, file, ret, __FILE__, __LINE__,
+                     "Writing attribute (%s) associated with variable (varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Error waiting on all pending asynchronous HDF5 ops",
+                     name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
 
     if (varid == PIO_GLOBAL)
         loc_id = file->hdf5_file_id;
@@ -7641,12 +7688,22 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
                       const PIO_Offset *start, const PIO_Offset *count,
                       const PIO_Offset *stride, nc_type xtype, const void *buf)
 {
+    int ret = PIO_NOERR;
     hsize_t dims[H5S_MAX_RANK];
     hsize_t mdims[H5S_MAX_RANK];
 
     assert(ios && file && varid >= 0 && buf);
     assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
     assert(ios->ioproc);
+
+    /* FIXME: Relax this wait */
+    ret = spio_wait_all_hdf5_async_ops(ios->iosysid);
+    if(ret != PIO_NOERR){
+      return pio_err(ios, file, ret, __FILE__, __LINE__,
+                     "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Error waiting on all pending asynchronous HDF5 ops",
+                     pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
 
     hid_t file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
     if (file_space_id == H5I_INVALID_HID)
@@ -7844,11 +7901,16 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
 
 int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file)
 {
-    int i;
+    int i = 0;
 
     assert(ios && file);
     assert((file->iotype == PIO_IOTYPE_HDF5) || ((file->iotype == PIO_IOTYPE_HDF5C)));
     assert(ios->ioproc);
+
+    /* Since close is always an async op, when async thread is used, we do not need
+     * to explicitly wait for async ops to complete
+     * i.e., we don't need spio_wait_all_hdf5_async_ops() here
+     */
 
     if (H5Pclose(file->dxplid_coll) < 0)
     {

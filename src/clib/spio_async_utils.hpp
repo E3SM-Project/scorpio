@@ -29,5 +29,6 @@ int pio_iosys_async_file_close_op_add(file_desc_t *file);
 
 std::string pio_async_op_type_to_string(pio_async_op_type_t op);
 
+int spio_wait_all_hdf5_async_ops(int iosysid);
 #endif // _SPIO_ASYNC_UTILS_HPP_
 
