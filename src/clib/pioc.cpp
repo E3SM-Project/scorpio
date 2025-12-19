@@ -1891,17 +1891,7 @@ int PIOc_finalize_impl(int iosysid)
 
 #endif /* ifdef _HDF5 */
 
-    free(ios->io_fstats);
-
-    /* Free this memory that was allocated in init_intracomm. */
-    if (ios->ioranks)
-        free(ios->ioranks);
-    LOG((3, "Freed ioranks."));
-    if (ios->compranks)
-        free(ios->compranks);
-    LOG((3, "Freed compranks."));
-
-    /* Learn the number of open IO systems. */
+    /* Find the number of open IO systems. */
     if ((ierr = pio_num_iosystem(&niosysid)))
     {
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
@@ -1919,6 +1909,16 @@ int PIOc_finalize_impl(int iosysid)
 #endif
 
     LOG((2, "%d iosystems are still open.", niosysid));
+    free(ios->io_fstats);
+
+    /* Free this memory that was allocated in init_intracomm. */
+    if (ios->ioranks)
+        free(ios->ioranks);
+    LOG((3, "Freed ioranks."));
+    if (ios->compranks)
+        free(ios->compranks);
+    LOG((3, "Freed compranks."));
+
 
     /* Free the MPI groups. */
     if (ios->compgroup != MPI_GROUP_NULL)
