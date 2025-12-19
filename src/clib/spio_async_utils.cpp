@@ -1006,6 +1006,25 @@ static inline void update_reg_infos_start_frame(std::vector<Util::RInfo> &reg_in
   }
 }
 
+namespace SPIO_Util{
+  namespace GVars{
+    std::atomic<int> npend_hdf5_async_ops;
+  } // namespace GVars
+} // namespace SPIO_Util
+
+int spio_wait_all_hdf5_async_ops(int iosysid)
+{
+  const int SLEEP_TIME_IN_MILLISECONDS = 500;
+  while(SPIO_Util::GVars::npend_hdf5_async_ops > 0){
+    std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME_IN_MILLISECONDS));
+    if(SPIO_Util::GVars::npend_hdf5_async_ops > 0){
+      PIOc_warn(iosysid, PIO_DEFAULT, __FILE__, __LINE__, "Continuing to wait on all HDF5 async ops...");
+    }
+  }
+
+  return PIO_NOERR;
+}
+
 int pio_iosys_async_op_hdf5_write(void *pdata)
 {
   /* FIXME: Add futures */
@@ -1222,6 +1241,7 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
 
   iodesc->nasync_pend_ops--;
   file->npend_ops--;
+  SPIO_Util::GVars::npend_hdf5_async_ops--;
 
   return PIO_NOERR;
 }
@@ -1318,6 +1338,11 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
   pnew->poke = pio_async_poke_func_unavail;
   pnew->free = pio_iosys_async_op_hdf5_free;
 
+  /* One more pending op using this iodesc & file */
+  iodesc->nasync_pend_ops++;
+  file->npend_ops++;
+  SPIO_Util::GVars::npend_hdf5_async_ops++;
+
   /* Get the mt queue and queue the async task */
   ret = pio_async_tpool_op_add(pnew);
   if(ret != PIO_NOERR){
@@ -1325,10 +1350,6 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                     "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", ios->iosysid);
   }
-
-  /* One more pending op using this iodesc & file */
-  iodesc->nasync_pend_ops++;
-  file->npend_ops++;
 
   return PIO_NOERR;
 }
@@ -1339,6 +1360,7 @@ int pio_iosys_async_file_close_op_wait(void *pdata)
   file_desc_t *file = static_cast<file_desc_t *>(pdata);
   assert(file);
 
+  //file->npend_ops--;
   if(file->npend_ops == 0){
     ret = spio_hard_closefile(file->iosystem, file, false);
     if(ret != PIO_NOERR){
@@ -1355,6 +1377,8 @@ int pio_iosys_async_file_close_op_wait(void *pdata)
                       pio_get_fname_from_file(file), file->pio_ncid);
     }
   }
+
+  SPIO_Util::GVars::npend_hdf5_async_ops--;
 
   return PIO_NOERR;
 }
@@ -1384,6 +1408,9 @@ int pio_iosys_async_file_close_op_add(file_desc_t *file)
   pnew->wait = pio_iosys_async_file_close_op_wait;
   pnew->poke = pio_async_poke_func_unavail;
   pnew->free = pio_iosys_async_file_close_op_free_no_op;
+
+  //file->npend_ops++;
+  SPIO_Util::GVars::npend_hdf5_async_ops++;
 
   /* Get the mt queue and queue the async task */
   ret = pio_async_tpool_op_add(pnew);
