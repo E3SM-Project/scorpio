@@ -1,6 +1,8 @@
 #ifndef __SPIO_LTIMER_HPP__
 #define __SPIO_LTIMER_HPP__
 
+#include <iostream>
+
 namespace PIO_Util{
   namespace SPIO_Ltimer_Utils{
     /* A simple timer class */
@@ -17,6 +19,12 @@ namespace PIO_Util{
         inline double get_stop_time(void ) const { return stop_; }
         /* Get elapsed wallclock time */
         double get_wtime(void ) const;
+
+        void sanity_check(const std::string &msg) const {
+          if(lvl_ != 0){
+            std::cerr << "WARNING: Sanity check failed, trying to get timer before its stopped, level = " << lvl_ << "(" << msg.c_str() << ")\n";
+          }
+        }
       private:
         /* Start time for the most recent start() call */
         double start_;
