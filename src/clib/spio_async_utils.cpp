@@ -977,6 +977,7 @@ struct Hdf5_wcache{
   std::size_t fillbuf_sz;
 };
 
+#ifdef _HDF5
 namespace Util{
   /* Each variable writes out one or more regions of data. However all variables have the
    * same I/O decomposition and write the same regions (within the variable) of data. The
@@ -1005,6 +1006,7 @@ static inline void update_reg_infos_start_frame(std::vector<Util::RInfo> &reg_in
     }
   }
 }
+#endif // _HDF5
 
 namespace SPIO_Util{
   namespace GVars{
@@ -1027,6 +1029,7 @@ int spio_wait_all_hdf5_async_ops(int iosysid)
 
 int pio_iosys_async_op_hdf5_write(void *pdata)
 {
+#ifdef _HDF5
   /* FIXME: Add futures */
   int ret = PIO_NOERR;
   Hdf5_wcache *wcache = static_cast<struct Hdf5_wcache *>(pdata);
@@ -1244,10 +1247,15 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
   SPIO_Util::GVars::npend_hdf5_async_ops--;
 
   return PIO_NOERR;
+#else // _HDF5
+  assert(0);
+  return PIO_EINTERNAL;
+#endif // _HDF5
 }
 
 void pio_iosys_async_op_hdf5_free(void *pdata)
 {
+#ifdef _HDF5
   Hdf5_wcache *wcache = static_cast<struct Hdf5_wcache *>(pdata);
   assert(wcache);
 
@@ -1263,11 +1271,15 @@ void pio_iosys_async_op_hdf5_free(void *pdata)
   if(wcache->fillbuf){ brel(wcache->fillbuf); }
 
   free(wcache);
+#else // _HDF5
+  assert(0);
+#endif // _HDF5
 }
 
 int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
       const int *varids, io_desc_t *iodesc, int fill, const int *frame)
 {
+#ifdef _HDF5
   int ret = PIO_NOERR;
 
   assert(file && (nvars > 0) && (fndims > 0) && varids && iodesc);
@@ -1352,6 +1364,10 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
   }
 
   return PIO_NOERR;
+#else // _HDF5
+  assert(0);
+  return PIO_EINTERNAL;
+#endif // _HDF5
 }
 
 int pio_iosys_async_file_close_op_wait(void *pdata)
