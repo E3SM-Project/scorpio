@@ -8,6 +8,7 @@
 #include "pio_internal.h"
 #include "spio_ltimer.h"
 #include "spio_ltimer.hpp"
+#include "spio_dbg_utils.hpp"
 
 /* Global timer cache */
 static std::map<std::string, PIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer> gtimers;
@@ -19,6 +20,7 @@ void PIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer::start(void )
     start_ = MPI_Wtime();
   }
   lvl_++;
+  // push_stack_trace();
 }
 
 void PIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer::stop(void )
@@ -34,6 +36,7 @@ void PIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer::stop(void )
   stop_ = MPI_Wtime();
   wtime_ += stop_ - start_;
   //start_ = 0.0;
+  // pop_stack_trace();
 }
 
 double PIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer::get_wtime(void ) const
@@ -57,5 +60,7 @@ void spio_ltimer_stop(const char *timer_name)
 double spio_ltimer_get_wtime(const char *timer_name)
 {
   /* Note : If the timer is not present we return 0 */
+  // gtimers[timer_name].sanity_check(timer_name);
+
   return gtimers[timer_name].get_wtime();
 }

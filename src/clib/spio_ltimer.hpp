@@ -2,6 +2,9 @@
 #define __SPIO_LTIMER_HPP__
 
 #include <iostream>
+#include <vector>
+#include <string>
+#include "spio_dbg_utils.hpp"
 
 namespace PIO_Util{
   namespace SPIO_Ltimer_Utils{
@@ -23,6 +26,10 @@ namespace PIO_Util{
         void sanity_check(const std::string &msg) const {
           if(lvl_ != 0){
             std::cerr << "WARNING: Sanity check failed, trying to get timer before its stopped, level = " << lvl_ << "(" << msg.c_str() << ")\n";
+            if(st_.size() > 0){
+              std::cerr << "Printing first (of " << st_.size() << ") stack traces:\n";
+              std::cerr << SPIO_Util::Dbg_Util::stack_trace_to_string(st_[0]).c_str() << "\n";
+            }
           }
         }
       private:
@@ -36,6 +43,20 @@ namespace PIO_Util{
          * recursive calls to this timer
          */
         int lvl_;
+
+        /* Stack traces of calls to timer - for debugging */
+        std::vector<std::vector<std::string> > st_;
+
+        void push_stack_trace(void ){
+          std::vector<std::string> st;
+          SPIO_Util::Dbg_Util::get_stack_trace(st);
+          st_.push_back(st);
+        }
+
+        void pop_stack_trace(void ){
+          assert(st_.size() > 0);
+          st_.pop_back();
+        }
     };
   } // namespace SPIO_Ltimer_Utils
 } // namespace PIO_Util
