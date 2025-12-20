@@ -65,6 +65,9 @@ namespace SPIO_Util{
     }
 
     std::string get_iodesc_info(io_desc_t *ios);
+
+    void get_stack_trace(std::vector<std::string> &st);
+    std::string stack_trace_to_string(const std::vector<std::string> &st);
   } // namespace Dbg_Util
 } // namespace SPIO_Util
 
