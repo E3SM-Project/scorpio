@@ -3,8 +3,10 @@
 #include "pio_internal.h"
 #include "pio_types.hpp"
 #include "spio_dbg_utils.hpp"
+#include "execinfo.h"
 
 #include <vector>
+#include <array>
 #include <iostream>
 #include <sstream>
 #include <iterator>
@@ -48,5 +50,27 @@ std::string SPIO_Util::Dbg_Util::get_iodesc_info(io_desc_t *iodesc)
     ostr<< "iodesc{NULL}";
   }
 
+  return ostr.str();
+}
+
+void SPIO_Util::Dbg_Util::get_stack_trace(std::vector<std::string> &st)
+{
+  const std::size_t MAX_STACK_DEPTH = 20;
+  std::array<void *, MAX_STACK_DEPTH> st_addrs;
+
+  std::size_t st_sz = backtrace(st_addrs.data(), st_addrs.size());
+  char **st_syms = backtrace_symbols(st_addrs.data(), st_sz);
+
+  if(!st_syms){ return; }
+
+  std::for_each(st_syms, st_syms + st_sz, [&st](char *sname) { st.push_back(sname); });
+
+  free(st_syms);
+}
+
+std::string SPIO_Util::Dbg_Util::stack_trace_to_string(const std::vector<std::string> &st)
+{
+  std::ostringstream ostr;
+  std::for_each(st.cbegin(), st.cend(), [&ostr](const std::string &str) { ostr << str << "\n"; });
   return ostr.str();
 }
