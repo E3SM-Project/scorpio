@@ -14,6 +14,7 @@
 #include <pio_internal.h>
 #include "spio_io_summary.h"
 #include "spio_hash.h"
+#include "spio_hdf5_utils.hpp"
 
 /**
  * Write a netCDF attribute of any type, converting to any type.

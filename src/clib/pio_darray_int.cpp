@@ -21,6 +21,7 @@
 #include "spio_file_mvcache.h"
 #include "spio_dbg_utils.hpp"
 #include "spio_dt_converter.hpp"
+#include "spio_hdf5_utils.hpp"
 
 /* 10MB default limit. */
 extern PIO_Offset pio_buffer_size_limit;

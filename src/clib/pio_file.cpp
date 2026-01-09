@@ -12,6 +12,7 @@
 #include <thread>
 #include <chrono>
 #include <string>
+#include "spio_hdf5_utils.hpp"
 
 #ifdef _ADIOS2
 #include "../../tools/adios2pio-nm/adios2pio-nm-lib-c.h"
