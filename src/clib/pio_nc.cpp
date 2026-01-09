@@ -21,6 +21,7 @@
 #include "pio_timer.h"
 #endif
 #include "spio_io_summary.h"
+#include "spio_hdf5_utils.hpp"
 
 const char spio_nc_fillvalue_aname[] = "_FillValue";
 
