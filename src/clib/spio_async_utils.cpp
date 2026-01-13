@@ -39,6 +39,7 @@ std::string pio_async_op_type_to_string(pio_async_op_type_t op)
     case PIO_ASYNC_INVALID_OP: return "PIO_ASYNC_INVALID_OP";
     case PIO_ASYNC_REARR_OP:  return "PIO_ASYNC_REARR_OP";
     case PIO_ASYNC_PNETCDF_WRITE_OP: return "PIO_ASYNC_PNETCDF_WRITE_OP";
+    case PIO_ASYNC_HDF5_CREATE_OP: return "PIO_ASYNC_HDF5_CREATE_OP";
     case PIO_ASYNC_HDF5_WRITE_OP: return "PIO_ASYNC_HDF5_WRITE_OP";
     case PIO_ASYNC_FILE_WRITE_OPS: return "PIO_ASYNC_FILE_WRITE_OPS";
     case PIO_ASYNC_FILE_CLOSE_OP: return "PIO_ASYNC_FILE_CLOSE_OP";
@@ -487,6 +488,8 @@ static file_async_pend_ops_kwait_func_t
     pio_async_rearr_kwait,
     /* PIO_ASYNC_PNETCDF_WRITE_OP */
     pio_async_pnetcdf_write_kwait,
+    /* PIO_ASYNC_HDF5_CREATE_OP */
+    pio_async_wait_func_unavail,
     /* PIO_ASYNC_HDF5_WRITE_OP */
     pio_async_hdf5_write_kwait,
     /* PIO_ASYNC_FILE_WRITE_OPS */
