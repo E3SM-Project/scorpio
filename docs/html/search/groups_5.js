@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['generating_0',['io descriptors, generating',['../group__iodesc__generate.html',1,'']]]
+  ['supported_20modes_20for_20creating_20a_20file_2042',['Supported modes for creating a file',['../group__create__file__modes.html',1,'']]],
+  ['supported_20modes_20for_20opening_20a_20file_2043',['Supported modes for opening a file',['../group__open__file__modes.html',1,'']]]
 ];

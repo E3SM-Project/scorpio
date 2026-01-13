@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['error_20handling_0',['Error Handling',['../error.html',1,'']]],
-  ['examples_1',['Examples',['../examp.html',1,'']]]
+  ['guide_20for_20contributors_2049',['Guide for Contributors',['../contributing_code.html',1,'']]]
 ];
