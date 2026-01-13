@@ -46,7 +46,7 @@ set (pio_lib_src
   spio_ltimer.cpp spio_serializer.cpp spio_file_mvcache.cpp
   spio_tracer.cpp spio_tracer_mdata.cpp spio_tracer_decomp.cpp
   spio_rearrange_any.cpp spio_dt_converter.cpp
-  spio_async_tpool.cpp spio_async_utils.cpp spio_hdf5_utils.cpp)
+  spio_async_tpool.cpp spio_async_utils.cpp spio_hdf5_utils.cpp spio_async_hdf5_utils.cpp)
 
 # Add sources for libpioc.a
 add_library (pioc ${pio_api_src} ${pio_lib_src})
