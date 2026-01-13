@@ -5,7 +5,9 @@
 #include <pio.h>
 #include <pio_internal.h>
 #include <string>
+#include "spio_async_hdf5_utils.hpp"
 
+int pio_async_poke_func_unavail(void *pdata, int *flag);
 int pio_file_async_pend_ops_wait(file_desc_t *file);
 int pio_file_async_pend_op_add(file_desc_t *file,
       pio_async_op_type_t op_type, void *pdata);
@@ -23,12 +25,9 @@ int pio_iosys_async_pend_op_add(iosystem_desc_t *iosys,
 int pio_tpool_async_pend_op_add(iosystem_desc_t *iosys,
       pio_async_op_type_t op_type, void *pdata);
 #endif // PIO_USE_ASYNC_WR_THREAD
-int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
-      const int *varids, io_desc_t *iodesc, int fill, const int *frame);
 int pio_iosys_async_file_close_op_add(file_desc_t *file);
 
 std::string pio_async_op_type_to_string(pio_async_op_type_t op);
 
-int spio_wait_all_hdf5_async_ops(int iosysid);
 #endif // _SPIO_ASYNC_UTILS_HPP_
 
