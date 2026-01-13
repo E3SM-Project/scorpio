@@ -22,6 +22,7 @@
 #endif
 #include "spio_io_summary.h"
 #include "spio_hdf5_utils.hpp"
+#include "spio_async_hdf5_utils.hpp"
 
 const char spio_nc_fillvalue_aname[] = "_FillValue";
 
@@ -3384,6 +3385,15 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
         return PIO_EINVAL;
     }
 
+    /* FIXME: Relax this wait */
+    ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+    if(ierr != PIO_NOERR){
+      return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                     "Defining variable (%s) in file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Error waiting on all pending asynchronous HDF5 ops",
+                     name, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
     /* ADIOS: assume all procs are also IO tasks */
 #ifdef _ADIOS2
     if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
@@ -3676,7 +3686,11 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
 #ifdef _HDF5
         if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
         {
+#ifdef PIO_USE_ASYNC_WR_THREAD
+             ierr = spio_iosys_async_hdf5_def_var_op_add(file, name, xtype, ndims, dimidsp, *varidp);
+#else
              ierr = spio_hdf5_def_var(ios, file, name, xtype, ndims, dimidsp, *varidp);
+#endif
              if (ierr != PIO_NOERR)
              {
                  char errmsg[PIO_MAX_NAME];
