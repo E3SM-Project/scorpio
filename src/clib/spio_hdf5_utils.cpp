@@ -550,15 +550,6 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
   assert(ios->ioproc);
 
-  /* FIXME: Relax this wait */
-  ret = spio_wait_all_hdf5_async_ops(ios->iosysid);
-  if(ret != PIO_NOERR){
-    return pio_err(ios, file, ret, __FILE__, __LINE__,
-                   "Defining variable (%s, varid = %d) in file (%s, ncid=%d) using HDF5 iotype failed. "
-                   "Error waiting on all pending asynchronous HDF5 ops",
-                   name, varid, pio_get_fname_from_file(file), file->pio_ncid);
-  }
-
   /* Cache the dim sizes for HDF5 calls */
   std::vector<hsize_t> dim_sz(ndims), max_dim_sz(ndims);
   for(int i = 0; i < ndims; i++){
