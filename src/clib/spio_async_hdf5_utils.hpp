@@ -9,9 +9,11 @@ namespace SPIO_Util{
   } // namespace GVars
 } // namespace SPIO_Util
 
+int spio_iosys_async_hdf5_create_op_add(file_desc_t *file, const char *filename);
+
 int spio_wait_all_hdf5_async_ops(int iosysid);
 int pio_iosys_async_op_hdf5_write(void *pdata);
-void pio_iosys_async_op_hdf5_free(void *pdata);
+void pio_iosys_async_op_hdf5_write_free(void *pdata);
 int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
       const int *varids, io_desc_t *iodesc, int fill, const int *frame);
 

@@ -50,13 +50,6 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
   assert(ios->ioproc);
 
-  /* FIXME: Relax this wait */
-  ret = spio_wait_all_hdf5_async_ops(ios->iosysid);
-  if(ret != PIO_NOERR){
-    return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                    "Creating file (%s) failed. Error waiting on all pending asynchronous HDF5 ops", filename);
-  }
-
   if(file->mode & PIO_NOCLOBBER){
     /* No clobber : Check if file exists from all processes */
     struct stat sd;

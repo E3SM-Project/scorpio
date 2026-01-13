@@ -30,6 +30,7 @@
 #include "spio_decomp_logger.hpp"
 #include "spio_async_utils.hpp"
 #include "spio_hdf5_utils.hpp"
+#include "spio_async_hdf5_utils.hpp"
 #include <typeinfo>
 #include <vector>
 #include <string>
@@ -3105,6 +3106,13 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
          iosysid, *iotype, filename, mode));
 
 #if PIO_USE_ASYNC_WR_THREAD
+    /* FIXME: Relax this wait */
+    ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+    if(ierr != PIO_NOERR){
+      return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                      "Creating file (%s) failed. Error waiting on all pending asynchronous HDF5 ops", filename);
+    }
+
     ierr = spio_close_soft_closed_file(filename);
     if(ierr != PIO_NOERR){
       return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -3812,7 +3820,11 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #ifdef _HDF5
         case PIO_IOTYPE_HDF5:
         case PIO_IOTYPE_HDF5C:
+#ifdef PIO_USE_ASYNC_WR_THREAD
+            ierr = spio_iosys_async_hdf5_create_op_add(file, filename);
+#else
             ierr = spio_hdf5_create(ios, file, filename);
+#endif
             break;
 #endif
         }
