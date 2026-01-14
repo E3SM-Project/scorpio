@@ -55,6 +55,9 @@
 /** Striping unit hint in bytes for a Lustre or GPFS file system. */
 #define PIO_STRIPING_UNIT @PIO_STRIPING_UNIT@
 
+/** If MPI File sync needs to be explicitly disabled (default : false) */
+#define SPIO_DISABLE_HDF5_MPI_FILE_SYNC @SPIO_DISABLE_HDF5_MPI_FILE_SYNC@
+
 /** Extra bytes reserved in the header when creating NetCDF files. */
 #define PIO_RESERVED_FILE_HEADER_SIZE @PIO_RESERVED_FILE_HEADER_SIZE@
 
