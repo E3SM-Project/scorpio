@@ -47,6 +47,15 @@ struct Hdf5_def_var_info{
   int varid;
 };
 
+struct Hdf5_put_att_info{
+  file_desc_t *file;
+  int varid;
+  std::string aname;
+  nc_type atype;
+  PIO_Offset alen;
+  void *abuf;
+};
+
 struct Hdf5_enddef_info{
   file_desc_t *file;
 };
@@ -217,6 +226,87 @@ int spio_iosys_async_hdf5_def_var_op_add(file_desc_t *file, const char *name,
   pnew->wait = spio_iosys_async_op_hdf5_def_var;
   pnew->poke = pio_async_poke_func_unavail;
   pnew->free = spio_iosys_async_op_hdf5_def_var_free;
+
+  /* One more pending op using this iodesc & file */
+  file->npend_ops++;
+  SPIO_Util::GVars::npend_hdf5_async_ops++;
+
+  /* Get the mt queue and queue the async task */
+  ret = pio_async_tpool_op_add(pnew);
+  if(ret != PIO_NOERR){
+    LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
+    return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                    "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", ios->iosysid);
+  }
+
+  return PIO_NOERR;
+}
+
+void spio_iosys_async_op_hdf5_put_att_free(void *pdata)
+{
+  if(pdata){
+    Hdf5_put_att_info *info = static_cast<Hdf5_put_att_info *>(pdata);
+    free(info->abuf);
+    delete(info);
+  }
+}
+
+int spio_iosys_async_op_hdf5_put_att(void *pdata)
+{
+  int ret = PIO_NOERR;
+
+  Hdf5_put_att_info *info = static_cast<Hdf5_put_att_info *>(pdata);
+
+  assert(info && info->file && info->file->iosystem);
+  assert((info->varid >= 0) || (info->varid == PIO_GLOBAL));
+  assert(info->alen > 0);
+
+  ret = spio_hdf5_put_att(info->file->iosystem, info->file,
+          info->varid, info->aname.c_str(), info->atype,
+          info->alen, info->abuf);
+
+  info->file->npend_ops--;
+  SPIO_Util::GVars::npend_hdf5_async_ops--;
+
+  return ret;
+}
+
+int spio_iosys_async_hdf5_put_att_op_add(file_desc_t *file, int varid,
+      const char *aname, nc_type atype, PIO_Offset alen, const void *abuf)
+{
+  int ret = PIO_NOERR;
+
+  assert(file && file->iosystem && aname && (alen > 0) && abuf);
+  assert((varid >= 0) || (varid = PIO_GLOBAL));
+
+  iosystem_desc_t *ios = file->iosystem;
+
+  if(!ios->ioproc){
+    return PIO_NOERR;
+  }
+
+  void *buf = malloc(alen * spio_get_nc_type_size(atype));
+  if(buf == NULL){
+    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Queuing asynchronous op/task for writing attribute (%s, variable=%s, file=%s) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for caching attribute value", aname, pio_get_vname_from_file(file, varid), pio_get_fname_from_file(file), static_cast<long long int>(alen));
+  }
+
+  memcpy(buf, abuf, alen * spio_get_nc_type_size(atype));
+
+  Hdf5_put_att_info *info = new Hdf5_put_att_info{file, varid, aname, atype, alen, buf};
+
+  /* Create async task */
+  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
+  if(pnew == NULL){
+    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Queuing asynchronous op/task for writing attribute (%s, variable=%s, file=%s) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for async task internal struct", aname, pio_get_vname_from_file(file, varid), pio_get_fname_from_file(file), static_cast<long long int>(sizeof(pio_async_op_t)));
+  }
+
+  pnew->op_type = PIO_ASYNC_HDF5_PUT_ATT_OP;
+  pnew->pdata = static_cast<void *>(info);
+  pnew->wait = spio_iosys_async_op_hdf5_put_att;
+  pnew->poke = pio_async_poke_func_unavail;
+  pnew->free = spio_iosys_async_op_hdf5_put_att_free;
 
   /* One more pending op using this iodesc & file */
   file->npend_ops++;

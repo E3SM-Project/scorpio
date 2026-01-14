@@ -65,6 +65,7 @@ int PIO_Util::PIO_async_tpool::dequeue_and_process(
       //assert(op->op_type == PIO_ASYNC_FILE_WRITE_OPS);
       assert((op->op_type == PIO_ASYNC_HDF5_CREATE_OP) ||
               (op->op_type == PIO_ASYNC_HDF5_DEF_VAR_OP) ||
+              (op->op_type == PIO_ASYNC_HDF5_PUT_ATT_OP) ||
               (op->op_type == PIO_ASYNC_HDF5_ENDDEF_OP) ||
               (op->op_type == PIO_ASYNC_HDF5_WRITE_OP) ||
               (op->op_type == PIO_ASYNC_FILE_CLOSE_OP));

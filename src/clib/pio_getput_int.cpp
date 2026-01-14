@@ -15,6 +15,7 @@
 #include "spio_io_summary.h"
 #include "spio_hash.h"
 #include "spio_hdf5_utils.hpp"
+#include "spio_async_hdf5_utils.hpp"
 
 /**
  * Write a netCDF attribute of any type, converting to any type.
@@ -58,6 +59,17 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 
     spio_ltimer_start(ios->io_fstats->wr_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
+
+#ifdef PIO_USE_ASYNC_WR_THREAD
+    /* FIXME: Relax this wait */
+    ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+    if(ierr != PIO_NOERR){
+      return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                     "Writing attribute (%s) associated with variable (varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Error waiting on all pending asynchronous HDF5 ops",
+                     name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+#endif
 
 #ifdef _ADIOS2
     if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
@@ -443,7 +455,11 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             file->io_fstats->wb += len * atttype_len;
         }
 
+#ifdef PIO_USE_ASYNC_WR_THREAD
+        ierr = spio_iosys_async_hdf5_put_att_op_add(file, varid, name, atttype, len, op);
+#else
         ierr = spio_hdf5_put_att(ios, file, varid, name, atttype, len, op);
+#endif
     }
 #endif /* _HDF5 */
 
