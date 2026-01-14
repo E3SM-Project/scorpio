@@ -12,6 +12,8 @@ namespace SPIO_Util{
 int spio_iosys_async_hdf5_create_op_add(file_desc_t *file, const char *filename);
 int spio_iosys_async_hdf5_def_var_op_add(file_desc_t *file, const char *name,
       nc_type xtype, int ndims, const int *dimidsp, int varid);
+int spio_iosys_async_hdf5_put_att_op_add(file_desc_t *file, int varid,
+      const char *aname, nc_type atype, PIO_Offset alen, const void *abuf);
 int spio_iosys_async_hdf5_enddef_op_add(file_desc_t *file);
 
 int spio_wait_all_hdf5_async_ops(int iosysid);
