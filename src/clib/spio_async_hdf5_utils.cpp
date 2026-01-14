@@ -60,6 +60,17 @@ struct Hdf5_enddef_info{
   file_desc_t *file;
 };
 
+struct Hdf5_put_var_info{
+  file_desc_t *file;
+  int varid;
+  std::vector<PIO_Offset> start;
+  std::vector<PIO_Offset> count;
+  std::vector<PIO_Offset> stride;
+  nc_type xtype;
+  PIO_Offset vbuf_sz;
+  void *vbuf;
+};
+
 struct Hdf5_wcache{
   file_desc_t *file;
   int nvars;
@@ -387,6 +398,109 @@ int spio_iosys_async_hdf5_enddef_op_add(file_desc_t *file)
 
   return PIO_NOERR;
 }
+
+void spio_iosys_async_op_hdf5_put_var_free(void *pdata)
+{
+  if(pdata){
+    Hdf5_put_var_info *info = static_cast<Hdf5_put_var_info *>(pdata);
+    free(info->vbuf);
+    delete(info);
+  }
+}
+
+int spio_iosys_async_op_hdf5_put_var(void *pdata)
+{
+  int ret = PIO_NOERR;
+
+  Hdf5_put_var_info *info = static_cast<Hdf5_put_var_info *>(pdata);
+
+  assert(info && info->file && info->file->iosystem);
+  assert((info->varid >= 0) || (info->varid == PIO_GLOBAL));
+
+  ret = spio_hdf5_put_var(info->file->iosystem, info->file,
+          info->varid,
+          (!info->start.empty()) ? (info->start.data()) : NULL,
+          (!info->count.empty()) ? (info->count.data()) : NULL,
+          (!info->stride.empty()) ? (info->stride.data()) : NULL,
+          info->xtype, info->vbuf);
+
+  info->file->npend_ops--;
+  SPIO_Util::GVars::npend_hdf5_async_ops--;
+
+  return ret;
+}
+
+int spio_iosys_async_hdf5_put_var_op_add(file_desc_t *file, int varid,
+      const PIO_Offset *start, const PIO_Offset *count, const PIO_Offset *stride,
+      nc_type xtype, const void *vbuf)
+{
+  int ret = PIO_NOERR;
+
+  assert(file && file->iosystem && (varid >= 0) && vbuf);
+
+  iosystem_desc_t *ios = file->iosystem;
+
+  if(!ios->ioproc){
+    return PIO_NOERR;
+  }
+
+  int ndims = file->hdf5_vars[varid].ndims;
+  PIO_Offset vbuf_sz = 0;
+  if(count){
+    vbuf_sz = std::accumulate(count, count + ndims, 1, std::multiplies<PIO_Offset>());
+  }
+  else{
+    int *dimids = file->hdf5_vars[varid].hdf5_dimids;
+    vbuf_sz = std::accumulate(dimids, dimids + ndims, 1,
+                [file](PIO_Offset acc_sz, const int &dimid){
+                  return acc_sz * file->hdf5_dims[dimid].len;
+                });
+  }
+
+  vbuf_sz *= spio_get_nc_type_size(xtype);
+
+  void *buf = malloc(vbuf_sz);
+  if(buf == NULL){
+    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Queuing asynchronous op/task for writing variable(%s, varid=%d, file=%s) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for caching variable value", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), static_cast<long long int>(vbuf_sz));
+  }
+
+  memcpy(buf, vbuf, vbuf_sz);
+
+  Hdf5_put_var_info *info = new Hdf5_put_var_info{file, varid,
+                                  (start) ? std::vector<PIO_Offset>{start, start + ndims} : std::vector<PIO_Offset>{},
+                                  (count) ? std::vector<PIO_Offset>{count, count + ndims} : std::vector<PIO_Offset>{},
+                                  (stride) ? std::vector<PIO_Offset>{stride, stride + ndims} : std::vector<PIO_Offset>{},
+                                  xtype, vbuf_sz, buf};
+
+  /* Create async task */
+  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
+  if(pnew == NULL){
+    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Queuing asynchronous op/task for writing variable(%s, varid=%d, file=%s) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for async internal struct", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), static_cast<long long int>(sizeof(pio_async_op_t)));
+  }
+
+  pnew->op_type = PIO_ASYNC_HDF5_PUT_VAR_OP;
+  pnew->pdata = static_cast<void *>(info);
+  pnew->wait = spio_iosys_async_op_hdf5_put_var;
+  pnew->poke = pio_async_poke_func_unavail;
+  pnew->free = spio_iosys_async_op_hdf5_put_var_free;
+
+  /* One more pending op using this file */
+  file->npend_ops++;
+  SPIO_Util::GVars::npend_hdf5_async_ops++;
+
+  /* Get the mt queue and queue the async task */
+  ret = pio_async_tpool_op_add(pnew);
+  if(ret != PIO_NOERR){
+    LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
+    return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                    "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", ios->iosysid);
+  }
+
+  return PIO_NOERR;
+}
+
 #endif // _HDF5
 
 int spio_wait_all_hdf5_async_ops(int iosysid)
