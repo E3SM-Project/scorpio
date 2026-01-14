@@ -2606,6 +2606,15 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         LOG((2, "spio_put_vars_tc complete bcast from comproot ndims = %d", ndims));
     }
 
+    /* FIXME: Relax this wait */
+    ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+    if(ierr != PIO_NOERR){
+      return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                     "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. "
+                     "Error waiting on all pending asynchronous HDF5 ops",
+                     pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
     /* ADIOS: assume all procs are also IO tasks */
 #ifdef _ADIOS2
     if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
@@ -3289,7 +3298,11 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             file->io_fstats->wb += num_elem * typelen;
         }
 
+#ifdef PIO_USE_ASYNC_WR_THREAD
+        ierr = spio_iosys_async_hdf5_put_var_op_add(file, varid, start, count, stride, xtype, buf);
+#else
         ierr = spio_hdf5_put_var(ios, file, varid, start, count, stride, xtype, buf);
+#endif
     }
 #endif /* _HDF5 */
 

@@ -15,6 +15,9 @@ int spio_iosys_async_hdf5_def_var_op_add(file_desc_t *file, const char *name,
 int spio_iosys_async_hdf5_put_att_op_add(file_desc_t *file, int varid,
       const char *aname, nc_type atype, PIO_Offset alen, const void *abuf);
 int spio_iosys_async_hdf5_enddef_op_add(file_desc_t *file);
+int spio_iosys_async_hdf5_put_var_op_add(file_desc_t *file, int varid,
+      const PIO_Offset *start, const PIO_Offset *count, const PIO_Offset *stride,
+      nc_type xtype, const void *vbuf);
 
 int spio_wait_all_hdf5_async_ops(int iosysid);
 int pio_iosys_async_op_hdf5_write(void *pdata);

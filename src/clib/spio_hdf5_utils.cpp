@@ -1046,15 +1046,6 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
   assert(ios->ioproc);
 
-  /* FIXME: Relax this wait */
-  ret = spio_wait_all_hdf5_async_ops(ios->iosysid);
-  if(ret != PIO_NOERR){
-    return pio_err(ios, file, ret, __FILE__, __LINE__,
-                   "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
-                   "Error waiting on all pending asynchronous HDF5 ops",
-                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-  }
-
   hid_t file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
   if(file_space_id == H5I_INVALID_HID){
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
