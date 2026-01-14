@@ -140,7 +140,9 @@ int pio_free_file(file_desc_t *file)
 
 #ifdef _HDF5
   if(file->dt_converter != NULL){
-    delete(static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter));
+    SPIO_Util::File_Util::DTConverter *dt_conv = static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter);
+    dt_conv->clear();
+    delete(dt_conv);
   }
 
   if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
