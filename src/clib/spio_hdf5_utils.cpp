@@ -129,6 +129,15 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
                    filename);
   }
 
+#if SPIO_DISABLE_HDF5_MPI_FILE_SYNC
+  /* This is essentially the same as setting env variable, HDF5_DO_MPI_FILE_SYNC=FALSE */
+  if(H5Fset_mpi_atomicity(file->hdf5_file_id, false) < 0){
+    std::string warn_msg = std::string("Unable to turn off MPI file syncing for HDF5 output") +
+                            "( file = " + pio_get_fname_from_file(file) + ")";
+    PIOc_warn(ios->iosysid, file->pio_ncid, __FILE__, __LINE__, warn_msg.c_str());
+  }
+#endif
+
   if(H5Pclose(fcpl_id) < 0){
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                    "Creating file (%s) using HDF5 iotype failed. "

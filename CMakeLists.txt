@@ -218,6 +218,14 @@ else()
   endif()
 endif()
 
+# Default - Do not disable MPI file syncing for HDF5 output files
+set(SPIO_DISABLE_HDF5_MPI_FILE_SYNC 0)
+if(FQDN_SITENAME MATCHES "^compute-386")
+  # On ANL compute nodes with NFS+ROMIO, disable MPI file syncing for HDF5 output
+  message(STATUS "Disabling HDF5 file syncing")
+  set(SPIO_DISABLE_HDF5_MPI_FILE_SYNC 1)
+endif()
+
 set(USE_INDEP_MODE 0)
 if(PIO_USE_INDEP_MODE)
   if(FQDN_SITENAME MATCHES "^chrlogin" OR FQDN_SITENAME MATCHES "^compute-240" OR FQDN_SITENAME MATCHES "^compute-386")
