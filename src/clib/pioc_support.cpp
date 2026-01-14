@@ -5798,6 +5798,17 @@ int spio_change_def(int ncid, int is_enddef)
         }
     }
 
+#ifdef PIO_USE_ASYNC_WR_THREAD
+    /* FIXME: Relax this wait */
+    ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+    if(ierr != PIO_NOERR){
+      return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                     "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Error waiting on all pending asynchronous HDF5 ops",
+                     pio_get_fname_from_file(file), file->pio_ncid);
+    }
+#endif
+
     /* If this is an IO task, then call the netCDF function. */
     LOG((3, "spio_change_def ios->ioproc = %d", ios->ioproc));
     if (ios->ioproc)
@@ -5921,12 +5932,14 @@ int spio_change_def(int ncid, int is_enddef)
         }
 #endif /* _NETCDF */
 #ifdef _HDF5
-        if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
-        {
-            if (is_enddef)
-            {
-                ierr = spio_hdf5_enddef(ios, file);
-            }
+        if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+          if(is_enddef){
+#ifdef PIO_USE_ASYNC_WR_THREAD
+            ierr = spio_iosys_async_hdf5_enddef_op_add(file);
+#else
+            ierr = spio_hdf5_enddef(ios, file);
+#endif
+          }
         }
 #endif /* _HDF5 */
     }

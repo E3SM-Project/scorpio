@@ -47,6 +47,10 @@ struct Hdf5_def_var_info{
   int varid;
 };
 
+struct Hdf5_enddef_info{
+  file_desc_t *file;
+};
+
 struct Hdf5_wcache{
   file_desc_t *file;
   int nvars;
@@ -215,6 +219,71 @@ int spio_iosys_async_hdf5_def_var_op_add(file_desc_t *file, const char *name,
   pnew->free = spio_iosys_async_op_hdf5_def_var_free;
 
   /* One more pending op using this iodesc & file */
+  file->npend_ops++;
+  SPIO_Util::GVars::npend_hdf5_async_ops++;
+
+  /* Get the mt queue and queue the async task */
+  ret = pio_async_tpool_op_add(pnew);
+  if(ret != PIO_NOERR){
+    LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
+    return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                    "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", ios->iosysid);
+  }
+
+  return PIO_NOERR;
+}
+
+void spio_iosys_async_op_hdf5_enddef_free(void *pdata)
+{
+  if(pdata){
+    delete(static_cast<Hdf5_enddef_info *>(pdata));
+  }
+}
+
+int spio_iosys_async_op_hdf5_enddef(void *pdata)
+{
+  int ret = PIO_NOERR;
+
+  Hdf5_enddef_info *info = static_cast<Hdf5_enddef_info *>(pdata);
+
+  assert(info && info->file && info->file->iosystem);
+
+  ret = spio_hdf5_enddef(info->file->iosystem, info->file);
+
+  info->file->npend_ops--;
+  SPIO_Util::GVars::npend_hdf5_async_ops--;
+
+  return ret;
+}
+
+int spio_iosys_async_hdf5_enddef_op_add(file_desc_t *file)
+{
+  int ret = PIO_NOERR;
+
+  assert(file && file->iosystem);
+
+  iosystem_desc_t *ios = file->iosystem;
+
+  if(!ios->ioproc){
+    return PIO_NOERR;
+  }
+
+  Hdf5_enddef_info *info = new Hdf5_enddef_info{file};
+
+  /* Create async task */
+  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
+  if(pnew == NULL){
+    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Queuing asynchronous op/task for ending define mode of file (%s) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for async task internal struct", pio_get_fname_from_file(file), static_cast<long long int>(sizeof(pio_async_op_t)));
+  }
+
+  pnew->op_type = PIO_ASYNC_HDF5_ENDDEF_OP;
+  pnew->pdata = static_cast<void *>(info);
+  pnew->wait = spio_iosys_async_op_hdf5_enddef;
+  pnew->poke = pio_async_poke_func_unavail;
+  pnew->free = spio_iosys_async_op_hdf5_enddef_free;
+
+  /* One more pending op using this file */
   file->npend_ops++;
   SPIO_Util::GVars::npend_hdf5_async_ops++;
 
