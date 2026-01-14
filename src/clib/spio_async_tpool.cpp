@@ -63,7 +63,10 @@ int PIO_Util::PIO_async_tpool::dequeue_and_process(
       LOG((2, " Tpool processing async op, kind = %s", pio_async_op_type_to_string(op->op_type).c_str()));
       /* We currently support only file write ops here */
       //assert(op->op_type == PIO_ASYNC_FILE_WRITE_OPS);
-      assert((op->op_type == PIO_ASYNC_HDF5_CREATE_OP) || (op->op_type == PIO_ASYNC_HDF5_DEF_VAR_OP) || (op->op_type == PIO_ASYNC_HDF5_WRITE_OP) ||
+      assert((op->op_type == PIO_ASYNC_HDF5_CREATE_OP) ||
+              (op->op_type == PIO_ASYNC_HDF5_DEF_VAR_OP) ||
+              (op->op_type == PIO_ASYNC_HDF5_ENDDEF_OP) ||
+              (op->op_type == PIO_ASYNC_HDF5_WRITE_OP) ||
               (op->op_type == PIO_ASYNC_FILE_CLOSE_OP));
       ret = op->wait(op->pdata);
       if(ret != PIO_NOERR){

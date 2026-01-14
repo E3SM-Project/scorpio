@@ -637,15 +637,6 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
   assert(ios->ioproc);
 
-  /* FIXME: Relax this wait */
-  ret = spio_wait_all_hdf5_async_ops(ios->iosysid);
-  if(ret != PIO_NOERR){
-    return pio_err(ios, file, ret, __FILE__, __LINE__,
-                   "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
-                   "Error waiting on all pending asynchronous HDF5 ops",
-                   pio_get_fname_from_file(file), file->pio_ncid);
-  }
-
   for(i = 0; i < file->hdf5_num_dims; i++){
     /* For dimensions without an associated coordinate var, define them here. However since the
      * the user can call redef() multiple times define it only its not already defined/valid
