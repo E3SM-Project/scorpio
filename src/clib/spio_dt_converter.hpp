@@ -20,6 +20,8 @@ namespace SPIO_Util{
       public:
         /* Convert buffer to requested type, buffer size, sz, is in bytes */
         void *convert(int ncid, void *buf, std::size_t sz, int from_pio_type, int to_pio_type);
+        /* Check if the converter has any cached buffers - useful for debugging */
+        bool empty(void ) const { return cbufs_.empty(); }
         /* Free the scratch/temp buffers associated with ncid/file */
         void free(int ncid);
         /* Clear all scratch/temp buffers */
