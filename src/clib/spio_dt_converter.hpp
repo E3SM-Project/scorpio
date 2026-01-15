@@ -18,8 +18,17 @@ namespace SPIO_Util{
      */
     class DTConverter{
       public:
-        /* Convert buffer to requested type, buffer size, sz, is in bytes */
+        /* Convert buffer to requested type, buffer size, sz, is in bytes
+         * - the returned buffer (converted buffer) is owned by the datatype converter &
+         * can be freed via the free(ncid) member function
+         */
         void *convert(int ncid, void *buf, std::size_t sz, int from_pio_type, int to_pio_type);
+        /* Convert buffer to requested type, buffer size, sz, is in bytes
+         * - the returned buffer (converted buffer) is owned by the caller &
+         * needs to be freed using the brel(PTR_RETURNED_BY_FUNCTION) function
+         * by the caller
+         */
+        void *convert(const void *buf, std::size_t sz, int from_pio_type, int to_pio_type);
         /* Check if the converter has any cached buffers - useful for debugging */
         bool empty(void ) const { return cbufs_.empty(); }
         /* Free the scratch/temp buffers associated with ncid/file */
@@ -76,19 +85,19 @@ namespace SPIO_Util{
           }
         }
 
-        static inline void copy_to(void *from_buf, int from_pio_type, void *to_buf, int to_pio_type, std::size_t nelems){
+        static inline void copy_to(const void *from_buf, int from_pio_type, void *to_buf, int to_pio_type, std::size_t nelems){
           switch(from_pio_type){
-            case PIO_DOUBLE : copy_to(static_cast<double *>(from_buf), to_buf, to_pio_type, nelems); break;
-            case PIO_FLOAT  : copy_to(static_cast<float *>(from_buf), to_buf, to_pio_type, nelems); break;
-            case PIO_INT    : copy_to(static_cast<int *>(from_buf), to_buf, to_pio_type, nelems); break;
-            case PIO_UINT   : copy_to(static_cast<unsigned int *>(from_buf), to_buf, to_pio_type, nelems); break;
-            case PIO_SHORT  : copy_to(static_cast<short int *>(from_buf), to_buf, to_pio_type, nelems); break;
-            case PIO_USHORT : copy_to(static_cast<unsigned short int *>(from_buf), to_buf, to_pio_type, nelems); break;
-            case PIO_INT64  : copy_to(static_cast<int64_t *>(from_buf), to_buf, to_pio_type, nelems); break;
-            case PIO_UINT64 : copy_to(static_cast<uint64_t *>(from_buf), to_buf, to_pio_type, nelems); break;
-            case PIO_CHAR   : copy_to(static_cast<char *>(from_buf), to_buf, to_pio_type, nelems); break;
-            case PIO_BYTE   : copy_to(static_cast<char *>(from_buf), to_buf, to_pio_type, nelems); break;
-            case PIO_UBYTE  : copy_to(static_cast<unsigned char *>(from_buf), to_buf, to_pio_type, nelems); break;
+            case PIO_DOUBLE : copy_to(static_cast<const double *>(from_buf), to_buf, to_pio_type, nelems); break;
+            case PIO_FLOAT  : copy_to(static_cast<const float *>(from_buf), to_buf, to_pio_type, nelems); break;
+            case PIO_INT    : copy_to(static_cast<const int *>(from_buf), to_buf, to_pio_type, nelems); break;
+            case PIO_UINT   : copy_to(static_cast<const unsigned int *>(from_buf), to_buf, to_pio_type, nelems); break;
+            case PIO_SHORT  : copy_to(static_cast<const short int *>(from_buf), to_buf, to_pio_type, nelems); break;
+            case PIO_USHORT : copy_to(static_cast<const unsigned short int *>(from_buf), to_buf, to_pio_type, nelems); break;
+            case PIO_INT64  : copy_to(static_cast<const int64_t *>(from_buf), to_buf, to_pio_type, nelems); break;
+            case PIO_UINT64 : copy_to(static_cast<const uint64_t *>(from_buf), to_buf, to_pio_type, nelems); break;
+            case PIO_CHAR   : copy_to(static_cast<const char *>(from_buf), to_buf, to_pio_type, nelems); break;
+            case PIO_BYTE   : copy_to(static_cast<const char *>(from_buf), to_buf, to_pio_type, nelems); break;
+            case PIO_UBYTE  : copy_to(static_cast<const unsigned char *>(from_buf), to_buf, to_pio_type, nelems); break;
             default         : assert(0);
           }
         }
