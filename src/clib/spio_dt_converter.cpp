@@ -24,6 +24,17 @@ void *SPIO_Util::File_Util::DTConverter::convert(int ncid, void *buf, std::size_
   return cbuf.buf;
 }
 
+void *SPIO_Util::File_Util::DTConverter::convert(const void *buf, std::size_t sz, int from_pio_type, int to_pio_type)
+{
+  std::size_t nelems = sz / size_of(from_pio_type);
+
+  void *rbuf = bget(nelems * size_of(to_pio_type));
+
+  copy_to(buf, from_pio_type, rbuf, to_pio_type, nelems);
+
+  return rbuf;
+}
+
 void SPIO_Util::File_Util::DTConverter::free(int ncid)
 {
   std::map<int, std::vector<Cachebuf> >::iterator cbufs_iter = cbufs_.find(ncid);
