@@ -1193,14 +1193,38 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
     }
   }
 
+  hid_t file_var_type_id = H5Dget_type(file->hdf5_vars[varid].hdf5_dataset_id);
+  assert(file_var_type_id != H5I_INVALID_HID);
+
+  hid_t file_var_ntype_id = H5Tget_native_type(file_var_type_id, H5T_DIR_DEFAULT);
+  assert(file_var_ntype_id != H5I_INVALID_HID);
+
+  void *wbuf = NULL;
+  bool dt_conv_reqd = (nelems > 0) && !H5Tequal(mem_type_id, file_var_ntype_id);
+  if(dt_conv_reqd){
+    assert(file->dt_converter);
+    wbuf = static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->convert(buf, spio_get_nc_type_size(xtype) * nelems, xtype, spio_hdf5_type_to_pio_type(file_var_ntype_id));
+    assert(wbuf != NULL);
+    if(wbuf == NULL){
+      return pio_err(ios, file, PIO_EINTERNAL, __FILE__, __LINE__,
+                     "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Unable to convert buffer from %d (buffer type in memory) to %d (variable type in file)",
+                     pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, static_cast<int>(xtype), spio_hdf5_type_to_pio_type(file_var_ntype_id));
+    }
+  }
+
   /* Independent write */
-  if(H5Dwrite(file->hdf5_vars[varid].hdf5_dataset_id, mem_type_id, mem_space_id,
-               file_space_id, file->dxplid_indep, buf) < 0){
+  if(H5Dwrite(file->hdf5_vars[varid].hdf5_dataset_id, file_var_ntype_id, mem_space_id,
+                file_space_id, file->dxplid_indep, (dt_conv_reqd) ? wbuf : buf) < 0){
     H5Eprint2(H5E_DEFAULT, stderr);
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                    "Writing variable (%s, varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                    "The low level (HDF5) I/O library call failed to write the dataset associated with this variable",
                    pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  if(dt_conv_reqd){
+    brel(wbuf);
   }
 
   if(H5Sclose(mem_space_id) < 0){
