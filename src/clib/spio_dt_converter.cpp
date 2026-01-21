@@ -1,6 +1,6 @@
 #include "spio_dt_converter.hpp"
 
-void *SPIO_Util::File_Util::DTConverter::convert(int ncid, void *buf, std::size_t sz, int from_pio_type, int to_pio_type)
+void *SPIO_Util::File_Util::DTConverter::convert(int ncid, void *buf, std::size_t sz, nc_type from_pio_type, nc_type to_pio_type)
 {
   if(from_pio_type == to_pio_type){
     /* No conversion required, return the buffer as is */
@@ -24,7 +24,7 @@ void *SPIO_Util::File_Util::DTConverter::convert(int ncid, void *buf, std::size_
   return cbuf.buf;
 }
 
-void *SPIO_Util::File_Util::DTConverter::convert(const void *buf, std::size_t sz, int from_pio_type, int to_pio_type)
+void *SPIO_Util::File_Util::DTConverter::convert(const void *buf, std::size_t sz, nc_type from_pio_type, nc_type to_pio_type)
 {
   std::size_t nelems = sz / size_of(from_pio_type);
 
