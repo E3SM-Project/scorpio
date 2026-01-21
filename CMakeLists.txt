@@ -340,6 +340,12 @@ else()
   endif()
 endif()
 
+# Maximum wait for asynchronous I/O operations (in milliseconds)
+if(NOT DEFINED SPIO_ASYNC_OP_WAIT_TIMEOUT)
+  # 2 minutes = 2 * 60 * 1000 milliseconds
+  set(SPIO_ASYNC_OP_WAIT_TIMEOUT 120000)
+endif()
+
 if(DEFINED SPIO_OVERRIDE_HDF5_COMPRESSION_VNAME_REGEX)
   if(WITH_HDF5 AND HDF5_USE_COMPRESSION)
     message(STATUS "Overriding HDF5 compression for variables matching regex: ${SPIO_OVERRIDE_HDF5_COMPRESSION_VNAME_REGEX}")

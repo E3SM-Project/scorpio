@@ -445,7 +445,7 @@ static int sync_file(int ncid)
 int spio_wait_on_hard_close(iosystem_desc_t *ios, file_desc_t *file)
 {
   /* FIXME: Make the max time configurable */
-  const int MAX_SLEEP_TIME_IN_MILLISECONDS = 5000;
+  const int MAX_SLEEP_TIME_IN_MILLISECONDS = SPIO_ASYNC_OP_WAIT_TIMEOUT;
   const int SLEEP_TIME_IN_MILLISECONDS = 500;
 
   /* For files that will never be closed, due to user error for ex, we cannot wait
