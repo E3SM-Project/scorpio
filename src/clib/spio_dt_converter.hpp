@@ -22,13 +22,13 @@ namespace SPIO_Util{
          * - the returned buffer (converted buffer) is owned by the datatype converter &
          * can be freed via the free(ncid) member function
          */
-        void *convert(int ncid, void *buf, std::size_t sz, int from_pio_type, int to_pio_type);
+        void *convert(int ncid, void *buf, std::size_t sz, nc_type from_pio_type, nc_type to_pio_type);
         /* Convert buffer to requested type, buffer size, sz, is in bytes
          * - the returned buffer (converted buffer) is owned by the caller &
          * needs to be freed using the brel(PTR_RETURNED_BY_FUNCTION) function
          * by the caller
          */
-        void *convert(const void *buf, std::size_t sz, int from_pio_type, int to_pio_type);
+        void *convert(const void *buf, std::size_t sz, nc_type from_pio_type, nc_type to_pio_type);
         /* Check if the converter has any cached buffers - useful for debugging */
         bool empty(void ) const { return cbufs_.empty(); }
         /* Free the scratch/temp buffers associated with ncid/file */
@@ -36,7 +36,7 @@ namespace SPIO_Util{
         /* Clear all scratch/temp buffers */
         void clear(void );
 
-        static inline std::size_t size_of(int pio_type){
+        static inline std::size_t size_of(nc_type pio_type){
           switch(pio_type){
             case PIO_DOUBLE : return sizeof(double);
             case PIO_FLOAT  : return sizeof(float);
@@ -68,7 +68,7 @@ namespace SPIO_Util{
         }
 
         template<typename F>
-        static inline void copy_to(F *from_buf, void *to_buf, int to_pio_type, std::size_t nelems){
+        static inline void copy_to(F *from_buf, void *to_buf, nc_type to_pio_type, std::size_t nelems){
           switch(to_pio_type){
             case PIO_DOUBLE : copy_to(from_buf, static_cast<double *>(to_buf), nelems); break;
             case PIO_FLOAT  : copy_to(from_buf, static_cast<float *>(to_buf), nelems); break;
@@ -85,7 +85,7 @@ namespace SPIO_Util{
           }
         }
 
-        static inline void copy_to(const void *from_buf, int from_pio_type, void *to_buf, int to_pio_type, std::size_t nelems){
+        static inline void copy_to(const void *from_buf, nc_type from_pio_type, void *to_buf, nc_type to_pio_type, std::size_t nelems){
           switch(from_pio_type){
             case PIO_DOUBLE : copy_to(static_cast<const double *>(from_buf), to_buf, to_pio_type, nelems); break;
             case PIO_FLOAT  : copy_to(static_cast<const float *>(from_buf), to_buf, to_pio_type, nelems); break;
