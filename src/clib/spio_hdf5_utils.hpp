@@ -48,7 +48,7 @@ inline hid_t spio_nc_type_to_hdf5_type(nc_type xtype)
   return H5I_INVALID_HID;
 }
 
-inline int spio_hdf5_type_to_pio_type(hid_t ntype)
+inline nc_type spio_hdf5_type_to_pio_type(hid_t ntype)
 {
   /* switch() does not work with HDF5 "types" since these types are macros
    * (which include library initialization call, H5Open(), if needed)
