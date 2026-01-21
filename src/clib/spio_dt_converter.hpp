@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 #include <algorithm>
+#include <cstdint>
 
 #include "pio_config.h"
 #include "pio.h"
