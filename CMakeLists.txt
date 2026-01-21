@@ -340,10 +340,30 @@ else()
   endif()
 endif()
 
+# Asynchronous I/O options
 # Maximum wait for asynchronous I/O operations (in milliseconds)
 if(NOT DEFINED SPIO_ASYNC_OP_WAIT_TIMEOUT)
   # 2 minutes = 2 * 60 * 1000 milliseconds
   set(SPIO_ASYNC_OP_WAIT_TIMEOUT 120000)
+  if(PIO_USE_ASYNC_WR_THREAD)
+    message(STATUS "Setting timeout for asynchronous I/O operations to ${SPIO_ASYNC_OP_WAIT_TIMEOUT} ms (default)")
+  endif()
+else()
+  if(PIO_USE_ASYNC_WR_THREAD)
+    message(STATUS "Setting timeout for asynchronous I/O operations to ${SPIO_ASYNC_OP_WAIT_TIMEOUT} ms")
+  endif()
+endif()
+
+# Maximum number of threads performing asynchronous I/O operations
+if(NOT DEFINED SPIO_ASYNC_NTHREADS)
+  set(SPIO_ASYNC_NTHREADS 1)
+  if(PIO_USE_ASYNC_WR_THREAD)
+    message(STATUS "Setting number of asynchronous I/O threads to ${SPIO_ASYNC_NTHREADS} (default)")
+  endif()
+else()
+  if(PIO_USE_ASYNC_WR_THREAD)
+    message(STATUS "Setting number of asynchronous I/O threads to ${SPIO_ASYNC_NTHREADS}")
+  endif()
 endif()
 
 if(DEFINED SPIO_OVERRIDE_HDF5_COMPRESSION_VNAME_REGEX)

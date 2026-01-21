@@ -179,4 +179,7 @@
 /** Maximum wait for asynchronous I/O operations (in milliseconds) */
 #define SPIO_ASYNC_OP_WAIT_TIMEOUT @SPIO_ASYNC_OP_WAIT_TIMEOUT@
 
+/** Number of threads performing asynchronous I/O operations */
+#define SPIO_ASYNC_NTHREADS @SPIO_ASYNC_NTHREADS@
+
 #endif /* _PIO_CONFIG_ */
