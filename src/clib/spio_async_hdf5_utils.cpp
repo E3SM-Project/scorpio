@@ -505,11 +505,18 @@ int spio_iosys_async_hdf5_put_var_op_add(file_desc_t *file, int varid,
 
 int spio_wait_all_hdf5_async_ops(int iosysid)
 {
+  unsigned long long int sleep_time = 0;
+  /* Sleep for 0.5 seconds */
   const int SLEEP_TIME_IN_MILLISECONDS = 500;
+  /* Warn every 2 seconds */
+  const int WARN_TIME_IN_MILLISECONDS = 2000;
   while(SPIO_Util::GVars::npend_hdf5_async_ops > 0){
     std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME_IN_MILLISECONDS));
-    if(SPIO_Util::GVars::npend_hdf5_async_ops > 0){
-      PIOc_warn(iosysid, PIO_DEFAULT, __FILE__, __LINE__, "Continuing to wait on all HDF5 async ops...");
+    sleep_time += SLEEP_TIME_IN_MILLISECONDS;
+    if((SPIO_Util::GVars::npend_hdf5_async_ops > 0) && (sleep_time % WARN_TIME_IN_MILLISECONDS == 0)){
+      std::string warn_msg = std::string("Continuing to wait on all HDF5 async ops... ") +
+                              "(Elapsed time = " + std::to_string(sleep_time) + " ms)";
+      PIOc_warn(iosysid, PIO_DEFAULT, __FILE__, __LINE__, warn_msg.c_str());
     }
   }
 
