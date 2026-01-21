@@ -176,4 +176,7 @@
  *  0 otherwise */
 #define PIO_USE_ASYNC_WR_THREAD @USE_ASYNC_WR_THREAD@
 
+/** Maximum wait for asynchronous I/O operations (in milliseconds) */
+#define SPIO_ASYNC_OP_WAIT_TIMEOUT @SPIO_ASYNC_OP_WAIT_TIMEOUT@
+
 #endif /* _PIO_CONFIG_ */
