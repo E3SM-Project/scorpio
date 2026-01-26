@@ -61,6 +61,11 @@ struct spio_hmap;
 /* Fwd declaration to use back pointer to var_desc_t in viobuf_cache */
 struct var_desc_t;
 
+/* Fwd declaration of thread-specific comm class used in iosystem_desc_t */
+namespace SPIO_Util{
+  class TComm_info;
+}
+
 /** The viobuf_cache is used to cache the rearranged data for the
  * variable. The iobuf inside the cache is freed when the data
  * is written out.
@@ -473,6 +478,8 @@ typedef struct iosystem_desc_t
      * comm_comms[cmp]) in the union communicator. Will always = number
      * of IO tasks in async situations. */
     int comproot;
+
+    SPIO_Util::TComm_info *tcomm_info;
 
     /** An array of the ranks of all IO tasks within the union
      * communicator. */

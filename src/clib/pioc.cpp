@@ -24,6 +24,7 @@
 #include "spio_dbg_utils.hpp"
 #include "spio_decomp_map_info_pool.hpp"
 #include "spio_decomp_logger.hpp"
+#include "spio_async_tcomm.hpp"
 
 /* Include headers for HDF5 compression filters */
 #if PIO_USE_HDF5
@@ -1677,6 +1678,9 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     /* Rank in the union comm is the same as rank in the comp comm. */
     ios->union_rank = ios->comp_rank;
 
+    /* FIXME: Catch exceptions and return error */
+    ios->tcomm_info = new SPIO_Util::TComm_info(ios->union_comm, ios->union_rank, ios->ioroot, ios->comproot, ios->io_comm, ios->io_rank, (ios->iomaster) ? true : false, ios->comp_comm, ios->comp_rank, (ios->compmaster) ? true : false, ios->intercomm, ios->my_comm, ios->node_comm);
+
     /* Async I/O service message info - not used here */
     ios->async_ios_msg_info.seq_num = PIO_MSG_START_SEQ_NUM;
     ios->async_ios_msg_info.prev_msg = PIO_MSG_INVALID;
@@ -2016,6 +2020,7 @@ int PIOc_finalize_impl(int iosysid)
         MPI_Comm_free(&ios->io_comm);
     if (ios->node_comm != MPI_COMM_NULL)
         MPI_Comm_free(&ios->node_comm);
+    if(ios->tcomm_info) { delete(ios->tcomm_info); }
 
     /* Delete the iosystem_desc_t data associated with this id. */
     LOG((2, "About to delete iosysid %d.", iosysid));
@@ -2610,6 +2615,9 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
             }
             LOG((3, "intercomm created for cmp = %d", cmp));
         }
+
+        /* FIXME: Catch exceptions and return error */
+        my_iosys->tcomm_info = new SPIO_Util::TComm_info(my_iosys->union_comm, my_iosys->union_rank, my_iosys->ioroot, my_iosys->comproot, my_iosys->io_comm, my_iosys->io_rank, (my_iosys->iomaster) ? true : false, my_iosys->comp_comm, my_iosys->comp_rank, (my_iosys->compmaster) ? true : false, my_iosys->intercomm, my_iosys->my_comm, my_iosys->node_comm);
 
         /* Async I/O service message info */
         my_iosys->async_ios_msg_info.seq_num = PIO_MSG_START_SEQ_NUM;
@@ -3209,6 +3217,10 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
         }
 
         iosys[i]->my_comm = iosys[i]->union_comm;
+
+        /* FIXME: Catch exceptions and return error */
+        iosys[i]->tcomm_info = new SPIO_Util::TComm_info(iosys[i]->union_comm, iosys[i]->union_rank, iosys[i]->ioroot, iosys[i]->comproot, iosys[i]->io_comm, iosys[i]->io_rank, (iosys[i]->iomaster) ? true : false, iosys[i]->comp_comm, iosys[i]->comp_rank, (iosys[i]->compmaster) ? true : false, iosys[i]->intercomm, iosys[i]->my_comm, iosys[i]->node_comm);
+
         /* Async I/O service message info */
         iosys[i]->async_ios_msg_info.seq_num = PIO_MSG_START_SEQ_NUM;
         iosys[i]->async_ios_msg_info.prev_msg = PIO_MSG_INVALID;

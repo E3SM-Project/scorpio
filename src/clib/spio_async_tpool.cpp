@@ -1,6 +1,8 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <utility>
+#include <algorithm>
 extern "C"{
 #include "pio_config.h"
 } // extern "C"
@@ -25,6 +27,17 @@ void PIO_Util::PIO_async_tpool::enqueue(pio_async_op_t *op)
 void PIO_Util::PIO_async_tpool::finalize(void )
 {
   mtq_.signal(PIO_Util::PIO_mtq<pio_async_op_t *>::PIO_MTQ_SIG_COMPLETE);
+}
+
+std::vector<std::size_t> PIO_Util::PIO_async_tpool::get_thread_ids(void ) const
+{
+  std::vector<std::size_t> htids;
+
+  std::hash<std::thread::id> tid_hasher;
+  std::for_each(pool_threads_.cbegin(), pool_threads_.cend(),
+    [&tid_hasher, &htids](const std::thread &t) { htids.push_back(tid_hasher(t.get_id())); });
+
+  return htids;
 }
 
 PIO_Util::PIO_async_tpool::PIO_async_tpool(int nthreads)
