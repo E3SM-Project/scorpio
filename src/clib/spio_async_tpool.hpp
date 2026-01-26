@@ -17,6 +17,7 @@ class PIO_async_tpool{
   public:
     void enqueue(pio_async_op_t *op);
     void finalize(void );
+    std::vector<std::size_t> get_thread_ids(void ) const;
   private:
     friend class PIO_async_tpool_manager;
     PIO_async_tpool(int nthreads);
