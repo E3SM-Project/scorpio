@@ -22,6 +22,7 @@
 //#include "pio_rearr_contig.hpp"
 //#include "spio_decomp_logger.hpp"
 #include "spio_async_utils.hpp"
+#include "spio_async_tcomm.hpp"
 #include <typeinfo>
 #include <vector>
 #include <string>
@@ -62,21 +63,22 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
   }
   else{
     /* Clobber mode : Delete HDF5 file (from root I/O proc) if it exists */
-    if(ios->io_rank == 0){
+    if(ios->tcomm_info->get_io_comm_rank() == 0){
       struct stat sd;
       if(0 == stat(filename, &sd)) { unlink(filename); }
     }
 
     /* Wait for root process (that might delete an existing file) */
-    if((mpierr = MPI_Barrier(ios->io_comm))){
+    if((mpierr = MPI_Barrier(ios->tcomm_info->get_io_comm()))){
       return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
     }
   }
 
-  if(ios->info == MPI_INFO_NULL){
-    if((mpierr = MPI_Info_create(&ios->info))){
-      return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
-    }
+  MPI_Info *pinfo = ios->tcomm_info->create_mpi_info();
+  if(!pinfo){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Creating file (%s) using HDF5 iotype failed. "
+                   "Failed to create MPI Info object for the file", filename);
   }
 
   hid_t fcpl_id = H5Pcreate(H5P_FILE_CREATE);
@@ -114,7 +116,7 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
                    filename);
   }
 
-  if(H5Pset_fapl_mpio(fapl_id, ios->io_comm, ios->info) < 0){
+  if(H5Pset_fapl_mpio(fapl_id, ios->tcomm_info->get_io_comm(), *pinfo) < 0){
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                    "Creating file (%s) using HDF5 iotype failed. "
                    "The low level (HDF5) I/O library call failed to store the user-supplied MPI IO parameters",
@@ -886,7 +888,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
            * step between the ranks.
            * Workaround: place a barrier to sync H5DSattach_scale calls.
            */
-          MPI_Barrier(ios->io_comm);
+          MPI_Barrier(ios->tcomm_info->get_io_comm());
         }
       }
     }
