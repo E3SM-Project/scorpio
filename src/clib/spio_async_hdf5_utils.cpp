@@ -270,7 +270,7 @@ int spio_iosys_async_op_hdf5_put_att(void *pdata)
 
   assert(info && info->file && info->file->iosystem);
   assert((info->varid >= 0) || (info->varid == PIO_GLOBAL));
-  assert(info->alen > 0);
+  assert(info->alen >= 0);
 
   ret = spio_hdf5_put_att(info->file->iosystem, info->file,
           info->varid, info->aname.c_str(), info->atype,
@@ -287,7 +287,7 @@ int spio_iosys_async_hdf5_put_att_op_add(file_desc_t *file, int varid,
 {
   int ret = PIO_NOERR;
 
-  assert(file && file->iosystem && aname && (alen > 0) && abuf);
+  assert(file && file->iosystem && aname && (alen >= 0) && ((alen == 0) || abuf));
   assert((varid >= 0) || (varid = PIO_GLOBAL));
 
   iosystem_desc_t *ios = file->iosystem;
