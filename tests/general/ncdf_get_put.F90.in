@@ -39,6 +39,9 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_1datt
     ret = PIO_put_att(pio_file, pio_cvar, 'dummy_att_put_cval', cval);
     PIO_TF_CHECK_ERR(ret, "Failed to put char attribute:" // trim(filename))
 
+    ret = PIO_put_att(pio_file, pio_cvar, 'empty_str_att', "");
+    PIO_TF_CHECK_ERR(ret, "Failed to put char attribute:" // trim(filename))
+
     ret = PIO_enddef(pio_file)
     PIO_TF_CHECK_ERR(ret, "Failed to enddef:" // trim(filename))
 
