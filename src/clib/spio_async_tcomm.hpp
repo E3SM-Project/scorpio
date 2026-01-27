@@ -4,6 +4,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <list>
 #include "mpi.h"
 #include "pio_config.h"
 #include "spio_async_tpool.hpp"
@@ -32,6 +33,11 @@ class TComm_info{
     MPI_Comm get_my_comm(void );
     MPI_Comm get_node_comm(void );
 
+    /* The MPI_Info object is owned by this class. The user can use it
+     * but its a "weak pointer"
+     */
+    MPI_Info *create_mpi_info(void );
+
     ~TComm_info();
   private:
     const std::size_t INVALID_IDX = -1;
@@ -57,6 +63,9 @@ class TComm_info{
     std::vector<MPI_Comm> intercomms_;
     std::vector<MPI_Comm> my_comms_;
     std::vector<MPI_Comm> node_comms_;
+
+    /* Note: We return pointers to elements of this list back to user */
+    std::list<MPI_Info> comm_infos_;
 
     void init_thread_info(void );
     std::size_t get_tidx(void );
