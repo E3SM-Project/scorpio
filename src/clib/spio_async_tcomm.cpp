@@ -1,6 +1,8 @@
 #include <vector>
 #include <thread>
+#include <mutex>
 #include <cassert>
+#include <algorithm>
 #include "spio_async_tcomm.hpp"
 #include "spio_async_tpool.hpp"
 
@@ -104,6 +106,19 @@ MPI_Comm SPIO_Util::TComm_info::get_node_comm(void )
   return node_comms_[get_tidx()];
 }
 
+MPI_Info *SPIO_Util::TComm_info::create_mpi_info(void )
+{
+  int ret = MPI_SUCCESS;
+  MPI_Info info;
+  std::mutex mtx;
+  std::lock_guard<std::mutex> lg(mtx);
+
+  ret = MPI_Info_create(&info); assert(ret == MPI_SUCCESS);
+
+  comm_infos_.push_back(info);
+  return &(comm_infos_.back());
+}
+
 SPIO_Util::TComm_info::~TComm_info()
 {
   /* The main thread comms, in tidx == 0, was just copied over (not duped)
@@ -121,6 +136,8 @@ SPIO_Util::TComm_info::~TComm_info()
     if(intercomms_[tidx] != MPI_COMM_NULL) { MPI_Comm_free(&intercomms_[tidx]); }
     if(node_comms_[tidx] != MPI_COMM_NULL) { MPI_Comm_free(&node_comms_[tidx]); }
   }
+
+  std::for_each(comm_infos_.begin(), comm_infos_.end(), [](MPI_Info &info) { MPI_Info_free(&info); });
 }
 
 void SPIO_Util::TComm_info::init_thread_info(void )
