@@ -31,6 +31,7 @@
 #include "spio_async_utils.hpp"
 #include "spio_hdf5_utils.hpp"
 #include "spio_async_hdf5_utils.hpp"
+#include "spio_async_tcomm.hpp"
 #include <typeinfo>
 #include <vector>
 #include <string>
@@ -1418,7 +1419,7 @@ int pio_err(iosystem_desc_t *ios, file_desc_t *file,
         /* If the user does not explicitly ask to return error, print
          * the error message in stderr on the root IO proc
          */
-        bool print_err_msg = (ios) ? (ios->union_rank == ios->ioroot) : true;
+        bool print_err_msg = (ios) ? (ios->tcomm_info->get_union_comm_rank() == ios->tcomm_info->get_union_comm_io_root()) : true;
 
         if (print_err_msg)
         {
@@ -1509,7 +1510,7 @@ void PIOc_warn(int iosysid, int ncid,
     ios = pio_get_iosystem_from_id(iosysid);
   }
 
-  bool print_warn_msg = (ios) ? (ios->union_rank == ios->ioroot) : true;
+  bool print_warn_msg = (ios) ? (ios->tcomm_info->get_union_comm_rank() == ios->tcomm_info->get_union_comm_io_root()) : true;
   if(print_warn_msg){
     fprintf(stderr, "PIO: WARNING: %s, (%s:%d)\n", uwarn_msg, (fname) ? fname : "\0", line);
     fflush(stderr);
