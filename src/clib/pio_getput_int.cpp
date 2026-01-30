@@ -62,13 +62,17 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 
 #ifdef PIO_USE_ASYNC_WR_THREAD
     /* FIXME: Relax this wait */
-    ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
-    if(ierr != PIO_NOERR){
-      return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                     "Writing attribute (%s) associated with variable (varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
-                     "Error waiting on all pending asynchronous HDF5 ops",
-                     name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+    /*
+    if((file->iotype != PIO_IOTYPE_HDF5) && (file->iotype != PIO_IOTYPE_HDF5C)){
+      ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+      if(ierr != PIO_NOERR){
+        return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                       "Writing attribute (%s) associated with variable (varid=%d) to file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Error waiting on all pending asynchronous HDF5 ops",
+                       name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+      }
     }
+    */
 #endif
 
 #ifdef _ADIOS2
@@ -2607,6 +2611,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     }
 
     /* FIXME: Relax this wait */
+    /*
     ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
     if(ierr != PIO_NOERR){
       return pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -2614,6 +2619,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                      "Error waiting on all pending asynchronous HDF5 ops",
                      pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
     }
+    */
 
     /* ADIOS: assume all procs are also IO tasks */
 #ifdef _ADIOS2

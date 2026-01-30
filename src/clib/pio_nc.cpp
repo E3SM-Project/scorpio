@@ -3386,6 +3386,7 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
     }
 
     /* FIXME: Relax this wait */
+    /*
     ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
     if(ierr != PIO_NOERR){
       return pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -3393,6 +3394,7 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
                      "Error waiting on all pending asynchronous HDF5 ops",
                      name, pio_get_fname_from_file(file), file->pio_ncid);
     }
+    */
 
     /* ADIOS: assume all procs are also IO tasks */
 #ifdef _ADIOS2
