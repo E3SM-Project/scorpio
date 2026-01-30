@@ -795,6 +795,11 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
   }
 
   for(i = 0; i < file->hdf5_num_vars; i++){
+    /* Note: For async I/O operations enddef() calls queued before
+     * the HDF5 variable is defined will see partially initialized
+     * "files" (file->hdf5_vars[i] is partially inited)
+     */
+    if(file->hdf5_vars[i].hdf5_dataset_id == H5I_INVALID_HID) { continue; }
     /* Upgrade the dataset of a coordinate variable to a dimension scale */
     if(file->hdf5_vars[i].is_coord_var){
       /* Write a special attribute (_Netcdf4Dimid) for the netCDF-4 dimension ID. */
