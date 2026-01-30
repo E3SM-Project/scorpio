@@ -13,6 +13,7 @@
 #include <chrono>
 #include <string>
 #include "spio_hdf5_utils.hpp"
+#include "spio_async_tcomm.hpp"
 
 #ifdef _ADIOS2
 #include "../../tools/adios2pio-nm/adios2pio-nm-lib-c.h"
@@ -448,6 +449,7 @@ int spio_wait_on_hard_close(iosystem_desc_t *ios, file_desc_t *file)
   const int MAX_SLEEP_TIME_IN_MILLISECONDS = SPIO_ASYNC_OP_WAIT_TIMEOUT;
   const int SLEEP_TIME_IN_MILLISECONDS = 500;
 
+  assert(ios && file);
   /* For files that will never be closed, due to user error for ex, we cannot wait
    * indefenitely. On the other hand we do want to have enough time to finish async ops
    */
@@ -467,6 +469,9 @@ int spio_wait_on_hard_close(iosystem_desc_t *ios, file_desc_t *file)
                         std::string(")");
     PIOc_warn(ios->iosysid, file->pio_ncid, __FILE__, __LINE__, msg.c_str());
   }
+
+  /* Sync compute procs with I/O procs */
+  MPI_Barrier(ios->tcomm_info->get_union_comm());
 
   return PIO_NOERR;
 }
