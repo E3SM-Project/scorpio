@@ -1022,10 +1022,13 @@ int PIOc_closefile_impl(int ncid)
     /* FIXME: How to account for async case ? */
     spio_write_file_io_summary(file);
 
-    if(!soft_close){
-      /* Delete file from our list of open files. */
+#if PIO_USE_ASYNC_WR_THREAD
+    if((file->iotype != PIO_IOTYPE_HDF5) && (file->iotype != PIO_IOTYPE_HDF5C)){
       pio_delete_file_from_list(ncid);
     }
+#else
+    pio_delete_file_from_list(ncid);
+#endif
 
     return ierr;
 }
