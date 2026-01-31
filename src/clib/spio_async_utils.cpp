@@ -43,6 +43,7 @@ std::string pio_async_op_type_to_string(pio_async_op_type_t op)
     case PIO_ASYNC_HDF5_DEF_VAR_OP: return "PIO_ASYNC_HDF5_DEF_VAR_OP";
     case PIO_ASYNC_HDF5_PUT_ATT_OP: return "PIO_ASYNC_HDF5_PUT_ATT_OP";
     case PIO_ASYNC_HDF5_ENDDEF_OP: return "PIO_ASYNC_HDF5_ENDDEF_OP";
+    case PIO_ASYNC_HDF5_SET_FRAME_OP: return "PIO_ASYNC_HDF5_SET_FRAME_OP";
     case PIO_ASYNC_HDF5_PUT_VAR_OP: return "PIO_ASYNC_HDF5_PUT_VAR_OP";
     case PIO_ASYNC_HDF5_WRITE_OP: return "PIO_ASYNC_HDF5_WRITE_OP";
     case PIO_ASYNC_FILE_WRITE_OPS: return "PIO_ASYNC_FILE_WRITE_OPS";
@@ -499,6 +500,8 @@ static file_async_pend_ops_kwait_func_t
     /* PIO_ASYNC_HDF5_PUT_ATT_OP */
     pio_async_wait_func_unavail,
     /* PIO_ASYNC_HDF5_ENDDEF_OP */
+    pio_async_wait_func_unavail,
+    /* PIO_ASYNC_HDF5_SET_FRAME_OP */
     pio_async_wait_func_unavail,
     /* PIO_ASYNC_HDF5_PUT_VAR_OP */
     pio_async_wait_func_unavail,

@@ -71,6 +71,12 @@ struct Hdf5_put_var_info{
   void *vbuf;
 };
 
+struct Hdf5_set_frame_info{
+  file_desc_t *file;
+  int varid;
+  int frame;
+};
+
 struct Hdf5_wcache{
   file_desc_t *file;
   int nvars;
@@ -501,6 +507,71 @@ int spio_iosys_async_hdf5_put_var_op_add(file_desc_t *file, int varid,
   return PIO_NOERR;
 }
 
+void spio_iosys_async_op_hdf5_set_frame_free(void *pdata)
+{
+  if(pdata){
+    delete(static_cast<Hdf5_set_frame_info *>(pdata));
+  }
+}
+
+int spio_iosys_async_op_hdf5_set_frame(void *pdata)
+{
+  int ret = PIO_NOERR;
+
+  Hdf5_set_frame_info *info = static_cast<Hdf5_set_frame_info *>(pdata);
+
+  assert(info && info->file && info->file->iosystem);
+
+  ret = spio_hdf5_set_frame(info->file, info->varid, info->frame);
+
+  info->file->npend_ops--;
+  SPIO_Util::GVars::npend_hdf5_async_ops--;
+
+  return ret;
+}
+
+int spio_iosys_async_hdf5_set_frame_op_add(file_desc_t *file, int varid, int frame)
+{
+  int ret = PIO_NOERR;
+
+  assert(file && file->iosystem && (varid >= 0) && (frame >= 0));
+
+  iosystem_desc_t *ios = file->iosystem;
+
+  if(!ios->ioproc){
+    return PIO_NOERR;
+  }
+
+  Hdf5_set_frame_info *info = new Hdf5_set_frame_info{file, varid, frame};
+
+  /* Create async task */
+  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
+  if(pnew == NULL){
+    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Queuing asynchronous op/task for setting frame for variable (%s, file=%s) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for async task internal struct", pio_get_vname_from_file(file, varid), pio_get_fname_from_file(file), static_cast<long long int>(sizeof(pio_async_op_t)));
+  }
+
+  pnew->op_type = PIO_ASYNC_HDF5_SET_FRAME_OP;
+  pnew->pdata = static_cast<void *>(info);
+  pnew->wait = spio_iosys_async_op_hdf5_set_frame;
+  pnew->poke = pio_async_poke_func_unavail;
+  pnew->free = spio_iosys_async_op_hdf5_set_frame_free;
+
+  /* One more pending op using this iodesc & file */
+  file->npend_ops++;
+  SPIO_Util::GVars::npend_hdf5_async_ops++;
+
+  /* Get the mt queue and queue the async task */
+  ret = pio_async_tpool_op_add(pnew);
+  if(ret != PIO_NOERR){
+    LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
+    return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                    "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", ios->iosysid);
+  }
+
+  return PIO_NOERR;
+}
+
 #endif // _HDF5
 
 int spio_wait_all_hdf5_async_ops(int iosysid)
@@ -509,7 +580,7 @@ int spio_wait_all_hdf5_async_ops(int iosysid)
   /* Sleep for 0.5 seconds */
   const int SLEEP_TIME_IN_MILLISECONDS = 500;
   /* Warn every 2 seconds */
-  const int WARN_TIME_IN_MILLISECONDS = 2000;
+  const int WARN_TIME_IN_MILLISECONDS = 500;
   while(SPIO_Util::GVars::npend_hdf5_async_ops > 0){
     std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME_IN_MILLISECONDS));
     sleep_time += SLEEP_TIME_IN_MILLISECONDS;
