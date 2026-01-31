@@ -26,6 +26,7 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
                       const PIO_Offset *stride, nc_type xtype, const void *buf);
 
 int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file);
+int spio_hdf5_set_frame(file_desc_t *file, int varid, int frame);
 
 /* Inline functions */
 inline hid_t spio_nc_type_to_hdf5_type(nc_type xtype)

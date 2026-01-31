@@ -24,7 +24,9 @@
 #include "spio_dbg_utils.hpp"
 #include "spio_decomp_map_info_pool.hpp"
 #include "spio_decomp_logger.hpp"
+#include "spio_hdf5_utils.hpp"
 #include "spio_async_tcomm.hpp"
+#include "spio_async_hdf5_utils.hpp"
 
 /* Include headers for HDF5 compression filters */
 #if PIO_USE_HDF5
@@ -349,56 +351,19 @@ int PIOc_setframe_impl(int ncid, int varid, int frame)
 #endif
 
 #ifdef _HDF5
-    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
-    {
-        if (frame >= 0)
-        {
-            if (ios->ioproc)
-            {
-                hsize_t dims[H5S_MAX_RANK];
-                hsize_t mdims[H5S_MAX_RANK];
-
-                /* Get current dimension size */
-                hid_t file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
-                if (file_space_id == H5I_INVALID_HID)
-                {
-                    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                                   "Setting frame to variable (%s, varid=%d) in file (%s, ncid=%d) using HDF5 iotype failed. "
-                                   "The low level (HDF5) I/O library call failed to make a copy of the dataspace of the dataset associated with this variable",
-                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-                }
-
-                int ndim = H5Sget_simple_extent_dims(file_space_id, dims, mdims);
-                if (ndim < 0)
-                {
-                    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                                   "Setting frame to variable (%s, varid=%d) in file (%s, ncid=%d) using HDF5 iotype failed. "
-                                   "The low level (HDF5) I/O library call failed to retrieve dimension size and maximum size of a dataspace copied from the dataset associated with this variable",
-                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-                }
-
-                if (H5Sclose(file_space_id) < 0)
-                {
-                    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                                   "Setting frame to variable (%s, varid=%d) in file (%s, ncid=%d) using HDF5 iotype failed. "
-                                   "The low level (HDF5) I/O library call failed to release a dataspace copied from the dataset associated with this variable",
-                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-                }
-
-                /* Extend record dimension if needed */
-                if (ndim > 0 && mdims[0] == H5S_UNLIMITED && dims[0] < (hsize_t)(frame + 1))
-                {
-                    dims[0] = frame + 1;
-                    if (H5Dextend(file->hdf5_vars[varid].hdf5_dataset_id, dims) < 0)
-                    {
-                        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                                       "Setting frame to variable (%s, varid=%d) in file (%s, ncid=%d) using HDF5 iotype failed. "
-                                       "The low level (HDF5) I/O library call failed to extend the dataset associated with this variable",
-                                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-                    }
-                }
-            }
+    if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+      if((frame >= 0) && (ios->ioproc)){
+#if PIO_USE_ASYNC_WR_THREAD
+        ret = spio_iosys_async_hdf5_set_frame_op_add(file, varid, frame);
+#else
+        ret = spio_hdf5_set_frame(file, varid, frame);
+#endif
+        if(ret != PIO_NOERR){
+          return pio_err(ios, file, ret, __FILE__, __LINE__,
+                         "Setting frame to variable (%s, varid=%d) in file (%s, ncid=%d) using HDF5 iotype failed",
+                         pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
+      }
     }
 #endif
 
