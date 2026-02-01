@@ -3825,7 +3825,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #ifdef _HDF5
         case PIO_IOTYPE_HDF5:
         case PIO_IOTYPE_HDF5C:
-#ifdef PIO_USE_ASYNC_WR_THREAD
+#if PIO_USE_ASYNC_WR_THREAD
             ierr = spio_iosys_async_hdf5_create_op_add(file, filename);
 #else
             ierr = spio_hdf5_create(ios, file, filename);
@@ -5804,7 +5804,7 @@ int spio_change_def(int ncid, int is_enddef)
         }
     }
 
-#ifdef PIO_USE_ASYNC_WR_THREAD
+#if PIO_USE_ASYNC_WR_THREAD
     /* FIXME: Relax this wait */
     /*
     ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
@@ -5942,7 +5942,7 @@ int spio_change_def(int ncid, int is_enddef)
 #ifdef _HDF5
         if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
           if(is_enddef){
-#ifdef PIO_USE_ASYNC_WR_THREAD
+#if PIO_USE_ASYNC_WR_THREAD
             ierr = spio_iosys_async_hdf5_enddef_op_add(file);
 #else
             ierr = spio_hdf5_enddef(ios, file);

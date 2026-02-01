@@ -60,7 +60,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
     spio_ltimer_start(ios->io_fstats->wr_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
 
-#ifdef PIO_USE_ASYNC_WR_THREAD
+#if PIO_USE_ASYNC_WR_THREAD
     /* FIXME: Relax this wait */
     /*
     if((file->iotype != PIO_IOTYPE_HDF5) && (file->iotype != PIO_IOTYPE_HDF5C)){
@@ -459,7 +459,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             file->io_fstats->wb += len * atttype_len;
         }
 
-#ifdef PIO_USE_ASYNC_WR_THREAD
+#if PIO_USE_ASYNC_WR_THREAD
         ierr = spio_iosys_async_hdf5_put_att_op_add(file, varid, name, atttype, len, op);
 #else
         ierr = spio_hdf5_put_att(ios, file, varid, name, atttype, len, op);
@@ -3304,7 +3304,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             file->io_fstats->wb += num_elem * typelen;
         }
 
-#ifdef PIO_USE_ASYNC_WR_THREAD
+#if PIO_USE_ASYNC_WR_THREAD
         ierr = spio_iosys_async_hdf5_put_var_op_add(file, varid, start, count, stride, xtype, buf);
 #else
         ierr = spio_hdf5_put_var(ios, file, varid, start, count, stride, xtype, buf);
