@@ -3688,7 +3688,7 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
 #ifdef _HDF5
         if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
         {
-#ifdef PIO_USE_ASYNC_WR_THREAD
+#if PIO_USE_ASYNC_WR_THREAD
              ierr = spio_iosys_async_hdf5_def_var_op_add(file, name, xtype, ndims, dimidsp, *varidp);
 #else
              ierr = spio_hdf5_def_var(ios, file, name, xtype, ndims, dimidsp, *varidp);
