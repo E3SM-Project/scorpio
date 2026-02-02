@@ -120,7 +120,7 @@ int PIOc_inq_vardimid(int ncid, int varid, int *dimidsp)
 
 #if SPIO_ENABLE_API_TRACING
   int ndims = 0;
-  int rval = PIOc_inq_varndims(ncid, varid, &ndims);
+  int rval = PIOc_inq_varndims_impl(ncid, varid, &ndims);
   if((rval == PIO_NOERR) && dimidsp){
     tr.add_rval("*dimidsp", dimidsp, ndims);
   }
