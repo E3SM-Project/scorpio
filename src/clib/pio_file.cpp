@@ -450,6 +450,12 @@ int spio_wait_on_hard_close(iosystem_desc_t *ios, file_desc_t *file)
   const int SLEEP_TIME_IN_MILLISECONDS = 500;
 
   assert(ios && file);
+  /* For read-only files, we don't have any async ops. This check is useful for
+   * applications that do not close - due to a bug in the application - read-only
+   * files
+   */
+  if(!(file->mode & PIO_WRITE)) { return PIO_NOERR; }
+
   /* For files that will never be closed, due to user error for ex, we cannot wait
    * indefenitely. On the other hand we do want to have enough time to finish async ops
    */
