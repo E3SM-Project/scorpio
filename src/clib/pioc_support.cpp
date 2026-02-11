@@ -4792,881 +4792,819 @@ static size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *con
 int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *filename,
                         int mode, int retry)
 {
-    char tname[SPIO_TIMER_MAX_NAME];
-    iosystem_desc_t *ios;      /* Pointer to io system information. */
-    file_desc_t *file;         /* Pointer to file information. */
-    int imode;                 /* Internal mode val for netcdf4 file open. */
-    int mpierr = MPI_SUCCESS;  /** Return code from MPI function codes. */
-    int ierr = PIO_NOERR;      /* Return code from function calls. */
-    int ierr2 = PIO_NOERR;      /* Return code from function calls. */
+  char tname[SPIO_TIMER_MAX_NAME];
+  iosystem_desc_t *ios;      /* Pointer to io system information. */
+  file_desc_t *file;         /* Pointer to file information. */
+  int imode;                 /* Internal mode val for netcdf4 file open. */
+  int mpierr = MPI_SUCCESS;  /** Return code from MPI function codes. */
+  int ierr = PIO_NOERR;      /* Return code from function calls. */
+  int ierr2 = PIO_NOERR;      /* Return code from function calls. */
 
-    /* Get the IO system info from the iosysid. */
-    if (!(ios = pio_get_iosystem_from_id(iosysid)))
-    {
-        return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
-                        "Opening file (%s) failed. Invalid iosystem id (%d) provided", (filename) ? filename : "UNKNOWN", iosysid);
-    }
+  /* Get the IO system info from the iosysid. */
+  if(!(ios = pio_get_iosystem_from_id(iosysid))){
+    return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
+                    "Opening file (%s) failed. Invalid iosystem id (%d) provided", (filename) ? filename : "UNKNOWN", iosysid);
+  }
 
-    /* User must provide valid input for these parameters. */
-    if (!ncidp || !iotype || !filename || strlen(filename) > PIO_MAX_NAME)
-    {
-        return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
-                        "Opening file (%s) failed. Invalid arguments provided. ncidp is %s (expected not NULL), iotype is %s (expected not NULL), filename is %s (expected not NULL), filename length = %lld (expected <= %d)", (filename) ? filename : "UNKNOWN", PIO_IS_NULL(ncidp), PIO_IS_NULL(iotype), PIO_IS_NULL(filename), (filename) ? ((unsigned long long )strlen(filename)) : 0, (int )PIO_MAX_NAME);
-    }
+  /* User must provide valid input for these parameters. */
+  if(!ncidp || !iotype || !filename || strlen(filename) > PIO_MAX_NAME){
+    return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
+                    "Opening file (%s) failed. Invalid arguments provided. ncidp is %s (expected not NULL), iotype is %s (expected not NULL), filename is %s (expected not NULL), filename length = %lld (expected <= %d)", (filename) ? filename : "UNKNOWN", PIO_IS_NULL(ncidp), PIO_IS_NULL(iotype), PIO_IS_NULL(filename), (filename) ? ((unsigned long long )strlen(filename)) : 0, (int )PIO_MAX_NAME);
+  }
 
-    /* A valid iotype must be specified. */
-    if (!iotype_is_valid(*iotype))
-    {
-        char avail_iotypes[PIO_MAX_NAME + 1];
-        PIO_get_avail_iotypes(avail_iotypes, PIO_MAX_NAME);
-        return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
-                        "Opening file (%s) failed. Invalid iotype (%s:%d) specified. Available iotypes are : %s", filename, pio_iotype_to_string(*iotype), *iotype, avail_iotypes);
-    }
+  /* A valid iotype must be specified. */
+  if(!iotype_is_valid(*iotype)){
+    char avail_iotypes[PIO_MAX_NAME + 1];
+    PIO_get_avail_iotypes(avail_iotypes, PIO_MAX_NAME);
+    return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                    "Opening file (%s) failed. Invalid iotype (%s:%d) specified. Available iotypes are : %s", filename, pio_iotype_to_string(*iotype), *iotype, avail_iotypes);
+  }
 
-    spio_ltimer_start(ios->io_fstats->rd_timer_name);
-    spio_ltimer_start(ios->io_fstats->tot_timer_name);
+  spio_ltimer_start(ios->io_fstats->rd_timer_name);
+  spio_ltimer_start(ios->io_fstats->tot_timer_name);
 
-    LOG((2, "PIOc_openfile_retry iosysid = %d iotype = %d filename = %s mode = %d retry = %d",
-         iosysid, *iotype, filename, mode, retry));
+  LOG((2, "PIOc_openfile_retry iosysid = %d iotype = %d filename = %s mode = %d retry = %d",
+       iosysid, *iotype, filename, mode, retry));
 
 #if PIO_USE_ASYNC_WR_THREAD
-    ierr = spio_close_soft_closed_file(filename);
+  ierr = spio_close_soft_closed_file(filename);
+  if(ierr != PIO_NOERR){
+    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                    "Creating file (%s) failed. Error closing previous soft closed file", filename);
+  }
+
+  //if(((*iotype == PIO_IOTYPE_HDF5) || (*iotype == PIO_IOTYPE_HDF5C)) && !(mode & PIO_WRITE)){
+  if((*iotype == PIO_IOTYPE_HDF5) || (*iotype == PIO_IOTYPE_HDF5C)){
+    ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
     if(ierr != PIO_NOERR){
       return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                      "Creating file (%s) failed. Error closing previous soft closed file", filename);
+                      "Creating file (%s) failed. Error waiting on all pending asynchronous HDF5 ops", filename);
     }
+  }
+#endif
 
-    //if(((*iotype == PIO_IOTYPE_HDF5) || (*iotype == PIO_IOTYPE_HDF5C)) && !(mode & PIO_WRITE)){
-    if((*iotype == PIO_IOTYPE_HDF5) || (*iotype == PIO_IOTYPE_HDF5C)){
-      ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
-      if(ierr != PIO_NOERR){
-        return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                        "Creating file (%s) failed. Error waiting on all pending asynchronous HDF5 ops", filename);
+  /* Allocate space for the file info. */
+  if(!(file = (file_desc_t *) calloc(sizeof(file_desc_t), 1))){
+    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+    return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                    "Opening file (%s) failed. Out of memory allocating %lld bytes for the file structure", filename, (unsigned long long) (sizeof(*file)));
+  }
+
+  file->pmtx = new std::mutex();
+  assert(file->pmtx);
+
+  file->io_fstats = (spio_io_fstats_summary_t *) calloc(sizeof(spio_io_fstats_summary_t), 1);
+  if(!(file->io_fstats)){
+    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+    return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                    "Opening file (%s) failed. Out of memory allocating %lld bytes for caching file I/O statistics", filename, (unsigned long long) (sizeof(spio_io_fstats_summary_t)));
+  }
+
+  /* Fill in some file values. */
+  file->fh = -1;
+  file->reserve_extra_header_space = false; /* Set to true for creating output NetCDF files only. */
+  file->is_reopened = true;
+  strncpy(file->fname, filename, PIO_MAX_NAME);
+  ierr = pio_create_uniq_str(ios, NULL, tname, SPIO_TIMER_MAX_NAME, "tmp_", "_file");
+  if(ierr != PIO_NOERR){
+    /* Not a fatal error */
+    LOG((0, "Creating a unique name for the write timer for file (%s, ncid=%d) failed, ret = %d", file->fname, file->pio_ncid, ierr));
+    tname[0] = '\0';
+  }
+
+  snprintf(file->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "PIO:wr_%s", tname);
+  snprintf(file->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "PIO:rd_%s", tname);
+  snprintf(file->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "PIO:tot_%s", tname);
+
+  /* FIXME: Files can be opened for rds and writes */
+  spio_ltimer_start(file->io_fstats->rd_timer_name);
+  spio_ltimer_start(file->io_fstats->tot_timer_name);
+
+  file->iotype = *iotype;
+#ifdef _ADIOS2
+  if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
+    /* Trying to open a file with adios unless ADIOS_BP2NC_TEST option is enabled for unit tests */
+    bool adios2_file_exist = false;
+
+#ifndef _ADIOS_BP2NC_TEST
+    adios2_error adiosErr = adios2_error_none;
+    char declare_name[PIO_MAX_NAME] = {'\0'};
+    char bpname[PIO_MAX_NAME] = {'\0'};
+    struct stat sd;
+
+    strcat(bpname, filename);
+    strcat(bpname, ".bp");
+
+    if(0 == stat(bpname, &sd)){
+      strncpy(file->fname, bpname, PIO_MAX_NAME);
+      snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
+      strncpy(file->io_name_reader, declare_name, PIO_MAX_NAME);
+
+      file->ioH = adios2_declare_io(ios->adios_readerH, file->io_name_reader);
+      if(file->ioH == NULL){
+        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Opening file (%s) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to declare a new io handler",
+                       filename);
+      }
+
+      adiosErr = adios2_set_parameter(file->ioH, "BufferVType", "chunk");
+      if(adiosErr != adios2_error_none){
+        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Opening file (%s) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to set a single parameter (adios2_error=%s)",
+                       filename, convert_adios2_error_to_string(adiosErr));
+      }
+
+      adiosErr = adios2_set_parameter(file->ioH, "BufferChunkSize", "1Gb");
+      if(adiosErr != adios2_error_none){
+        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Opening file (%s) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to set a single parameter (adios2_error=%s)",
+                       filename, convert_adios2_error_to_string(adiosErr));
+      }
+
+      adiosErr = adios2_set_parameter(file->ioH, "InitialBufferSize", "1Gb");
+      if(adiosErr != adios2_error_none){
+        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Opening file (%s) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to set a single parameter (adios2_error=%s)",
+                       filename, convert_adios2_error_to_string(adiosErr));
+      }
+
+      adiosErr = adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
+      if(adiosErr != adios2_error_none){
+        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Opening file (%s) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to set a single parameter (adios2_error=%s)",
+                       filename, convert_adios2_error_to_string(adiosErr));
+      }
+
+      adiosErr = adios2_set_engine(file->ioH, "BP5");
+      if(adiosErr != adios2_error_none){
+        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Opening file (%s) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to set the engine type for current io handler (adios2_error=%s)",
+                       filename, convert_adios2_error_to_string(adiosErr));
+      }
+
+      adios2_file_exist = true;
+
+      file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+      if(file->engineH == NULL){
+        adios2_file_exist = false; /* Failed to open with adios2 trying pnetcdf */
+      }
+      else{
+        strncpy(file->fname, bpname, PIO_MAX_NAME);
       }
     }
 #endif
 
-    /* Allocate space for the file info. */
-    if (!(file = (file_desc_t *) calloc(sizeof(file_desc_t), 1)))
-    {
-        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Opening file (%s) failed. Out of memory allocating %lld bytes for the file structure", filename, (unsigned long long) (sizeof(*file)));
-    }
-
-    file->pmtx = new std::mutex();
-    assert(file->pmtx);
-
-    file->io_fstats = (spio_io_fstats_summary_t *) calloc(sizeof(spio_io_fstats_summary_t), 1);
-    if(!(file->io_fstats))
-    {
-        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Opening file (%s) failed. Out of memory allocating %lld bytes for caching file I/O statistics", filename, (unsigned long long) (sizeof(spio_io_fstats_summary_t)));
-    }
-
-    /* Fill in some file values. */
-    file->fh = -1;
-    file->reserve_extra_header_space = false; /* Set to true for creating output NetCDF files only. */
-    file->is_reopened = true;
-    strncpy(file->fname, filename, PIO_MAX_NAME);
-    ierr = pio_create_uniq_str(ios, NULL, tname, SPIO_TIMER_MAX_NAME, "tmp_", "_file");
-    if(ierr != PIO_NOERR)
-    {
-        /* Not a fatal error */
-        LOG((0, "Creating a unique name for the write timer for file (%s, ncid=%d) failed, ret = %d", file->fname, file->pio_ncid, ierr));
-        tname[0] = '\0';
-    }
-
-    snprintf(file->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "PIO:wr_%s", tname);
-    snprintf(file->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "PIO:rd_%s", tname);
-    snprintf(file->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "PIO:tot_%s", tname);
-
-    /* FIXME: Files can be opened for rds and writes */
-    spio_ltimer_start(file->io_fstats->rd_timer_name);
-    spio_ltimer_start(file->io_fstats->tot_timer_name);
-
-    file->iotype = *iotype;
-#ifdef _ADIOS2
-    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
-    {
-        /* Trying to open a file with adios unless ADIOS_BP2NC_TEST option is enabled for unit tests */
-        bool adios2_file_exist = false;
-
-#ifndef _ADIOS_BP2NC_TEST
-        adios2_error adiosErr = adios2_error_none;
-        char declare_name[PIO_MAX_NAME] = {'\0'};
-        char bpname[PIO_MAX_NAME] = {'\0'};
-        struct stat sd;
-
-        strcat(bpname, filename);
-        strcat(bpname, ".bp");
-
-        if (0 == stat(bpname, &sd))
-        {
-            strncpy(file->fname, bpname, PIO_MAX_NAME);
-            snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
-            strncpy(file->io_name_reader, declare_name, PIO_MAX_NAME);
-
-            file->ioH = adios2_declare_io(ios->adios_readerH, file->io_name_reader);
-            if (file->ioH == NULL)
-            {
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Opening file (%s) using ADIOS iotype failed. "
-                               "The low level (ADIOS) I/O library call failed to declare a new io handler",
-                               filename);
-            }
-
-            adiosErr = adios2_set_parameter(file->ioH, "BufferVType", "chunk");
-            if (adiosErr != adios2_error_none)
-            {
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Opening file (%s) using ADIOS iotype failed. "
-                               "The low level (ADIOS) I/O library call failed to set a single parameter (adios2_error=%s)",
-                               filename, convert_adios2_error_to_string(adiosErr));
-            }
-
-            adiosErr = adios2_set_parameter(file->ioH, "BufferChunkSize", "1Gb");
-            if (adiosErr != adios2_error_none)
-            {
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Opening file (%s) using ADIOS iotype failed. "
-                               "The low level (ADIOS) I/O library call failed to set a single parameter (adios2_error=%s)",
-                               filename, convert_adios2_error_to_string(adiosErr));
-            }
-
-            adiosErr = adios2_set_parameter(file->ioH, "InitialBufferSize", "1Gb");
-            if (adiosErr != adios2_error_none)
-            {
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Opening file (%s) using ADIOS iotype failed. "
-                               "The low level (ADIOS) I/O library call failed to set a single parameter (adios2_error=%s)",
-                               filename, convert_adios2_error_to_string(adiosErr));
-            }
-
-            adiosErr = adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
-            if (adiosErr != adios2_error_none)
-            {
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Opening file (%s) using ADIOS iotype failed. "
-                               "The low level (ADIOS) I/O library call failed to set a single parameter (adios2_error=%s)",
-                               filename, convert_adios2_error_to_string(adiosErr));
-            }
-
-            adiosErr = adios2_set_engine(file->ioH, "BP5");
-            if (adiosErr != adios2_error_none)
-            {
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Opening file (%s) using ADIOS iotype failed. "
-                               "The low level (ADIOS) I/O library call failed to set the engine type for current io handler (adios2_error=%s)",
-                               filename, convert_adios2_error_to_string(adiosErr));
-            }
-
-            adios2_file_exist = true;
-
-            file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
-            if (file->engineH == NULL)
-                adios2_file_exist = false; /* Failed to open with adios2 trying pnetcdf */
-            else
-                strncpy(file->fname, bpname, PIO_MAX_NAME);
-        }
-#endif
-
-        if (!adios2_file_exist)
-        {
-            /* Fall back to open as pnetcdf */
+    if(!adios2_file_exist){
+      /* Fall back to open as pnetcdf */
 #ifdef _PNETCDF
-            file->iotype = PIO_IOTYPE_PNETCDF;
+      file->iotype = PIO_IOTYPE_PNETCDF;
 #else
 #ifdef _NETCDF4
 #ifdef _MPISERIAL
-            file->iotype = PIO_IOTYPE_NETCDF4C;
+      file->iotype = PIO_IOTYPE_NETCDF4C;
 #else
-            file->iotype = PIO_IOTYPE_NETCDF4P;
+      file->iotype = PIO_IOTYPE_NETCDF4P;
 #endif
 #endif
 #endif
-        }
     }
+  }
 #endif
 
 #ifdef _HDF5
-    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
-    {
-        if (H5Fis_hdf5(filename) > 0)
-        {
+  if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+    if(H5Fis_hdf5(filename) > 0){
 #ifdef _NETCDF4
-            /* Use NETCDF4 IO type to read files generated with HDF5 IO type so far */
+      /* Use NETCDF4 IO type to read files generated with HDF5 IO type so far */
 #ifdef _MPISERIAL
-            file->iotype = PIO_IOTYPE_NETCDF4C;
+      file->iotype = PIO_IOTYPE_NETCDF4C;
 #else
-            file->iotype = PIO_IOTYPE_NETCDF4P;
+      file->iotype = PIO_IOTYPE_NETCDF4P;
 #endif
 #else
-            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->rd_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
-                            "Opening file (%s) with PIO_IOTYPE_HDF5 failed. HDF5 IO type currently requires NETCDF4 (not configured for SCORPIO) to support read operations", filename);
+      spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+      spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+      spio_ltimer_stop(file->io_fstats->rd_timer_name);
+      spio_ltimer_stop(file->io_fstats->tot_timer_name);
+      return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                      "Opening file (%s) with PIO_IOTYPE_HDF5 failed. HDF5 IO type currently requires NETCDF4 (not configured for SCORPIO) to support read operations", filename);
 #endif
-        }
-        else
-        {
+    }
+    else{
 #ifdef _PNETCDF
-            file->iotype = PIO_IOTYPE_PNETCDF;
+      file->iotype = PIO_IOTYPE_PNETCDF;
 #else
 #ifdef _NETCDF
-            file->iotype = PIO_IOTYPE_NETCDF;
+      file->iotype = PIO_IOTYPE_NETCDF;
 #endif
 #endif
+    }
+  }
+#endif
+
+  file->iosystem = ios;
+  file->mode = mode;
+  /*
+  file->num_unlim_dimids = 0;
+  file->unlim_dimids = NULL;
+  */
+
+#ifdef _ADIOS2
+  file->num_dim_vars = 0;
+#endif
+
+  for(int i = 0; i < PIO_MAX_VARS; i++){
+    file->varlist[i].varid = -1;
+    file->varlist[i].vname[0] = '\0';
+    file->varlist[i].vdesc[0] = '\0';
+    file->varlist[i].rec_var = 0;
+    file->varlist[i].record = -1;
+    file->varlist[i].request = NULL;
+    file->varlist[i].request_sz = NULL;
+    file->varlist[i].nreqs = 0;
+    file->varlist[i].fillvalue = NULL;
+    file->varlist[i].pio_type = PIO_NAT;
+    file->varlist[i].type_size = 0;
+    file->varlist[i].vrsize = 0;
+    file->varlist[i].rb_pend = 0;
+    file->varlist[i].vrsize = 0;
+    file->varlist[i].wb_pend = 0;
+    file->varlist[i].use_fill = 0;
+    file->varlist[i].fillbuf = NULL;
+  }
+
+#ifdef _ADIOS2
+  /* Set communicator for all adios processes, process rank, and I/O master node */
+  file->all_comm = ios->union_comm;
+  file->all_rank = ios->union_rank;
+  file->num_alltasks = ios->num_uniontasks;
+#endif
+
+  /* Set to true if this task should participate in IO (only true
+   * for one task with netcdf serial files. */
+  if(file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR ||
+      file->iotype == PIO_IOTYPE_PNETCDF ||
+      ios->io_rank == 0) { file->do_io = 1; }
+
+  /* If async is in use, bcast the parameters from compute to I/O procs. */
+  if(ios->async){
+    int len = strlen(filename) + 1;
+    PIO_SEND_ASYNC_MSG(ios, PIO_MSG_OPEN_FILE, &ierr, len, filename, file->iotype, file->mode, retry);
+    if(ierr != PIO_NOERR){
+      spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+      spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+      spio_ltimer_stop(file->io_fstats->rd_timer_name);
+      spio_ltimer_stop(file->io_fstats->tot_timer_name);
+      return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                      "Opening file (%s) failed. Sending asynchronous message, PIO_MSG_OPEN_FILE, failed on iosystem (iosysid=%d)", filename, ios->iosysid);
+    }
+  }
+
+#ifdef _ADIOS2
+  if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
+    /* Get available variables and set structures. Restrict to the first step only */
+    adios2_step_status status;
+    size_t nsteps = 0, step = 0;
+    adios2_error err_steps = adios2_steps(&nsteps, file->engineH);
+    adios2_error adiosErr = adios2_error_none;
+
+    /* Initialize adios structure */
+    assert(file->num_vars < PIO_MAX_VARS);
+    for(size_t var = 0; var < PIO_MAX_VARS; var++){
+      file->adios_vars[var].nc_type = PIO_NAT;
+      file->adios_vars[var].adios_type = adios2_type_unknown;
+      file->adios_vars[var].adios_type_size = 0;
+      file->adios_vars[var].nattrs = 0;
+      file->adios_vars[var].ndims = 0;
+      file->adios_vars[var].adios_varid = 0;
+      file->adios_vars[var].decomp_varid = 0;
+      file->adios_vars[var].frame_varid = 0;
+      file->adios_vars[var].fillval_varid = 0;
+      file->adios_vars[var].gdimids = NULL;
+      file->adios_vars[var].interval_map = NULL;
+    }
+
+    file->cache_data_blocks = spio_hash(10000);
+    file->cache_block_sizes = spio_hash(10000);
+    file->cache_darray_info = spio_hash(10000);
+
+    file->adios_reader_num_decomp_blocks = 0;
+
+    file->store_adios_decomp = true;
+
+    while(step < nsteps && adios2_begin_step(file->engineH, adios2_step_mode_read, -1.0, &status) == adios2_error_none){
+      file->begin_step_called = 1;
+      if(status == adios2_step_status_end_of_stream) { break; }
+
+      size_t var_size = 0;
+      char **var_names = adios2_available_variables(file->ioH, &var_size);
+      if(var_names == NULL){
+        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Opening file (%s) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to return an array or c strings for names of available variables",
+                       filename);
+      }
+
+      adios_read_global_dimensions(ios, file, var_names, var_size);
+
+      /* Read names of variables from variables */
+      size_t nvars = adios_read_vars_vars(file, var_size, var_names);
+
+      /* Free memory */
+      for(size_t i = 0; i < var_size; i++) { free(var_names[i]); }
+
+      free(var_names);
+
+      /* Additionally read variables from attributes like
+       * /__pio__/var/dummy_scalar_var_int/def/ndims */
+      size_t attr_size = 0;
+      char **attr_names = adios2_available_attributes(file->ioH, &attr_size);
+      if(attr_names == NULL){
+        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Opening file (%s) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to return an array or c strings for names of available attributes",
+                       filename);
+      }
+
+      nvars = adios_read_vars_attrs(file, attr_size, attr_names);
+
+      for(size_t i = 0; i < attr_size; i++){ free(attr_names[i]); }
+
+      free(attr_names);
+
+      /* Initialize variables */
+      for(int var_id = 0; var_id < file->num_vars; var_id++){
+        adios_get_nc_type(file, var_id);
+        adios_get_adios_type(file, var_id);
+        adios_get_ndims(file, var_id);
+        adios_get_nc_op_tag(file, var_id);
+        adios_get_dim_ids(file, var_id);
+        adios_get_step_info(file, var_id, step, nsteps);
+      }
+
+      if(step == 0){
+        adios_get_num_decomp_blocks(file);
+        adios_get_decomp_storage_info(file);
+      }
+
+      adiosErr = adios2_end_step(file->engineH);
+      if(adiosErr != adios2_error_none){
+        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Opening file (%s) using ADIOS iotype failed. "
+                       "The low level (ADIOS) I/O library call failed to terminate interaction with current step (adios2_error=%s)",
+                       filename, convert_adios2_error_to_string(adiosErr));
+      }
+
+      file->begin_step_called = 0;
+      step++;
+    }
+
+    int attr_id = 0;
+    size_t attr_size = 0;
+    char **attr_names = adios2_available_attributes(file->ioH, &attr_size);
+    if(attr_names == NULL){
+      spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+      spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+      spio_ltimer_stop(file->io_fstats->rd_timer_name);
+      spio_ltimer_stop(file->io_fstats->tot_timer_name);
+      return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                     "Opening file (%s) using ADIOS iotype failed. "
+                     "The low level (ADIOS) I/O library call failed to return an array or c strings for names of available attributes",
+                     filename);
+    }
+
+    /** Parse global attributes */
+    for(size_t i = 0; i < attr_size; i++){
+      /* Get global attributes */
+      /* Strings that start with /__pio__/var/ are variables */
+      if(strncmp(attr_names[i], adios_pio_global_prefix, strlen(adios_pio_global_prefix)) == 0){
+        /* Get substring from string for name */
+        int sub_length = strlen(attr_names[i]) - strlen(adios_pio_global_prefix);
+        int full_length = strlen(attr_names[i]);
+        int prefix_length = strlen(adios_pio_global_prefix);
+
+        file->adios_attrs[attr_id].att_name = (char *) calloc(sub_length + 1, 1);
+        if(file->adios_attrs[attr_id].att_name == NULL){
+          spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+          spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+          spio_ltimer_stop(file->io_fstats->rd_timer_name);
+          spio_ltimer_stop(file->io_fstats->tot_timer_name);
+          return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                         "Opening file (%s) using ADIOS iotype failed. "
+                         "Out of memory allocating %lld bytes for global attribute %s",
+                         filename, (long long int)(sub_length + 1), attr_names[i]);
         }
-    }
-#endif
 
-    file->iosystem = ios;
-    file->mode = mode;
-    /*
-    file->num_unlim_dimids = 0;
-    file->unlim_dimids = NULL;
-    */
+        strncpy(file->adios_attrs[attr_id].att_name, &attr_names[i][prefix_length], sub_length);
+        file->adios_attrs[attr_id].att_varid = -1;
 
-#ifdef _ADIOS2
-    file->num_dim_vars = 0;
-#endif
+        adios_get_attr(file, attr_id, attr_names, i);
 
-    for (int i = 0; i < PIO_MAX_VARS; i++)
-    {
-        file->varlist[i].varid = -1;
-        file->varlist[i].vname[0] = '\0';
-        file->varlist[i].vdesc[0] = '\0';
-        file->varlist[i].rec_var = 0;
-        file->varlist[i].record = -1;
-        file->varlist[i].request = NULL;
-        file->varlist[i].request_sz = NULL;
-        file->varlist[i].nreqs = 0;
-        file->varlist[i].fillvalue = NULL;
-        file->varlist[i].pio_type = PIO_NAT;
-        file->varlist[i].type_size = 0;
-        file->varlist[i].vrsize = 0;
-        file->varlist[i].rb_pend = 0;
-        file->varlist[i].vrsize = 0;
-        file->varlist[i].wb_pend = 0;
-        file->varlist[i].use_fill = 0;
-        file->varlist[i].fillbuf = NULL;
-    }
+        attr_id++;
+        assert(attr_id < PIO_MAX_ATTRS);
+      }
 
-#ifdef _ADIOS2
-    /* Set communicator for all adios processes, process rank, and I/O master node */
-    file->all_comm = ios->union_comm;
-    file->all_rank = ios->union_rank;
-    file->num_alltasks = ios->num_uniontasks;
-#endif
-
-    /* Set to true if this task should participate in IO (only true
-     * for one task with netcdf serial files. */
-    if (file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR ||
-        file->iotype == PIO_IOTYPE_PNETCDF ||
-        ios->io_rank == 0)
-        file->do_io = 1;
-
-    /* If async is in use, bcast the parameters from compute to I/O procs. */
-    if(ios->async)
-    {
-        int len = strlen(filename) + 1;
-        PIO_SEND_ASYNC_MSG(ios, PIO_MSG_OPEN_FILE, &ierr, len, filename, file->iotype, file->mode, retry);
-        if(ierr != PIO_NOERR)
-        {
+      /* Cache decomp attributes */
+      if(strncmp(attr_names[i], adios_pio_var_prefix, strlen(adios_pio_var_prefix)) == 0 &&
+          strstr(attr_names[i], adios_def_decomp_suffix) != NULL){
+        adios2_attribute const *attributeH = adios2_inquire_attribute(file->ioH, attr_names[i]);
+        if(attributeH != NULL){
+          size_t size_attr = 0;
+          char *attr_data = (char *) calloc(PIO_MAX_NAME, 1);
+          if(attr_data == NULL){
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Opening file (%s) failed. Sending asynchronous message, PIO_MSG_OPEN_FILE, failed on iosystem (iosysid=%d)", filename, ios->iosysid);
-        }
-    }
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Opening file (%s) using ADIOS iotype failed. "
+                           "Out of memory allocating %lld bytes for decomposition attribute (%s)",
+                           filename, (long long int)PIO_MAX_NAME, attr_names[i]);
+          }
 
-#ifdef _ADIOS2
-    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
-    {
-        /* Get available variables and set structures. Restrict to the first step only */
-        adios2_step_status status;
-        size_t nsteps = 0, step = 0;
-        adios2_error err_steps = adios2_steps(&nsteps, file->engineH);
-        adios2_error adiosErr = adios2_error_none;
-
-        /* Initialize adios structure */
-        assert(file->num_vars < PIO_MAX_VARS);
-        for (size_t var = 0; var < PIO_MAX_VARS; var++)
-        {
-            file->adios_vars[var].nc_type = PIO_NAT;
-            file->adios_vars[var].adios_type = adios2_type_unknown;
-            file->adios_vars[var].adios_type_size = 0;
-            file->adios_vars[var].nattrs = 0;
-            file->adios_vars[var].ndims = 0;
-            file->adios_vars[var].adios_varid = 0;
-            file->adios_vars[var].decomp_varid = 0;
-            file->adios_vars[var].frame_varid = 0;
-            file->adios_vars[var].fillval_varid = 0;
-            file->adios_vars[var].gdimids = NULL;
-            file->adios_vars[var].interval_map = NULL;
-        }
-
-        file->cache_data_blocks = spio_hash(10000);
-        file->cache_block_sizes = spio_hash(10000);
-        file->cache_darray_info = spio_hash(10000);
-
-        file->adios_reader_num_decomp_blocks = 0;
-
-        file->store_adios_decomp = true;
-
-        while (step < nsteps && adios2_begin_step(file->engineH, adios2_step_mode_read, -1.0, &status) == adios2_error_none)
-        {
-            file->begin_step_called = 1;
-            if (status == adios2_step_status_end_of_stream)
-                break;
-
-            size_t var_size = 0;
-            char **var_names = adios2_available_variables(file->ioH, &var_size);
-            if (var_names == NULL)
-            {
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Opening file (%s) using ADIOS iotype failed. "
-                               "The low level (ADIOS) I/O library call failed to return an array or c strings for names of available variables",
-                               filename);
-            }
-
-            adios_read_global_dimensions(ios, file, var_names, var_size);
-
-            /* Read names of variables from variables */
-            size_t nvars = adios_read_vars_vars(file, var_size, var_names);
-
-            /* Free memory */
-            for (size_t i = 0; i < var_size; i++)
-                free(var_names[i]);
-
-            free(var_names);
-
-            /* Additionally read variables from attributes like
-             * /__pio__/var/dummy_scalar_var_int/def/ndims */
-            size_t attr_size = 0;
-            char **attr_names = adios2_available_attributes(file->ioH, &attr_size);
-            if (attr_names == NULL)
-            {
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Opening file (%s) using ADIOS iotype failed. "
-                               "The low level (ADIOS) I/O library call failed to return an array or c strings for names of available attributes",
-                               filename);
-            }
-
-            nvars = adios_read_vars_attrs(file, attr_size, attr_names);
-
-            for (size_t i = 0; i < attr_size; i++)
-                free(attr_names[i]);
-
-            free(attr_names);
-
-            /* Initialize variables */
-            for (int var_id = 0; var_id < file->num_vars; var_id++)
-            {
-                adios_get_nc_type(file, var_id);
-                adios_get_adios_type(file, var_id);
-                adios_get_ndims(file, var_id);
-                adios_get_nc_op_tag(file, var_id);
-                adios_get_dim_ids(file, var_id);
-                adios_get_step_info(file, var_id, step, nsteps);
-            }
-
-            if (step == 0)
-            {
-                adios_get_num_decomp_blocks(file);
-                adios_get_decomp_storage_info(file);
-            }
-
-            adiosErr = adios2_end_step(file->engineH);
-            if (adiosErr != adios2_error_none)
-            {
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Opening file (%s) using ADIOS iotype failed. "
-                               "The low level (ADIOS) I/O library call failed to terminate interaction with current step (adios2_error=%s)",
-                               filename, convert_adios2_error_to_string(adiosErr));
-            }
-
-            file->begin_step_called = 0;
-            step++;
-        }
-
-        int attr_id = 0;
-        size_t attr_size = 0;
-        char **attr_names = adios2_available_attributes(file->ioH, &attr_size);
-        if (attr_names == NULL)
-        {
+          adiosErr = adios2_attribute_data(attr_data, &size_attr, attributeH);
+          if(adiosErr != adios2_error_none){
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "Opening file (%s) using ADIOS iotype failed. "
-                           "The low level (ADIOS) I/O library call failed to return an array or c strings for names of available attributes",
-                           filename);
+                           "The low level (ADIOS) I/O library call failed to retrieve attribute data pointer (adios2_error=%s)",
+                           filename, convert_adios2_error_to_string(adiosErr));
+          }
+
+          /* attr_data will be deleted in the cache delete operation */
+          file->cache_darray_info->put(file->cache_darray_info, attr_names[i], attr_data);
         }
-
-        /** Parse global attributes */
-        for (size_t i = 0; i < attr_size; i++)
-        {
-            /* Get global attributes */
-            /* Strings that start with /__pio__/var/ are variables */
-            if (strncmp(attr_names[i], adios_pio_global_prefix, strlen(adios_pio_global_prefix)) == 0)
-            {
-                /* Get substring from string for name */
-                int sub_length = strlen(attr_names[i]) - strlen(adios_pio_global_prefix);
-                int full_length = strlen(attr_names[i]);
-                int prefix_length = strlen(adios_pio_global_prefix);
-
-                file->adios_attrs[attr_id].att_name = (char *) calloc(sub_length + 1, 1);
-                if (file->adios_attrs[attr_id].att_name == NULL)
-                {
-                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                                   "Opening file (%s) using ADIOS iotype failed. "
-                                   "Out of memory allocating %lld bytes for global attribute %s",
-                                   filename, (long long int)(sub_length + 1), attr_names[i]);
-                }
-
-                strncpy(file->adios_attrs[attr_id].att_name, &attr_names[i][prefix_length], sub_length);
-                file->adios_attrs[attr_id].att_varid = -1;
-
-                adios_get_attr(file, attr_id, attr_names, i);
-
-                attr_id++;
-                assert(attr_id < PIO_MAX_ATTRS);
-            }
-
-            /* Cache decomp attributes */
-            if (strncmp(attr_names[i], adios_pio_var_prefix, strlen(adios_pio_var_prefix)) == 0 &&
-                strstr(attr_names[i], adios_def_decomp_suffix) != NULL)
-            {
-                adios2_attribute const *attributeH = adios2_inquire_attribute(file->ioH, attr_names[i]);
-                if (attributeH != NULL)
-                {
-                    size_t size_attr = 0;
-                    char *attr_data = (char *) calloc(PIO_MAX_NAME, 1);
-                    if (attr_data == NULL)
-                    {
-                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                        return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                                       "Opening file (%s) using ADIOS iotype failed. "
-                                       "Out of memory allocating %lld bytes for decomposition attribute (%s)",
-                                       filename, (long long int)PIO_MAX_NAME, attr_names[i]);
-                    }
-
-                    adiosErr = adios2_attribute_data(attr_data, &size_attr, attributeH);
-                    if (adiosErr != adios2_error_none)
-                    {
-                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                       "Opening file (%s) using ADIOS iotype failed. "
-                                       "The low level (ADIOS) I/O library call failed to retrieve attribute data pointer (adios2_error=%s)",
-                                       filename, convert_adios2_error_to_string(adiosErr));
-                    }
-
-                    /* attr_data will be deleted in the cache delete operation */
-                    file->cache_darray_info->put(file->cache_darray_info, attr_names[i], attr_data);
-                }
-            }
-        }
-        file->num_gattrs += attr_id;
-
-        /* Parse variable attributes */
-        for (size_t i = 0; i < attr_size; i++)
-        {
-            /* Get variable attribute */
-            char suffix_att_name[] = "/";
-
-            for (size_t var_cnt = 0; var_cnt < file->num_vars; var_cnt++)
-            {
-                char *attr_full_prefix = adios_name(adios_pio_var_prefix, file->adios_vars[var_cnt].name,
-                                                    suffix_att_name);
-                if (strncmp(attr_names[i], attr_full_prefix, strlen(attr_full_prefix)) == 0)
-                {
-                    int sub_length = strlen(attr_names[i]) - strlen(attr_full_prefix);
-                    int full_length = strlen(attr_names[i]);
-                    int prefix_length = strlen(attr_full_prefix);
-                    if (strrchr(attr_names[i], '/') > &attr_names[i][prefix_length])
-                        continue;
-
-                    file->adios_attrs[attr_id].att_name = (char *) calloc(sub_length + 1, 1);
-                    if (file->adios_attrs[attr_id].att_name == NULL)
-                    {
-                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                        return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                                       "Opening file (%s) using ADIOS iotype failed. "
-                                       "Out of memory allocating %lld bytes for attribute (id = %d) name",
-                                       filename, (long long int)(sub_length + 1), attr_id);
-                    }
-
-                    strncpy(file->adios_attrs[attr_id].att_name, &attr_names[i][prefix_length], sub_length);
-                    file->adios_attrs[attr_id].att_varid = var_cnt;
-                    adios_get_attr(file, attr_id, attr_names, i);
-
-                    assert(attr_id < PIO_MAX_ATTRS);
-                    attr_id++;
-                }
-            }
-
-            free(attr_names[i]);
-        }
-
-        free(attr_names);
-        file->num_attrs += attr_id;
-    }
-#endif
-
-    /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
-    {
-        switch (file->iotype)
-        {
-#ifdef _NETCDF4
-
-        case PIO_IOTYPE_NETCDF4P:
-#ifdef _MPISERIAL
-            ierr = nc_open(filename, file->mode, &file->fh);
-#else
-            imode = file->mode |  NC_MPIIO;
-            if ((ierr = nc_open_par(filename, imode, ios->io_comm, ios->info, &file->fh)))
-                break;
-            file->mode = imode;
-
-            /* Check the vars for valid use of unlim dims. */
-            if ((ierr = check_unlim_use(file->fh)))
-                break;
-            LOG((2, "PIOc_openfile_retry:nc_open_par filename = %s mode = %d imode = %d ierr = %d",
-                 filename, file->mode, imode, ierr));
-#endif
-            break;
-
-        case PIO_IOTYPE_NETCDF4P_NCZARR:
-            file->mode = file->mode |  NC_NETCDF4;
-            LOG((2, "Calling nc_open_par (nczarr) io_comm = %d mode = %d fh = %d",
-                 ios->io_comm, file->mode, file->fh));
-            ierr = PIO_ENOTBUILT;
-#ifndef _MPISERIAL
-#if PIO_USE_NETCDF4_NCZARR
-            {
-              std::string filename_nczarr = spio_get_nczarr_fname(filename);
-              if(!filename_nczarr.empty()){
-                ierr = nc_open_par(filename_nczarr.c_str(), file->mode,
-                                      ios->io_comm, ios->info, &file->fh);
-                if(ierr != NC_NOERR){
-                  /* The file being opened may not be NCZarr, for now retry with NetCDF4 */
-                  file->iotype = PIO_IOTYPE_NETCDF4P;
-                  ierr = nc_open_par(filename, file->mode, ios->io_comm, ios->info, &file->fh);
-                }
-              }
-            }
-            LOG((2, "nc_open_par returned %d file->fh = %d", ierr, file->fh));
-#else
-            LOG((2, "nc_open_par returned %d, NCZarr support not built/enabled", ierr));
-#endif
-#endif
-            break;
-        case PIO_IOTYPE_NETCDF4C:
-            if (ios->io_rank == 0)
-            {
-                imode = file->mode | NC_NETCDF4;
-                if ((ierr = nc_open(filename, imode, &file->fh)))
-                    break;
-                file->mode = imode;
-                /* Check the vars for valid use of unlim dims. */
-                if ((ierr = check_unlim_use(file->fh)))
-                    break;                    
-            }
-            break;
-#endif /* _NETCDF4 */
-
-#ifdef _NETCDF
-        case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank == 0)
-                ierr = nc_open(filename, file->mode, &file->fh);
-            break;
-#endif /* _NETCDF */
-
-#ifdef _PNETCDF
-        case PIO_IOTYPE_PNETCDF:
-            ierr = ncmpi_open(ios->io_comm, filename, file->mode, ios->info, &file->fh);
-
-            // This should only be done with a file opened to append
-            if (ierr == PIO_NOERR && (file->mode & PIO_WRITE))
-            {
-                if (ios->iomaster == MPI_ROOT)
-                    LOG((2, "%d Setting IO buffer %ld", __LINE__, pio_buffer_size_limit));
-
-                /* Please refer to a previous related comment for why we ensure a minimum buffer size (16 MiB) for
-                   buffered put APIs in PnetCDF.
-                 */
-                const PIO_Offset min_bufsize = 16777216; /* Minimum buffer size (16 MiB) for buffered put APIs in PnetCDF */
-                ierr = ncmpi_buffer_attach(file->fh, (pio_buffer_size_limit > min_bufsize)? pio_buffer_size_limit : min_bufsize);
-            }
-            LOG((2, "ncmpi_open(%s) : fd = %d", filename, file->fh));
-            break;
-#endif
-#ifdef _ADIOS2
-        case PIO_IOTYPE_ADIOS:
-        case PIO_IOTYPE_ADIOSC:
-            break; /* This case has been handled above */
-#endif
-        default:
-            {
-                char avail_iotypes[PIO_MAX_NAME + 1];
-                int tmp_iotype = file->iotype;
-
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-
-                free(file->io_fstats);
-                free(file);
-                PIO_get_avail_iotypes(avail_iotypes, PIO_MAX_NAME);
-                return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
-                                "Opening file (%s) failed. Invalid iotype (%s:%d) specified. Available iotypes are : %s", filename, pio_iotype_to_string(tmp_iotype), tmp_iotype, avail_iotypes);
-            }
-        }
-
-        /* If the caller requested a retry, and we failed to open a
-           file due to an incompatible type of NetCDF, try it once
-           with just plain old basic NetCDF. */
-        if (retry)
-        {
-#ifdef _NETCDF
-            LOG((2, "retry error code ierr = %d io_rank %d", ierr, ios->io_rank));
-            /* Bcast error code from io rank 0 to all io procs */
-            mpierr = MPI_Bcast(&ierr, 1, MPI_INT, 0, ios->io_comm);
-            if(mpierr != MPI_SUCCESS){
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return check_mpi(NULL, file, ierr, __FILE__, __LINE__);
-            }
-            if ((ierr != NC_NOERR) && (file->iotype != PIO_IOTYPE_NETCDF))
-            {
-                /* reset file markers for NETCDF on all IO tasks */
-                file->iotype = PIO_IOTYPE_NETCDF;
-
-                /* FIXME: The changes below to modify the user-specified
-                 * iotype needs to be propogated to all tasks. */
-                /* modify the user-specified iotype on all tasks */
-                /* Modifying the user-specified iotype unfortunately
-                 * causes some E3SM model components to reset the iotype
-                 * to NetCDF for all subsequent reads and writes
-                 * (eventhough only some files read are in the NetCDF4
-                 * format)
-                 * Commenting this out for now, until we introduce
-                 * PIO_IOTYPE_ANY that would allow users to explicitly
-                 * specify that the lib can internally modify iotypes
-                 */
-                /* *iotype = PIO_IOTYPE_NETCDF; */
-
-                /* open netcdf file serially on main task */
-                if (ios->io_rank == 0)
-                {
-                    char errmsg[PIO_MAX_NAME];
-
-                    ierr2 = PIOc_strerror_impl(ierr, errmsg, PIO_MAX_NAME);
-                    printf("PIO: WARNING: Opening file (%s) with iotype=%d (%s) failed (ierr=%d, %s). Retrying with iotype=PIO_IOTYPE_NETCDF\n", filename, *iotype, pio_iotype_to_string(*iotype), ierr, ((ierr2 == PIO_NOERR) ? errmsg : ""));
-                    ierr = nc_open(filename, file->mode, &file->fh);
-                    if(ierr == NC_NOERR)
-                    {
-                        printf("PIO: WARNING: Opening file (%s) with iotype=%d (%s) failed. But retrying with iotype PIO_IOTYPE_NETCDF was successful. Switching iotype to PIO_IOTYPE_NETCDF for this file\n", filename, *iotype, pio_iotype_to_string(*iotype));
-                    }
-                }
-                else
-                {
-                    /* reset ierr */
-                    ierr = PIO_NOERR;
-
-                    file->do_io = 0;
-                }
-            }
-            LOG((2, "retry nc_open(%s) : fd = %d, iotype = %d, do_io = %d, ierr = %d",
-                 filename, file->fh, file->iotype, file->do_io, ierr));
-#endif /* _NETCDF */
-        }
+      }
     }
 
-    /* Broadcast open mode to all tasks. */
-    if ((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-    {
-        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        free(file->io_fstats);
-        free(file);
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
-    }
+    file->num_gattrs += attr_id;
 
-    if (retry)
-    {
-        /* Broadcast IO type (might be switched on IO tasks) to all tasks. */
-        if ((mpierr = MPI_Bcast(&file->iotype, 1, MPI_INT, ios->ioroot, ios->my_comm)))
-        {
+    /* Parse variable attributes */
+    for(size_t i = 0; i < attr_size; i++){
+      /* Get variable attribute */
+      char suffix_att_name[] = "/";
+
+      for(size_t var_cnt = 0; var_cnt < file->num_vars; var_cnt++){
+        char *attr_full_prefix = adios_name(adios_pio_var_prefix, file->adios_vars[var_cnt].name,
+                                            suffix_att_name);
+        if(strncmp(attr_names[i], attr_full_prefix, strlen(attr_full_prefix)) == 0){
+          int sub_length = strlen(attr_names[i]) - strlen(attr_full_prefix);
+          int full_length = strlen(attr_names[i]);
+          int prefix_length = strlen(attr_full_prefix);
+          if(strrchr(attr_names[i], '/') > &attr_names[i][prefix_length]) { continue; }
+
+          file->adios_attrs[attr_id].att_name = (char *) calloc(sub_length + 1, 1);
+          if(file->adios_attrs[attr_id].att_name == NULL){
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            free(file->io_fstats);
-            free(file);
-            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Opening file (%s) using ADIOS iotype failed. "
+                           "Out of memory allocating %lld bytes for attribute (id = %d) name",
+                           filename, (long long int)(sub_length + 1), attr_id);
+          }
+
+          strncpy(file->adios_attrs[attr_id].att_name, &attr_names[i][prefix_length], sub_length);
+          file->adios_attrs[attr_id].att_varid = var_cnt;
+          adios_get_attr(file, attr_id, attr_names, i);
+
+          assert(attr_id < PIO_MAX_ATTRS);
+          attr_id++;
         }
+      }
+
+      free(attr_names[i]);
     }
 
-    ierr = check_netcdf(ios, file, ierr, __FILE__, __LINE__);
-    /* If there was an error, free allocated memory and deal with the error. */
-    if(ierr != PIO_NOERR){
+    free(attr_names);
+    file->num_attrs += attr_id;
+  }
+#endif
+
+  /* If this is an IO task, then call the netCDF function. */
+  if(ios->ioproc){
+    switch(file->iotype){
+#ifdef _NETCDF4
+
+  case PIO_IOTYPE_NETCDF4P:
+#ifdef _MPISERIAL
+      ierr = nc_open(filename, file->mode, &file->fh);
+#else
+      imode = file->mode |  NC_MPIIO;
+      if ((ierr = nc_open_par(filename, imode, ios->io_comm, ios->info, &file->fh))) { break; }
+      file->mode = imode;
+
+      /* Check the vars for valid use of unlim dims. */
+      if ((ierr = check_unlim_use(file->fh))) { break; }
+      LOG((2, "PIOc_openfile_retry:nc_open_par filename = %s mode = %d imode = %d ierr = %d",
+           filename, file->mode, imode, ierr));
+#endif
+      break;
+
+  case PIO_IOTYPE_NETCDF4P_NCZARR:
+      file->mode = file->mode |  NC_NETCDF4;
+      LOG((2, "Calling nc_open_par (nczarr) io_comm = %d mode = %d fh = %d",
+           ios->io_comm, file->mode, file->fh));
+      ierr = PIO_ENOTBUILT;
+#ifndef _MPISERIAL
+#if PIO_USE_NETCDF4_NCZARR
+      {
+        std::string filename_nczarr = spio_get_nczarr_fname(filename);
+        if(!filename_nczarr.empty()){
+          ierr = nc_open_par(filename_nczarr.c_str(), file->mode,
+                                ios->io_comm, ios->info, &file->fh);
+          if(ierr != NC_NOERR){
+            /* The file being opened may not be NCZarr, for now retry with NetCDF4 */
+            file->iotype = PIO_IOTYPE_NETCDF4P;
+            ierr = nc_open_par(filename, file->mode, ios->io_comm, ios->info, &file->fh);
+          }
+        }
+      }
+      LOG((2, "nc_open_par returned %d file->fh = %d", ierr, file->fh));
+#else
+      LOG((2, "nc_open_par returned %d, NCZarr support not built/enabled", ierr));
+#endif
+#endif
+      break;
+  case PIO_IOTYPE_NETCDF4C:
+      if(ios->io_rank == 0){
+        imode = file->mode | NC_NETCDF4;
+        if((ierr = nc_open(filename, imode, &file->fh))) { break; }
+        file->mode = imode;
+        /* Check the vars for valid use of unlim dims. */
+        if((ierr = check_unlim_use(file->fh))) { break; }
+      }
+      break;
+#endif /* _NETCDF4 */
+
+#ifdef _NETCDF
+  case PIO_IOTYPE_NETCDF:
+      if(ios->io_rank == 0){
+          ierr = nc_open(filename, file->mode, &file->fh);
+      }
+      break;
+#endif /* _NETCDF */
+
+#ifdef _PNETCDF
+  case PIO_IOTYPE_PNETCDF:
+      ierr = ncmpi_open(ios->io_comm, filename, file->mode, ios->info, &file->fh);
+
+      // This should only be done with a file opened to append
+      if(ierr == PIO_NOERR && (file->mode & PIO_WRITE)){
+        if(ios->iomaster == MPI_ROOT) { LOG((2, "%d Setting IO buffer %ld", __LINE__, pio_buffer_size_limit)); }
+
+        /* Please refer to a previous related comment for why we ensure a minimum buffer size (16 MiB) for
+           buffered put APIs in PnetCDF.
+         */
+        const PIO_Offset min_bufsize = 16777216; /* Minimum buffer size (16 MiB) for buffered put APIs in PnetCDF */
+        ierr = ncmpi_buffer_attach(file->fh, (pio_buffer_size_limit > min_bufsize)? pio_buffer_size_limit : min_bufsize);
+      }
+      LOG((2, "ncmpi_open(%s) : fd = %d", filename, file->fh));
+      break;
+#endif
+#ifdef _ADIOS2
+  case PIO_IOTYPE_ADIOS:
+  case PIO_IOTYPE_ADIOSC:
+      break; /* This case has been handled above */
+#endif
+  default:
+      {
+        char avail_iotypes[PIO_MAX_NAME + 1];
         int tmp_iotype = file->iotype;
+
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
         free(file->io_fstats);
         free(file);
-        LOG((1, "PIOc_openfile_retry failed, ierr = %d", ierr));
-        return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                        "Opening file (%s) with iotype %d (%s) failed. The low level I/O library call failed", filename, tmp_iotype, pio_iotype_to_string(tmp_iotype));;
-    }
+        PIO_get_avail_iotypes(avail_iotypes, PIO_MAX_NAME);
+        return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                        "Opening file (%s) failed. Invalid iotype (%s:%d) specified. Available iotypes are : %s", filename, pio_iotype_to_string(tmp_iotype), tmp_iotype, avail_iotypes);
+      }
+    } // switch(file->iotype)
 
-    /* Add this file to the list of currently open files. */
-    MPI_Comm comm = MPI_COMM_NULL;
-    if(ios->async)
-    {
-        /* For asynchronous I/O service, since file ids are passed across
-         * disjoint comms we need it to be unique across the union comm
+    /* If the caller requested a retry, and we failed to open a
+       file due to an incompatible type of NetCDF, try it once
+       with just plain old basic NetCDF. */
+    if(retry){
+#ifdef _NETCDF
+      LOG((2, "retry error code ierr = %d io_rank %d", ierr, ios->io_rank));
+      /* Bcast error code from io rank 0 to all io procs */
+      mpierr = MPI_Bcast(&ierr, 1, MPI_INT, 0, ios->io_comm);
+      if(mpierr != MPI_SUCCESS){
+          spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+          spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+          spio_ltimer_stop(file->io_fstats->rd_timer_name);
+          spio_ltimer_stop(file->io_fstats->tot_timer_name);
+          return check_mpi(NULL, file, ierr, __FILE__, __LINE__);
+      }
+
+      if((ierr != NC_NOERR) && (file->iotype != PIO_IOTYPE_NETCDF)){
+        /* reset file markers for NETCDF on all IO tasks */
+        file->iotype = PIO_IOTYPE_NETCDF;
+
+        /* FIXME: The changes below to modify the user-specified
+         * iotype needs to be propogated to all tasks. */
+        /* modify the user-specified iotype on all tasks */
+        /* Modifying the user-specified iotype unfortunately
+         * causes some E3SM model components to reset the iotype
+         * to NetCDF for all subsequent reads and writes
+         * (eventhough only some files read are in the NetCDF4
+         * format)
+         * Commenting this out for now, until we introduce
+         * PIO_IOTYPE_ANY that would allow users to explicitly
+         * specify that the lib can internally modify iotypes
          */
-        comm = ios->union_comm;
-    }
+        /* *iotype = PIO_IOTYPE_NETCDF; */
 
-    /* Initialize the multi-variable cache used to cache data for
-     * multiple variables before writing it to the output file
-     * Note: The MVCache is not used by ADIOS or a file opened
-     *       as "read only"
-     */
-    spio_file_mvcache_init(file);
+        /* open netcdf file serially on main task */
+        if(ios->io_rank == 0){
+          char errmsg[PIO_MAX_NAME];
 
-#ifdef _HDF5
-    /* A datatype converter for converting user buffer to a "file type" buffer */
-    file->dt_converter = static_cast<void *>(new SPIO_Util::File_Util::DTConverter());
-#endif
-
-    *ncidp = pio_add_to_file_list(file, comm);
-
-    LOG((2, "Opened file %s file->pio_ncid = %d file->fh = %d ierr = %d",
-         filename, file->pio_ncid, file->fh, ierr));
-
-    /* Set ncid to ADIOS attributes */
-    if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
-    {
-#ifdef _ADIOS2
-        for (int i = 0; i < file->num_attrs; i++)
-            file->adios_attrs[i].att_ncid = *ncidp;
-#endif
-    }
-
-    /* Check if the file has unlimited dimensions */
-    if(!ios->async || !ios->ioproc)
-    {
-        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        ierr = PIOc_inq_unlimdims_impl(*ncidp, &(file->num_unlim_dimids), NULL);
-        if(ierr != PIO_NOERR)
-        {
-            spio_file_mvcache_finalize(file);
-            return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                              "Opening file (%s) failed. Although the file was opened successfully, querying the number of unlimited dimensions in the file failed", filename);
+          ierr2 = PIOc_strerror_impl(ierr, errmsg, PIO_MAX_NAME);
+          printf("PIO: WARNING: Opening file (%s) with iotype=%d (%s) failed (ierr=%d, %s). Retrying with iotype=PIO_IOTYPE_NETCDF\n", filename, *iotype, pio_iotype_to_string(*iotype), ierr, ((ierr2 == PIO_NOERR) ? errmsg : ""));
+          ierr = nc_open(filename, file->mode, &file->fh);
+          if(ierr == NC_NOERR)
+          {
+              printf("PIO: WARNING: Opening file (%s) with iotype=%d (%s) failed. But retrying with iotype PIO_IOTYPE_NETCDF was successful. Switching iotype to PIO_IOTYPE_NETCDF for this file\n", filename, *iotype, pio_iotype_to_string(*iotype));
+          }
         }
-        if(file->num_unlim_dimids > 0)
-        {
-            file->unlim_dimids = (int *)malloc(file->num_unlim_dimids * sizeof(int));
-            if(!file->unlim_dimids)
-            {
-                spio_file_mvcache_finalize(file);
-                return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                                "Opening file (%s) failed. Out of memory allocating %lld bytes for caching the unlimited dimension ids", filename, (unsigned long long) (file->num_unlim_dimids * sizeof(int)));
-            }
-            ierr = PIOc_inq_unlimdims_impl(*ncidp, NULL, file->unlim_dimids);
-            if(ierr != PIO_NOERR)
-            {
-                spio_file_mvcache_finalize(file);
-                return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                                "Opening file (%s) failed. Although the file was opened successfully, querying the unlimited dimensions in the file failed", filename);
-            }
-        }
-        spio_ltimer_start(ios->io_fstats->rd_timer_name);
-        spio_ltimer_start(ios->io_fstats->tot_timer_name);
-        spio_ltimer_start(file->io_fstats->rd_timer_name);
-        spio_ltimer_start(file->io_fstats->tot_timer_name);
-        LOG((3, "File has %d unlimited dimensions", file->num_unlim_dimids));
-    }
+        else{
+          /* reset ierr */
+          ierr = PIO_NOERR;
 
+          file->do_io = 0;
+        }
+      }
+      LOG((2, "retry nc_open(%s) : fd = %d, iotype = %d, do_io = %d, ierr = %d",
+           filename, file->fh, file->iotype, file->do_io, ierr));
+#endif /* _NETCDF */
+    } // if(retry)
+  } // if(ios->ioproc)
+
+  /* Broadcast open mode to all tasks. */
+  if((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->ioroot, ios->my_comm))){
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->rd_timer_name);
     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-    return ierr;
+    free(file->io_fstats);
+    free(file);
+    return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+  }
+
+  if(retry){
+    /* Broadcast IO type (might be switched on IO tasks) to all tasks. */
+    if((mpierr = MPI_Bcast(&file->iotype, 1, MPI_INT, ios->ioroot, ios->my_comm))){
+      spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+      spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+      spio_ltimer_stop(file->io_fstats->rd_timer_name);
+      spio_ltimer_stop(file->io_fstats->tot_timer_name);
+      free(file->io_fstats);
+      free(file);
+      return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+    }
+  }
+
+  ierr = check_netcdf(ios, file, ierr, __FILE__, __LINE__);
+  /* If there was an error, free allocated memory and deal with the error. */
+  if(ierr != PIO_NOERR){
+    int tmp_iotype = file->iotype;
+    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+    free(file->io_fstats);
+    free(file);
+    LOG((1, "PIOc_openfile_retry failed, ierr = %d", ierr));
+    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                    "Opening file (%s) with iotype %d (%s) failed. The low level I/O library call failed", filename, tmp_iotype, pio_iotype_to_string(tmp_iotype));;
+  }
+
+  /* Add this file to the list of currently open files. */
+  MPI_Comm comm = MPI_COMM_NULL;
+  if(ios->async){
+    /* For asynchronous I/O service, since file ids are passed across
+     * disjoint comms we need it to be unique across the union comm
+     */
+    comm = ios->union_comm;
+  }
+
+  /* Initialize the multi-variable cache used to cache data for
+   * multiple variables before writing it to the output file
+   * Note: The MVCache is not used by ADIOS or a file opened
+   *       as "read only"
+   */
+  spio_file_mvcache_init(file);
+
+#ifdef _HDF5
+  /* A datatype converter for converting user buffer to a "file type" buffer */
+  file->dt_converter = static_cast<void *>(new SPIO_Util::File_Util::DTConverter());
+#endif
+
+  *ncidp = pio_add_to_file_list(file, comm);
+
+  LOG((2, "Opened file %s file->pio_ncid = %d file->fh = %d ierr = %d",
+       filename, file->pio_ncid, file->fh, ierr));
+
+  /* Set ncid to ADIOS attributes */
+  if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
+#ifdef _ADIOS2
+    for(int i = 0; i < file->num_attrs; i++) { file->adios_attrs[i].att_ncid = *ncidp; }
+#endif
+  }
+
+  /* Check if the file has unlimited dimensions */
+  if(!ios->async || !ios->ioproc){
+    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+    ierr = PIOc_inq_unlimdims_impl(*ncidp, &(file->num_unlim_dimids), NULL);
+    if(ierr != PIO_NOERR){
+      spio_file_mvcache_finalize(file);
+      return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                        "Opening file (%s) failed. Although the file was opened successfully, querying the number of unlimited dimensions in the file failed", filename);
+    }
+
+    if(file->num_unlim_dimids > 0){
+      file->unlim_dimids = (int *)malloc(file->num_unlim_dimids * sizeof(int));
+      if(!file->unlim_dimids){
+        spio_file_mvcache_finalize(file);
+        return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Opening file (%s) failed. Out of memory allocating %lld bytes for caching the unlimited dimension ids", filename, (unsigned long long) (file->num_unlim_dimids * sizeof(int)));
+      }
+      ierr = PIOc_inq_unlimdims_impl(*ncidp, NULL, file->unlim_dimids);
+      if(ierr != PIO_NOERR){
+        spio_file_mvcache_finalize(file);
+        return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                        "Opening file (%s) failed. Although the file was opened successfully, querying the unlimited dimensions in the file failed", filename);
+      }
+    }
+
+    spio_ltimer_start(ios->io_fstats->rd_timer_name);
+    spio_ltimer_start(ios->io_fstats->tot_timer_name);
+    spio_ltimer_start(file->io_fstats->rd_timer_name);
+    spio_ltimer_start(file->io_fstats->tot_timer_name);
+    LOG((3, "File has %d unlimited dimensions", file->num_unlim_dimids));
+  }
+
+  spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+  spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+  spio_ltimer_stop(file->io_fstats->rd_timer_name);
+  spio_ltimer_stop(file->io_fstats->tot_timer_name);
+  return ierr;
 }
 
 /**
