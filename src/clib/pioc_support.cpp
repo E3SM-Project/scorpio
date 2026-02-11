@@ -5031,6 +5031,10 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #endif
 #endif
     }
+    std::string warn_msg = std::string("Opening files with the HDF5 library is currently not supported.") +
+      std::string(" Switching from PIO_IOTYPE_HDF5 to ") +  pio_iotype_to_string(file->iotype) +
+      std::string(" for file, ") + filename;
+    PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, warn_msg.c_str());
   }
 #endif
 
