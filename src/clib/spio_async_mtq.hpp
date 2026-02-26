@@ -7,6 +7,7 @@
 #include <chrono>
 #include <mutex>
 #include <condition_variable>
+#include <stdexcept>
 #include "pio_internal.h"
 
 namespace PIO_Util{
@@ -14,6 +15,27 @@ namespace PIO_Util{
 template<typename T>
 class PIO_mtq{
   public:
+    /* Multi-threaded queue exceptions */
+    class Mtq_exception{
+      public:
+        Mtq_exception(const std::string &msg) : msg_(msg){}
+        std::string what(void ) const { return msg_; }
+      private:
+        std::string msg_;
+    };
+    /* Exception : Signal received on MT queue */
+    class Qsignal_exception : public Mtq_exception{
+      public:
+        Qsignal_exception(const std::string &msg) : Mtq_exception(msg){}
+    };
+    /* Exception : Queue is empty
+     * e.g. After a signal was received, queue is empty
+     */
+    class Qempty_exception : public Mtq_exception{
+      public:
+        Qempty_exception(const std::string &msg) : Mtq_exception(msg){}
+    };
+
     typedef enum SigTypes{
       PIO_MTQ_SIG_INVALID=1,
       /* Stop processing elements in the queue */
@@ -24,6 +46,7 @@ class PIO_mtq{
     PIO_mtq();
     void enqueue(const T& val);
     int dequeue(T &val);
+    T dequeue(void );
     void signal(SigTypes_t sig);
     int size(void );
 
@@ -99,6 +122,60 @@ int PIO_mtq<T>::dequeue(T &val)
   LOG((2, "PIO_mtq:dequeue: Successfully dequeued val from mtq"));
   lk.unlock();
   return 0;
+}
+
+template<typename T>
+T PIO_mtq<T>::dequeue(void )
+{
+  std::unique_lock<std::mutex> lk(mtx_);
+  do{
+    LOG((2, "PIO_mtq:dequeue: Waiting for dequeueing val from mtq..."));
+    while(queue_.empty() && (sig_ == PIO_MTQ_SIG_INVALID)){
+      cv_.wait(lk, [this]{ return (queue_.empty() && (sig_ == PIO_MTQ_SIG_INVALID));});
+      /*
+      cv_.wait_for(lk, DEFAULT_TIMEOUT,
+              [this]{ return (queue_.empty() && (sig_ == PIO_MTQ_SIG_INVALID));});
+      */
+      /* At least on Linux (Ubuntu 4.5.0-040500-generic) just waiting on the condition
+       * variable (with/without timeouts) does not allow other threads to acquire
+       * the lock. So we explicitly unlock, sleep for 0 seconds and reacquire the
+       * lock to allow other threads to be able to get scheduled and acquire the lock
+       */
+      thread_yield(lk);
+    }
+    if(sig_ == PIO_MTQ_SIG_STOP){
+      LOG((2, "PIO_mtq:dequeue: Received STOP signal on mtq (exiting...)"));
+      throw Qsignal_exception("Received STOP signal on multi-threaded queue");
+    }
+    else if(sig_ == PIO_MTQ_SIG_COMPLETE){
+      if(queue_.empty()){
+        /* Reset signal */
+        sig_ = PIO_MTQ_SIG_INVALID;
+        lk.unlock();
+        /* Notify threads that all async ops are complete */
+        cv_sig_.notify_all();
+        lk.lock();
+      }
+      else{
+        break;
+      }
+    }
+    else{
+      break;
+    }
+  }while(true);
+
+  if(!queue_.empty()){
+    T val = queue_.front();
+    queue_.pop();
+    LOG((2, "PIO_mtq:dequeue: Successfully dequeued val from mtq"));
+    lk.unlock();
+    return val;
+  }
+  else{
+    lk.unlock();
+    throw Qempty_exception("Multi-threaded queue is empty");
+  }
 }
 
 template<typename T>
