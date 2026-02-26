@@ -20,18 +20,15 @@ extern "C"{
 #endif /* PIO_ENABLE_LOGGING */
 #include <pio.h>
 } // extern "C"
-#if PIO_USE_ASYNC_WR_THREAD
-#include "spio_async_tpool_cint.h"
-#endif
 #include "pio_timer.h"
 #include <pio_internal.h>
+#include "spio_async_op.hpp"
 #include "spio_async_utils.hpp"
 #include "spio_async_tpool.hpp"
 #include "spio_file_mvcache.h"
 #include "spio_dbg_utils.hpp"
 #include "spio_dt_converter.hpp"
 #include "spio_hdf5_utils.hpp"
-#include "spio_async_tpool_cint.h"
 
 struct Hdf5_create_info{
   file_desc_t *file;
@@ -163,28 +160,22 @@ int spio_iosys_async_hdf5_create_op_add(file_desc_t *file, const char *filename)
   Hdf5_create_info *cinfo = new Hdf5_create_info{file, filename};
 
   /* Create async task */
-  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
-  if(pnew == NULL){
-    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Queuing asynchronous op/task for creating file (%s) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for async task internal struct", filename, static_cast<long long int>(sizeof(pio_async_op_t)));
-  }
-
-  pnew->op_type = PIO_ASYNC_HDF5_CREATE_OP;
-  pnew->pdata = static_cast<void *>(cinfo);
-  pnew->wait = spio_iosys_async_op_hdf5_create;
-  pnew->poke = pio_async_poke_func_unavail;
-  pnew->free = spio_iosys_async_op_hdf5_create_free;
+  SPIO_Util::Async_op op = {SPIO_Util::Async_op::Op_type::SPIO_ASYNC_HDF5_CREATE_OP,
+                            static_cast<void *>(cinfo),
+                            spio_iosys_async_op_hdf5_create,
+                            pio_async_poke_func_unavail,
+                            spio_iosys_async_op_hdf5_create_free};
 
   /* One more pending op using this iodesc & file */
   file->npend_ops++;
   SPIO_Util::GVars::npend_hdf5_async_ops++;
 
   /* Get the mt queue and queue the async task */
-  ret = pio_async_tpool_op_add(pnew);
+  ret = pio_async_tpool_op_add(op);
   if(ret != PIO_NOERR){
     LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                    "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", ios->iosysid);
+                    "Internal error while adding asynchronous pending operation (to create file = %s) to the thread pool (iosystem = %d). Adding the asynchronous operation failed", filename, ios->iosysid);
   }
 
   return PIO_NOERR;
@@ -232,28 +223,22 @@ int spio_iosys_async_hdf5_def_var_op_add(file_desc_t *file, const char *name,
                                   {dimidsp, dimidsp + ndims}, varid};
 
   /* Create async task */
-  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
-  if(pnew == NULL){
-    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Queuing asynchronous op/task for defining variable (%s, file=%s) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for async task internal struct", name, pio_get_fname_from_file(file), static_cast<long long int>(sizeof(pio_async_op_t)));
-  }
-
-  pnew->op_type = PIO_ASYNC_HDF5_DEF_VAR_OP;
-  pnew->pdata = static_cast<void *>(def_var_info);
-  pnew->wait = spio_iosys_async_op_hdf5_def_var;
-  pnew->poke = pio_async_poke_func_unavail;
-  pnew->free = spio_iosys_async_op_hdf5_def_var_free;
+  SPIO_Util::Async_op op = {SPIO_Util::Async_op::Op_type::SPIO_ASYNC_HDF5_DEF_VAR_OP,
+                            static_cast<void *>(def_var_info),
+                            spio_iosys_async_op_hdf5_def_var,
+                            pio_async_poke_func_unavail,
+                            spio_iosys_async_op_hdf5_def_var_free};
 
   /* One more pending op using this iodesc & file */
   file->npend_ops++;
   SPIO_Util::GVars::npend_hdf5_async_ops++;
 
   /* Get the mt queue and queue the async task */
-  ret = pio_async_tpool_op_add(pnew);
+  ret = pio_async_tpool_op_add(op);
   if(ret != PIO_NOERR){
     LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                    "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", ios->iosysid);
+                    "Internal error while adding asynchronous pending operation (to define var = %s, in file = %s) to the thread pool (iosystem = %d). Adding the asynchronous operation failed", name, pio_get_fname_from_file(file), ios->iosysid);
   }
 
   return PIO_NOERR;
@@ -313,28 +298,22 @@ int spio_iosys_async_hdf5_put_att_op_add(file_desc_t *file, int varid,
   Hdf5_put_att_info *info = new Hdf5_put_att_info{file, varid, aname, atype, alen, buf};
 
   /* Create async task */
-  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
-  if(pnew == NULL){
-    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Queuing asynchronous op/task for writing attribute (%s, variable=%s, file=%s) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for async task internal struct", aname, pio_get_vname_from_file(file, varid), pio_get_fname_from_file(file), static_cast<long long int>(sizeof(pio_async_op_t)));
-  }
-
-  pnew->op_type = PIO_ASYNC_HDF5_PUT_ATT_OP;
-  pnew->pdata = static_cast<void *>(info);
-  pnew->wait = spio_iosys_async_op_hdf5_put_att;
-  pnew->poke = pio_async_poke_func_unavail;
-  pnew->free = spio_iosys_async_op_hdf5_put_att_free;
+  SPIO_Util::Async_op op = {SPIO_Util::Async_op::Op_type::SPIO_ASYNC_HDF5_PUT_ATT_OP,
+                            static_cast<void *>(info),
+                            spio_iosys_async_op_hdf5_put_att,
+                            pio_async_poke_func_unavail,
+                            spio_iosys_async_op_hdf5_put_att_free};
 
   /* One more pending op using this iodesc & file */
   file->npend_ops++;
   SPIO_Util::GVars::npend_hdf5_async_ops++;
 
   /* Get the mt queue and queue the async task */
-  ret = pio_async_tpool_op_add(pnew);
+  ret = pio_async_tpool_op_add(op);
   if(ret != PIO_NOERR){
     LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                    "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", ios->iosysid);
+                    "Internal error while adding asynchronous pending operation (to define attribute = %s, for var = %s in file = %s) to the thread pool (iosystem = %d). Adding the asynchronous operation failed", aname, pio_get_vname_from_file(file, varid), pio_get_fname_from_file(file), ios->iosysid);
   }
 
   return PIO_NOERR;
@@ -378,28 +357,22 @@ int spio_iosys_async_hdf5_enddef_op_add(file_desc_t *file)
   Hdf5_enddef_info *info = new Hdf5_enddef_info{file};
 
   /* Create async task */
-  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
-  if(pnew == NULL){
-    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Queuing asynchronous op/task for ending define mode of file (%s) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for async task internal struct", pio_get_fname_from_file(file), static_cast<long long int>(sizeof(pio_async_op_t)));
-  }
-
-  pnew->op_type = PIO_ASYNC_HDF5_ENDDEF_OP;
-  pnew->pdata = static_cast<void *>(info);
-  pnew->wait = spio_iosys_async_op_hdf5_enddef;
-  pnew->poke = pio_async_poke_func_unavail;
-  pnew->free = spio_iosys_async_op_hdf5_enddef_free;
+  SPIO_Util::Async_op op = {SPIO_Util::Async_op::Op_type::SPIO_ASYNC_HDF5_ENDDEF_OP,
+                            static_cast<void *>(info),
+                            spio_iosys_async_op_hdf5_enddef,
+                            pio_async_poke_func_unavail,
+                            spio_iosys_async_op_hdf5_enddef_free};
 
   /* One more pending op using this file */
   file->npend_ops++;
   SPIO_Util::GVars::npend_hdf5_async_ops++;
 
   /* Get the mt queue and queue the async task */
-  ret = pio_async_tpool_op_add(pnew);
+  ret = pio_async_tpool_op_add(op);
   if(ret != PIO_NOERR){
     LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                    "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", ios->iosysid);
+                    "Internal error while adding asynchronous pending operation (to end define mode in file = %s) to the thread pool (iosystem = %d). Adding the asynchronous operation failed", pio_get_fname_from_file(file), ios->iosysid);
   }
 
   return PIO_NOERR;
@@ -480,28 +453,22 @@ int spio_iosys_async_hdf5_put_var_op_add(file_desc_t *file, int varid,
                                   xtype, vbuf_sz, buf};
 
   /* Create async task */
-  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
-  if(pnew == NULL){
-    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Queuing asynchronous op/task for writing variable(%s, varid=%d, file=%s) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for async internal struct", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), static_cast<long long int>(sizeof(pio_async_op_t)));
-  }
-
-  pnew->op_type = PIO_ASYNC_HDF5_PUT_VAR_OP;
-  pnew->pdata = static_cast<void *>(info);
-  pnew->wait = spio_iosys_async_op_hdf5_put_var;
-  pnew->poke = pio_async_poke_func_unavail;
-  pnew->free = spio_iosys_async_op_hdf5_put_var_free;
+  SPIO_Util::Async_op op = {SPIO_Util::Async_op::Op_type::SPIO_ASYNC_HDF5_PUT_VAR_OP,
+                            static_cast<void *>(info),
+                            spio_iosys_async_op_hdf5_put_var,
+                            pio_async_poke_func_unavail,
+                            spio_iosys_async_op_hdf5_put_var_free};
 
   /* One more pending op using this file */
   file->npend_ops++;
   SPIO_Util::GVars::npend_hdf5_async_ops++;
 
   /* Get the mt queue and queue the async task */
-  ret = pio_async_tpool_op_add(pnew);
+  ret = pio_async_tpool_op_add(op);
   if(ret != PIO_NOERR){
     LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                    "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", ios->iosysid);
+                    "Internal error while adding asynchronous pending operation (to write/put var = %s in file = %s) to the thread pool (iosystem = %d). Adding the asynchronous operation failed", pio_get_vname_from_file(file, varid), pio_get_fname_from_file(file), ios->iosysid);
   }
 
   return PIO_NOERR;
@@ -545,28 +512,22 @@ int spio_iosys_async_hdf5_set_frame_op_add(file_desc_t *file, int varid, int fra
   Hdf5_set_frame_info *info = new Hdf5_set_frame_info{file, varid, frame};
 
   /* Create async task */
-  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
-  if(pnew == NULL){
-    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Queuing asynchronous op/task for setting frame for variable (%s, file=%s) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for async task internal struct", pio_get_vname_from_file(file, varid), pio_get_fname_from_file(file), static_cast<long long int>(sizeof(pio_async_op_t)));
-  }
-
-  pnew->op_type = PIO_ASYNC_HDF5_SET_FRAME_OP;
-  pnew->pdata = static_cast<void *>(info);
-  pnew->wait = spio_iosys_async_op_hdf5_set_frame;
-  pnew->poke = pio_async_poke_func_unavail;
-  pnew->free = spio_iosys_async_op_hdf5_set_frame_free;
+  SPIO_Util::Async_op op = {SPIO_Util::Async_op::Op_type::SPIO_ASYNC_HDF5_SET_FRAME_OP,
+                            static_cast<void *>(info),
+                            spio_iosys_async_op_hdf5_set_frame,
+                            pio_async_poke_func_unavail,
+                            spio_iosys_async_op_hdf5_set_frame_free};
 
   /* One more pending op using this iodesc & file */
   file->npend_ops++;
   SPIO_Util::GVars::npend_hdf5_async_ops++;
 
   /* Get the mt queue and queue the async task */
-  ret = pio_async_tpool_op_add(pnew);
+  ret = pio_async_tpool_op_add(op);
   if(ret != PIO_NOERR){
     LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                    "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", ios->iosysid);
+                    "Internal error while adding asynchronous pending operation (to set frame to %d for variable = %s in file = %s) to the thread pool (iosystem = %d). Adding the asynchronous operation failed", frame, pio_get_vname_from_file(file, varid), pio_get_fname_from_file(file), ios->iosysid);
   }
 
   return PIO_NOERR;
@@ -905,17 +866,11 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
   }
 
   /* Create async task */
-  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
-  if(pnew == NULL){
-    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Queuing asynchronous op/task for writing fillvalue for variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for async task internal struct", nvars, pio_get_fname_from_file(file), file->pio_ncid, static_cast<long long int>(sizeof(pio_async_op_t)));
-  }
-
-  pnew->op_type = PIO_ASYNC_HDF5_WRITE_OP;
-  pnew->pdata = static_cast<void *>(wcache);
-  pnew->wait = pio_iosys_async_op_hdf5_write;
-  pnew->poke = pio_async_poke_func_unavail;
-  pnew->free = pio_iosys_async_op_hdf5_write_free;
+  SPIO_Util::Async_op op = {SPIO_Util::Async_op::Op_type::SPIO_ASYNC_HDF5_WRITE_OP,
+                            static_cast<void *>(wcache),
+                            pio_iosys_async_op_hdf5_write,
+                            pio_async_poke_func_unavail,
+                            pio_iosys_async_op_hdf5_write_free};
 
   /* One more pending op using this iodesc & file */
   iodesc->nasync_pend_ops++;
@@ -923,11 +878,11 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
   SPIO_Util::GVars::npend_hdf5_async_ops++;
 
   /* Get the mt queue and queue the async task */
-  ret = pio_async_tpool_op_add(pnew);
+  ret = pio_async_tpool_op_add(op);
   if(ret != PIO_NOERR){
     LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                    "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Adding the asynchronous operation failed", ios->iosysid);
+                    "Internal error while adding asynchronous pending operation (to write %d variables in file = %s) to the thread pool (iosystem = %d). Adding the asynchronous operation failed", nvars, pio_get_fname_from_file(file), ios->iosysid);
   }
 
   return PIO_NOERR;

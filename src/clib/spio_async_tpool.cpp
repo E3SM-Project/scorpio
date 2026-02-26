@@ -9,24 +9,20 @@ extern "C"{
 #include "spio_async_mtq.hpp"
 #include "spio_async_tpool.hpp"
 #include "pio_internal.h"
-extern "C"{
-#include "spio_async_tpool_cint.h"
-} // extern "C"
 
 int pio_async_init_cnt = 0;
 PIO_Util::PIO_async_tpool *PIO_Util::PIO_async_tpool_manager::tpool_ = NULL;
 static PIO_Util::PIO_async_tpool_manager tpool_mgr;
 
-void PIO_Util::PIO_async_tpool::enqueue(pio_async_op_t *op)
+void PIO_Util::PIO_async_tpool::enqueue(const SPIO_Util::Async_op &op)
 {
-  assert(op);
-  LOG((2, "PIO_async_tpool:enqueue: Enqueing async op, kind = %s", pio_async_op_type_to_string(op->op_type).c_str()));
+  LOG((2, "PIO_async_tpool:enqueue: Enqueing async op, kind = %s", SPIO_Util::Async_op::op_type_to_string(op.type()).c_str()));
   mtq_.enqueue(op);
 }
 
 void PIO_Util::PIO_async_tpool::finalize(void )
 {
-  mtq_.signal(PIO_Util::PIO_mtq<pio_async_op_t *>::PIO_MTQ_SIG_COMPLETE);
+  mtq_.signal(PIO_Util::PIO_mtq<SPIO_Util::Async_op>::PIO_MTQ_SIG_COMPLETE);
 }
 
 std::vector<std::size_t> PIO_Util::PIO_async_tpool::get_thread_ids(void ) const
@@ -51,7 +47,7 @@ PIO_Util::PIO_async_tpool::PIO_async_tpool(int nthreads)
 PIO_Util::PIO_async_tpool::~PIO_async_tpool()
 {
   LOG((2, "PIO_async_tpool:~PIO_async_tpool: Sending STOP signal"));
-  mtq_.signal(PIO_Util::PIO_mtq<pio_async_op_t *>::PIO_MTQ_SIG_STOP);
+  mtq_.signal(PIO_Util::PIO_mtq<SPIO_Util::Async_op>::PIO_MTQ_SIG_STOP);
   for(std::vector<std::thread>::iterator iter = pool_threads_.begin();
       iter != pool_threads_.end(); ++iter){
     if(iter->joinable()){
@@ -63,36 +59,29 @@ PIO_Util::PIO_async_tpool::~PIO_async_tpool()
 int PIO_Util::PIO_async_tpool::dequeue_and_process(
   PIO_Util::PIO_async_tpool *tpool)
 {
-  int ret = 0;
+  int ret = PIO_NOERR;
   assert(tpool);
   /* Wait in an infinite loop (until the threads receive a signal) for 
    * pending asynchronous operations queued in the thread pool
    */
-  do{
+  while(true){
     LOG((2, "PIO_async_tpool:dequeue_and_process: Waiting for async ops..."));
-    pio_async_op_t *op = NULL;
-    ret = tpool->mtq_.dequeue(op);
-    if(ret == 0){
-      LOG((2, " Tpool processing async op, kind = %s", pio_async_op_type_to_string(op->op_type).c_str()));
-      /* We currently support only file write ops here */
-      //assert(op->op_type == PIO_ASYNC_FILE_WRITE_OPS);
-      assert((op->op_type == PIO_ASYNC_HDF5_CREATE_OP) ||
-              (op->op_type == PIO_ASYNC_HDF5_DEF_VAR_OP) ||
-              (op->op_type == PIO_ASYNC_HDF5_PUT_ATT_OP) ||
-              (op->op_type == PIO_ASYNC_HDF5_ENDDEF_OP) ||
-              (op->op_type == PIO_ASYNC_HDF5_SET_FRAME_OP) ||
-              (op->op_type == PIO_ASYNC_HDF5_PUT_VAR_OP) ||
-              (op->op_type == PIO_ASYNC_HDF5_WRITE_OP) ||
-              (op->op_type == PIO_ASYNC_FILE_CLOSE_OP));
-      ret = op->wait(op->pdata);
+
+    try{
+      SPIO_Util::Async_op op = tpool->mtq_.dequeue();
+      ret = op.wait();
       if(ret != PIO_NOERR){
         return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
-                        "Internal error dequeuing and processing asynchronous operations in the thread pool. Internal error waiting on asynchronous file write operation");
+                        "Internal error dequeuing and processing asynchronous operation (%s) in the thread pool. Internal error waiting on asynchronous file write operation",
+                        SPIO_Util::Async_op::op_type_to_string(op.type()).c_str());
       }
-      op->free(op->pdata);
-      free(op);
+      op.free();
+    }catch(const PIO_Util::PIO_mtq<SPIO_Util::Async_op>::Mtq_exception &e){
+      /* MTQ exceptions are for MTQ signal handling, stop waiting on the queue */
+      LOG((1, "MTQ exception : %s", e.what().c_str()));
+      break;
     }
-  } while(ret == 0);
+  }
 
   return PIO_NOERR;
 }
@@ -138,7 +127,7 @@ int pio_async_tpool_create(void )
   return PIO_NOERR;
 }
 
-int pio_async_tpool_op_add(pio_async_op_t *op)
+int pio_async_tpool_op_add(const SPIO_Util::Async_op &op)
 {
   PIO_Util::PIO_async_tpool *tpool = tpool_mgr.get_tpool_instance();
   assert(tpool);

@@ -468,47 +468,41 @@ int pio_swapm(const void *sendbuf, const int *sendcounts, const int *sdispls, co
 /**
  * Non-blocking wait on swapm request
  * @param p User swapm request (the request passed to pio_swapm() call)
- * @param flag Pointer to a flag that holds the status of the user request.
- * The flag is 0 if the request is pending and 1 if the request is completed
+ * @param flag bool that holds the status of the user request.
+ * The flag is false if some requests are pending and true if all the requests are completed
  * @returns PIO_NOERR on success, a pio error code otherwise
  * - Similar to MPI_Testall(), makes progress on all requests
  */
-int pio_swapm_iwait(void *p, int *flag)
+int pio_swapm_iwait(void *p, bool &flag)
 {
-    pio_swapm_req *ureq = (pio_swapm_req *)p;
-    int mpierr;
+  pio_swapm_req *ureq = (pio_swapm_req *)p;
+  int status = 0;
+  int mpierr;
 
-    assert((ureq != NULL) && (flag != NULL));
-    *flag = 1;
-    if(ureq->nrcvids != 0)
-    {
-        mpierr = MPI_Testall(ureq->nrcvids, ureq->rcvids, flag, MPI_STATUSES_IGNORE);
-        if(mpierr != MPI_SUCCESS)
-        {
-            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-        }
+  assert(ureq != NULL);
+  if(ureq->nrcvids != 0){
+    mpierr = MPI_Testall(ureq->nrcvids, ureq->rcvids, &status, MPI_STATUSES_IGNORE);
+    if(mpierr != MPI_SUCCESS){ return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
 
-        if(*flag == 1)
-        {
-            free(ureq->rcvids);
-            ureq->nrcvids = 0;
-        }
+    /* status == 1 (true), implies that all the request have completed */
+    if(status == 1){
+      free(ureq->rcvids);
+      ureq->nrcvids = 0;
     }
-    if(ureq->nsndids != 0)
-    {
-        mpierr = MPI_Testall(ureq->nsndids, ureq->sndids, flag, MPI_STATUSES_IGNORE);
-        if(mpierr != MPI_SUCCESS)
-        {
-            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-        }
+  }
+  if(ureq->nsndids != 0){
+    mpierr = MPI_Testall(ureq->nsndids, ureq->sndids, &status, MPI_STATUSES_IGNORE);
+    if(mpierr != MPI_SUCCESS){ return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
 
-        if(*flag == 1)
-        {
-            free(ureq->sndids);
-            ureq->nsndids = 0;
-        }
+    /* status == 1 (true), implies that all the request have completed */
+    if(status == 1){
+      free(ureq->sndids);
+      ureq->nsndids = 0;
     }
-    return PIO_NOERR;
+  }
+
+  flag = (status == 1);
+  return PIO_NOERR;
 }
 
 /**

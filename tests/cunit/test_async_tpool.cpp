@@ -3,6 +3,7 @@
 #include <chrono>
 #include <algorithm>
 #include <cassert>
+#include "spio_async_op.hpp"
 #include "spio_async_mtq.hpp"
 #include "spio_async_tpool.hpp"
 extern "C"{
@@ -47,7 +48,7 @@ int pio_utype_wait(void *pdata)
   return PIO_NOERR;
 }
 
-int pio_poke_func_unavail(void *pdata, int *)
+int pio_poke_func_unavail(void *pdata, bool &flag)
 {
   assert(0);
   return PIO_NOERR;
@@ -66,13 +67,10 @@ int tpool_enq_putype(int wrank, const int max_elems_in_q, std::vector<UType> &ud
     PIO_Util::PIO_async_tpool *tpool = tpool_mgr.get_tpool_instance();
 
     for(int i=0; i<max_elems_in_q; i++){
-      pio_async_op_t *op = (pio_async_op_t *)calloc(1, sizeof(pio_async_op_t));
       /* Only file write ops are supported */
-      op->op_type = PIO_ASYNC_FILE_WRITE_OPS;
-      op->pdata = &(udata[i]);
-      op->wait = pio_utype_wait;
-      op->poke = pio_poke_func_unavail;
-      op->free = pio_noop_free;
+      SPIO_Util::Async_op op = {SPIO_Util::Async_op::Op_type::SPIO_ASYNC_FILE_WRITE_OPS,
+                                static_cast<void *>(&(udata[i])),
+                                pio_utype_wait, pio_poke_func_unavail, pio_noop_free};
       tpool->enqueue(op);
     }
 
