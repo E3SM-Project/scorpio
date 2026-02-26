@@ -4,18 +4,16 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include "spio_async_op.hpp"
 #include "spio_async_mtq.hpp"
 #include "spio_async_utils.hpp"
 #include "pio_internal.h"
-extern "C"{
-#include "spio_async_tpool_cint.h"
-} // extern "C"
 
 namespace PIO_Util{
 
 class PIO_async_tpool{
   public:
-    void enqueue(pio_async_op_t *op);
+    void enqueue(const SPIO_Util::Async_op &op);
     void finalize(void );
     std::vector<std::size_t> get_thread_ids(void ) const;
   private:
@@ -23,7 +21,7 @@ class PIO_async_tpool{
     PIO_async_tpool(int nthreads);
     ~PIO_async_tpool();
     static int dequeue_and_process(PIO_async_tpool *tpool);
-    PIO_Util::PIO_mtq<pio_async_op_t *> mtq_;
+    PIO_Util::PIO_mtq<SPIO_Util::Async_op> mtq_;
     std::vector<std::thread> pool_threads_;
 };
 
@@ -36,5 +34,11 @@ class PIO_async_tpool_manager{
 };
 
 } // namespace PIO_Util
+
+/* FIXME: Move it inside the SPIO_Util namespace */
+int pio_async_tpool_create(void );
+int pio_async_tpool_op_add(const SPIO_Util::Async_op &op);
+int pio_async_tpool_ops_wait(void );
+int pio_async_tpool_finalize(void );
 
 #endif // _SPIO_ASYNC_TPOOL_HPP_

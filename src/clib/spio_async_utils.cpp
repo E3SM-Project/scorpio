@@ -8,6 +8,7 @@
 #include <string>
 #include <numeric>
 #include <functional>
+#include <algorithm>
 
 extern "C"{
 
@@ -20,37 +21,15 @@ extern "C"{
 #endif /* PIO_ENABLE_LOGGING */
 #include <pio.h>
 } // extern "C"
-#if PIO_USE_ASYNC_WR_THREAD
-#include "spio_async_tpool_cint.h"
-#endif
 #include "pio_timer.h"
 #include <pio_internal.h>
+#include "spio_async_op.hpp"
 #include "spio_async_utils.hpp"
 #include "spio_async_tpool.hpp"
 #include "spio_file_mvcache.h"
 #include "spio_dbg_utils.hpp"
 #include "spio_dt_converter.hpp"
 #include "spio_hdf5_utils.hpp"
-#include "spio_async_tpool_cint.h"
-
-std::string pio_async_op_type_to_string(pio_async_op_type_t op)
-{
-  switch(op){
-    case PIO_ASYNC_INVALID_OP: return "PIO_ASYNC_INVALID_OP";
-    case PIO_ASYNC_REARR_OP:  return "PIO_ASYNC_REARR_OP";
-    case PIO_ASYNC_PNETCDF_WRITE_OP: return "PIO_ASYNC_PNETCDF_WRITE_OP";
-    case PIO_ASYNC_HDF5_CREATE_OP: return "PIO_ASYNC_HDF5_CREATE_OP";
-    case PIO_ASYNC_HDF5_DEF_VAR_OP: return "PIO_ASYNC_HDF5_DEF_VAR_OP";
-    case PIO_ASYNC_HDF5_PUT_ATT_OP: return "PIO_ASYNC_HDF5_PUT_ATT_OP";
-    case PIO_ASYNC_HDF5_ENDDEF_OP: return "PIO_ASYNC_HDF5_ENDDEF_OP";
-    case PIO_ASYNC_HDF5_SET_FRAME_OP: return "PIO_ASYNC_HDF5_SET_FRAME_OP";
-    case PIO_ASYNC_HDF5_PUT_VAR_OP: return "PIO_ASYNC_HDF5_PUT_VAR_OP";
-    case PIO_ASYNC_HDF5_WRITE_OP: return "PIO_ASYNC_HDF5_WRITE_OP";
-    case PIO_ASYNC_FILE_WRITE_OPS: return "PIO_ASYNC_FILE_WRITE_OPS";
-    case PIO_ASYNC_FILE_CLOSE_OP: return "PIO_ASYNC_FILE_CLOSE_OP";
-    default : return "UNKNOWN";
-  }
-}
 
 /* Use this function for op kinds with no wait functions
  * We use it to indicate,
@@ -69,7 +48,7 @@ int pio_async_wait_func_unavail(void *pdata)
  *pio_iosys_async_op_hdf5_write so any generic code that uses the poke function must
  * check the existence of this function before using it
  */
-int pio_async_poke_func_unavail(void *pdata, int *flag)
+int pio_async_poke_func_unavail(void *pdata, bool &flag)
 {
   assert(0);
 }
@@ -85,28 +64,22 @@ int pio_file_async_pend_ops_wait(file_desc_t *file)
   int ret;
   assert(file != NULL);
 
-  if(file->nasync_pend_ops == 0){
-    return PIO_NOERR;
-  }
+  while(!file->async_pend_ops.empty()){
+    SPIO_Util::Async_op op = file->async_pend_ops.front();
+    LOG((2, "Waiting on async op, kind = %s", SPIO_Util::Async_op::op_type_to_string(op.type()).c_str()));
 
-  pio_async_op_t *p = file->async_pend_ops, *q=NULL;
-  while(p){
-    LOG((2, "Waiting on async op, kind = %s",
-        (p->op_type == PIO_ASYNC_REARR_OP) ? "PIO_ASYNC_REARR_OP" :
-        ((p->op_type == PIO_ASYNC_PNETCDF_WRITE_OP) ? "PIO_ASYNC_PNETCDF_WRITE_OP" :
-        "UNKNOWN")));
-    ret = p->wait(p->pdata);
+    ret = op.wait();
     if(ret != PIO_NOERR){
       return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
-                      "Error waiting for pending asynchronous operation on file, %s (ncid = %d)", pio_get_fname_from_file(file), file->pio_ncid);
+                      "Error waiting for pending asynchronous operation (%s) on file, %s (ncid = %d)",
+                      SPIO_Util::Async_op::op_type_to_string(op.type()).c_str(),
+                      pio_get_fname_from_file(file), file->pio_ncid);
     }
-    q = p;
-    p = p->next;
-    q->free(q->pdata);
-    free(q);
+
+    op.free();
+
+    file->async_pend_ops.pop_front();
   }
-  file->async_pend_ops = NULL;
-  file->nasync_pend_ops = 0;
 
   return PIO_NOERR;
 }
@@ -308,122 +281,85 @@ int pio_async_pnetcdf_write_kwait(void *f)
   assert(file);
   assert(file->iotype == PIO_IOTYPE_PNETCDF);
 
+  if(file->async_pend_ops.empty()) { return PIO_NOERR; }
+
   /* Gather up all requests corresponding to all vdescs associated
    * with the pending async ops
    * Also delete these async ops from the list since we wait for 
    * the requests associated with the ops here
    * */
-  if(file->nasync_pend_ops > 0){
-    int nreqs = 0;
-    int *reqs = (int *)malloc(file->nasync_pend_ops * sizeof(int));
-    if(!reqs){
-      return pio_err(file->iosystem, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Error while waiting for asynchronous writes to complete for the PIO_IOTYPE_PNETCDF I/O type on file (%s, ncid=%d). Unable to allocate %lld bytes to consolidate requests associated with pending asynchronous operations on the file", pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long) (file->nasync_pend_ops * sizeof(int)));
+  std::vector<int> reqs;
+  std::vector<var_desc_t *> vdescs;
+  std::vector<viobuf_cache_t *> viobufs;
+
+  for(std::deque<SPIO_Util::Async_op>::iterator iter = file->async_pend_ops.begin(); iter != file->async_pend_ops.end();){
+    SPIO_Util::Async_op op = *iter;
+    /* Only process PnetCDF write ops */
+    if(op.type() == SPIO_Util::Async_op::Op_type::SPIO_ASYNC_PNETCDF_WRITE_OP){
+      viobuf_cache_t *pviobuf = static_cast<viobuf_cache_t *>(op.data());
+      assert(pviobuf);
+
+      reqs.push_back(pviobuf->req);
+      viobufs.push_back(pviobuf);
+      vdescs.push_back(pviobuf->vdesc);
+
+      iter = file->async_pend_ops.erase(iter);
     }
-    int nvdescs = 0;
-    var_desc_t **vdescs = (var_desc_t **)malloc(file->nasync_pend_ops * sizeof(var_desc_t *));
-    if(!vdescs){
-      return pio_err(file->iosystem, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Error while waiting for asynchronous writes to complete for the PIO_IOTYPE_PNETCDF I/O type on file (%s, ncid=%d). Unable to allocate %lld bytes to keep track of variable descriptors associated with pending asynchronous operations on the file", pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long) (file->nasync_pend_ops * sizeof(var_desc_t *)));
+    else{
+      ++iter;
     }
+  }
 
-    viobuf_cache_t **viobufs = (viobuf_cache_t **) malloc(file->nasync_pend_ops * sizeof(viobuf_cache_t *));
-    if(!viobufs){
-      return pio_err(file->iosystem, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Error while waiting for asynchronous writes to complete for the PIO_IOTYPE_PNETCDF I/O type on file (%s, ncid=%d). Unable to allocate %lld bytes to keep track of buffered data associated with pending asynchronous operations on the file", pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long) (file->nasync_pend_ops * sizeof(viobuf_cache_t *)));
-    }
-    
-    pio_async_op_t *p = file->async_pend_ops, *q=NULL;
-    pio_async_op_t *prev = file->async_pend_ops;
-    while(p){
-      if(p->op_type == PIO_ASYNC_PNETCDF_WRITE_OP){
-        viobuf_cache_t *pviobuf = (viobuf_cache_t *)(p->pdata);
-        assert(pviobuf);
+  if(reqs.empty()) { return PIO_NOERR; }
 
-        reqs[nreqs] = pviobuf->req;
-        viobufs[nreqs] = pviobuf;
-        nreqs++;
-
-        vdescs[nvdescs] = pviobuf->vdesc;
-        nvdescs++;
-
-        q = p->next;
-        /* Free node */
-        free(p);
-        /* p == file->async_pend_ops => First node */
-        if(p == file->async_pend_ops){
-          /* Update head and prev */
-          file->async_pend_ops = q;
-          prev = q;
-        }
-        else{
-          /* Skip node p, already deleted */
-          prev->next = q;
-        }
-        p = q;
-      }
-      else{
-        /* Ignore op kinds/types that are not pnetcdf writes */
-        prev = p;
-        p = p->next;
-      }
-    }
-
-    /* We don't expect any other pending operations when writes are
-     * pending on this file
-     * This was a constraint that was introduced by resuing a
-     * single file buffer, file->iobuf, for rearrange and write.
-     * So a write needed to complete before a rearrange occurs.
-     * FIXME: Since this is no longer a constraint for async writes
-     * investigate on how to relax the constraint
-     */ 
-    assert(nreqs <= file->nasync_pend_ops);
-    LOG((2, "pio_async_pnetcdf_write_kwait(): nreqs= %d, file->nasync_pend_ops= %d\n",
-              nreqs, file->nasync_pend_ops));
+  /* We don't expect any other pending operations when writes are
+   * pending on this file
+   * This was a constraint that was introduced by resuing a
+   * single file buffer, file->iobuf, for rearrange and write.
+   * So a write needed to complete before a rearrange occurs.
+   * FIXME: Since this is no longer a constraint for async writes
+   * investigate on how to relax the constraint
+   */
+  assert(reqs.size() <= file->async_pend_ops.size());
+  LOG((2, "pio_async_pnetcdf_write_kwait(): nreqs= %d, file->nasync_pend_ops= %d\n",
+            reqs.size(), file->async_pend_ops.size()));
 
 #ifdef PIO_MICRO_TIMING
-    pio_async_pnetcdf_wr_timer_info_t wr_info;
-    ret = pio_async_pnetcdf_setup_wr_timers(file, vdescs, nvdescs, &wr_info);
-    if(ret != PIO_NOERR){
-      LOG((1, "Initializing var write timers failed"));
-      return ret;
-    }
+  pio_async_pnetcdf_wr_timer_info_t wr_info;
+  ret = pio_async_pnetcdf_setup_wr_timers(file, vdescs.data(), vdescs.size(), &wr_info);
+  if(ret != PIO_NOERR){
+    LOG((1, "Initializing var write timers failed"));
+    return ret;
+  }
 #endif
 
-    /* Wait on all requests in one call */
-    /* We don't care about the status of each request, we
-     * only care whether wait succeeded or not 
-     * Requires pnetcdf ver >= 1.7.0 to support a
-     * NULL value for the status array
-     */
-    ret = ncmpi_wait_all(file->fh, nreqs, reqs, NULL);
-    if(ret != NC_NOERR){
-      return pio_err(file->iosystem, file, ret, __FILE__, __LINE__,
-                      "Error while waiting for asynchronous writes to complete for the PIO_IOTYPE_PNETCDF I/O type on file (%s, ncid=%d). Internal I/O library error while waiting for pending PnetCDF operations.", pio_get_fname_from_file(file), file->pio_ncid);
-    }
+  /* Wait on all requests in one call */
+  /* We don't care about the status of each request, we
+   * only care whether wait succeeded or not
+   * Requires pnetcdf ver >= 1.7.0 to support a
+   * NULL value for the status array
+   */
+  /* FIXME: Replace with op.wait() */
+  ret = ncmpi_wait_all(file->fh, reqs.size(), reqs.data(), NULL);
+  if(ret != NC_NOERR){
+    return pio_err(file->iosystem, file, ret, __FILE__, __LINE__,
+                    "Error while waiting for asynchronous writes to complete for the PIO_IOTYPE_PNETCDF I/O type on file (%s, ncid=%d). Internal I/O library error while waiting for pending PnetCDF operations.", pio_get_fname_from_file(file), file->pio_ncid);
+  }
 
-    for(int i=0; i<nreqs; i++){
-      pio_viobuf_free(viobufs[i]);
-    }
+  /* FIXME: Replace with op.free() */
+  std::for_each(viobufs.begin(), viobufs.end(), [](viobuf_cache_t *pv) { free(pv); });
 
 #ifdef PIO_MICRO_TIMING
-    ret = pio_async_pnetcdf_finalize_wr_timers(file, vdescs, nvdescs, &wr_info);
-    if(ret != PIO_NOERR){
-      LOG((1, "Finalizing var write timers failed"));
-      return ret;
-    }
+  ret = pio_async_pnetcdf_finalize_wr_timers(file, vdescs.data(), vdescs.size(), &wr_info);
+  if(ret != PIO_NOERR){
+    LOG((1, "Finalizing var write timers failed"));
+    return ret;
+  }
 #endif
-    ret = pio_async_pnetcdf_reset_vdesc(vdescs, nvdescs);
-    if(ret != PIO_NOERR){
-      return pio_err(file->iosystem, file, PIO_EINTERNAL, __FILE__, __LINE__,
-                      "Error while waiting for asynchronous writes to complete for the PIO_IOTYPE_PNETCDF I/O type on file (%s, ncid=%d). Resetting variable descriptors associated with the completed asynchronous operations failed", pio_get_fname_from_file(file), file->pio_ncid);
-    }
-
-    free(viobufs);
-    free(vdescs);
-    free(reqs);
-
-    file->nasync_pend_ops -= nreqs;
+  ret = pio_async_pnetcdf_reset_vdesc(vdescs.data(), vdescs.size());
+  if(ret != PIO_NOERR){
+    return pio_err(file->iosystem, file, PIO_EINTERNAL, __FILE__, __LINE__,
+                    "Error while waiting for asynchronous writes to complete for the PIO_IOTYPE_PNETCDF I/O type on file (%s, ncid=%d). Resetting variable descriptors associated with the completed asynchronous operations failed", pio_get_fname_from_file(file), file->pio_ncid);
   }
 
   return PIO_NOERR;
@@ -436,43 +372,22 @@ int pio_async_rearr_kwait(void *f)
   file_desc_t *file = (file_desc_t *)f;
   assert(file);
 
-  if(file->nasync_pend_ops > 0){
-    int nreqs = 0;
-    pio_async_op_t *p = file->async_pend_ops, *q=NULL;
-    pio_async_op_t *prev = file->async_pend_ops;
-    while(p){
-      if(p->op_type == PIO_ASYNC_REARR_OP){
-        nreqs++;
-        ret = p->wait(p->pdata);
-        if(ret != PIO_NOERR){
-          LOG((1, "Waiting for rearr async op failed"));
-          return pio_err(file->iosystem, file, PIO_EINTERNAL,
-                          __FILE__, __LINE__,
-                          "Internal error while waiting for asynchronous rearrangement operations (number of pending ops = %d) on file (%s, ncid=%d)", file->nasync_pend_ops, pio_get_fname_from_file(file), file->pio_ncid);
-        }
-        p->free(p->pdata);
-        q = p->next;
-        /* Free node */
-        free(p);
-        /* p == file->async_pend_ops => First node */
-        if(p == file->async_pend_ops){
-          /* Update head and prev to delete/skip node p */
-          file->async_pend_ops = q;
-          prev = q;
-        }
-        else{
-          /* Delete node p, already freed */
-          prev->next = q;
-        }
-        p = q;
+  if(file->async_pend_ops.empty()) { return PIO_NOERR; }
+
+  for(std::deque<SPIO_Util::Async_op>::iterator iter = file->async_pend_ops.begin(); iter != file->async_pend_ops.end();){
+    SPIO_Util::Async_op op = *iter;
+    if(op.type() == SPIO_Util::Async_op::Op_type::SPIO_ASYNC_REARR_OP){
+      ret = op.wait();
+      if(ret != PIO_NOERR){
+        LOG((1, "Waiting for rearr async op failed"));
+        return pio_err(file->iosystem, file, PIO_EINTERNAL, __FILE__, __LINE__, "Internal error while waiting for asynchronous rearrangement operations (number of pending ops = %zu) on file (%s, ncid=%d)", file->async_pend_ops.size(), pio_get_fname_from_file(file), file->pio_ncid);
       }
-      else{
-        /* Ignore op kinds/types that are not pnetcdf writes */
-        prev = p;
-        p = p->next;
-      }
+      op.free();
+      iter = file->async_pend_ops.erase(iter);
     }
-    file->nasync_pend_ops -= nreqs;
+    else{
+      ++iter;
+    }
   }
 
   return PIO_NOERR;
@@ -483,47 +398,21 @@ int pio_async_hdf5_write_kwait(void *file)
   assert(0);
 }
 
-/* Optimized wait functions for different async op kinds/types on a file */
-typedef int (*file_async_pend_ops_kwait_func_t) (void *file);
-static file_async_pend_ops_kwait_func_t
-  file_async_pend_ops_kwait_funcs[PIO_ASYNC_NUM_OP_TYPES] = {
-    /* PIO_ASYNC_INVALID_OP */
-    pio_async_wait_func_unavail,
-    /* PIO_ASYNC_REARR_OP */
-    pio_async_rearr_kwait,
-    /* PIO_ASYNC_PNETCDF_WRITE_OP */
-    pio_async_pnetcdf_write_kwait,
-    /* PIO_ASYNC_HDF5_CREATE_OP */
-    pio_async_wait_func_unavail,
-    /* PIO_ASYNC_HDF5_DEF_VAR_OP */
-    pio_async_wait_func_unavail,
-    /* PIO_ASYNC_HDF5_PUT_ATT_OP */
-    pio_async_wait_func_unavail,
-    /* PIO_ASYNC_HDF5_ENDDEF_OP */
-    pio_async_wait_func_unavail,
-    /* PIO_ASYNC_HDF5_SET_FRAME_OP */
-    pio_async_wait_func_unavail,
-    /* PIO_ASYNC_HDF5_PUT_VAR_OP */
-    pio_async_wait_func_unavail,
-    /* PIO_ASYNC_HDF5_WRITE_OP */
-    pio_async_hdf5_write_kwait,
-    /* PIO_ASYNC_FILE_WRITE_OPS */
-    pio_async_wait_func_unavail,
-    /* PIO_ASYNC_FILE_CLOSE_OP */
-    pio_async_wait_func_unavail
-  };
-
 /* Wait for pending asynchronous operations of kind, op_kind, on this file
  * @param file Pointer to the file_desc for the file
  * Returns PIO_NOERR on success, a pio error code otherwise
  */
-int pio_file_async_pend_ops_kwait(file_desc_t *file, pio_async_op_type_t op_kind)
+int pio_file_async_pend_ops_kwait(file_desc_t *file, SPIO_Util::Async_op::Op_type op_kind)
 {
   assert(file);
-  assert((op_kind > PIO_ASYNC_INVALID_OP)
-          && (op_kind < PIO_ASYNC_NUM_OP_TYPES));
 
-  int ret = file_async_pend_ops_kwait_funcs[op_kind](file);
+  int ret = PIO_NOERR;
+  switch(op_kind){
+    case SPIO_Util::Async_op::Op_type::SPIO_ASYNC_REARR_OP : ret = pio_async_rearr_kwait(file); break;
+    case SPIO_Util::Async_op::Op_type::SPIO_ASYNC_PNETCDF_WRITE_OP : ret = pio_async_pnetcdf_write_kwait(file); break;
+    default : ret = pio_async_wait_func_unavail(file); break;
+  }
+
   if(ret != PIO_NOERR){
     return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
                     "Internal error while waiting for pending asynchronous operations on file (%s, ncid=%d)", pio_get_fname_from_file(file), file->pio_ncid);
@@ -539,37 +428,26 @@ int pio_file_async_pend_ops_kwait(file_desc_t *file, pio_async_op_type_t op_kind
  * Returns PIO_NOERR on success, a pio error code otherwise
  */
 int pio_file_async_pend_op_add(file_desc_t *file,
-      pio_async_op_type_t op_type, void *pdata)
+      SPIO_Util::Async_op::Op_type op_type, void *pdata)
 {
   assert(file != NULL);
-  assert((op_type > PIO_ASYNC_INVALID_OP)
-          && (op_type < PIO_ASYNC_NUM_OP_TYPES));
+  assert( (op_type != SPIO_Util::Async_op::Op_type::SPIO_ASYNC_INVALID_OP) &&
+          ( (op_type == SPIO_Util::Async_op::Op_type::SPIO_ASYNC_REARR_OP) ||
+            (op_type == SPIO_Util::Async_op::Op_type::SPIO_ASYNC_PNETCDF_WRITE_OP) ) );
+
   assert(pdata != NULL);
 
-  pio_async_op_t *pnew = (pio_async_op_t *) calloc(1, sizeof(pio_async_op_t));
-  if(pnew == NULL){
-    return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                  "Adding an asynchronous operation to file (%s, ncid=%d) failed. Unable to allocate %lld bytes to cache the asynchronous operation", pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long) (sizeof(pio_async_op_t)));
+  if(op_type == SPIO_Util::Async_op::Op_type::SPIO_ASYNC_REARR_OP){
+    file->async_pend_ops.push_back({op_type, pdata,
+      pio_swapm_wait, pio_swapm_iwait, pio_swapm_req_free});
   }
-
-  pnew->op_type = op_type;
-  pnew->pdata = pdata;
-  if(op_type == PIO_ASYNC_REARR_OP){
-    pnew->wait = pio_swapm_wait;
-    pnew->poke = pio_swapm_iwait;
-    pnew->free = pio_swapm_req_free;
+  else if(op_type == SPIO_Util::Async_op::Op_type::SPIO_ASYNC_PNETCDF_WRITE_OP){
+    file->async_pend_ops.push_back({op_type, pdata,
+      pio_async_wait_func_unavail, pio_async_poke_func_unavail, pio_viobuf_free});
   }
-  else if(op_type == PIO_ASYNC_PNETCDF_WRITE_OP){
-    /* Don't wait on individual ops, do coll wait on all ops */
-    pnew->wait = pio_async_wait_func_unavail;
-    /* PnetCDF does not have a non-blocking test/poke function */
-    pnew->poke = pio_async_poke_func_unavail;
-    pnew->free = pio_viobuf_free;
+  else{
+    assert(0);
   }
-  pnew->next = file->async_pend_ops;
-
-  file->async_pend_ops = pnew;
-  file->nasync_pend_ops++;
 
   return PIO_NOERR;
 }
@@ -824,30 +702,23 @@ int pio_iosys_async_pend_ops_wait(iosystem_desc_t *iosys)
   int ret;
   assert(iosys != NULL);
 
-  if(iosys->nasync_pend_ops == 0){
-    return PIO_NOERR;
-  }
+  if(iosys->async_pend_ops.empty()) { return PIO_NOERR; }
 
-  pio_async_op_t *p = iosys->async_pend_ops, *q=NULL;
-  while(p){
-    LOG((2, "Waiting on async op, kind = %s",
-        (p->op_type == PIO_ASYNC_REARR_OP) ? "PIO_ASYNC_REARR_OP" :
-        ((p->op_type == PIO_ASYNC_PNETCDF_WRITE_OP) ? "PIO_ASYNC_PNETCDF_WRITE_OP" :
-        ((p->op_type == PIO_ASYNC_FILE_WRITE_OPS) ? "PIO_ASYNC_FILE_WRITE_OPS" :
-        "UNKNOWN"))));
-    assert(p->op_type == PIO_ASYNC_FILE_WRITE_OPS);
-    ret = p->wait(p->pdata);
+  for(std::deque<SPIO_Util::Async_op>::iterator iter = iosys->async_pend_ops.begin();
+        iter != iosys->async_pend_ops.end();){
+    SPIO_Util::Async_op op = *iter;
+
+    assert(op.type() == SPIO_Util::Async_op::Op_type::SPIO_ASYNC_FILE_WRITE_OPS);
+    ret = op.wait();
     if(ret != PIO_NOERR){
-      return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
-                      "Internal error waiting for pending asynchronous operations on iosystem (iosysid=%d). Waiting for an asynchronous operation failed.", iosys->iosysid);
+      return pio_err(iosys, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
+                      "Internal error waiting for pending asynchronous operations on iosystem (iosysid=%d). Waiting for an asynchronous operation (%s) failed.",
+                      iosys->iosysid, SPIO_Util::Async_op::op_type_to_string(op.type()).c_str());
     }
-    q = p;
-    p = p->next;
-    q->free(q->pdata);
-    free(q);
+
+    op.free();
+    iter = iosys->async_pend_ops.erase(iter);
   }
-  iosys->async_pend_ops = NULL;
-  iosys->nasync_pend_ops = 0;
 
   return PIO_NOERR;
 }
@@ -862,20 +733,20 @@ int pio_iosys_async_pend_ops_wait(iosystem_desc_t *iosys)
 int pio_file_async_pend_op_wait(void *pdata)
 {
   int ret;
-  assert(pdata != NULL);
 
-  file_desc_t *file = (file_desc_t *)pdata;
-  if(file->nasync_pend_ops == 0){
-    return PIO_NOERR;
-  }
+  file_desc_t *file = static_cast<file_desc_t *>(pdata);
+  assert(file);
+
+  if(file->async_pend_ops.empty()) { return PIO_NOERR; }
 
   /* We only wait for pending pnetcdf writes. So the caller
    * needs to make sure that no data rearrangement ops are
    * pending */
-  ret = pio_file_async_pend_ops_kwait(file, PIO_ASYNC_PNETCDF_WRITE_OP);
+  ret = pio_file_async_pend_ops_kwait(file, SPIO_Util::Async_op::Op_type::SPIO_ASYNC_PNETCDF_WRITE_OP);
   if(ret != PIO_NOERR){
     return pio_err(file->iosystem, file, ret, __FILE__, __LINE__,
-                    "Internal error while waiting for pending asynchronous write operations on file (%s, ncid=%d) for the PIO_IOTYPE_PNETCDF iotype", pio_get_fname_from_file(file), file->pio_ncid);
+                    "Internal error while waiting for pending asynchronous write operations on file (%s, ncid=%d) for the PIO_IOTYPE_PNETCDF iotype",
+                    pio_get_fname_from_file(file), file->pio_ncid);
   }
 
   file->wb_pend = 0;
@@ -891,9 +762,9 @@ int pio_file_async_pend_op_wait(void *pdata)
 void pio_file_close_and_free(void *pdata)
 {
   int ret;
-  assert(pdata != NULL);
-
   file_desc_t *file = (file_desc_t *)pdata;
+  assert(file);
+
   bool sync_with_ioprocs = false;
   ret = spio_hard_closefile(file->iosystem, file, sync_with_ioprocs);
   if(ret != PIO_NOERR){
@@ -909,32 +780,14 @@ void pio_file_close_and_free(void *pdata)
  * Returns PIO_NOERR on success, a pio error code otherwise
  */
 int pio_iosys_async_pend_op_add(iosystem_desc_t *iosys,
-      pio_async_op_type_t op_type, void *pdata)
+      SPIO_Util::Async_op::Op_type op_type, void *pdata)
 {
-  assert(iosys != NULL);
-  assert((op_type > PIO_ASYNC_INVALID_OP)
-          && (op_type < PIO_ASYNC_NUM_OP_TYPES));
-  assert(pdata != NULL);
-  assert(op_type == PIO_ASYNC_FILE_WRITE_OPS);
+  assert((iosys != NULL) && (pdata != NULL));
+  assert(op_type != SPIO_Util::Async_op::Op_type::SPIO_ASYNC_INVALID_OP);
 
-  pio_async_op_t *pnew = (pio_async_op_t *) calloc(1, sizeof(pio_async_op_t));
-  if(pnew == NULL){
-    return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                    "Internal error while adding a pending asynchronous operations on the iosystem (iosysid=%d). Unable to allocate %lld bytes to keep track of the asynchronous operation", iosys->iosysid, (unsigned long long) (sizeof(pio_async_op_t)));
-  }
-
-  pnew->op_type = op_type;
-  pnew->pdata = pdata;
-  if(op_type == PIO_ASYNC_FILE_WRITE_OPS){
-    pnew->wait = pio_file_async_pend_op_wait;
-    /* File writes do not have a non-blocking test/poke function */
-    pnew->poke = pio_async_poke_func_unavail;
-    pnew->free = pio_file_close_and_free;
-  }
-  pnew->next = iosys->async_pend_ops;
-
-  iosys->async_pend_ops = pnew;
-  iosys->nasync_pend_ops++;
+  assert(op_type == SPIO_Util::Async_op::Op_type::SPIO_ASYNC_FILE_WRITE_OPS);
+  iosys->async_pend_ops.push_back({op_type, pdata,
+    pio_file_async_pend_op_wait, pio_async_poke_func_unavail, pio_file_close_and_free});
 
   return PIO_NOERR;
 }
@@ -946,31 +799,16 @@ int pio_iosys_async_pend_op_add(iosystem_desc_t *iosys,
  * Returns PIO_NOERR on success, a pio error code otherwise
  */
 int pio_tpool_async_pend_op_add(iosystem_desc_t *iosys,
-      pio_async_op_type_t op_type, void *pdata)
+      SPIO_Util::Async_op::Op_type op_type, void *pdata)
 {
   int ret;
-  assert(iosys != NULL);
-  assert((op_type > PIO_ASYNC_INVALID_OP)
-          && (op_type < PIO_ASYNC_NUM_OP_TYPES));
-  assert(pdata != NULL);
-  assert(op_type == PIO_ASYNC_FILE_WRITE_OPS);
+  assert(iosys && pdata);
+  assert(op_type == SPIO_Util::Async_op::Op_type::SPIO_ASYNC_FILE_WRITE_OPS);
 
-  pio_async_op_t *pnew = (pio_async_op_t *) calloc(1, sizeof(pio_async_op_t));
-  if(pnew == NULL){
-    return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                    "Internal error while adding asynchronous pending operation to the thread pool (iosystem = %d). Unable to allocate %lld bytes to keep track of the asynchronous operation", iosys->iosysid, (unsigned long long) sizeof(pio_async_op_t));
-  }
+  SPIO_Util::Async_op op = {op_type, pdata, pio_file_async_pend_op_wait,
+                            pio_async_poke_func_unavail, pio_file_close_and_free};
 
-  pnew->op_type = op_type;
-  pnew->pdata = pdata;
-  if(op_type == PIO_ASYNC_FILE_WRITE_OPS){
-    pnew->wait = pio_file_async_pend_op_wait;
-    /* File writes do not have a non-blocking test/poke function */
-    pnew->poke = pio_async_poke_func_unavail;
-    pnew->free = pio_file_close_and_free;
-  }
-
-  ret = pio_async_tpool_op_add(pnew);
+  ret = pio_async_tpool_op_add(op);
   if(ret != PIO_NOERR){
     LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
     return pio_err(iosys, NULL, ret, __FILE__, __LINE__,
@@ -1022,28 +860,25 @@ int pio_iosys_async_file_close_op_add(file_desc_t *file)
 {
   int ret = PIO_NOERR;
 
-  /* Create async task */
-  pio_async_op_t *pnew = static_cast<pio_async_op_t *>(calloc(1, sizeof(pio_async_op_t)));
-  if(pnew == NULL){
-    return pio_err(file->iosystem, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Queuing asynchronous op/task for closing file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Allocating memory for async op task (%zu bytes)", pio_get_fname_from_file(file), file->pio_ncid, sizeof(pio_async_op_t));
-  }
+  assert(file);
 
-  pnew->op_type = PIO_ASYNC_FILE_CLOSE_OP;
-  pnew->pdata = static_cast<void *>(file);
-  pnew->wait = pio_iosys_async_file_close_op_wait;
-  pnew->poke = pio_async_poke_func_unavail;
-  pnew->free = pio_iosys_async_file_close_op_free_no_op;
+  /* Create async task */
+  SPIO_Util::Async_op op = {SPIO_Util::Async_op::Op_type::SPIO_ASYNC_FILE_CLOSE_OP,
+                            static_cast<void *>(file),
+                            pio_iosys_async_file_close_op_wait,
+                            pio_async_poke_func_unavail,
+                            pio_iosys_async_file_close_op_free_no_op};
 
   //file->npend_ops++;
   SPIO_Util::GVars::npend_hdf5_async_ops++;
 
   /* Get the mt queue and queue the async task */
-  ret = pio_async_tpool_op_add(pnew);
+  ret = pio_async_tpool_op_add(op);
   if(ret != PIO_NOERR){
     LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
-    return pio_err(file->iosystem, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Queuing asynchronous op/task for closing file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Adding async op to thread pool failed", pio_get_fname_from_file(file), file->pio_ncid);
+    return pio_err(file->iosystem, file, PIO_EINTERNAL, __FILE__, __LINE__,
+                      "Queuing asynchronous op/task for closing file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Adding async op to thread pool failed",
+                      pio_get_fname_from_file(file), file->pio_ncid);
   }
 
   return PIO_NOERR;

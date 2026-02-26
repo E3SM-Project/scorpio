@@ -200,7 +200,7 @@ extern "C" {
                   MPI_Comm comm, const rearr_comm_fc_opt_t *fc);
 
     /* Non blocking wait for pio swapm user request */
-    int pio_swapm_iwait(void *p, int *flag);
+    int pio_swapm_iwait(void *p, bool &flag);
 
     /* Blocking wait for pio swapm user request */
     int pio_swapm_wait(void *p);

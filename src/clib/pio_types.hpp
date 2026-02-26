@@ -49,6 +49,8 @@ extern "C" {
 
 #include <atomic>
 #include <mutex>
+#include <deque>
+#include "spio_async_op.hpp"
 
 #ifdef PIO_MICRO_TIMING
 /** Some fwd declarations to avoid including internal headers */
@@ -348,50 +350,6 @@ typedef struct io_desc_t
     struct io_desc_t *next;
 } io_desc_t;
 
-/**
- * PIO asynchronous operation types
- */
-typedef enum pio_async_op_type
-{
-    PIO_ASYNC_INVALID_OP = 0,
-    PIO_ASYNC_REARR_OP,
-    PIO_ASYNC_PNETCDF_WRITE_OP,
-    PIO_ASYNC_HDF5_CREATE_OP,
-    PIO_ASYNC_HDF5_DEF_VAR_OP,
-    PIO_ASYNC_HDF5_PUT_ATT_OP,
-    PIO_ASYNC_HDF5_ENDDEF_OP,
-    PIO_ASYNC_HDF5_SET_FRAME_OP,
-    PIO_ASYNC_HDF5_PUT_VAR_OP,
-    PIO_ASYNC_HDF5_WRITE_OP,
-    PIO_ASYNC_FILE_WRITE_OPS,
-    PIO_ASYNC_FILE_CLOSE_OP,
-    PIO_ASYNC_NUM_OP_TYPES
-} pio_async_op_type_t;
-
-/**
- * PIO asynchronous op
- */
-typedef struct pio_async_op
-{
-    pio_async_op_type_t op_type;
-    void *pdata;
-    /* Blocking wait function for this async op
-     * param 1 : A user defined data pointer
-     * return : PIO_NOERR on success, pio error code on failure
-     */
-    int (*wait)(void *);
-    /* Non-blocking function for making progress on this async op
-     * param 1 : A user defined data pointer
-     * param 2 : Pointer to a flag that is set to true if async op
-     * is complete, false otherwise
-     * return : PIO_NOERR on success, pio error code on failure
-     */
-    int (*poke)(void *, int *);
-    /* Free function for user defined pdata */
-    void (*free)(void *);
-    struct pio_async_op *next;
-} pio_async_op_t;
-
 /* Forward decl for I/O file summary stats info */
 struct spio_io_fstats_summary;
 
@@ -547,11 +505,8 @@ typedef struct iosystem_desc_t
     /** I/O statistics associated with this I/O system */
     struct spio_io_fstats_summary *io_fstats;
 
-    /* Number of pending async operations on this iosystem */
-    int nasync_pend_ops;
-
     /* List of pending async operations on this iosystem */
-    pio_async_op_t *async_pend_ops;
+    std::deque<SPIO_Util::Async_op> async_pend_ops;
 
     /** Pointer to the next iosystem_desc_t in the list. */
     struct iosystem_desc_t *next;
@@ -951,17 +906,15 @@ typedef struct file_desc_t
     /** I/O statistics associated with this file */
     struct spio_io_fstats_summary *io_fstats;
 
-    /* Number of pending async operations on this file */
-    int nasync_pend_ops;
-
     /* List of pending async operations on this file */
-    pio_async_op_t *async_pend_ops;
+    std::deque<SPIO_Util::Async_op> async_pend_ops;
 
     /** Total number of pending ops on this file, including
-      * nasync_pend_ops. In the case where nasync_pend_ops == 0
-      * npend_ops shows any other pending ops (e.g. non-blocking
-      * write done of rearranged data, still need to wait 
-      * on it) */
+      * the ones queued in async_pend_ops. In the case where
+      * async_pend_ops.size() == 0, npend_ops shows any other
+      * pending ops (e.g. non-blocking write done of rearranged
+      * data, still need to wait on it)
+      */
     std::atomic<int> npend_ops;
     std::atomic<bool> is_hard_closed;
     std::mutex *pmtx;
