@@ -22,7 +22,6 @@
 #define NETCDF_INT_FLOAT_SIZE 4
 #define NETCDF_DOUBLE_INT64_SIZE 8
 
-#include <bget.h>
 #include <limits.h>
 #include <math.h>
 #ifdef SPIO_ENABLE_GPTL_TIMING
@@ -31,7 +30,8 @@
 #include "gptl_skel.h"
 #endif
 #include <assert.h>
-#include "spio_ltimer.h"
+#include "util/bget.h"
+#include "util/spio_ltimer.h"
 #include "pio_types.hpp"
 
 #if defined(__cplusplus)

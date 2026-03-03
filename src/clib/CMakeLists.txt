@@ -13,8 +13,9 @@ target_include_directories(spio_default_public_options INTERFACE
   $<INSTALL_INTERFACE:include>)
 
 add_library (spio_default_private_options INTERFACE)
-set (spio_default_public_libs "")
-set (spio_default_private_libs "")
+# Include the install include dir for all dep projects
+target_include_directories(spio_default_private_options INTERFACE
+  $<INSTALL_INTERFACE:include>)
 
 #==============================================================================
 #  FIND EXTERNAL LIBRARIES/DEPENDENCIES
@@ -39,7 +40,7 @@ if (PIO_ENABLE_TIMING)
     message (STATUS "GPTL C library dependencies: ${GPTL_C_LIBRARIES}")
     target_include_directories (spio_default_public_options
       INTERFACE ${GPTL_C_INCLUDE_DIRS})
-    list (APPEND spio_default_public_libs ${GPTL_C_LIBRARIES})
+    target_link_libraries (spio_default_public_options INTERFACE ${GPTL_C_LIBRARIES})
 
     # GPTL expects HAVE_MPI, if MPI is available, when using GPTL header files
     if (NOT PIO_USE_MPISERIAL)
@@ -49,7 +50,7 @@ if (PIO_ENABLE_TIMING)
     message (STATUS "Using internal GPTL C library for timing")
     target_include_directories (spio_default_private_options
       INTERFACE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/../gptl>)
-    list (APPEND spio_default_public_libs gptl)
+    target_link_libraries (spio_default_public_options INTERFACE gptl)
   endif ()
   target_compile_definitions (spio_default_public_options
     INTERFACE SPIO_ENABLE_GPTL_TIMING)
@@ -79,7 +80,7 @@ if (WITH_NETCDF)
     set(PIO_USE_NETCDF 1)
     target_include_directories (spio_default_public_options
       INTERFACE ${NetCDF_C_INCLUDE_DIRS})
-    list (APPEND spio_default_public_libs ${NetCDF_C_LIBRARIES})
+    target_link_libraries (spio_default_public_options INTERFACE ${NetCDF_C_LIBRARIES})
     if (${NetCDF_C_HAS_PARALLEL})
       set(PIO_USE_NETCDF4 1)
       set(PIO_USE_NETCDF4_NCZARR 0)
@@ -135,7 +136,7 @@ if (WITH_PNETCDF)
     set(PIO_USE_PNETCDF 1)
     target_include_directories (spio_default_public_options
       INTERFACE ${PnetCDF_C_INCLUDE_DIRS})
-    list (APPEND spio_default_public_libs ${PnetCDF_C_LIBRARIES})
+    target_link_libraries (spio_default_public_options INTERFACE ${PnetCDF_C_LIBRARIES})
 
     # Check library for varn functions
     set (CMAKE_REQUIRED_LIBRARIES ${PnetCDF_C_LIBRARY})
@@ -178,8 +179,7 @@ if (WITH_ADIOS2)
     # Required for symlink() support/decl in unistd.h
     target_compile_definitions (spio_default_private_options
       INTERFACE _POSIX_C_SOURCE=200112L)
-    list (APPEND spio_default_public_libs "adios2::adios2")
-    list (APPEND spio_default_public_libs "adios2pio-nm-lib")
+    target_link_libraries (spio_default_public_options INTERFACE adios2::adios2 adios2pio-nm-lib)
   else ()
     message(STATUS "Could not find ADIOS library, disabling support for ADIOS")
     set(PIO_USE_ADIOS 0)
@@ -199,9 +199,7 @@ if (WITH_HDF5)
       INTERFACE _HDF5)
     target_include_directories (spio_default_public_options
       INTERFACE ${HDF5_C_INCLUDE_DIRS} ${HDF5_HL_INCLUDE_DIRS})
-    list (APPEND spio_default_public_libs ${HDF5_C_LIBRARIES})
-    list (APPEND spio_default_public_libs ${HDF5_HL_LIBRARIES})
-    list (APPEND spio_default_public_libs ${CMAKE_DL_LIBS})
+    target_link_libraries (spio_default_public_options INTERFACE ${HDF5_C_LIBRARIES} ${HDF5_HL_LIBRARIES} ${CMAKE_DL_LIBS})
 
     # Look for HDF5 ZFP (compression library) filter library
     set(H5Z_ZFP_USE_STATIC_LIBS ON)
@@ -218,7 +216,8 @@ if (WITH_HDF5)
     if (H5Z_ZFP_FOUND)
       message (STATUS "Found ZFP filter for HDF5")
       target_compile_definitions (spio_default_public_options INTERFACE _SPIO_HAS_H5Z_ZFP)
-      list (APPEND spio_default_public_libs "h5z_zfp::h5z_zfp")
+      target_include_directories (spio_default_public_options INTERFACE ${H5Z_ZFP_INCLUDE_DIR})
+      target_link_libraries (spio_default_public_options INTERFACE h5z_zfp::h5z_zfp)
     else ()
       message (STATUS "Could not find ZFP filter for HDF5, disabling ZFP with HDF5")
     endif ()
@@ -233,7 +232,8 @@ if (WITH_HDF5)
     if (H5Z_BLOSC2_FOUND)
       message (STATUS "Found BLOSC2 filter for HDF5")
       target_compile_definitions (spio_default_public_options INTERFACE _SPIO_HAS_H5Z_BLOSC2)
-      list (APPEND spio_default_public_libs "h5z_blosc2::h5z_blosc2")
+      target_include_directories (spio_default_public_options INTERFACE ${H5Z_BLOSC2_INCLUDE_DIR})
+      target_link_libraries (spio_default_public_options INTERFACE h5z_blosc2::h5z_blosc2)
     else ()
       message (STATUS "Could not find Blosc2 filter, disabling HDF5 filter for Blosc2")
     endif ()
@@ -430,7 +430,7 @@ if (MPISERIAL_C_FOUND)
     INTERFACE MPI_SERIAL)
   target_include_directories (spio_default_public_options
     INTERFACE ${MPISERIAL_C_INCLUDE_DIRS})
-  list (APPEND spio_default_public_libs ${MPISERIAL_C_LIBRARIES})
+  target_link_libraries (spio_default_public_options INTERFACE ${MPISERIAL_C_LIBRARIES})
   set (WITH_PNETCDF FALSE)
 endif ()
 
@@ -458,29 +458,22 @@ endif ()
 #  DEFINE THE TARGET LIBRARY
 #==============================================================================
 message(STATUS "===== Configuring SCORPIO C library... =====")
-# PIO lib source
-set (pio_lib_src
-  topology.cpp pio_mpi_timer.cpp pio_timer.cpp pio_file.cpp
-  pioc_support.cpp pio_lists.cpp pio_print.cpp spio_dbg_ds.cpp
-  pioc.cpp pioc_sc.cpp pio_spmd.cpp pio_rearrange.cpp pio_rearr_utils.cpp pio_rearr_contig.cpp
-  pio_nc4.cpp bget.cpp
-  pio_nc.cpp pio_put_nc.cpp pio_get_nc.cpp pio_getput_int.cpp pio_msg.cpp pio_varm.cpp
-  pio_darray.cpp pio_darray_int.cpp spio_hash.cpp pio_sdecomps_regex.cpp spio_io_summary.cpp
-  spio_decomp_map_info_pool.cpp spio_decomp_nc_logger.cpp spio_decomp_txt_logger.cpp
-  spio_ltimer.cpp spio_serializer.cpp spio_file_mvcache.cpp
-  spio_tracer.cpp spio_tracer_mdata.cpp spio_tracer_decomp.cpp
-  spio_rearrange_any.cpp spio_dt_converter.cpp
-  spio_async_tpool.cpp spio_async_utils.cpp spio_async_tcomm.cpp
-  spio_hdf5_utils.cpp spio_async_hdf5_utils.cpp)
-
 # Add subdirectories
 add_subdirectory (api)
+add_subdirectory (util)
+add_subdirectory (core)
+
 # Add sources for libpioc.a
-add_library (pioc ${pio_lib_src}
-  $<TARGET_OBJECTS:pioc_api>)
+add_library (pioc
+  $<TARGET_OBJECTS:pioc_api>
+  $<TARGET_OBJECTS:spio_util>
+  $<TARGET_OBJECTS:spio_core>)
+
+#  PUBLIC ${spio_default_public_libs}
+#  PRIVATE ${spio_default_private_libs}
+
 target_link_libraries (pioc
   PUBLIC spio_default_public_options
-  PUBLIC ${spio_default_public_libs}
   PRIVATE spio_default_private_options)
 
 # FIXME: CMake 3.26+ can completely hide the local private interface lib

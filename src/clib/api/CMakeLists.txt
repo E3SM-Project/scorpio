@@ -31,7 +31,7 @@ set (pio_api_src
 add_library (pioc_api OBJECT ${pio_api_src})
 target_include_directories(pioc_api
   PUBLIC .
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR}/..)
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR}/.. ${CMAKE_CURRENT_SOURCE_DIR}/../util)
 target_link_libraries(pioc_api
   PUBLIC spio_default_public_options
   PRIVATE spio_default_private_options)

@@ -50,7 +50,7 @@ extern "C" {
 #include <atomic>
 #include <mutex>
 #include <deque>
-#include "spio_async_op.hpp"
+#include "core/spio_async_op.hpp"
 
 #ifdef PIO_MICRO_TIMING
 /** Some fwd declarations to avoid including internal headers */
