@@ -469,6 +469,7 @@ add_library (pioc
   $<TARGET_OBJECTS:pioc_api>
   $<TARGET_OBJECTS:spio_util>
   $<TARGET_OBJECTS:spio_core>
+  $<TARGET_OBJECTS:spio_core_rearr>
   $<TARGET_OBJECTS:spio_core_iolib>
   $<TARGET_OBJECTS:spio_core_iolib_hdf5>)
 
