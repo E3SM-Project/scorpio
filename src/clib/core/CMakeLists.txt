@@ -6,9 +6,7 @@ message(STATUS "===== Configuring SCORPIO C Core... =====")
 set (spio_core_src
   spio_async_utils.cpp
   spio_async_tpool.cpp
-  spio_async_hdf5_utils.cpp
   pio_spmd.cpp
-  spio_hdf5_utils.cpp
   spio_decomp_txt_logger.cpp
   spio_decomp_nc_logger.cpp
   spio_decomp_map_info_pool.cpp
@@ -25,7 +23,6 @@ set (spio_core_src
   pio_file.cpp
   pio_darray_int.cpp
   pio_darray.cpp
-  spio_serializer.cpp
   pio_varm.cpp
   pio_nc4.cpp
   spio_rearrange_any.cpp
@@ -37,10 +34,15 @@ set (spio_core_src
   pio_msg.cpp
   pio_get_nc.cpp)
 
-add_library (spio_core OBJECT ${spio_core_src})
+add_subdirectory (iolib)
+
+add_library (spio_core OBJECT
+  $<TARGET_OBJECTS:spio_core_iolib>
+  ${spio_core_src})
+
 target_include_directories(spio_core
   PUBLIC .
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR}/.. ${CMAKE_CURRENT_SOURCE_DIR}/../util)
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR}/.. ${CMAKE_CURRENT_SOURCE_DIR}/../util ${CMAKE_CURRENT_SOURCE_DIR}/iolib/hdf5)
 target_link_libraries(spio_core
   PUBLIC spio_default_public_options
   PRIVATE spio_default_private_options)
