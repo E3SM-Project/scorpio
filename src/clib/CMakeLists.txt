@@ -463,11 +463,14 @@ add_subdirectory (api)
 add_subdirectory (util)
 add_subdirectory (core)
 
+# FIXME : Use interface libs for subdir sources ?
 # Add sources for libpioc.a
 add_library (pioc
   $<TARGET_OBJECTS:pioc_api>
   $<TARGET_OBJECTS:spio_util>
-  $<TARGET_OBJECTS:spio_core>)
+  $<TARGET_OBJECTS:spio_core>
+  $<TARGET_OBJECTS:spio_core_iolib>
+  $<TARGET_OBJECTS:spio_core_iolib_hdf5>)
 
 #  PUBLIC ${spio_default_public_libs}
 #  PRIVATE ${spio_default_private_libs}
