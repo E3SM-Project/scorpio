@@ -9,7 +9,8 @@ include(SPIOUtils)
 #==============================================================================
 #  SET THE COMPILER OPTIONS
 #==============================================================================
-include_directories("${SCORPIO_SOURCE_DIR}/tests/cunit" "${SCORPIO_SOURCE_DIR}/src/clib" "${SCORPIO_BINARY_DIR}/src/clib" "${SCORPIO_SOURCE_DIR}/src/clib/core" "${SCORPIO_SOURCE_DIR}/src/clib/core/iolib/hdf5" "${SCORPIO_SOURCE_DIR}/src/clib/util")
+# FIXME: Use an interface lib to track these include deps
+include_directories("${SCORPIO_SOURCE_DIR}/tests/cunit" "${SCORPIO_SOURCE_DIR}/src/clib" "${SCORPIO_BINARY_DIR}/src/clib" "${SCORPIO_SOURCE_DIR}/src/clib/core" "${SCORPIO_SOURCE_DIR}/src/clib/core/rearr" "${SCORPIO_SOURCE_DIR}/src/clib/core/iolib/hdf5" "${SCORPIO_SOURCE_DIR}/src/clib/util")
 
 # Compiler-specific compiler options
 string (TOUPPER "${CMAKE_C_COMPILER_ID}" CMAKE_C_COMPILER_NAME)

@@ -13,9 +13,6 @@ set (spio_core_src
   spio_async_tcomm.cpp
   pioc_support.cpp
   pioc.cpp
-  pio_rearrange.cpp
-  pio_rearr_utils.cpp
-  pio_rearr_contig.cpp
   pio_print.cpp
   pio_nc.cpp
   pio_lists.cpp
@@ -25,7 +22,6 @@ set (spio_core_src
   pio_darray.cpp
   pio_varm.cpp
   pio_nc4.cpp
-  spio_rearrange_any.cpp
   spio_io_summary.cpp
   spio_file_mvcache.cpp
   pioc_sc.cpp
@@ -34,15 +30,18 @@ set (spio_core_src
   pio_msg.cpp
   pio_get_nc.cpp)
 
+add_subdirectory (rearr)
 add_subdirectory (iolib)
 
 add_library (spio_core OBJECT
+  $<TARGET_OBJECTS:spio_core_rearr>
   $<TARGET_OBJECTS:spio_core_iolib>
   ${spio_core_src})
 
 target_include_directories(spio_core
   PUBLIC .
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR}/.. ${CMAKE_CURRENT_SOURCE_DIR}/../util ${CMAKE_CURRENT_SOURCE_DIR}/iolib/hdf5)
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR}/.. ${CMAKE_CURRENT_SOURCE_DIR}/../util ${CMAKE_CURRENT_SOURCE_DIR}/rearr ${CMAKE_CURRENT_SOURCE_DIR}/iolib/hdf5)
+
 target_link_libraries(spio_core
   PUBLIC spio_default_public_options
   PRIVATE spio_default_private_options)
