@@ -5,6 +5,7 @@
 #include <pio.h>
 #include <pio_internal.h>
 #include <string>
+/* FIXME: Avoid including HDF5 async hdr here */
 #include "spio_async_hdf5_utils.hpp"
 #include "spio_async_op.hpp"
 

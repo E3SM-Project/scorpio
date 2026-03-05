@@ -15,6 +15,7 @@ set (spio_util_src
   spio_tracer_mdata.cpp
   spio_tracer_decomp.cpp
   spio_serializer.cpp
+  pio_print.cpp
   pio_mpi_timer.cpp)
 
 add_library (spio_util OBJECT ${spio_util_src})
