@@ -13,7 +13,7 @@ set (spio_clib_bin_dir "${CMAKE_CURRENT_BINARY_DIR}/../../..")
 add_library (spio_core_iolib_hdf5 OBJECT ${spio_core_iolib_hdf5_src})
 target_include_directories(spio_core_iolib_hdf5
   PUBLIC .
-  PRIVATE ${spio_clib_src_dir} ${spio_clib_bin_dir} ${spio_clib_src_dir}/util ${spio_clib_src_dir}/core)
+  PRIVATE ${spio_clib_src_dir} ${spio_clib_bin_dir} ${spio_clib_src_dir}/util ${spio_clib_src_dir}/core ${spio_clib_src_dir}/core/util ${spio_clib_src_dir}/core/progress_engine)
 target_link_libraries(spio_core_iolib_hdf5
   PUBLIC spio_default_public_options
   PRIVATE spio_default_private_options)
