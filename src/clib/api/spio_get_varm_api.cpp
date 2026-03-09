@@ -15,7 +15,7 @@
 int PIOc_get_varm_schar(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                         const PIO_Offset *stride, const PIO_Offset *imap, signed char *buf)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_varm_schar");
@@ -34,7 +34,7 @@ int PIOc_get_varm_schar(int ncid, int varid, const PIO_Offset *start, const PIO_
 int PIOc_get_varm_short(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                         const PIO_Offset *stride, const PIO_Offset *imap, short *buf)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_varm_short");
@@ -53,7 +53,7 @@ int PIOc_get_varm_short(int ncid, int varid, const PIO_Offset *start, const PIO_
 int PIOc_get_varm_ulonglong(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                             const PIO_Offset *stride, const PIO_Offset *imap, unsigned long long *buf)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_varm_ulonglong");
@@ -72,7 +72,7 @@ int PIOc_get_varm_ulonglong(int ncid, int varid, const PIO_Offset *start, const 
 int PIOc_get_varm_ushort(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                          const PIO_Offset *stride, const PIO_Offset *imap, unsigned short *buf)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_varm_ushort");
@@ -91,7 +91,7 @@ int PIOc_get_varm_ushort(int ncid, int varid, const PIO_Offset *start, const PIO
 int PIOc_get_varm_longlong(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                            const PIO_Offset *stride, const PIO_Offset *imap, long long *buf)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_varm_longlong");
@@ -110,7 +110,7 @@ int PIOc_get_varm_longlong(int ncid, int varid, const PIO_Offset *start, const P
 int PIOc_get_varm_double(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                          const PIO_Offset *stride, const PIO_Offset *imap, double *buf)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_varm_double");
@@ -129,7 +129,7 @@ int PIOc_get_varm_double(int ncid, int varid, const PIO_Offset *start, const PIO
 int PIOc_get_varm_text(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                        const PIO_Offset *stride, const PIO_Offset *imap, char *buf)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_varm_text");
@@ -148,7 +148,7 @@ int PIOc_get_varm_text(int ncid, int varid, const PIO_Offset *start, const PIO_O
 int PIOc_get_varm_int(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                       const PIO_Offset *stride, const PIO_Offset *imap, int *buf)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_varm_int");
@@ -167,7 +167,7 @@ int PIOc_get_varm_int(int ncid, int varid, const PIO_Offset *start, const PIO_Of
 int PIOc_get_varm_uint(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                        const PIO_Offset *stride, const PIO_Offset *imap, unsigned int *buf)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_varm_uint");
@@ -187,7 +187,7 @@ int PIOc_get_varm(int ncid, int varid, const PIO_Offset *start, const PIO_Offset
                   const PIO_Offset *stride, const PIO_Offset *imap, void *buf,
                   PIO_Offset bufcount, MPI_Datatype buftype)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_varx");
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_varm");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("varid", varid).
@@ -202,7 +202,7 @@ int PIOc_get_varm(int ncid, int varid, const PIO_Offset *start, const PIO_Offset
 int PIOc_get_varm_float(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                         const PIO_Offset *stride, const PIO_Offset *imap, float *buf)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_varm_float");
@@ -221,7 +221,7 @@ int PIOc_get_varm_float(int ncid, int varid, const PIO_Offset *start, const PIO_
 int PIOc_get_varm_long(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                        const PIO_Offset *stride, const PIO_Offset *imap, long *buf)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_varx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_varx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_varm_long");

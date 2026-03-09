@@ -35,7 +35,7 @@ int SPIO_Util::Rearr_Util::gatherw(const void *sendbuf, int sendcount,
 {
   int ret = PIO_NOERR, comm_rank = -1, comm_sz = 0;
 
-  SPIO_Util::GPTL_Util::GPTL_wrapper("PIO:SPIO_Util::Rearr_Util::gatherw");
+  SPIO_Util::GPTL_Util::GPTL_timer("PIO:SPIO_Util::Rearr_Util::gatherw");
 
   //assert((sendcount == 0) || sendbuf);
 
@@ -187,7 +187,7 @@ int SPIO_Util::Rearr_Util::scatterw(const void *sendbuf, const std::vector<int> 
 {
   int ret = PIO_NOERR, comm_rank = -1, comm_sz = 0;
 
-  SPIO_Util::GPTL_Util::GPTL_wrapper("PIO:SPIO_Util::Rearr_Util::scatterw");
+  SPIO_Util::GPTL_Util::GPTL_timer("PIO:SPIO_Util::Rearr_Util::scatterw");
 
   ret = MPI_Comm_rank(comm, &comm_rank);
   if(ret != MPI_SUCCESS){
@@ -378,7 +378,7 @@ int SPIO_Util::Rearr_Util::alltoallw(const void *sendbuf, const int *sendcounts,
   MPI_Status status; /* Not actually used - replace with MPI_STATUSES_IGNORE. */
   int mpierr;  /* Return code from MPI functions. */
 
-  SPIO_Util::GPTL_Util::GPTL_wrapper("PIO:SPIO_Util::Rearr_Util::alltoallw");
+  SPIO_Util::GPTL_Util::GPTL_timer("PIO:SPIO_Util::Rearr_Util::alltoallw");
   LOG((2, "pio_swapm fc->hs = %d fc->isend = %d fc->max_pend_req = %d", fc->hs,
        fc->isend, fc->max_pend_req));
 
@@ -699,7 +699,7 @@ int SPIO_Util::Rearr_Util::alltoall(const void *sendbuf, int sendcount,
     }
   }
 
-  SPIO_Util::GPTL_Util::GPTL_wrapper("PIO:SPIO_Util::Rearr_Util::alltoallw");
+  SPIO_Util::GPTL_Util::GPTL_timer("PIO:SPIO_Util::Rearr_Util::alltoallw");
   LOG((2, "pio_swapm fc->hs = %d fc->isend = %d fc->max_pend_req = %d", fc->hs,
        fc->isend, fc->max_pend_req));
 

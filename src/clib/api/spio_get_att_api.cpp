@@ -8,7 +8,7 @@
 /* APIs for reading file/variable attributes */
 int PIOc_get_att(int ncid, int varid, const char *name, void *ip)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_attx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_attx");
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -20,7 +20,7 @@ int PIOc_get_att(int ncid, int varid, const char *name, void *ip)
 
 int PIOc_get_att_text(int ncid, int varid, const char *name, char *ip)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_attx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_attx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_text");
@@ -38,7 +38,7 @@ int PIOc_get_att_text(int ncid, int varid, const char *name, char *ip)
 
 int PIOc_get_att_schar(int ncid, int varid, const char *name, signed char *ip)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_attx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_attx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_schar");
@@ -56,7 +56,7 @@ int PIOc_get_att_schar(int ncid, int varid, const char *name, signed char *ip)
 
 int PIOc_get_att_short(int ncid, int varid, const char *name, short *ip)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_attx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_attx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_short");
@@ -74,7 +74,7 @@ int PIOc_get_att_short(int ncid, int varid, const char *name, short *ip)
 
 int PIOc_get_att_int(int ncid, int varid, const char *name, int *ip)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_attx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_attx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_int");
@@ -92,7 +92,7 @@ int PIOc_get_att_int(int ncid, int varid, const char *name, int *ip)
 
 int PIOc_get_att_long(int ncid, int varid, const char *name, long *ip)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_attx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_attx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_long");
@@ -110,7 +110,7 @@ int PIOc_get_att_long(int ncid, int varid, const char *name, long *ip)
 
 int PIOc_get_att_float(int ncid, int varid, const char *name, float *ip)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_attx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_attx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_float");
@@ -128,7 +128,7 @@ int PIOc_get_att_float(int ncid, int varid, const char *name, float *ip)
 
 int PIOc_get_att_double(int ncid, int varid, const char *name, double *ip)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_attx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_attx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_double");
@@ -146,7 +146,7 @@ int PIOc_get_att_double(int ncid, int varid, const char *name, double *ip)
 
 int PIOc_get_att_uchar(int ncid, int varid, const char *name, unsigned char *ip)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_attx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_attx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_uchar");
@@ -164,7 +164,7 @@ int PIOc_get_att_uchar(int ncid, int varid, const char *name, unsigned char *ip)
 
 int PIOc_get_att_ushort(int ncid, int varid, const char *name, unsigned short *ip)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_attx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_attx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_ushort");
@@ -182,7 +182,7 @@ int PIOc_get_att_ushort(int ncid, int varid, const char *name, unsigned short *i
 
 int PIOc_get_att_uint(int ncid, int varid, const char *name, unsigned int *ip)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_attx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_attx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_uint");
@@ -200,7 +200,7 @@ int PIOc_get_att_uint(int ncid, int varid, const char *name, unsigned int *ip)
 
 int PIOc_get_att_longlong(int ncid, int varid, const char *name, long long *ip)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_attx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_attx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_longlong");
@@ -218,7 +218,7 @@ int PIOc_get_att_longlong(int ncid, int varid, const char *name, long long *ip)
 
 int PIOc_get_att_ulonglong(int ncid, int varid, const char *name, unsigned long long *ip)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_get_attx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_attx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_att_ulonglong");

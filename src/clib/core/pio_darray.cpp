@@ -129,7 +129,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
   int mpierr = MPI_SUCCESS;  /* Return code from MPI function calls. */
   int ierr = PIO_NOERR;              /* Return code. */
 
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("PIO:PIOc_write_darray_multi");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("PIO:PIOc_write_darray_multi");
   /* Get the file info. */
   if((ierr = pio_get_file(ncid, &file))){
     return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
@@ -1983,7 +1983,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
   int mpierr = MPI_SUCCESS;  /* Return code from MPI functions. */
   int ierr = PIO_NOERR;  /* Return code. */
 
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer2("PIO:write_total");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer2("PIO:write_total");
   LOG((1, "PIOc_write_darray ncid = %d varid = %d ioid = %d arraylen = %d",
        ncid, varid, ioid, arraylen));
 
