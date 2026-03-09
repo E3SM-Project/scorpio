@@ -9,7 +9,7 @@
 /* APIs for variable dimensions */
 int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_inq_dimx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_dimx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_dim");
@@ -26,7 +26,7 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
 
 int PIOc_inq_dimid(int ncid, const char *name, int *idp)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_inq_dimx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_dimx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_dimid");
@@ -44,7 +44,7 @@ int PIOc_inq_dimid(int ncid, const char *name, int *idp)
 
 int PIOc_inq_dimname(int ncid, int dimid, char *name)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_inq_dimx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_dimx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_dimname");
@@ -61,7 +61,7 @@ int PIOc_inq_dimname(int ncid, int dimid, char *name)
 
 int PIOc_inq_dimlen(int ncid, int dimid, PIO_Offset *lenp)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_inq_dimx");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_dimx");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_dimlen");
@@ -78,7 +78,7 @@ int PIOc_inq_dimlen(int ncid, int dimid, PIO_Offset *lenp)
 
 int PIOc_rename_dim(int ncid, int dimid, const char *name)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_rename_dim");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_rename_dim");
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_rename_dim");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("dimid", dimid).
@@ -89,7 +89,7 @@ int PIOc_rename_dim(int ncid, int dimid, const char *name)
 
 int PIOc_def_dim(int ncid, const char *name, PIO_Offset len, int *idp)
 {
-  SPIO_Util::GPTL_Util::GPTL_wrapper func_timer("SPIO:PIOc_def_dim");
+  SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_def_dim");
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_def_dim");
