@@ -119,7 +119,7 @@ int create_decomposition(int ntasks, int my_rank, int iosysid, int dim1_len, int
     elements_per_pe = dim1_len / ntasks;
 
     /* Allocate space for the decomposition array. */
-    if (!(compdof = (PIO_Offset *)malloc(elements_per_pe * sizeof(PIO_Offset))))
+    if (!(compdof = (PIO_Offset *) malloc(elements_per_pe * sizeof(PIO_Offset))))
         return PIO_ENOMEM;
 
     /* Describe the decomposition. The new init_decomp uses a 0-based
@@ -486,24 +486,24 @@ int check_error_strings(int my_rank, int num_tries, int *errcode,
     int ret;
 
     /* Try each test code. */
-    for (int t = 0; t < num_tries; t++)
+    for (int i = 0; i < num_tries; i++)
     {
         char errstr[PIO_MAX_NAME + 1];
 
         /* Get the error string for this errcode. */
-        if ((ret = PIOc_strerror(errcode[t], errstr, PIO_MAX_NAME)))
+        if ((ret = PIOc_strerror(errcode[i], errstr, PIO_MAX_NAME)))
             return ret;
 
-        printf("%d for errcode = %d message = %s\n", my_rank, errcode[t], errstr);
+        printf("%d for errcode = %d message = %s\n", my_rank, errcode[i], errstr);
 
         /* Check that it was as expected. */
-        if (strncmp(errstr, expected[t], strlen(expected[t])))
+        if (strncmp(errstr, expected[i], strlen(expected[i])))
         {
-            printf("%d expected %s got %s\n", my_rank, expected[t], errstr);
+            printf("%d expected %s got %s\n", my_rank, expected[i], errstr);
             return ERR_AWFUL;
         }
         if (!my_rank)
-            printf("%d errcode = %d passed\n", my_rank, errcode[t]);
+            printf("%d errcode = %d passed\n", my_rank, errcode[i]);
     }
 
     return PIO_NOERR;
@@ -1661,7 +1661,7 @@ int test_malloc_iodesc2(int iosysid, int my_rank)
     for (int t = 0; t < num_types; t++)
     {
 
-        if ((ret = malloc_iodesc(ios, test_type[t], 1, &iodesc)))
+        if ((ret = malloc_iodesc(ios, test_type[t], 1, 1, &iodesc)))
             return ret;
         if (iodesc->mpitype != mpi_type[t])
             return ERR_WRONG;
@@ -1670,6 +1670,8 @@ int test_malloc_iodesc2(int iosysid, int my_rank)
         ioid = pio_add_to_iodesc_list(iodesc, MPI_COMM_NULL);
         if (iodesc->firstregion)
             free_region_list(iodesc->firstregion);
+        free(iodesc->map);
+        free(iodesc->dimlen);
         if ((ret = pio_delete_iodesc_from_list(ioid)))
             return ret;
     }

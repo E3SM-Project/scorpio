@@ -9,7 +9,8 @@ include(SPIOUtils)
 #==============================================================================
 #  SET THE COMPILER OPTIONS
 #==============================================================================
-include_directories("${SCORPIO_SOURCE_DIR}/tests/cunit" "${SCORPIO_SOURCE_DIR}/src/clib" "${SCORPIO_BINARY_DIR}/src/clib")
+# FIXME: Use an interface lib to track these include deps
+include_directories("${SCORPIO_SOURCE_DIR}/tests/cunit" "${SCORPIO_SOURCE_DIR}/src/clib" "${SCORPIO_BINARY_DIR}/src/clib" "${SCORPIO_SOURCE_DIR}/src/clib/core" "${SCORPIO_SOURCE_DIR}/src/clib/core/util" "${SCORPIO_SOURCE_DIR}/src/clib/core/rearr" "${SCORPIO_SOURCE_DIR}/src/clib/core/progress_engine" "${SCORPIO_SOURCE_DIR}/src/clib/core/iolib/hdf5" "${SCORPIO_SOURCE_DIR}/src/clib/util")
 
 # Compiler-specific compiler options
 string (TOUPPER "${CMAKE_C_COMPILER_ID}" CMAKE_C_COMPILER_NAME)
@@ -64,52 +65,72 @@ endif ()
 
 # Exclude tests that require more than 1 procs when using the MPI serial library
 if (NOT PIO_USE_MPISERIAL)
-  add_spio_executable (test_intercomm2 TRUE "" test_intercomm2.c test_common.c)
-  add_spio_executable (test_async_simple TRUE "" test_async_simple.c test_common.c)
-  add_spio_executable (test_async_3proc TRUE "" test_async_3proc.c test_common.c)
-  add_spio_executable (test_async_4proc TRUE "" test_async_4proc.c test_common.c)
-  add_spio_executable (test_iosystem2_simple TRUE "" test_iosystem2_simple.c test_common.c)
-  add_spio_executable (test_iosystem2_simple2 TRUE "" test_iosystem2_simple2.c test_common.c)
-  add_spio_executable (test_iosystem2 TRUE "" test_iosystem2.c test_common.c)
-  add_spio_executable (test_iosystem3_simple TRUE "" test_iosystem3_simple.c test_common.c)
-  add_spio_executable (test_iosystem3_simple2 TRUE "" test_iosystem3_simple2.c test_common.c)
-  add_spio_executable (test_iosystem3 TRUE "" test_iosystem3.c test_common.c)
-  add_spio_executable (test_pioc TRUE "" test_pioc.cpp test_common.c)
-  add_spio_executable (test_pioc_unlim TRUE "" test_pioc_unlim.c test_common.c test_shared.c)
-  add_spio_executable (test_pioc_putget TRUE "" test_pioc_putget.c test_common.c test_shared.c)
-  add_spio_executable (test_pioc_fill TRUE "" test_pioc_fill.c test_common.c test_shared.c)
-  add_spio_executable (test_darray TRUE "" test_darray.c test_common.c)
-  add_spio_executable (test_darray_multi TRUE "" test_darray_multi.c test_common.c)
-  add_spio_executable (test_darray_multivar TRUE "" test_darray_multivar.c test_common.c)
-  add_spio_executable (test_darray_multivar2 TRUE "" test_darray_multivar2.c test_common.c)
-  add_spio_executable (test_darray_1d TRUE "" test_darray_1d.c test_common.c)
-  add_spio_executable (test_darray_3d TRUE "" test_darray_3d.c test_common.c)
-  add_spio_executable (test_decomp_uneven TRUE "" test_decomp_uneven.c test_common.c)
-  add_spio_executable (test_decomps TRUE "" test_decomps.c test_common.c)
-  add_spio_executable (test_rearr TRUE "" test_rearr.c test_common.c)
+  add_spio_executable (test_intercomm2 TRUE "" test_intercomm2.cpp test_common.cpp)
+  add_spio_executable (test_async_simple TRUE "" test_async_simple.cpp test_common.cpp)
+  add_spio_executable (test_async_3proc TRUE "" test_async_3proc.cpp test_common.cpp)
+  add_spio_executable (test_async_4proc TRUE "" test_async_4proc.cpp test_common.cpp)
+  add_spio_executable (test_iosystem2_simple TRUE "" test_iosystem2_simple.cpp test_common.cpp)
+  add_spio_executable (test_iosystem2_simple2 TRUE "" test_iosystem2_simple2.cpp test_common.cpp)
+  add_spio_executable (test_iosystem2 TRUE "" test_iosystem2.cpp test_common.cpp)
+  add_spio_executable (test_iosystem3_simple TRUE "" test_iosystem3_simple.cpp test_common.cpp)
+  add_spio_executable (test_iosystem3_simple2 TRUE "" test_iosystem3_simple2.cpp test_common.cpp)
+  add_spio_executable (test_iosystem3 TRUE "" test_iosystem3.cpp test_common.cpp)
+  add_spio_executable (test_pioc TRUE "" test_pioc.cpp test_common.cpp)
+  add_spio_executable (test_pioc_unlim TRUE "" test_pioc_unlim.cpp test_common.cpp test_shared.cpp)
+  add_spio_executable (test_pioc_putget TRUE "" test_pioc_putget.cpp test_common.cpp test_shared.cpp)
+  add_spio_executable (test_pioc_fill TRUE "" test_pioc_fill.cpp test_common.cpp test_shared.cpp)
+  add_spio_executable (test_darray TRUE "" test_darray.cpp test_common.cpp)
+  add_spio_executable (test_darray_multi TRUE "" test_darray_multi.cpp test_common.cpp)
+  add_spio_executable (test_darray_multivar TRUE "" test_darray_multivar.cpp test_common.cpp)
+  add_spio_executable (test_darray_multivar2 TRUE "" test_darray_multivar2.cpp test_common.cpp)
+  add_spio_executable (test_darray_1d TRUE "" test_darray_1d.cpp test_common.cpp)
+  add_spio_executable (test_darray_3d TRUE "" test_darray_3d.cpp test_common.cpp)
+  add_spio_executable (test_decomp_uneven TRUE "" test_decomp_uneven.cpp test_common.cpp)
+  add_spio_executable (test_decomps TRUE "" test_decomps.cpp test_common.cpp)
+  add_spio_executable (test_rearr TRUE "" test_rearr.cpp test_common.cpp)
   add_dependencies (tests test_intercomm2 test_async_simple test_async_3proc test_async_4proc
                     test_iosystem2_simple test_iosystem2_simple2 test_iosystem2 test_iosystem3_simple
                     test_iosystem3_simple2 test_iosystem3 test_pioc test_pioc_unlim test_pioc_putget
                     test_pioc_fill test_darray test_darray_multi test_darray_multivar test_darray_multivar2
                     test_darray_1d test_darray_3d test_decomp_uneven test_decomps test_rearr)
   if (PIO_USE_MALLOC)
-    add_spio_executable (test_darray_async_simple TRUE "" test_darray_async_simple.c test_common.c)
-    add_spio_executable (test_darray_async TRUE "" test_darray_async.c test_common.c)
-    add_spio_executable (test_darray_async_many TRUE "" test_darray_async_many.c test_common.c)
+    add_spio_executable (test_darray_async_simple TRUE "" test_darray_async_simple.cpp test_common.cpp)
+    add_spio_executable (test_darray_async TRUE "" test_darray_async.cpp test_common.cpp)
+    add_spio_executable (test_darray_async_many TRUE "" test_darray_async_many.cpp test_common.cpp)
     add_dependencies (tests test_darray_async_simple test_darray_async test_darray_async_many)
   endif ()
 endif ()
-add_spio_executable (test_spmd TRUE "" test_spmd.c test_common.c)
+add_spio_executable (test_spmd TRUE "" test_spmd.cpp test_common.cpp)
 add_spio_executable (test_spio_ltimer TRUE "" test_spio_ltimer.cpp)
 add_spio_executable (test_spio_serializer TRUE "" test_spio_serializer.cpp)
 add_spio_executable (test_spio_tree TRUE "" test_spio_tree.cpp)
 add_spio_executable (test_spio_file_mvcache TRUE "" test_spio_file_mvcache.cpp)
-add_spio_executable (test_spio_rearr_contig TRUE "" test_spio_rearr_contig.cpp test_common.c)
-add_spio_executable (test_sdecomp_regex TRUE "" test_sdecomp_regex.cpp test_common.c)
-add_spio_executable(test_req_block_wait TRUE "" test_req_block_wait.c test_common.c)
+add_spio_executable (test_spio_sort_utils TRUE "" test_spio_sort_utils.cpp)
+add_spio_executable (test_spio_rearr_utils_gather TRUE "" test_spio_rearr_utils_gather.cpp)
+add_spio_executable (test_spio_rearr_utils_scatter TRUE "" test_spio_rearr_utils_scatter.cpp)
+add_spio_executable (test_spio_rearr_utils_alltoall TRUE "" test_spio_rearr_utils_alltoall.cpp)
+add_spio_executable (test_spio_rearr_contig TRUE "" test_spio_rearr_contig.cpp)
+add_spio_executable (test_spio_rearr_contig_nvars TRUE "" test_spio_rearr_contig_nvars.cpp)
+add_spio_executable (test_spio_rearr_contig_fillval TRUE "" test_spio_rearr_contig_fillval.cpp)
+add_spio_executable (test_spio_decomp_logger TRUE "" test_spio_decomp_logger.cpp)
+add_spio_executable (test_sdecomp_regex TRUE "" test_sdecomp_regex.cpp test_common.cpp)
+add_spio_executable(test_req_block_wait TRUE "" test_req_block_wait.cpp test_common.cpp)
+add_spio_executable(test_spio_dt_converter TRUE "" test_spio_dt_converter.cpp)
 add_dependencies (tests test_spmd test_spio_ltimer test_spio_serializer test_spio_tree
-                  test_spio_file_mvcache test_spio_rearr_contig test_sdecomp_regex
-                  test_req_block_wait)
+                  test_spio_file_mvcache test_spio_sort_utils test_spio_rearr_utils_gather
+                  test_spio_rearr_utils_scatter test_spio_rearr_utils_alltoall
+                  test_spio_rearr_contig test_spio_rearr_contig_nvars test_spio_rearr_contig_fillval
+                  test_spio_decomp_logger test_sdecomp_regex test_req_block_wait
+                  test_spio_dt_converter)
+
+if(PIO_USE_ASYNC_WR_THREAD)
+  add_spio_executable (test_mtq TRUE "" test_async_mtq.cpp test_common.cpp)
+  add_spio_executable (test_mtq_signal TRUE "" test_async_mtq_signal.cpp test_common.cpp)
+  add_spio_executable (test_mtq_pool TRUE "" test_async_tpool.cpp test_common.cpp)
+  add_dependencies(tests test_mtq test_mtq_signal test_mtq_pool)
+endif()
+
+set (SPIO_TEST_MAX_NPROCS 4)
 
 # Test Timeout in seconds.
 if (PIO_VALGRIND_CHECK)
@@ -129,8 +150,15 @@ add_test(NAME test_spio_ltimer COMMAND test_spio_ltimer)
 add_test(NAME test_spio_serializer COMMAND test_spio_serializer)
 add_test(NAME test_spio_tree COMMAND test_spio_tree)
 add_test(NAME test_spio_file_mvcache COMMAND test_spio_file_mvcache)
-add_test(NAME test_spio_rearr_contig COMMAND test_spio_rearr_contig)
+add_test(NAME test_spio_dt_converter COMMAND test_spio_dt_converter)
 add_test(NAME test_sdecomp_regex COMMAND test_sdecomp_regex)
+add_test(NAME test_spio_sort_utils COMMAND test_spio_sort_utils)
+
+if(PIO_USE_ASYNC_WR_THREAD)
+  add_test(NAME test_mtq COMMAND test_mtq)
+  add_test(NAME test_mtq_signal COMMAND test_mtq_signal)
+  add_test(NAME test_mtq_pool COMMAND test_mtq_pool)
+endif()
 
 if (PIO_USE_MPISERIAL)
   add_test(NAME test_pioc
@@ -152,6 +180,48 @@ else ()
     EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_req_block_wait
     NUMPROCS 4
     TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_rearr_utils_gather${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_utils_gather
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_rearr_utils_scatter${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_utils_scatter
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_rearr_utils_alltoall${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_utils_alltoall
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_rearr_contig${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_contig
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_rearr_contig_nvars${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_contig_nvars
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_rearr_contig_fillval${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_contig_fillval
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_decomp_logger${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_decomp_logger
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
   add_mpi_test(test_spmd
     EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spmd
     NUMPROCS ${AT_LEAST_FOUR_TASKS}
