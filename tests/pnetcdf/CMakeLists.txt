@@ -10,6 +10,8 @@ include(SPIOUtils)
 #  SET THE COMPILER OPTIONS
 #==============================================================================
 include_directories("${SCORPIO_SOURCE_DIR}/tests/cunit" "${SCORPIO_SOURCE_DIR}/src/clib" "${SCORPIO_BINARY_DIR}/src/clib")
+# Required for time.h to include decl of asctime_r()
+add_compile_definitions(_POSIX_C_SOURCE=200112L)
 
 # Compiler-specific compiler options
 string (TOUPPER "${CMAKE_C_COMPILER_ID}" CMAKE_C_COMPILER_NAME)
