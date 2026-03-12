@@ -179,7 +179,7 @@ if (WITH_ADIOS2)
     # Required for symlink() support/decl in unistd.h
     target_compile_definitions (spio_default_private_options
       INTERFACE _POSIX_C_SOURCE=200112L)
-    target_link_libraries (spio_default_public_options INTERFACE adios2::adios2 adios2pio-nm-lib)
+    target_link_libraries (spio_default_public_options INTERFACE adios2::adios2)
   else ()
     message(STATUS "Could not find ADIOS library, disabling support for ADIOS")
     set(PIO_USE_ADIOS 0)
@@ -465,7 +465,7 @@ add_subdirectory (core)
 
 # FIXME : Use interface libs for subdir sources ?
 # Add sources for libpioc.a
-add_library (pioc
+set (SPIO_PIOC_OBJS
   $<TARGET_OBJECTS:pioc_api>
   $<TARGET_OBJECTS:spio_util>
   $<TARGET_OBJECTS:spio_core>
@@ -474,6 +474,12 @@ add_library (pioc
   $<TARGET_OBJECTS:spio_core_rearr>
   $<TARGET_OBJECTS:spio_core_iolib>
   $<TARGET_OBJECTS:spio_core_iolib_hdf5>)
+
+if (ADIOS2_FOUND)
+  set (SPIO_PIOC_OBJS ${SPIO_PIOC_OBJS} $<TARGET_OBJECTS:adios2pio-nm-lib-objs>)
+endif ()
+
+add_library (pioc ${SPIO_PIOC_OBJS})
 
 #  PUBLIC ${spio_default_public_libs}
 #  PRIVATE ${spio_default_private_libs}
