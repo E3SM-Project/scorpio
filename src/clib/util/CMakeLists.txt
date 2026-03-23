@@ -21,7 +21,7 @@ set (spio_util_src
 add_library (spio_util OBJECT ${spio_util_src})
 target_include_directories(spio_util
   PUBLIC .
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR}/..)
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR}/.. ${SCORPIO_SOURCE_DIR}/util)
 target_link_libraries(spio_util
   PUBLIC spio_default_public_options
   PRIVATE spio_default_private_options)
