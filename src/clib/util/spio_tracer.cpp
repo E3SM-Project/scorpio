@@ -278,7 +278,7 @@ SPIO_Util::Logger::MPI_logger<std::ofstream> &SPIO_Util::Tracer::get_iosys_trace
     assert(ret == MPI_SUCCESS);
 
     // FIXME: use unique_ptr
-    std::ofstream *fstr = new std::ofstream();
+    std::shared_ptr<std::ofstream> fstr = std::make_shared<std::ofstream>();
     const std::string DEV_NULL = "/dev/null";
     std::string log_fname = get_trace_log_fname(iosysid, mpi_wrank);
 
@@ -318,10 +318,9 @@ void SPIO_Util::Tracer::finalize_iosys_trace_logger(std::string iosys_key)
   std::map<std::string, SPIO_Util::Logger::MPI_logger<std::ofstream> >::iterator iter = SPIO_Util::Tracer::GVars::trace_loggers_.find(iosys_key);
   if(iter != SPIO_Util::Tracer::GVars::trace_loggers_.end()){
     (*iter).second.log(get_trace_log_footer());
-    std::ofstream *fstr = (*iter).second.get_log_stream();
+    std::shared_ptr<std::ofstream> fstr = (*iter).second.get_log_stream();
     assert(fstr);
     fstr->close();
-    delete fstr;
 
     SPIO_Util::Tracer::GVars::trace_loggers_.erase(iter);
   }

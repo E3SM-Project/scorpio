@@ -2,6 +2,7 @@
 #define __SPIO_LOGGER_HPP__
 
 #include <string>
+#include <memory>
 
 #include "mpi.h"
 
@@ -25,7 +26,7 @@ namespace SPIO_Util{
       public:
         MPI_logger() : mpi_comm_(MPI_COMM_NULL), ostr_(NULL), is_io_proc_(false), slog_done_(false), log_lvl_(Log_level::INFO) {}
 
-        MPI_logger(MPI_Comm comm, TStream *ostr);
+        MPI_logger(MPI_Comm comm, std::shared_ptr<TStream> &ostr);
 
         MPI_logger(const MPI_logger &other) = default;
 
@@ -50,12 +51,12 @@ namespace SPIO_Util{
         void flush(void );
 
         /* Get associated stream */
-        TStream *get_log_stream(void ) const;
+        std::shared_ptr<TStream> get_log_stream(void ) const;
 
         ~MPI_logger(){}
       private:
         MPI_Comm mpi_comm_;
-        TStream *ostr_;
+        std::shared_ptr<TStream> ostr_;
         bool is_io_proc_;
         bool slog_done_;
         Log_level log_lvl_;
@@ -67,7 +68,7 @@ namespace SPIO_Util{
 } // namespace SPIO_Util
 
 template<typename TStream>
-SPIO_Util::Logger::MPI_logger<TStream>::MPI_logger(MPI_Comm comm, TStream *ostr):
+SPIO_Util::Logger::MPI_logger<TStream>::MPI_logger(MPI_Comm comm, std::shared_ptr<TStream> &ostr):
   mpi_comm_(comm), ostr_(ostr), is_io_proc_(false), slog_done_(false), log_lvl_(Log_level::INFO)
 {
   int rank;
@@ -120,7 +121,7 @@ void SPIO_Util::Logger::MPI_logger<TStream>::flush()
 }
 
 template<typename TStream>
-TStream *SPIO_Util::Logger::MPI_logger<TStream>::get_log_stream(void ) const
+std::shared_ptr<TStream> SPIO_Util::Logger::MPI_logger<TStream>::get_log_stream(void ) const
 {
   return ostr_;
 }
