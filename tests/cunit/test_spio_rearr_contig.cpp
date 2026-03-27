@@ -12,6 +12,7 @@
 #include "pio.h"
 #include "pio_tests.h"
 #include "pio_rearr_contig.hpp"
+#include "spio_test_framework.hpp"
 
 #ifdef SPIO_ENABLE_GPTL_TIMING
 #ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
@@ -19,21 +20,13 @@
 #endif
 #endif
 
-#define LOG_RANK0(rank, ...)                      \
-            do{                                   \
-              if(rank == 0){                      \
-                fprintf(stderr, __VA_ARGS__);     \
-              }                                   \
-            }while(0);
-
 static const int FAIL = -1;
 
 template<typename T>
-bool cmp_result(int wrank, const std::vector<T> &res, const std::vector<T> &exp)
+bool cmp_result(SPIO_TF::Test_framework &tf, int wrank, const std::vector<T> &res, const std::vector<T> &exp)
 {
-  
   if(res.size() != exp.size()){
-    LOG_RANK0(wrank, "ERROR: The result and expected vectors are of different sizes\n");
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO, "ERROR: The result and expected vectors are of different sizes\n");
     return false;
   }
 
@@ -41,8 +34,8 @@ bool cmp_result(int wrank, const std::vector<T> &res, const std::vector<T> &exp)
     if(res[i] != exp[i]){
       std::ostringstream oss;
       oss << "ERROR: Invalid/Unexpected value, array[ " << i << "] = " << res[i]
-          << " (Expected array[" << i << "] = " << exp[i] << ")";
-      LOG_RANK0(wrank, "ERROR: %s\n", oss.str().c_str());
+          << " (Expected array[" << i << "] = " << exp[i] << ")\n";
+      tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO, "ERROR:" + oss.str());
       return false;
     }
   }
@@ -50,13 +43,13 @@ bool cmp_result(int wrank, const std::vector<T> &res, const std::vector<T> &exp)
   return true;
 }
 
-iosystem_desc_t *get_iosystem(MPI_Comm comm, int wrank, int wsz, int nio_procs)
+iosystem_desc_t *get_iosystem(SPIO_TF::Test_framework &tf, MPI_Comm comm, int wrank, int wsz, int nio_procs)
 {
   int ret = PIO_NOERR;
   static int iosysid = 1;
   iosystem_desc_t *ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t));
   if(!ios){
-    LOG_RANK0(wrank, "Unable to allocate memory for I/O system");
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO, "Unable to allocate memory for I/O system");
     return NULL;
   }
 
@@ -77,7 +70,7 @@ iosystem_desc_t *get_iosystem(MPI_Comm comm, int wrank, int wsz, int nio_procs)
 
   ret = MPI_Comm_split(comm, color, 0, &(ios->io_comm));
   if(ret != MPI_SUCCESS){
-    LOG_RANK0(wrank, "Unable to split comm for creating I/O system");
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO, "Unable to split comm for creating I/O system");
     free(ios);
     return NULL;
   }
@@ -87,7 +80,7 @@ iosystem_desc_t *get_iosystem(MPI_Comm comm, int wrank, int wsz, int nio_procs)
   if(ios->ioproc){
     ret = MPI_Comm_rank(ios->io_comm, &(ios->io_rank));
     if(ret != MPI_SUCCESS){
-      LOG_RANK0(wrank, "Unable to get rank of I/O process");
+      tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO, "Unable to get rank of I/O process");
       free(ios);
       return NULL;
     }
@@ -108,13 +101,19 @@ void free_iosystem(iosystem_desc_t *ios){
   free(ios);
 }
 
-int test_create_block_rearr(MPI_Comm comm, int wrank, int wsz)
+int test_create_block_rearr(SPIO_TF::Test_framework &tf)
 {
+  MPI_Comm comm = tf.get_comm();
+  int wrank = tf.get_comm_rank();
+  int wsz = tf.get_comm_size();
+  SPIO_Util::Logger::MPI_logger<std::ofstream> logger = tf.get_logger();
+
   int ret = PIO_NOERR;
+
   int nio_procs = (wsz/2 > 0) ? wsz/2 : wsz;
-  iosystem_desc_t *ios = get_iosystem(comm, wrank, wsz, nio_procs);
+  iosystem_desc_t *ios = get_iosystem(tf, comm, wrank, wsz, nio_procs);
   if(!ios){
-    LOG_RANK0(wrank, "Unable to get I/O system");
+    logger.log(SPIO_Util::Logger::Log_level::ERROR, "Unable to get I/O system");
     return PIO_EINTERNAL;
   }
     
@@ -127,18 +126,18 @@ int test_create_block_rearr(MPI_Comm comm, int wrank, int wsz)
     std::iota(compmap.begin(), compmap.end(), wrank * LOCAL_COMPMAP_SZ);
     ret = rearr.init(PIO_DOUBLE, compmap.data(), compmap.size(), &gdimlen, 1, NULL);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Initializing contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Initializing contig rearranger failed");
       return PIO_EINTERNAL;
     }
 
     ret = rearr.finalize();
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Finalizing contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Finalizing contig rearranger failed");
       return PIO_EINTERNAL;
     }
   }
   catch(...){
-    LOG_RANK0(wrank, "Creating contig rearranger failed");
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Creating contig rearranger failed");
     return PIO_EINTERNAL;
   }
 
@@ -146,13 +145,18 @@ int test_create_block_rearr(MPI_Comm comm, int wrank, int wsz)
   return PIO_NOERR;
 }
 
-int test_c2i_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
+int test_c2i_block_data_rearr(SPIO_TF::Test_framework &tf)
 {
+  MPI_Comm comm = tf.get_comm();
+  int wrank = tf.get_comm_rank();
+  int wsz = tf.get_comm_size();
+  SPIO_Util::Logger::MPI_logger<std::ofstream> logger = tf.get_logger();
   int ret = PIO_NOERR;
+
   int nio_procs = (wsz/2 > 0) ? wsz/2 : wsz;
-  iosystem_desc_t *ios = get_iosystem(comm, wrank, wsz, nio_procs);
+  iosystem_desc_t *ios = get_iosystem(tf, comm, wrank, wsz, nio_procs);
   if(!ios){
-    LOG_RANK0(wrank, "Unable to get I/O system");
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Unable to get I/O system");
     return PIO_EINTERNAL;
   }
     
@@ -181,29 +185,29 @@ int test_c2i_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
       [](const PIO_Offset i){ return static_cast<double>(i); });
     ret = rearr.init(PIO_DOUBLE, compmap.data(), compmap.size(), &gdimlen, 1, NULL);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Initializing contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Initializing contig rearranger failed");
       return PIO_EINTERNAL;
     }
     ret = rearr.rearrange_comp2io(sdata.data(), sdata.size() * sizeof(double),
             rdata.data(), rdata.size() * sizeof(double), 1);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed");
       return PIO_EINTERNAL;
     }
 
-    if(!cmp_result(wrank, rdata, exp_data)){
-      LOG_RANK0(wrank, "ERROR: Unexpected/invalid data received after data rearrangement\n");
+    if(!cmp_result(tf, wrank, rdata, exp_data)){
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "ERROR: Unexpected/invalid data received after data rearrangement\n");
       return PIO_EINTERNAL;
     }
 
     ret = rearr.finalize();
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Finalizing contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Finalizing contig rearranger failed");
       return PIO_EINTERNAL;
     }
   }
   catch(...){
-    LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed");
     return PIO_EINTERNAL;
   }
 
@@ -211,13 +215,18 @@ int test_c2i_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
   return PIO_NOERR;
 }
 
-int test_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
+int test_block_data_rearr(SPIO_TF::Test_framework &tf)
 {
+  MPI_Comm comm = tf.get_comm();
+  int wrank = tf.get_comm_rank();
+  int wsz = tf.get_comm_size();
+  SPIO_Util::Logger::MPI_logger<std::ofstream> logger = tf.get_logger();
   int ret = PIO_NOERR;
+
   int nio_procs = (wsz/2 > 0) ? wsz/2 : wsz;
-  iosystem_desc_t *ios = get_iosystem(comm, wrank, wsz, nio_procs);
+  iosystem_desc_t *ios = get_iosystem(tf, comm, wrank, wsz, nio_procs);
   if(!ios){
-    LOG_RANK0(wrank, "Unable to get I/O system");
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Unable to get I/O system");
     return PIO_EINTERNAL;
   }
     
@@ -246,7 +255,7 @@ int test_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
       [](const PIO_Offset i){ return static_cast<double>(i); });
     ret = rearr.init(PIO_DOUBLE, compmap.data(), compmap.size(), &gdimlen, 1, NULL);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Initializing contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Initializing contig rearranger failed");
       return PIO_EINTERNAL;
     }
 
@@ -254,12 +263,12 @@ int test_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
     ret = rearr.rearrange_comp2io(sdata.data(), sdata.size() * sizeof(double),
             rdata.data(), rdata.size() * sizeof(double), 1);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed");
       return PIO_EINTERNAL;
     }
 
-    if(!cmp_result(wrank, rdata, exp_data)){
-      LOG_RANK0(wrank, "ERROR: Unexpected/invalid data received after data rearrangement (compute to I/O procs)\n");
+    if(!cmp_result(tf, wrank, rdata, exp_data)){
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "ERROR: Unexpected/invalid data received after data rearrangement (compute to I/O procs)\n");
       return PIO_EINTERNAL;
     }
 
@@ -272,23 +281,23 @@ int test_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
     ret = rearr.rearrange_io2comp(rdata.data(), rdata.size() * sizeof(double),
             sdata.data(), sdata.size() * sizeof(double), 1);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed");
       return PIO_EINTERNAL;
     }
 
-    if(!cmp_result(wrank, sdata, exp_data)){
-      LOG_RANK0(wrank, "ERROR: Unexpected/invalid data received after data rearrangement (I/O to compute procs)\n");
+    if(!cmp_result(tf, wrank, sdata, exp_data)){
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "ERROR: Unexpected/invalid data received after data rearrangement (I/O to compute procs)\n");
       return PIO_EINTERNAL;
     }
 
     ret = rearr.finalize();
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Finalizing contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Finalizing contig rearranger failed");
       return PIO_EINTERNAL;
     }
   }
   catch(...){
-    LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed");
     return PIO_EINTERNAL;
   }
 
@@ -296,13 +305,18 @@ int test_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
   return PIO_NOERR;
 }
 
-int test_rev_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
+int test_rev_block_data_rearr(SPIO_TF::Test_framework &tf)
 {
+  MPI_Comm comm = tf.get_comm();
+  int wrank = tf.get_comm_rank();
+  int wsz = tf.get_comm_size();
+  SPIO_Util::Logger::MPI_logger<std::ofstream> logger = tf.get_logger();
+
   int ret = PIO_NOERR;
   int nio_procs = (wsz/2 > 0) ? wsz/2 : wsz;
-  iosystem_desc_t *ios = get_iosystem(comm, wrank, wsz, nio_procs);
+  iosystem_desc_t *ios = get_iosystem(tf, comm, wrank, wsz, nio_procs);
   if(!ios){
-    LOG_RANK0(wrank, "Unable to get I/O system");
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Unable to get I/O system");
     return PIO_EINTERNAL;
   }
     
@@ -334,18 +348,18 @@ int test_rev_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
       [](const PIO_Offset i){ return static_cast<double>(i); });
     ret = rearr.init(PIO_DOUBLE, compmap.data(), compmap.size(), &gdimlen, 1, NULL);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Initializing contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Initializing contig rearranger failed");
       return PIO_EINTERNAL;
     }
     ret = rearr.rearrange_comp2io(sdata.data(), sdata.size() * sizeof(double),
             rdata.data(), rdata.size() * sizeof(double), 1);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed");
       return PIO_EINTERNAL;
     }
 
-    if(!cmp_result(wrank, rdata, exp_data)){
-      LOG_RANK0(wrank, "ERROR: Unexpected/invalid data received after data rearrangement\n");
+    if(!cmp_result(tf, wrank, rdata, exp_data)){
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "ERROR: Unexpected/invalid data received after data rearrangement\n");
       return PIO_EINTERNAL;
     }
 
@@ -358,23 +372,23 @@ int test_rev_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
     ret = rearr.rearrange_io2comp(rdata.data(), rdata.size() * sizeof(double),
             sdata.data(), sdata.size() * sizeof(double), 1);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Rearranging data using contig rearranger failed (I/O to compute procs)");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed (I/O to compute procs)");
       return PIO_EINTERNAL;
     }
 
-    if(!cmp_result(wrank, sdata, exp_data)){
-      LOG_RANK0(wrank, "ERROR: Unexpected/invalid data received after data rearrangement (I/O to compute procs)\n");
+    if(!cmp_result(tf, wrank, sdata, exp_data)){
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "ERROR: Unexpected/invalid data received after data rearrangement (I/O to compute procs)\n");
       return PIO_EINTERNAL;
     }
 
     ret = rearr.finalize();
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Finalizing contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Finalizing contig rearranger failed");
       return PIO_EINTERNAL;
     }
   }
   catch(...){
-    LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed");
     return PIO_EINTERNAL;
   }
 
@@ -382,13 +396,18 @@ int test_rev_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
   return PIO_NOERR;
 }
 
-int test_mrange_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
+int test_mrange_block_data_rearr(SPIO_TF::Test_framework &tf)
 {
+  MPI_Comm comm = tf.get_comm();
+  int wrank = tf.get_comm_rank();
+  int wsz = tf.get_comm_size();
+  SPIO_Util::Logger::MPI_logger<std::ofstream> logger = tf.get_logger();
+
   int ret = PIO_NOERR;
   int nio_procs = (wsz/2 > 0) ? wsz/2 : wsz;
-  iosystem_desc_t *ios = get_iosystem(comm, wrank, wsz, nio_procs);
+  iosystem_desc_t *ios = get_iosystem(tf, comm, wrank, wsz, nio_procs);
   if(!ios){
-    LOG_RANK0(wrank, "Unable to get I/O system");
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Unable to get I/O system");
     return PIO_EINTERNAL;
   }
     
@@ -422,18 +441,18 @@ int test_mrange_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
       [](const PIO_Offset i){ return static_cast<double>(i); });
     ret = rearr.init(PIO_DOUBLE, compmap.data(), compmap.size(), &gdimlen, 1, NULL);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Initializing contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Initializing contig rearranger failed");
       return PIO_EINTERNAL;
     }
     ret = rearr.rearrange_comp2io(sdata.data(), sdata.size() * sizeof(double),
             rdata.data(), rdata.size() * sizeof(double), 1);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed");
       return PIO_EINTERNAL;
     }
 
-    if(!cmp_result(wrank, rdata, exp_data)){
-      LOG_RANK0(wrank, "ERROR: Unexpected/invalid data received after data rearrangement\n");
+    if(!cmp_result(tf, wrank, rdata, exp_data)){
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "ERROR: Unexpected/invalid data received after data rearrangement\n");
       return PIO_EINTERNAL;
     }
 
@@ -446,23 +465,23 @@ int test_mrange_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
     ret = rearr.rearrange_io2comp(rdata.data(), rdata.size() * sizeof(double),
             sdata.data(), sdata.size() * sizeof(double), 1);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Rearranging data using contig rearranger failed (I/O to compute procs)");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed (I/O to compute procs)");
       return PIO_EINTERNAL;
     }
 
-    if(!cmp_result(wrank, sdata, exp_data)){
-      LOG_RANK0(wrank, "ERROR: Unexpected/invalid data received after data rearrangement (I/O to compute procs)\n");
+    if(!cmp_result(tf, wrank, sdata, exp_data)){
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "ERROR: Unexpected/invalid data received after data rearrangement (I/O to compute procs)\n");
       return PIO_EINTERNAL;
     }
 
     ret = rearr.finalize();
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Finalizing contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Finalizing contig rearranger failed");
       return PIO_EINTERNAL;
     }
   }
   catch(...){
-    LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed");
     return PIO_EINTERNAL;
   }
 
@@ -470,17 +489,22 @@ int test_mrange_block_data_rearr(MPI_Comm comm, int wrank, int wsz)
   return PIO_NOERR;
 }
 
-int test_mrange_oddz_data_rearr(MPI_Comm comm, int wrank, int wsz)
+int test_mrange_oddz_data_rearr(SPIO_TF::Test_framework &tf)
 {
+  MPI_Comm comm = tf.get_comm();
+  int wrank = tf.get_comm_rank();
+  int wsz = tf.get_comm_size();
+  SPIO_Util::Logger::MPI_logger<std::ofstream> logger = tf.get_logger();
+
   bool is_odd_proc = ((wrank % 2) != 0) ? true : false;
   int nodd_procs = wsz/2;
   int neven_procs = wsz - nodd_procs;
   int ret = PIO_NOERR;
 
   int nio_procs = (wsz/2 > 0) ? wsz/2 : wsz;
-  iosystem_desc_t *ios = get_iosystem(comm, wrank, wsz, nio_procs);
+  iosystem_desc_t *ios = get_iosystem(tf, comm, wrank, wsz, nio_procs);
   if(!ios){
-    LOG_RANK0(wrank, "Unable to get I/O system");
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Unable to get I/O system");
     return PIO_EINTERNAL;
   }
     
@@ -522,18 +546,18 @@ int test_mrange_oddz_data_rearr(MPI_Comm comm, int wrank, int wsz)
 
     ret = rearr.init(PIO_DOUBLE, compmap.data(), compmap.size(), &gdimlen, 1, NULL);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Initializing contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Initializing contig rearranger failed");
       return PIO_EINTERNAL;
     }
     ret = rearr.rearrange_comp2io(sdata.data(), sdata.size() * sizeof(double),
             rdata.data(), rdata.size() * sizeof(double), 1);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed");
       return PIO_EINTERNAL;
     }
 
-    if(!cmp_result(wrank, rdata, exp_data)){
-      LOG_RANK0(wrank, "ERROR: Unexpected/invalid data received after data rearrangement\n");
+    if(!cmp_result(tf, wrank, rdata, exp_data)){
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "ERROR: Unexpected/invalid data received after data rearrangement\n");
       return PIO_EINTERNAL;
     }
 
@@ -552,23 +576,23 @@ int test_mrange_oddz_data_rearr(MPI_Comm comm, int wrank, int wsz)
     ret = rearr.rearrange_io2comp(rdata.data(), rdata.size() * sizeof(double),
             sdata.data(), sdata.size() * sizeof(double), 1);
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Rearranging data using contig rearranger failed (I/O to compute procs)");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed (I/O to compute procs)");
       return PIO_EINTERNAL;
     }
 
-    if(!cmp_result(wrank, sdata, exp_data)){
-      LOG_RANK0(wrank, "ERROR: Unexpected/invalid data received after data rearrangement (I/O to compute procs)\n");
+    if(!cmp_result(tf, wrank, sdata, exp_data)){
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "ERROR: Unexpected/invalid data received after data rearrangement (I/O to compute procs)\n");
       return PIO_EINTERNAL;
     }
 
     ret = rearr.finalize();
     if(ret != PIO_NOERR){
-      LOG_RANK0(wrank, "Finalizing contig rearranger failed");
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Finalizing contig rearranger failed");
       return PIO_EINTERNAL;
     }
   }
   catch(...){
-    LOG_RANK0(wrank, "Rearranging data using contig rearranger failed");
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Rearranging data using contig rearranger failed");
     return PIO_EINTERNAL;
   }
 
@@ -576,104 +600,31 @@ int test_mrange_oddz_data_rearr(MPI_Comm comm, int wrank, int wsz)
   return PIO_NOERR;
 }
 
-int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
-{
-  int nerrs = 0, ret = PIO_NOERR, mpierr = MPI_SUCCESS;
-  assert((comm != MPI_COMM_NULL) && (wrank >= 0) && (wsz > 0) && num_errors);
-  
-  std::vector<std::pair<std::string, std::function<int(MPI_Comm, int, int)> > > test_funcs = {
-      {"test_create_block_rearr", test_create_block_rearr},
-      {"test_c2i_block_data_rearr", test_c2i_block_data_rearr},
-      {"test_block_data_rearr", test_block_data_rearr},
-      {"test_rev_block_data_rearr", test_rev_block_data_rearr},
-      {"test_mrange_block_data_rearr", test_mrange_block_data_rearr},
-      {"test_mrange_oddz_data_rearr", test_mrange_oddz_data_rearr}
-    };
-  
-  for(std::size_t tid = 0; tid < test_funcs.size(); tid++){
-    try{
-      ret = test_funcs[tid].second(comm, wrank, wsz);
-    }
-    catch(...){
-      ret = PIO_EINTERNAL;
-      nerrs++;
-    }
-    int lfail = (ret == PIO_NOERR) ? 0 : 1;
-    mpierr = MPI_Reduce(&ret, &lfail, 1, MPI_INT, MPI_SUM, 0, comm);
-    if(mpierr != MPI_SUCCESS){
-      LOG_RANK0(wrank, "Test Driver failed: Unable to calculate total num errors\n");
-    }
-    if(ret != 0){
-      std::string non_root_fail_msg = std::string(", failed on ") + std::to_string(ret) + std::string(" non-root processes");
-      LOG_RANK0(wrank, "%s() FAILED (ret = %d%s)\n", test_funcs[tid].first.c_str(), ret, (lfail) ? "" : non_root_fail_msg.c_str());
-      nerrs++;
-    }
-    else{
-      LOG_RANK0(wrank, "%s() PASSED\n", test_funcs[tid].first.c_str());
-    }
-  }
-
-  *num_errors += nerrs;
-  return nerrs;
-}
-
 int main(int argc, char *argv[])
 {
   int ret;
-  int wrank, wsz;
-  int num_errors;
-#ifdef SPIO_ENABLE_GPTL_TIMING
-#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
-  ret = GPTLinitialize();
-  if(ret != 0){
-    LOG_RANK0(wrank, "GPTLinitialize() FAILED, ret = %d\n", ret);
-    return ret;
-  }
-#endif /* TIMING_INTERNAL */
-#endif /* TIMING */
 
   ret = MPI_Init(&argc, &argv);
   if(ret != MPI_SUCCESS){
-    LOG_RANK0(wrank, "MPI_Init() FAILED, ret = %d\n", ret);
+    std::cerr << "MPI_Init() FAILED, ret = " << ret << "\n";
     return ret;
   }
 
-  ret = MPI_Comm_rank(MPI_COMM_WORLD, &wrank);
-  if(ret != MPI_SUCCESS){
-    LOG_RANK0(wrank, "MPI_Comm_rank() FAILED, ret = %d\n", ret);
-    return ret;
-  }
-  ret = MPI_Comm_size(MPI_COMM_WORLD, &wsz);
-  if(ret != MPI_SUCCESS){
-    LOG_RANK0(wrank, "MPI_Comm_rank() FAILED, ret = %d\n", ret);
-    return ret;
-  }
+  std::vector<std::pair<std::string, std::function<int(SPIO_TF::Test_framework &)> > > rfuncs = {
+    {"test_create_block_rearr", test_create_block_rearr}, 
+    {"test_c2i_block_data_rearr", test_c2i_block_data_rearr},
+    {"test_block_data_rearr", test_block_data_rearr},
+    {"test_rev_block_data_rearr", test_rev_block_data_rearr},
+    {"test_mrange_block_data_rearr", test_mrange_block_data_rearr},
+    {"test_mrange_oddz_data_rearr", test_mrange_oddz_data_rearr}
+  };
 
-  num_errors = 0;
-  ret = test_driver(MPI_COMM_WORLD, wrank, wsz, &num_errors);
-  if(ret != 0){
-    LOG_RANK0(wrank, "Test driver FAILED\n");
-    return FAIL;
-  }
-  else{
-    LOG_RANK0(wrank, "All tests PASSED\n");
-  }
+  SPIO_TF::Test_framework tf("test_spio_rearr_contig", MPI_COMM_WORLD, rfuncs);
+  tf.init(argc, argv);
+  ret = tf.run();
+  tf.finalize();
 
   MPI_Finalize();
 
-#ifdef SPIO_ENABLE_GPTL_TIMING
-#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
-  ret = GPTLfinalize();
-  if(ret != 0){
-    LOG_RANK0(wrank, "GPTLinitialize() FAILED, ret = %d\n", ret);
-    return ret;
-  }
-#endif /* TIMING_INTERNAL */
-#endif /* TIMING */
-
-  if(num_errors != 0){
-    LOG_RANK0(wrank, "Total errors = %d\n", num_errors);
-    return FAIL;
-  }
-  return 0;
+  return ret;
 }

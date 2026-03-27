@@ -10,7 +10,7 @@ include(SPIOUtils)
 #  SET THE COMPILER OPTIONS
 #==============================================================================
 # FIXME: Use an interface lib to track these include deps
-include_directories("${SCORPIO_SOURCE_DIR}/tests/cunit" "${SCORPIO_SOURCE_DIR}/src/clib" "${SCORPIO_BINARY_DIR}/src/clib" "${SCORPIO_SOURCE_DIR}/src/clib/core" "${SCORPIO_SOURCE_DIR}/src/clib/core/util" "${SCORPIO_SOURCE_DIR}/src/clib/core/rearr" "${SCORPIO_SOURCE_DIR}/src/clib/core/progress_engine" "${SCORPIO_SOURCE_DIR}/src/clib/core/iolib/hdf5" "${SCORPIO_SOURCE_DIR}/src/clib/util")
+include_directories("${SCORPIO_SOURCE_DIR}/tests/cunit" "${SCORPIO_SOURCE_DIR}/util" "${SCORPIO_SOURCE_DIR}/src/clib" "${SCORPIO_BINARY_DIR}/src/clib" "${SCORPIO_SOURCE_DIR}/src/clib/core" "${SCORPIO_SOURCE_DIR}/src/clib/core/util" "${SCORPIO_SOURCE_DIR}/src/clib/core/rearr" "${SCORPIO_SOURCE_DIR}/src/clib/core/progress_engine" "${SCORPIO_SOURCE_DIR}/src/clib/core/iolib/hdf5" "${SCORPIO_SOURCE_DIR}/src/clib/util")
 
 # Compiler-specific compiler options
 string (TOUPPER "${CMAKE_C_COMPILER_ID}" CMAKE_C_COMPILER_NAME)
@@ -63,7 +63,7 @@ endif ()
 #  DEFINE THE TARGETS AND TESTS
 #==============================================================================
 
-add_library (test_common_obj OBJECT test_common.cpp)
+add_library (test_common_obj OBJECT test_common.cpp ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
 target_link_libraries (test_common_obj PRIVATE pioc)
 
 # Exclude tests that require more than 1 procs when using the MPI serial library
@@ -112,7 +112,7 @@ add_spio_executable (test_spio_sort_utils TRUE "" test_spio_sort_utils.cpp)
 add_spio_executable (test_spio_rearr_utils_gather TRUE "" test_spio_rearr_utils_gather.cpp)
 add_spio_executable (test_spio_rearr_utils_scatter TRUE "" test_spio_rearr_utils_scatter.cpp)
 add_spio_executable (test_spio_rearr_utils_alltoall TRUE "" test_spio_rearr_utils_alltoall.cpp)
-add_spio_executable (test_spio_rearr_contig TRUE "" test_spio_rearr_contig.cpp)
+add_spio_executable (test_spio_rearr_contig TRUE "" test_spio_rearr_contig.cpp OBJ_LIBS test_common_obj)
 add_spio_executable (test_spio_rearr_contig_nvars TRUE "" test_spio_rearr_contig_nvars.cpp)
 add_spio_executable (test_spio_rearr_contig_fillval TRUE "" test_spio_rearr_contig_fillval.cpp)
 add_spio_executable (test_spio_decomp_logger TRUE "" test_spio_decomp_logger.cpp)
