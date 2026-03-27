@@ -3,6 +3,8 @@
 
 #include <string>
 #include <memory>
+#include <algorithm>
+#include <cctype>
 
 #include "mpi.h"
 
@@ -17,6 +19,49 @@ namespace SPIO_Util{
       ERROR,
       FATAL
     };
+
+    inline std::string log_level_to_string(const Log_level &lvl){
+      switch(lvl){
+        case Logger::Log_level::INVALID : return "INVALID";
+        case Logger::Log_level::TRACE : return "TRACE";
+        case Logger::Log_level::DEBUG : return "DEBUG";
+        case Logger::Log_level::INFO : return "INFO";
+        case Logger::Log_level::WARN : return "WARN";
+        case Logger::Log_level::ERROR : return "ERROR";
+        case Logger::Log_level::FATAL : return "FATAL";
+        default : return "INVALID";
+      }
+    }
+
+    inline Log_level string_to_log_level(const std::string &lvl){
+      std::string ulvl(lvl);
+
+      std::transform(ulvl.begin(), ulvl.end(), ulvl.begin(),
+        [](unsigned char c) { return std::toupper(c); });
+
+      if(ulvl == "INVALID") { return Logger::Log_level::INVALID; }
+      if(ulvl == "TRACE") { return Logger::Log_level::TRACE; }
+      if(ulvl == "DEBUG") { return Logger::Log_level::DEBUG; }
+      if(ulvl == "INFO") { return Logger::Log_level::INFO; }
+      if(ulvl == "WARN") { return Logger::Log_level::WARN; }
+      if(ulvl == "ERROR") { return Logger::Log_level::ERROR; }
+      if(ulvl == "FATAL") { return Logger::Log_level::FATAL; }
+
+      return Logger::Log_level::INVALID;
+    }
+
+    inline std::string get_available_log_levels(void ){
+      std::vector<Log_level> log_levels = {Log_level::INVALID,
+        Log_level::TRACE, Log_level::DEBUG, Log_level::INFO,
+        Log_level::WARN, Log_level::ERROR, Log_level::FATAL};
+
+      std::string str_lvls("[");
+      std::for_each(log_levels.cbegin(), log_levels.cend(),
+        [&str_lvls](const Log_level &lvl) { str_lvls += log_level_to_string(lvl) + ", "; });
+
+      return str_lvls + "]";
+    }
+
 
     /* FIXME: Add a generic logger class */
     /* FIXME : Allow logging from multiple classes */
