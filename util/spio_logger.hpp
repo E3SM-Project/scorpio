@@ -1,6 +1,7 @@
 #ifndef __SPIO_LOGGER_HPP__
 #define __SPIO_LOGGER_HPP__
 
+#include <iostream>
 #include <string>
 #include <memory>
 #include <algorithm>
@@ -99,6 +100,7 @@ namespace SPIO_Util{
         std::shared_ptr<TStream> get_log_stream(void ) const;
 
         ~MPI_logger(){}
+
       private:
         MPI_Comm mpi_comm_;
         std::shared_ptr<TStream> ostr_;
@@ -136,7 +138,7 @@ template<typename TStream>
 void SPIO_Util::Logger::MPI_logger<TStream>::log(Log_level lvl, const std::string &log_msg)
 {
   if(is_io_proc_ && (log_lvl_ <= lvl)){
-    (*ostr_) << log_msg.c_str() << LOG_SEP;
+    ((ostr_) ? (*ostr_) : std::cout) << log_msg.c_str() << LOG_SEP;
   }
 }
 
@@ -161,7 +163,7 @@ template<typename TStream>
 void SPIO_Util::Logger::MPI_logger<TStream>::flush()
 {
   if(is_io_proc_){
-    ostr_->flush();
+    (ostr_) ? ostr_->flush() : std::cout.flush();
   }
 }
 
