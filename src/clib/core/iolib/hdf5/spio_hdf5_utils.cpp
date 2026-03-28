@@ -441,10 +441,12 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
 /* Get default chunk size (no of elems) - across each dimension - for variable data. The
  * max chunk size (across all dimensions) is specified via PIO_CHUNK_SIZE (in bytes)
  */
-static inline std::vector<hsize_t> spio_get_dim_chunk_sz(const std::string &fname, const std::string &vname,
+static inline std::vector<hsize_t> spio_get_dim_chunk_sz(iosystem_desc_t *ios, file_desc_t *file,
+  const std::string &vname,
   const std::vector<std::string> &dim_names, const std::vector<hsize_t> &dim_sz,
   const std::vector<PIO_Offset> &default_dim_chunk_sz, nc_type xtype)
 {
+  const std::string fname(file->fname);
   const std::string dim_chunk_info(SPIO_DIM_CHUNK_INFO);
   bool user_provided_dim_chunk_info = !dim_chunk_info.empty();
 
@@ -458,8 +460,13 @@ static inline std::vector<hsize_t> spio_get_dim_chunk_sz(const std::string &fnam
   /* No chunking for scalars and 1D vars */
   if(ndims <= 1) { return dim_chunk_sz; }
 
+  /* Search/Match using ioid is not required, passing -1 for ioid */
   if(!PIO_Util::spio_chunk_regex_match(-1, fname, vname)){
-    std::cout << "DBG: file = " << fname.c_str() << ", var = " << vname.c_str() << ", did not match regex = " << SPIO_ENABLE_CHUNKING_REGEX << "\n";
+    std::string msg = std::string("Disabling chunking for variable. File name ")
+                        + "(" + fname + ")" + " or variable name " + "(" + vname
+                        + ") did not match chunking regex "
+                        + "(SPIO_ENABLE_CHUNKING_REGEX = " + SPIO_ENABLE_CHUNKING_REGEX + ")";
+    PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, msg.c_str());
     return dim_chunk_sz;
   }
 
@@ -475,14 +482,19 @@ static inline std::vector<hsize_t> spio_get_dim_chunk_sz(const std::string &fnam
     if(!user_provided_dim_chunk_info){
       /* Chunk size across UNLIMITED dimension is 1 */
       dim_chunk_sz[i] = (dim_sz[i] != H5S_UNLIMITED) ? (std::min(chunk_per_dim_nelems, dim_sz[i])) : 1;
-      std::cout << "DBG: DEFAULT : file = " <<  fname.c_str() << ", var = " << vname.c_str() << ", Chunking dim " << dim_names[i].c_str() << " : chunk sz = " << dim_chunk_sz[i] << "\n";
     }
     else{
       /* User specified dim chunk info, if default_dim_chunk_sz (parsed from user provided dim chunk info)
        * is 0 no chunking for that dim.
        */
-      if(default_dim_chunk_sz[i] != 0) { dim_chunk_sz[i] = default_dim_chunk_sz[i]; }
-      std::cout << "DBG: file = " <<  fname.c_str() << ", var = " << vname.c_str() << ", Chunking dim " << dim_names[i].c_str() << " : chunk sz = " << dim_chunk_sz[i] << "\n";
+      if(default_dim_chunk_sz[i] != 0){
+        dim_chunk_sz[i] = default_dim_chunk_sz[i];
+        std::string msg = std::string("Setting user specified chunk size for variable. File name ")
+                            + "(" + fname + ")" + ", variable name " + "(" + vname + ")"
+                            + ", dimension name " + "(" + dim_names[i] + ")"
+                            + ", chunk size = " + std::to_string(static_cast<long>(dim_chunk_sz[i]));
+        PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, msg.c_str());
+      }
     }
   }
 
@@ -613,8 +625,7 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
 
   /* Set default chunk size for variable data */
   if(ndims > 0){
-    std::cout << "DBG: Finding chunk dims for variable : " << name << "\n";
-    if(H5Pset_chunk(dcpl_id, ndims, spio_get_dim_chunk_sz(file->fname, name, dim_names, max_dim_sz, default_dim_chunk_sz, xtype).data()) < 0){
+    if(H5Pset_chunk(dcpl_id, ndims, spio_get_dim_chunk_sz(ios, file, name, dim_names, max_dim_sz, default_dim_chunk_sz, xtype).data()) < 0){
       return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                      "Defining variable (%s, varid = %d) in file (%s, ncid=%d) using HDF5 iotype failed. "
                      "The low level (HDF5) I/O library call failed to set the size of the chunks used to store a chunked layout dataset",
