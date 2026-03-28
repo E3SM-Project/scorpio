@@ -1411,12 +1411,12 @@ PIO_Offset spio_hdf5_get_dim_chunk_sz_from_chunk_info(const std::string &dim_nam
 
   /* FIXME: Parse it once - hdf5 init - instead of re-parsing when each dim is defined */
   /* FIXME: Since C++ regex support is limited for some compilers using streams for now */
-  /* SPIO_DIM_CHUNK_INFO = "DIM1_NAME,DIM1_CHUNK_SZ;DIM2_NAME,DIM2_CHUNK_SZ;" */
+  /* SPIO_DIM_CHUNK_INFO = "DIM1_NAME:DIM1_CHUNK_SZ;DIM2_NAME:DIM2_CHUNK_SZ;" */
 
   std::istringstream istr(dim_chunk_info);
   std::string dim_info_tok, dim_name_tok, dim_chunk_sz_tok;
   const char dim_info_delim = ';';
-  const char chunk_info_delim = ',';
+  const char chunk_info_delim = ':';
 
   while(std::getline(istr, dim_info_tok, dim_info_delim)){
     std::size_t pos = 0;

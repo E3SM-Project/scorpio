@@ -65,7 +65,7 @@
 #define PIO_CHUNK_SIZE @PIO_CHUNK_SIZE@
 
 /** Set dimension chunk info for HDF5 chunked variables.
-  * Expected format: "DIM1_NAME,DIM1_CHUNK_SZ;DIM2_NAME,DIM2_CHUNK_SZ;"
+  * Expected format: "DIM1_NAME:DIM1_CHUNK_SZ;DIM2_NAME:DIM2_CHUNK_SZ;"
   */
 #define SPIO_DIM_CHUNK_INFO "@SPIO_DIM_CHUNK_INFO@"
 

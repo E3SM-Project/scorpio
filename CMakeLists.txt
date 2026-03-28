@@ -266,8 +266,8 @@ else()
   message(STATUS "Setting chunk size (in bytes) for HDF5/PnetCDF chunked variables, requested bytes = " ${PIO_CHUNK_SIZE} " (default)")
 endif()
 
-# Expected format for SPIO_DIM_CHUNK_INFO = "DIM1_NAME,DIM1_CHUNK_SZ;DIM2_NAME,DIM2_CHUNK_SZ;"
-# e.g. "time,1;lev,8;"   ---> Each chunk has 1 time dimension (time) and 8 levels (lev)
+# Expected format for SPIO_DIM_CHUNK_INFO = "DIM1_NAME:DIM1_CHUNK_SZ;DIM2_NAME:DIM2_CHUNK_SZ;"
+# e.g. "time:1;lev:8;"   ---> Each chunk has 1 time dimension (time) and 8 levels (lev)
 if(DEFINED SPIO_DIM_CHUNK_INFO)
   message(STATUS "Using user-specified dimension chunk info, " ${SPIO_DIM_CHUNK_INFO})
 endif()
