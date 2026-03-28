@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <regex>
 #include <vector>
@@ -439,8 +440,12 @@ static hid_t spio_create_hdf5_dataset_pid(iosystem_desc_t *ios, file_desc_t *fil
 /* Get default chunk size (no of elems) - across each dimension - for variable data. The
  * max chunk size (across all dimensions) is specified via PIO_CHUNK_SIZE (in bytes)
  */
-static inline std::vector<hsize_t> spio_get_dim_chunk_sz(const std::vector<hsize_t> &dim_sz, nc_type xtype)
+static inline std::vector<hsize_t> spio_get_dim_chunk_sz(const std::vector<std::string> &dim_names, const std::vector<hsize_t> &dim_sz,
+  const std::vector<PIO_Offset> &default_dim_chunk_sz, nc_type xtype)
 {
+  const std::string dim_chunk_info(SPIO_DIM_CHUNK_INFO);
+  bool user_provided_dim_chunk_info = !dim_chunk_info.empty();
+
   std::size_t ndims = dim_sz.size();
   std::vector<hsize_t> dim_chunk_sz = dim_sz;
 
@@ -460,8 +465,18 @@ static inline std::vector<hsize_t> spio_get_dim_chunk_sz(const std::vector<hsize
   hsize_t chunk_per_dim_nelems = static_cast<hsize_t>(pow(chunk_nelems, 1.0/(ndims - 1) ));
 
   for(std::size_t i = 0; i < ndims; i++){
-    /* Chunk size across UNLIMITED dimension is 1 */
-    dim_chunk_sz[i] = (dim_sz[i] != H5S_UNLIMITED) ? (std::min(chunk_per_dim_nelems, dim_sz[i])) : 1;
+    if(!user_provided_dim_chunk_info){
+      /* Chunk size across UNLIMITED dimension is 1 */
+      dim_chunk_sz[i] = (dim_sz[i] != H5S_UNLIMITED) ? (std::min(chunk_per_dim_nelems, dim_sz[i])) : 1;
+      std::cout << "DBG: DEFAULT : Chunking dim " << dim_names[i].c_str() << " : chunk sz = " << dim_chunk_sz[i] << "\n";
+    }
+    else{
+      /* User specified dim chunk info, if default_dim_chunk_sz (parsed from user provided dim chunk info)
+       * is 0 no chunking for that dim.
+       */
+      if(default_dim_chunk_sz[i] != 0) { dim_chunk_sz[i] = default_dim_chunk_sz[i]; }
+      std::cout << "DBG: Chunking dim " << dim_names[i].c_str() << " : chunk sz = " << dim_chunk_sz[i] << "\n";
+    }
   }
 
   return dim_chunk_sz;
@@ -563,6 +578,8 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
 
   /* Cache the dim sizes for HDF5 calls */
   std::vector<hsize_t> dim_sz(ndims), max_dim_sz(ndims);
+  std::vector<PIO_Offset> default_dim_chunk_sz(ndims);
+  std::vector<std::string> dim_names(ndims);
   for(int i = 0; i < ndims; i++){
     if(file->hdf5_dims[dimidsp[i]].len != PIO_UNLIMITED){
       dim_sz[i] = max_dim_sz[i] = file->hdf5_dims[dimidsp[i]].len;
@@ -571,6 +588,8 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
       dim_sz[i] = 1;
       max_dim_sz[i] = H5S_UNLIMITED;
     }
+    default_dim_chunk_sz[i] = file->hdf5_dims[dimidsp[i]].chunk_sz;
+    dim_names[i] = file->hdf5_dims[dimidsp[i]].name;
   }
 
   /* Create HDF5 dataset (and optionally add filters as needed) */
@@ -587,7 +606,8 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
 
   /* Set default chunk size for variable data */
   if(ndims > 0){
-    if(H5Pset_chunk(dcpl_id, ndims, spio_get_dim_chunk_sz(max_dim_sz, xtype).data()) < 0){
+    std::cout << "DBG: Finding chunk dims for variable : " << name << "\n";
+    if(H5Pset_chunk(dcpl_id, ndims, spio_get_dim_chunk_sz(dim_names, max_dim_sz, default_dim_chunk_sz, xtype).data()) < 0){
       return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                      "Defining variable (%s, varid = %d) in file (%s, ncid=%d) using HDF5 iotype failed. "
                      "The low level (HDF5) I/O library call failed to set the size of the chunks used to store a chunked layout dataset",
@@ -1373,5 +1393,35 @@ int spio_hdf5_set_frame(file_desc_t *file, int varid, int frame)
   file->varlist[varid].record = frame;
 
   return PIO_NOERR;
+}
+
+PIO_Offset spio_hdf5_get_dim_chunk_sz_from_chunk_info(const std::string &dim_name)
+{
+  const std::string dim_chunk_info(SPIO_DIM_CHUNK_INFO);
+  bool user_provided_dim_chunk_info = !dim_chunk_info.empty();
+
+  if(!user_provided_dim_chunk_info) { return 0; }
+
+  /* FIXME: Parse it once - hdf5 init - instead of re-parsing when each dim is defined */
+  /* FIXME: Since C++ regex support is limited for some compilers using streams for now */
+  /* SPIO_DIM_CHUNK_INFO = "DIM1_NAME,DIM1_CHUNK_SZ;DIM2_NAME,DIM2_CHUNK_SZ;" */
+
+  std::istringstream istr(dim_chunk_info);
+  std::string dim_info_tok, dim_name_tok, dim_chunk_sz_tok;
+  const char dim_info_delim = ';';
+  const char chunk_info_delim = ',';
+
+  while(std::getline(istr, dim_info_tok, dim_info_delim)){
+    std::size_t pos = 0;
+    if((pos = dim_info_tok.find(chunk_info_delim, 0)) != std::string::npos){
+      dim_name_tok = dim_info_tok.substr(0, pos);
+      if((dim_name_tok == dim_name) && (pos + 1 < dim_info_tok.size())){
+        dim_chunk_sz_tok = dim_info_tok.substr(pos + 1);
+        return static_cast<PIO_Offset>(std::stoi(dim_chunk_sz_tok));
+      }
+    }
+  }
+
+  return 0;
 }
 #endif

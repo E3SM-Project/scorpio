@@ -666,6 +666,14 @@ typedef struct hdf5_dim_desc_t
     /** Dimension length */
     PIO_Offset len;
 
+    /** Chunk size, if specified. Default 0
+     * if SPIO_DIM_CHUNK_INFO is provided by the user,
+     *  - a Chunk size of 0 => no chunking on this dimension
+     * if SPIO_DIM_CHUNK_INFO is not provided by the user (empty string),
+     *  - a Chunk size of 0 => default chunking (based on PIO_CHUNK_SIZE)
+     */
+    PIO_Offset chunk_sz;
+
     /** True if the dimension has a coordinate variable */
     bool has_coord_var;
 

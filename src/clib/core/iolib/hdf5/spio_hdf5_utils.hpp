@@ -28,6 +28,8 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
 int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file);
 int spio_hdf5_set_frame(file_desc_t *file, int varid, int frame);
 
+PIO_Offset spio_hdf5_get_dim_chunk_sz_from_chunk_info(const std::string &dim_name);
+
 /* Inline functions */
 inline hid_t spio_nc_type_to_hdf5_type(nc_type xtype)
 {

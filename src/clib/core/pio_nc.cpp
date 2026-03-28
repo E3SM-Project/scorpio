@@ -3205,6 +3205,7 @@ int PIOc_def_dim_impl(int ncid, const char *name, PIO_Offset len, int *idp)
         }
 
         file->hdf5_dims[file->hdf5_num_dims].len = len;
+        file->hdf5_dims[file->hdf5_num_dims].chunk_sz = spio_hdf5_get_dim_chunk_sz_from_chunk_info(name);
         file->hdf5_dims[file->hdf5_num_dims].has_coord_var = false;
         file->hdf5_dims[file->hdf5_num_dims].hdf5_dataset_id = H5I_INVALID_HID;
         *idp = file->hdf5_num_dims;

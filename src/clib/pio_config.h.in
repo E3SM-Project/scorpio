@@ -64,6 +64,11 @@
 /** Set chunk size (in bytes) for HDF5/PnetCDF chunked variables. */
 #define PIO_CHUNK_SIZE @PIO_CHUNK_SIZE@
 
+/** Set dimension chunk info for HDF5 chunked variables.
+  * Expected format: "DIM1_NAME,DIM1_CHUNK_SZ;DIM2_NAME,DIM2_CHUNK_SZ;"
+  */
+#define SPIO_DIM_CHUNK_INFO "@SPIO_DIM_CHUNK_INFO@"
+
 /** Maximum number of I/O decompositions registered with ADIOS type */
 #define PIO_MAX_ADIOS_DECOMPS @PIO_MAX_ADIOS_DECOMPS@
 
