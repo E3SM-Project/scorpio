@@ -272,6 +272,22 @@ if(DEFINED SPIO_DIM_CHUNK_INFO)
   message(STATUS "Using user-specified dimension chunk info, " ${SPIO_DIM_CHUNK_INFO})
 endif()
 
+# Add more constraints on where chunking is enabled. Specify a regex that matches the variable and file name where chunking
+# is enabled. Chunking will be disabled for all other variables
+# The regex is same as the one used to save decompositions
+# e.g. -DSPIO_ENABLE_CHUNKING_REGEX:STRING='(VAR=\".*U.*\")&&(FILE=\".*e3sm_fgi.*\")'
+#       Chunking is enabled only on variables with names that match ".*U.*" in files with names that match ".*e3sm_fgi.*"
+if(DEFINED SPIO_ENABLE_CHUNKING_REGEX)
+  if(DEFINED SPIO_DIM_CHUNK_INFO)
+    message(STATUS "Using user-specified regex," ${SPIO_ENABLE_CHUNKING_REGEX} " to decide when to enable chunking of variables")
+  else()
+    message(STATUS "WARNING: SPIO_ENABLE_CHUNKING_REGEX was defined but SPIO_DIM_CHUNK_INFO was not defined, disabling SPIO_ENABLE_CHUNKING_REGEX")
+    set(SPIO_ENABLE_CHUNKING_REGEX "*")
+  endif()
+else()
+  set(SPIO_ENABLE_CHUNKING_REGEX "*")
+endif()
+
 if(WITH_ADIOS2)
   # Maximum number of I/O decompositions registered with ADIOS type
   set(DEF_SPIO_MAX_ADIOS_DECOMPS 65536)

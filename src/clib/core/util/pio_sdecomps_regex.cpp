@@ -616,6 +616,12 @@ bool pio_save_decomps_regex_match(int ioid, const char *fname, const char *vname
   /* Match everything */
   return true;
 }
+
+bool PIO_Util::spio_chunk_regex_match(int ioid, const std::string &fname, const std::string &vname)
+{
+  return true;
+}
+
 #else /* SPIO_NO_CXX_REGEX */
 static PIO_Util::PIO_save_decomp_regex pio_sdecomp_regex(PIO_SAVE_DECOMPS_REGEX);
 
@@ -628,5 +634,16 @@ bool pio_save_decomps_regex_match(int ioid, const char *fname, const char *vname
   std::string fname_str((fname) ? fname : "");
   std::string vname_str((vname) ? vname : "");
   return pio_sdecomp_regex.matches(ioid, fname_str, vname_str);
+}
+
+static PIO_Util::PIO_save_decomp_regex spio_chunk_regex(SPIO_ENABLE_CHUNKING_REGEX);
+bool PIO_Util::spio_chunk_regex_match(int ioid, const std::string &fname, const std::string &vname)
+{
+  bool ioid_is_valid = (ioid >= 0) ? true : false;
+  if(!ioid_is_valid && fname.empty() && vname.empty()){
+    return false;
+  }
+
+  return spio_chunk_regex.matches(ioid, fname, vname);
 }
 #endif /* SPIO_NO_CXX_REGEX */

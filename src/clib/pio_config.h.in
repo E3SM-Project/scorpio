@@ -69,6 +69,12 @@
   */
 #define SPIO_DIM_CHUNK_INFO "@SPIO_DIM_CHUNK_INFO@"
 
+/** Set the constraints/regex for enabling chunking of variables
+  * Regex format is same as the one used for PIO_SAVE_DECOMPS_REGEX
+  * e.g. '(VAR=\".*test_var1.*\")&&(FILE=\".*testfile1\")'
+  */
+#define SPIO_ENABLE_CHUNKING_REGEX "@SPIO_ENABLE_CHUNKING_REGEX@"
+
 /** Maximum number of I/O decompositions registered with ADIOS type */
 #define PIO_MAX_ADIOS_DECOMPS @PIO_MAX_ADIOS_DECOMPS@
 

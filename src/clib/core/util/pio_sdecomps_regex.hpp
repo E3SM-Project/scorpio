@@ -190,6 +190,9 @@ namespace PIO_Util{
        */
       std::vector<const PIO_SDecomp_Util::SDecomp_regex_token *> postfix_exp_;
   };
+
+  bool spio_chunk_regex_match(int ioid, const std::string &fname, const std::string &vname);
+
 } // namespace PIO_Util
 
 #endif // __PIO_SDECOMPS_REGEX_HPP__
