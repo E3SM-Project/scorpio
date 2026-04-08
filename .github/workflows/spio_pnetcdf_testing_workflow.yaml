@@ -18,10 +18,10 @@ on:  # yamllint disable-line rule:truthy
         default: 'master'
   push:
     branches:
-      - master
+      - '**' # A "*" matches any char except "/", so use "**" to handle all branch names
   pull_request:
     branches:
-      - master
+      - '**'
 
 jobs:
   build_and_test:
