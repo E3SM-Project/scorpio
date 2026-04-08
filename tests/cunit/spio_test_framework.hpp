@@ -66,7 +66,7 @@ class Test_framework{
       ret = GPTLinitialize();
       if(ret != 0){
         get_logger().log(SPIO_Util::Logger::Log_level::ERROR, std::string("GPTLinitialize() FAILED, ret = ") + std::to_string(ret) + ")");
-        return ret;
+        return;
       }
 #endif /* TIMING_INTERNAL */
 #endif /* TIMING */
@@ -143,10 +143,9 @@ class Test_framework{
       get_logger().log(SPIO_Util::Logger::Log_level::DEBUG, "Testing framework finalizing...");
 #ifdef SPIO_ENABLE_GPTL_TIMING
 #ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
-      ret = GPTLfinalize();
+      int ret = GPTLfinalize();
       if(ret != 0){
         get_logger().log(SPIO_Util::Logger::Log_level::ERROR, std::string("GPTLfinalize() FAILED, ret = ") + std::to_string(ret) + ")");
-        return ret;
       }
 #endif /* TIMING_INTERNAL */
 #endif /* TIMING */
