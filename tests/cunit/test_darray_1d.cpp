@@ -186,18 +186,18 @@ int test_darray_fill(int iosysid, int ioid, int pio_type, int num_flavors, int *
                 return ret;
 
             /* Initialize some data. */
-            signed char byte_test_data[2] = {my_rank, my_rank};
-            char char_test_data[2] = {my_rank, my_rank};
-            short short_test_data[2] = {my_rank, my_rank};
+            signed char byte_test_data[2] = {static_cast<signed char>(my_rank), static_cast<signed char>(my_rank)};
+            char char_test_data[2] = {static_cast<char>(my_rank), static_cast<char>(my_rank)};
+            short short_test_data[2] = {static_cast<short>(my_rank), static_cast<short>(my_rank)};
             int int_test_data[2] = {my_rank, my_rank};
-            float float_test_data[2] = {my_rank, my_rank};
-            double double_test_data[2] = {my_rank, my_rank};
+            float float_test_data[2] = {static_cast<float>(my_rank), static_cast<float>(my_rank)};
+            double double_test_data[2] = {static_cast<double>(my_rank), static_cast<double>(my_rank)};
 #ifdef _NETCDF4
-            unsigned char ubyte_test_data[2] = {my_rank, my_rank};
-            unsigned short ushort_test_data[2] = {my_rank, my_rank};
-            unsigned int uint_test_data[2] = {my_rank, my_rank};
-            long long int64_test_data[2] = {my_rank, my_rank};
-            unsigned long long uint64_test_data[2] = {my_rank, my_rank};
+            unsigned char ubyte_test_data[2] = {static_cast<unsigned char>(my_rank), static_cast<unsigned char>(my_rank)};
+            unsigned short ushort_test_data[2] = {static_cast<unsigned short>(my_rank), static_cast<unsigned short>(my_rank)};
+            unsigned int uint_test_data[2] = {static_cast<unsigned int>(my_rank), static_cast<unsigned int>(my_rank)};
+            long long int64_test_data[2] = {static_cast<long long>(my_rank), static_cast<long long>(my_rank)};
+            unsigned long long uint64_test_data[2] = {static_cast<unsigned long long>(my_rank), static_cast<unsigned long long>(my_rank)};
 #endif /* _NETCDF4 */
             
             switch (pio_type)
@@ -480,18 +480,18 @@ int test_darray_fill_unlim(int iosysid, int ioid, int pio_type, int num_flavors,
             return ret;
 
         /* Initialize some data. */
-        signed char byte_test_data[2] = {my_rank, my_rank};
-        char char_test_data[2] = {my_rank, my_rank};
-        short short_test_data[2] = {my_rank, my_rank};
+        signed char byte_test_data[2] = {static_cast<signed char>(my_rank), static_cast<signed char>(my_rank)};
+        char char_test_data[2] = {static_cast<char>(my_rank), static_cast<char>(my_rank)};
+        short short_test_data[2] = {static_cast<short>(my_rank), static_cast<short>(my_rank)};
         int int_test_data[2] = {my_rank, my_rank};
-        float float_test_data[2] = {my_rank, my_rank};
-        double double_test_data[2] = {my_rank, my_rank};
+        float float_test_data[2] = {static_cast<float>(my_rank), static_cast<float>(my_rank)};
+        double double_test_data[2] = {static_cast<double>(my_rank), static_cast<double>(my_rank)};
 #ifdef _NETCDF4
-        unsigned char ubyte_test_data[2] = {my_rank, my_rank};
-        unsigned short ushort_test_data[2] = {my_rank, my_rank};
-        unsigned int uint_test_data[2] = {my_rank, my_rank};
-        long long int64_test_data[2] = {my_rank, my_rank};
-        unsigned long long uint64_test_data[2] = {my_rank, my_rank};
+        unsigned char ubyte_test_data[2] = {static_cast<unsigned char>(my_rank), static_cast<unsigned char>(my_rank)};
+        unsigned short ushort_test_data[2] = {static_cast<unsigned short>(my_rank), static_cast<unsigned short>(my_rank)};
+        unsigned int uint_test_data[2] = {static_cast<unsigned int>(my_rank), static_cast<unsigned int>(my_rank)};
+        long long int64_test_data[2] = {static_cast<long long>(my_rank), static_cast<long long>(my_rank)};
+        unsigned long long uint64_test_data[2] = {static_cast<unsigned long long>(my_rank), static_cast<unsigned long long>(my_rank)};
 #endif /* _NETCDF4 */
         switch (pio_type)
         {
