@@ -97,8 +97,8 @@ Include dependency graph for pio.h:</div>
 <area shape="rect" title=" " alt="" coords="192,80,275,107"/>
 <area shape="rect" title=" " alt="" coords="299,80,370,107"/>
 <area shape="rect" title=" " alt="" coords="395,80,453,107"/>
-<area shape="rect" title=" " alt="" coords="477,80,579,107"/>
-<area shape="rect" title=" " alt="" coords="603,80,685,107"/>
+<area shape="rect" title=" " alt="" coords="478,80,578,107"/>
+<area shape="rect" title=" " alt="" coords="602,80,683,107"/>
 </map>
 </div>
 </div><div class="textblock"><div class="dynheader">
@@ -113,9 +113,9 @@ This graph shows which files directly or indirectly include this file:</div>
 <area shape="rect" href="example2_8c.html" title="A simple C example for the ParallelIO Library." alt="" coords="440,80,539,107"/>
 <area shape="rect" href="example_pio_8c.html" title="A simple C example for the ParallelIO Library." alt="" coords="563,80,674,107"/>
 <area shape="rect" href="netcdf4p_8c.html" title=" " alt="" coords="699,80,789,107"/>
-<area shape="rect" href="put__var_8c.html" title="A simple C example for the ParallelIO Library using PIOc_put_vara()" alt="" coords="813,80,896,107"/>
-<area shape="rect" href="test__adios_8c.html" title=" " alt="" coords="921,80,1021,107"/>
-<area shape="rect" href="test__hdf5_8c.html" title=" " alt="" coords="1045,80,1139,107"/>
+<area shape="rect" href="put__var_8c.html" title="A simple C example for the ParallelIO Library using PIOc_put_vara()" alt="" coords="814,80,895,107"/>
+<area shape="rect" href="test__adios_8c.html" title=" " alt="" coords="919,80,1019,107"/>
+<area shape="rect" href="test__hdf5_8c.html" title=" " alt="" coords="1043,80,1138,107"/>
 </map>
 </div>
 </div>
@@ -281,7 +281,7 @@ Enumerations</h2></td></tr>
 &#160;&#160;<a class="el" href="pio_8h.html#aa81fb241b31a8419bc97c01bce7ef368a494ec95488702cd9d3bd8cd6621d4a66">PIO_IOTYPE_HDF5C</a> = 9
 <br />
  }</td></tr>
-<tr class="memdesc:aa81fb241b31a8419bc97c01bce7ef368"><td class="mdescLeft">&#160;</td><td class="mdescRight">These are the supported methods of reading/writing netCDF files.  <a href="pio_8h.html#aa81fb241b31a8419bc97c01bce7ef368">More...</a><br /></td></tr>
+<tr class="memdesc:aa81fb241b31a8419bc97c01bce7ef368"><td class="mdescLeft">&#160;</td><td class="mdescRight">These are the supported methods of reading/writing input/output files.  <a href="pio_8h.html#aa81fb241b31a8419bc97c01bce7ef368">More...</a><br /></td></tr>
 <tr class="separator:aa81fb241b31a8419bc97c01bce7ef368"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab0dd70fbaba2863ad8194ff3ad0b3153"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="pio_8h.html#ab0dd70fbaba2863ad8194ff3ad0b3153">PIO_REARRANGERS</a> { <a class="el" href="pio_8h.html#ab0dd70fbaba2863ad8194ff3ad0b3153a294a1426a9188239a5409dfea62850ed">PIO_REARR_BOX</a> = 1
 , <a class="el" href="pio_8h.html#ab0dd70fbaba2863ad8194ff3ad0b3153a53e62a3987ad419926771d478a395fad">PIO_REARR_SUBSET</a> = 2
@@ -941,26 +941,26 @@ Enumerations</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>These are the supported methods of reading/writing netCDF files. </p>
-<p>(Not all methods can be used with all netCDF files.) </p>
+<p>These are the supported methods of reading/writing input/output files. </p>
+<p>The PnetCDF, NetCDF and HDF5 libraries output data in the NetCDF file format. The ADIOS library outputs data in the BP file format. </p>
 <table class="fieldtable">
-<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368adcd470331bb74d49fbaa41f255ed1ba5"></a>PIO_IOTYPE_PNETCDF&#160;</td><td class="fielddoc"><p>Parallel Netcdf (parallel) </p>
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368adcd470331bb74d49fbaa41f255ed1ba5"></a>PIO_IOTYPE_PNETCDF&#160;</td><td class="fielddoc"><p>Parallel NetCDF library (Parallel I/O, NetCDF3 classic file format) </p>
 </td></tr>
-<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368aab3557e863c590270695774022e8124f"></a>PIO_IOTYPE_NETCDF&#160;</td><td class="fielddoc"><p>Netcdf3 Classic format (serial) </p>
+<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368aab3557e863c590270695774022e8124f"></a>PIO_IOTYPE_NETCDF&#160;</td><td class="fielddoc"><p>NetCDF library (Serial I/O, NetCDF3 classic file format) </p>
 </td></tr>
-<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368a34a90f9c42a2aee1d0ca458cd50750ed"></a>PIO_IOTYPE_NETCDF4C&#160;</td><td class="fielddoc"><p>NetCDF4 (HDF5) compressed format (serial) </p>
+<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368a34a90f9c42a2aee1d0ca458cd50750ed"></a>PIO_IOTYPE_NETCDF4C&#160;</td><td class="fielddoc"><p>NetCDF library (Serial I/O, NetCDF4/HDF5 compressed file format) </p>
 </td></tr>
-<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368a22e0fea0660c7df8ff5909de767e195a"></a>PIO_IOTYPE_NETCDF4P&#160;</td><td class="fielddoc"><p>NetCDF4 (HDF5) parallel. </p>
+<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368a22e0fea0660c7df8ff5909de767e195a"></a>PIO_IOTYPE_NETCDF4P&#160;</td><td class="fielddoc"><p>NetCDF library (Parallel I/O, NetCDF4/HDF5 file format) </p>
 </td></tr>
-<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368a1c2f680a97a40fe931eeea1f4a562253"></a>PIO_IOTYPE_NETCDF4P_NCZARR&#160;</td><td class="fielddoc"><p>NetCDF4 (HDF5) parallel NCZarr. </p>
+<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368a1c2f680a97a40fe931eeea1f4a562253"></a>PIO_IOTYPE_NETCDF4P_NCZARR&#160;</td><td class="fielddoc"><p>NetCDF library (Parallel I/O, NCZarr file format) </p>
 </td></tr>
-<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368a616dbcd0166f8c5945e18f715acdc392"></a>PIO_IOTYPE_ADIOS&#160;</td><td class="fielddoc"><p>ADIOS parallel. </p>
+<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368a616dbcd0166f8c5945e18f715acdc392"></a>PIO_IOTYPE_ADIOS&#160;</td><td class="fielddoc"><p>ADIOS library (Parallel I/O, ADIOS BP file format) </p>
 </td></tr>
-<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368aa4d57e9cae96a299b4133c84eb5b1fb9"></a>PIO_IOTYPE_ADIOSC&#160;</td><td class="fielddoc"><p>ADIOS parallel with compression. </p>
+<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368aa4d57e9cae96a299b4133c84eb5b1fb9"></a>PIO_IOTYPE_ADIOSC&#160;</td><td class="fielddoc"><p>ADIOS library (Parallel I/O, ADIOS BP compressed file format) </p>
 </td></tr>
-<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368a250d8d80198053a42b46d903c0bddb5f"></a>PIO_IOTYPE_HDF5&#160;</td><td class="fielddoc"><p>HDF5 parallel. </p>
+<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368a250d8d80198053a42b46d903c0bddb5f"></a>PIO_IOTYPE_HDF5&#160;</td><td class="fielddoc"><p>HDF5 library (Parallel I/O, NetCDF4/HDF5 file format) </p>
 </td></tr>
-<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368a494ec95488702cd9d3bd8cd6621d4a66"></a>PIO_IOTYPE_HDF5C&#160;</td><td class="fielddoc"><p>HDF5 parallel with compression. </p>
+<tr><td class="fieldname"><a id="aa81fb241b31a8419bc97c01bce7ef368a494ec95488702cd9d3bd8cd6621d4a66"></a>PIO_IOTYPE_HDF5C&#160;</td><td class="fielddoc"><p>HDF5 library (Parallel I/O, NetCDF4/HDF5 compressed file format) </p>
 </td></tr>
 </table>
 
@@ -1043,7 +1043,7 @@ Enumerations</h2></td></tr>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Wed Apr 8 2026 15:34:16 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Thu Apr 9 2026 10:56:44 for SCORPIO by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>
