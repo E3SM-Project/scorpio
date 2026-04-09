@@ -1,6 +1,7 @@
 #include "pio_config.h"
 #include "pio_timer.h"
 #include "pio_internal.h"
+#include <string>
 
 /* This structure stores information on a timer type
  * init -> The init function for the timer
@@ -129,7 +130,6 @@ int mtimer_stop(mtimer_t mt, const char *log_msg)
 {
     int ret = PIO_NOERR;
     double elapsed_time = 0;
-    char tmp_log_msg[PIO_MAX_NAME];
     if(mt == NULL)
     {
         LOG((3, "ERROR: Micro timer failed to stop, the timer handle is invalid"));
@@ -154,10 +154,13 @@ int mtimer_stop(mtimer_t mt, const char *log_msg)
     /* Flush timer log message if no asynchronous events are pending */
     if(!mt->is_async_event_in_progress)
     {
-        snprintf(tmp_log_msg, PIO_MAX_NAME, "%s %s time=%11.8f s", mt->name, (log_msg)?(log_msg):"", mt->total_time);
         if(pio_timer_type == PIO_MICRO_MPI_WTIME_ROOT)
         {
-            ret = mtimer_flush_root(mt, tmp_log_msg, mt->comm);
+            std::string tmp_log_msg(mt->name);
+            if(log_msg) { tmp_log_msg += log_msg; }
+            tmp_log_msg += std::string("time=") + std::to_string(mt->total_time);
+
+            ret = mtimer_flush_root(mt, tmp_log_msg.c_str(), mt->comm);
             mt->total_time = 0;
         }
         else
@@ -365,7 +368,6 @@ int mtimer_update(mtimer_t mt, double time)
 int mtimer_flush(mtimer_t mt, const char *log_msg)
 {
     int ret = PIO_NOERR;
-    char tmp_log_msg[PIO_MAX_NAME];
     if(mt == NULL)
     {
         LOG((3, "ERROR: Flushing timer failed, invalid handle"));
@@ -384,10 +386,13 @@ int mtimer_flush(mtimer_t mt, const char *log_msg)
       */
     if(!mt->is_async_event_in_progress && (mt->total_time > 0))
     {
-        snprintf(tmp_log_msg, PIO_MAX_NAME, "%s %s time=%11.8f s", mt->name, (log_msg)?(log_msg):"", mt->total_time);
         if(pio_timer_type == PIO_MICRO_MPI_WTIME_ROOT)
         {
-            ret = mtimer_flush_root(mt, tmp_log_msg, mt->comm);
+            std::string tmp_log_msg(mt->name);
+            if(log_msg) { tmp_log_msg += log_msg; }
+            tmp_log_msg += std::string("time=") + std::to_string(mt->total_time);
+
+            ret = mtimer_flush_root(mt, tmp_log_msg.c_str(), mt->comm);
             mt->total_time = 0;
         }
         else

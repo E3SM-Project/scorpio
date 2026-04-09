@@ -25,6 +25,7 @@
 #include "spio_decomp_logger.hpp"
 #include "spio_dt_converter.hpp"
 #include "spio_async_utils.hpp"
+#include <string>
 
 /* uint64_t definition */
 #ifdef _ADIOS2
@@ -2097,24 +2098,20 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
 #if PIO_SAVE_DECOMPS
   if(!(iodesc->is_saved) &&
       pio_save_decomps_regex_match(ioid, file->fname, file->varlist[varid].vname)){
-    char filename[PIO_MAX_NAME];
-    ierr = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME, "piodecomp", ".dat");
-    if(ierr != PIO_NOERR){
-      if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
-        GPTLstop("PIO:write_total_adios");
-      }
-      return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                      "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Saving I/O decomposition (ioid=%d) failed. Unable to create a unique file name for saving the I/O decomposition", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
-    }
-    LOG((2, "Saving decomp map (write) to %s", filename));
-    PIOc_writemap_impl(filename, ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
-    char log_fname[PIO_MAX_NAME];
-    ierr = pio_create_uniq_str(ios, iodesc, log_fname, PIO_MAX_NAME, "piodecomp", ".nc");
-    SPIO_Util::Decomp_Util::Decomp_logger *logger = SPIO_Util::Decomp_Util::create_decomp_logger(ios->comp_comm, std::string(log_fname));
+    std::string filename;
+    pio_create_uniq_str(ios, iodesc, filename, "piodecomp", ".dat");
+
+    LOG((2, "Saving decomp map (write) to %s", filename.c_str()));
+    PIOc_writemap_impl(filename.c_str(), ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
+
+    std::string log_fname;
+    pio_create_uniq_str(ios, iodesc, log_fname, "piodecomp", ".nc");
+    SPIO_Util::Decomp_Util::Decomp_logger *logger = SPIO_Util::Decomp_Util::create_decomp_logger(ios->comp_comm, log_fname);
     (*logger).write_only().open().put(iodesc).close();
     delete logger;
+
     iodesc->is_saved = true;
-    SPIO_Util::Decomp_Util::gdpool_mgr.get_decomp_map_info_pool()->add_decomp_map_info(ioid, filename);
+    SPIO_Util::Decomp_Util::gdpool_mgr.get_decomp_map_info_pool()->add_decomp_map_info(ioid, filename.c_str());
   }
   SPIO_Util::Decomp_Util::gdpool_mgr.get_decomp_map_info_pool()->add_var_info(ioid, file->pio_ncid, file->fname, varid, file->varlist[varid].vname);
 #endif
@@ -3646,14 +3643,11 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 #if PIO_SAVE_DECOMPS
   if(!(iodesc->is_saved) &&
       pio_save_decomps_regex_match(ioid, file->fname, file->varlist[varid].vname)){
-    char filename[PIO_MAX_NAME];
-    ierr = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME, "piodecomp", ".dat");
-    if(ierr != PIO_NOERR){
-      return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                      "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Saving the I/O decomposition (ioid=%d) failed, unable to create a unique file name for saving the decomposition", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
-    }
-    LOG((2, "Saving decomp map (read) to %s", filename));
-    PIOc_writemap_impl(filename, ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
+    std::string filename;
+    pio_create_uniq_str(ios, iodesc, filename, "piodecomp", ".dat");
+
+    LOG((2, "Saving decomp map (read) to %s", filename.c_str()));
+    PIOc_writemap_impl(filename.c_str(), ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
     iodesc->is_saved = true;
   }
 #endif

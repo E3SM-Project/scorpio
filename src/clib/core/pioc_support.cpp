@@ -3074,7 +3074,7 @@ int PIO_get_avail_iotypes(char *buf, size_t sz)
 int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *filename,
                         int mode)
 {
-    char tname[SPIO_TIMER_MAX_NAME];
+    std::string tname;
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function codes. */
@@ -3148,17 +3148,11 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     file->reserve_extra_header_space = true; /* Set to true for creating output NetCDF files only. */
     file->is_reopened = false;
     strncpy(file->fname, filename, PIO_MAX_NAME);
-    ierr = pio_create_uniq_str(ios, NULL, tname, SPIO_TIMER_MAX_NAME, "tmp_", "_file");
-    if(ierr != PIO_NOERR)
-    {
-        /* Not a fatal error */
-        LOG((0, "Creating a unique name for the write timer for file (%s, ncid=%d) failed, ret = %d", file->fname, file->pio_ncid, ierr));
-        tname[0] = '\0';
-    }
+    pio_create_uniq_str(ios, NULL, tname, "tmp_", "_file");
 
-    snprintf(file->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "PIO:wr_%s", tname);
-    snprintf(file->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "PIO:rd_%s", tname);
-    snprintf(file->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "PIO:tot_%s", tname);
+    snprintf(file->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:wr_") + tname).c_str());
+    snprintf(file->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:rd_") + tname).c_str());
+    snprintf(file->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:tot_") + tname).c_str());
 
     spio_ltimer_start(file->io_fstats->wr_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
@@ -4792,7 +4786,7 @@ static size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *con
 int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *filename,
                         int mode, int retry)
 {
-  char tname[SPIO_TIMER_MAX_NAME];
+  std::string tname;
   iosystem_desc_t *ios;      /* Pointer to io system information. */
   file_desc_t *file;         /* Pointer to file information. */
   int imode;                 /* Internal mode val for netcdf4 file open. */
@@ -4867,16 +4861,11 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   file->reserve_extra_header_space = false; /* Set to true for creating output NetCDF files only. */
   file->is_reopened = true;
   strncpy(file->fname, filename, PIO_MAX_NAME);
-  ierr = pio_create_uniq_str(ios, NULL, tname, SPIO_TIMER_MAX_NAME, "tmp_", "_file");
-  if(ierr != PIO_NOERR){
-    /* Not a fatal error */
-    LOG((0, "Creating a unique name for the write timer for file (%s, ncid=%d) failed, ret = %d", file->fname, file->pio_ncid, ierr));
-    tname[0] = '\0';
-  }
+  pio_create_uniq_str(ios, NULL, tname, "tmp_", "_file");
 
-  snprintf(file->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "PIO:wr_%s", tname);
-  snprintf(file->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "PIO:rd_%s", tname);
-  snprintf(file->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "PIO:tot_%s", tname);
+  snprintf(file->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:wr_") + tname).c_str());
+  snprintf(file->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:rd_") + tname).c_str());
+  snprintf(file->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:tot_") + tname).c_str());
 
   /* FIXME: Files can be opened for rds and writes */
   spio_ltimer_start(file->io_fstats->rd_timer_name);
@@ -6308,29 +6297,28 @@ const char *get_var_desc_str(int ncid, int varid, const char *desc_prefix)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
-    static const char EMPTY_STR[] = "";
+    std::string vdesc;
     int ierr = PIO_NOERR;
 
     ierr = pio_get_file(ncid, &file);
     if(ierr != PIO_NOERR)
     {
         LOG((1, "Unable to get file corresponding to ncid = %d", ncid));
-        return EMPTY_STR;
+        return vdesc.c_str();
     }
     ios = file->iosystem;
     assert(ios != NULL);
 
-    snprintf(file->varlist[varid].vdesc, PIO_MAX_NAME,
-              "%s %s %s %llu %llu %llu %llu %llu",
-              (desc_prefix)?desc_prefix:"",
-              file->varlist[varid].vname,
-              file->fname,
-              (unsigned long long int)file->varlist[varid].vrsize,
-              (unsigned long long int)file->varlist[varid].rb_pend,
-              (unsigned long long int)file->varlist[varid].wb_pend,
-              (unsigned long long int)file->rb_pend,
-              (unsigned long long int)file->wb_pend
-              );
+    if(desc_prefix) { vdesc += desc_prefix; }
+    vdesc += std::string(file->varlist[varid].vname) +
+              std::string(file->fname) +
+              std::to_string(static_cast<unsigned long long int>(file->varlist[varid].vrsize)) +
+              std::to_string(static_cast<unsigned long long int>(file->varlist[varid].rb_pend)) +
+              std::to_string(static_cast<unsigned long long int>(file->varlist[varid].wb_pend)) +
+              std::to_string(static_cast<unsigned long long int>(file->rb_pend)) +
+              std::to_string(static_cast<unsigned long long int>(file->wb_pend));
+
+    snprintf(file->varlist[varid].vdesc, PIO_MAX_NAME, "%s", vdesc.c_str());
 
     return file->varlist[varid].vdesc;
 }

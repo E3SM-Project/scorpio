@@ -33,6 +33,7 @@
 #include "util/bget.h"
 #include "util/spio_ltimer.h"
 #include "pio_types.hpp"
+#include <string>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -395,7 +396,7 @@ extern "C" {
                                 char *history, char *source, char *version, int *fortran_order);
 
     /* Create a unique PIO string */
-    int pio_create_uniq_str(iosystem_desc_t *ios, io_desc_t *iodesc, char *str, int len, const char *prefix, const char *suffix);
+    void pio_create_uniq_str(iosystem_desc_t *ios, io_desc_t *iodesc, std::string &str, const std::string &prefix, const std::string &suffix);
 
     /* Set the size limit for each block of requests to wait */
     int set_file_req_block_size_limit(file_desc_t *file, PIO_Offset sz);

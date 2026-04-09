@@ -1480,9 +1480,9 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
     snprintf(timer_log_fname, PIO_MAX_NAME, "piorwinfo%010dwrank.dat", ios->ioroot);
     if(!mtimer_is_valid(file->varlist[varid].rd_mtimer))
     {
-        char tmp_timer_name[PIO_MAX_NAME];
-        snprintf(tmp_timer_name, PIO_MAX_NAME, "%s_%s", "rd", file->varlist[varid].vname);
-        file->varlist[varid].rd_mtimer = mtimer_create(tmp_timer_name, ios->my_comm, timer_log_fname);
+        std::string tmp_timer_name;
+        tmp_timer_name = std::string("rd_") + std::string(file->varlist[varid].vname);
+        file->varlist[varid].rd_mtimer = mtimer_create(tmp_timer_name.c_str(), ios->my_comm, timer_log_fname);
         if(!mtimer_is_valid(file->varlist[varid].rd_mtimer))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1491,8 +1491,8 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
                             "Inquiring information of variable %s (varid=%d) failed on file %s (ncid=%d) failed. Error creating micro timer (read) for variable", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
         }
         assert(!mtimer_is_valid(file->varlist[varid].rd_rearr_mtimer));
-        snprintf(tmp_timer_name, PIO_MAX_NAME, "%s_%s", "rd_rearr", file->varlist[varid].vname);
-        file->varlist[varid].rd_rearr_mtimer = mtimer_create(tmp_timer_name, ios->my_comm, timer_log_fname);
+        tmp_timer_name = std::string("rd_rearr_") + std::string(file->varlist[varid].vname);
+        file->varlist[varid].rd_rearr_mtimer = mtimer_create(tmp_timer_name.c_str(), ios->my_comm, timer_log_fname);
         if(!mtimer_is_valid(file->varlist[varid].rd_rearr_mtimer))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1500,8 +1500,8 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
             return pio_err(ios, file, PIO_EINTERNAL, __FILE__, __LINE__,
                             "Inquiring information of variable %s (varid=%d) failed on file %s (ncid=%d) failed. Error creating micro timer (read rearrange) for variable", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid);
         }
-        snprintf(tmp_timer_name, PIO_MAX_NAME, "%s_%s", "wr", file->varlist[varid].vname);
-        file->varlist[varid].wr_mtimer = mtimer_create(tmp_timer_name, ios->my_comm, timer_log_fname);
+        tmp_timer_name = std::string("wr_") + std::string(file->varlist[varid].vname);
+        file->varlist[varid].wr_mtimer = mtimer_create(tmp_timer_name.c_str(), ios->my_comm, timer_log_fname);
         if(!mtimer_is_valid(file->varlist[varid].wr_mtimer))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1510,8 +1510,8 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
                             "Inquiring information of variable %s (varid=%d) failed on file %s (ncid=%d) failed. Error creating micro timer (write) for variable", pio_get_fname_from_file(file), varid, pio_get_fname_from_file(file), ncid);
         }
         assert(!mtimer_is_valid(file->varlist[varid].wr_rearr_mtimer));
-        snprintf(tmp_timer_name, PIO_MAX_NAME, "%s_%s", "wr_rearr", file->varlist[varid].vname);
-        file->varlist[varid].wr_rearr_mtimer = mtimer_create(tmp_timer_name, ios->my_comm, timer_log_fname);
+        tmp_timer_name = std::string("wr_rearr_") + std::string(file->varlist[varid].vname);
+        file->varlist[varid].wr_rearr_mtimer = mtimer_create(tmp_timer_name.c_str(), ios->my_comm, timer_log_fname);
         if(!mtimer_is_valid(file->varlist[varid].wr_rearr_mtimer))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);

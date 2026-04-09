@@ -39,6 +39,8 @@
 #include "blosc2_filter.h"
 #endif
 #endif
+#include <string>
+#include <atomic>
 #include <algorithm>
 
 bool fortran_order = false;
@@ -514,102 +516,30 @@ int PIOc_set_iosystem_error_handling_impl(int iosysid, int method, int *old_meth
 }
 
 /* Create a unique string/name using information provided by the user */
-int pio_create_uniq_str(iosystem_desc_t *ios, io_desc_t *iodesc, char *str, int len, const char *prefix, const char *suffix)
+void pio_create_uniq_str(iosystem_desc_t *ios, io_desc_t *iodesc, std::string &str, const std::string &prefix, const std::string &suffix)
 {
-    static int counter = 0;
-    const char *DEFAULT_PREFIX = "pio";
-    const char *DEFAULT_SUFFIX = ".dat";
-    const int HUNDRED = 100;
-    const char *INT_FMT_LT_HUNDRED = "%2.2d";
-    const int TEN_THOUSAND = 1000;
-    const char *INT_FMT_LT_TEN_THOUSAND = "%4.4d";
-    const int MILLION = 1000000;
-    const char *INT_FMT_LT_MILLION = "%6.6d";
+  static std::atomic<long long int> counter(0);
+  const std::string DEFAULT_PREFIX("pio");
+  const std::string DEFAULT_SUFFIX(".dat");
 
-    assert(str && (len > 0));
+  /* Add prefix */
+  str += (!prefix.empty()) ? prefix : DEFAULT_PREFIX;
+  if(ios){
+    /* Add ios specific info into the str */
+    str += std::to_string(ios->iosysid) + std::string("id");
+    str += std::to_string(ios->num_comptasks) + std::string("tasks");
+    str += std::to_string(ios->num_iotasks) + std::string("io");
+  }
+  if(iodesc){
+    /* Add iodesc specific info into the str */
+    str += std::to_string(iodesc->ndims) + std::string("dims");
+  }
 
-    if(!prefix)
-    {
-        prefix = DEFAULT_PREFIX;
-    }
-    if(!suffix)
-    {
-        suffix = DEFAULT_SUFFIX;
-    }
+  /* Add counter - to make the str unique */
+  str += std::to_string(counter++);
 
-    int rem_len = len;
-    char *sptr = str;
-
-    /* Add prefix */
-    int prefix_len = strlen(prefix);
-    assert(rem_len > prefix_len);
-    snprintf(sptr, rem_len, "%s", prefix);
-    rem_len -= prefix_len;
-    sptr += prefix_len;
-
-    if(ios)
-    {
-        /* Add ios specific info into the str */
-        assert(ios->iosysid < MILLION);
-        assert(ios->num_comptasks < MILLION);
-        assert(rem_len > 0);
-        const char *iosysid_fmt = (ios->iosysid < HUNDRED) ? (INT_FMT_LT_HUNDRED) : ((ios->iosysid < TEN_THOUSAND) ? (INT_FMT_LT_TEN_THOUSAND): INT_FMT_LT_MILLION);
-        const char *num_comptasks_fmt = (ios->num_comptasks < HUNDRED) ? (INT_FMT_LT_HUNDRED) : ((ios->num_comptasks < TEN_THOUSAND) ? (INT_FMT_LT_TEN_THOUSAND): INT_FMT_LT_MILLION);
-        const char *num_iotasks_fmt = num_comptasks_fmt;
-
-        snprintf(sptr, rem_len, iosysid_fmt, ios->iosysid);
-        rem_len = len - strlen(str);
-        sptr = str + strlen(str);
-        snprintf(sptr, rem_len, "%s", "id");
-        rem_len = len - strlen(str);
-        sptr = str + strlen(str);
-
-        snprintf(sptr, rem_len, num_comptasks_fmt, ios->num_comptasks);
-        rem_len = len - strlen(str);
-        sptr = str + strlen(str);
-        snprintf(sptr, rem_len, "%s", "tasks");
-        rem_len = len - strlen(str);
-        sptr = str + strlen(str);
-
-        snprintf(sptr, rem_len, num_iotasks_fmt, ios->num_iotasks);
-        rem_len = len - strlen(str);
-        sptr = str + strlen(str);
-        snprintf(sptr, rem_len, "%s", "io");
-        rem_len = len - strlen(str);
-        sptr = str + strlen(str);
-    }
-
-    if(iodesc)
-    {
-        /* Add iodesc specific info into the str */
-        assert(iodesc->ndims < MILLION);
-        assert(rem_len > 0);
-        const char *ndims_fmt = (iodesc->ndims < HUNDRED) ? (INT_FMT_LT_HUNDRED) : ((iodesc->ndims < TEN_THOUSAND) ? (INT_FMT_LT_TEN_THOUSAND): INT_FMT_LT_MILLION);
-        snprintf(sptr, rem_len, ndims_fmt, iodesc->ndims);
-        rem_len = len - strlen(str);
-        sptr = str + strlen(str);
-        snprintf(sptr, rem_len, "%s", "dims");
-        rem_len = len - strlen(str);
-        sptr = str + strlen(str);
-    }
-
-    /* Add counter - to make the str unique */
-    assert(counter < MILLION);
-    const char *counter_fmt = (counter < HUNDRED) ? (INT_FMT_LT_HUNDRED) : ((counter < TEN_THOUSAND) ? (INT_FMT_LT_TEN_THOUSAND): INT_FMT_LT_MILLION);
-    snprintf(sptr, rem_len, counter_fmt, counter);
-    rem_len = len - strlen(str);
-    sptr = str + strlen(str);
-
-    counter++;
-
-    /* Add suffix */
-    int suffix_len = strlen(suffix);
-    assert(rem_len > suffix_len);
-    snprintf(sptr, rem_len, "%s", suffix);
-    rem_len -= suffix_len;
-    sptr += suffix_len;
-
-    return PIO_NOERR;
+  /* Add suffix */
+  str += (!suffix.empty()) ? suffix : DEFAULT_SUFFIX;
 }
 
 static int subset_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PIO_Offset *iostart, const PIO_Offset *iocount)
@@ -991,24 +921,21 @@ static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, 
 
 #if PIO_SAVE_DECOMPS
   if(pio_save_decomps_regex_match(*ioidp, NULL, NULL)){
-    char filename[PIO_MAX_NAME];
-    ierr = pio_create_uniq_str(ios, iodesc, filename, PIO_MAX_NAME, "piodecomp", ".dat");
-    if(ierr != PIO_NOERR){
-      return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                      "Initializing the PIO decomposition failed. Creating a unique file name for saving the decomposition failed");
-    }
-    LOG((2, "Saving decomp map to %s", filename));
-    PIOc_writemap_impl(filename, *ioidp, ndims, gdimlen, maplen, (PIO_Offset *)compmap, ios->my_comm);
+    std::string filename;
+    pio_create_uniq_str(ios, iodesc, filename, "piodecomp", ".dat");
 
-    char log_fname[PIO_MAX_NAME];
-    ierr = pio_create_uniq_str(ios, iodesc, log_fname, PIO_MAX_NAME, "piodecomp", ".nc");
-    SPIO_Util::Decomp_Util::Decomp_logger *logger = SPIO_Util::Decomp_Util::create_decomp_logger(ios->comp_comm, std::string(log_fname));
+    LOG((2, "Saving decomp map to %s", filename.c_str()));
+    PIOc_writemap_impl(filename.c_str(), *ioidp, ndims, gdimlen, maplen, (PIO_Offset *)compmap, ios->my_comm);
+
+    std::string log_fname;
+    pio_create_uniq_str(ios, iodesc, log_fname, "piodecomp", ".nc");
+    SPIO_Util::Decomp_Util::Decomp_logger *logger = SPIO_Util::Decomp_Util::create_decomp_logger(ios->comp_comm, log_fname);
     (*logger).write_only().open().put(iodesc).close();
     delete logger;
 
     iodesc->is_saved = true;
 
-    SPIO_Util::Decomp_Util::gdpool_mgr.get_decomp_map_info_pool()->add_decomp_map_info(*ioidp, filename);
+    SPIO_Util::Decomp_Util::gdpool_mgr.get_decomp_map_info_pool()->add_decomp_map_info(*ioidp, filename.c_str());
   }
 #endif
 
@@ -1660,17 +1587,15 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
                         "PIO Init failed. Internal error allocating buffer space on compute processes to cache user data");
     }
 
-    ret = pio_create_uniq_str(ios, NULL, ios->sname, PIO_MAX_NAME, "UNKNOWN:SPIO_COMP_", "_tmp_name");
-    if(ret != PIO_NOERR)
-    {
-        /* Not a fatal error */
-        LOG((0, "Creating a unique name for the iosystem (iosysid=%d) failed, ret = %d", *iosysidp, ret));
-    }
+    std::string sname;
+    pio_create_uniq_str(ios, NULL, sname, "UNKNOWN:SPIO_COMP_", "_tmp_name");
+
+    snprintf(ios->sname, PIO_MAX_NAME, "%s", sname.c_str());
 
     /* Set the timer names for this iosystem */
-    snprintf(ios->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "PIO:wr_%s", ios->sname);
-    snprintf(ios->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "PIO:rd_%s", ios->sname);
-    snprintf(ios->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "PIO:tot_%s", ios->sname);
+    snprintf(ios->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:wr_") + sname).c_str());
+    snprintf(ios->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:rd_") + sname).c_str());
+    snprintf(ios->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:tot_") + sname).c_str());
 
     LOG((2, "Init_Intracomm complete iosysid = %d", *iosysidp));
 
@@ -2592,16 +2517,15 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         iosysidp[cmp] = pio_add_to_iosystem_list(my_iosys, MPI_COMM_NULL);
         LOG((2, "new iosys ID added to iosystem_list iosysid = %d", iosysidp[cmp]));
 
-        ret = pio_create_uniq_str(my_iosys, NULL, my_iosys->sname, PIO_MAX_NAME, "UNKNOWN:SPIO_COMP_", "_tmp_name");
-        if(ret != PIO_NOERR)
-        {
-            /* Not Fatal error */
-            LOG((0, "Creating a unique name for the iosystem (iosysid=%d) failed,ret = %d", my_iosys->iosysid, ret));
-        }
+        std::string sname;
+        pio_create_uniq_str(my_iosys, NULL, sname, "UNKNOWN:SPIO_COMP_", "_tmp_name");
+
+        snprintf(my_iosys->sname, PIO_MAX_NAME, "%s", sname.c_str());
+
         /* Set the timer names for this iosystem */
-        snprintf(my_iosys->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "PIO:wr_%s", my_iosys->sname);
-        snprintf(my_iosys->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "PIO:rd_%s", my_iosys->sname);
-        snprintf(my_iosys->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "PIO:tot_%s", my_iosys->sname);
+        snprintf(my_iosys->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:wr_") + sname).c_str());
+        snprintf(my_iosys->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:rd_") + sname).c_str());
+        snprintf(my_iosys->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:tot_") + sname).c_str());
     } /* next computational component */
 
     /* Initialize async message signatures */
@@ -3195,16 +3119,14 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
         LOG((2, "PIOc_init_intercomm : iosys[%d]->ioid=%d, iosys[%d]->uniontasks = %d, iosys[%d]->union_rank=%d, %s", i, iosys[i]->iosysid, i, iosys[i]->num_uniontasks, i, iosys[i]->union_rank, ((iosys[i]->ioproc) ? ("IS IO PROC"):((iosys[i]->compproc) ? ("IS COMPUTE PROC") : ("NEITHER IO NOR COMPUTE PROC"))) ));
         LOG((2, "New IOsystem added to iosystem_list iosysid = %d", iosysidps[i]));
 
-        ret = pio_create_uniq_str(iosys[i], NULL, iosys[i]->sname, PIO_MAX_NAME, "UNKNOWN:SPIO_COMP_", "_tmp_name");
-        if(ret != PIO_NOERR)
-        {
-            /* Not Fatal error */
-            LOG((0, "Creating a unique name for the iosystem (iosysid=%d) failed,ret = %d", iosys[i]->iosysid, ret));
-        }
+        std::string sname;
+        pio_create_uniq_str(iosys[i], NULL, sname, "UNKNOWN:SPIO_COMP_", "_tmp_name");
+        snprintf(iosys[i]->sname, PIO_MAX_NAME, "%s", sname.c_str());
+
         /* Set the timer names for this iosystem */
-        snprintf(iosys[i]->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "PIO:wr_%s", iosys[i]->sname);
-        snprintf(iosys[i]->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "PIO:rd_%s", iosys[i]->sname);
-        snprintf(iosys[i]->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "PIO:tot_%s", iosys[i]->sname);
+        snprintf(iosys[i]->io_fstats->wr_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:wr_") + sname).c_str());
+        snprintf(iosys[i]->io_fstats->rd_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:rd_") + sname).c_str());
+        snprintf(iosys[i]->io_fstats->tot_timer_name, SPIO_TIMER_MAX_NAME, "%s", (std::string("PIO:tot_") + sname).c_str());
     }
 
     /* The comp_comms array is freed. The communicators will be freed internally
