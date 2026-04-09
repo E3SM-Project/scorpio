@@ -1199,36 +1199,38 @@ typedef struct file_desc_t
 } file_desc_t;
 
 /**
- * These are the supported methods of reading/writing netCDF
- * files. (Not all methods can be used with all netCDF files.)
+ * These are the supported methods of reading/writing input/output
+ * files. The PnetCDF, NetCDF and HDF5 libraries output data in the
+ * NetCDF file format. The ADIOS library outputs data in the BP file
+ * format.
  */
 enum PIO_IOTYPE
 {
-    /** Parallel Netcdf  (parallel) */
+    /** Parallel NetCDF library (Parallel I/O, NetCDF3 classic file format) */
     PIO_IOTYPE_PNETCDF = 1,
 
-    /** Netcdf3 Classic format (serial) */
+    /** NetCDF library (Serial I/O, NetCDF3 classic file format) */
     PIO_IOTYPE_NETCDF = 2,
 
-    /**  NetCDF4 (HDF5) compressed format (serial) */
+    /** NetCDF library (Serial I/O, NetCDF4/HDF5 compressed file format) */
     PIO_IOTYPE_NETCDF4C = 3,
 
-    /** NetCDF4 (HDF5) parallel */
+    /** NetCDF library (Parallel I/O, NetCDF4/HDF5 file format) */
     PIO_IOTYPE_NETCDF4P = 4,
 
-    /** NetCDF4 (HDF5) parallel NCZarr */
+    /** NetCDF library (Parallel I/O, NCZarr file format) */
     PIO_IOTYPE_NETCDF4P_NCZARR = 5,
 
-    /** ADIOS parallel */
+    /** ADIOS library (Parallel I/O, ADIOS BP file format) */
     PIO_IOTYPE_ADIOS = 6,
 
-    /** ADIOS parallel with compression */
+    /** ADIOS library (Parallel I/O, ADIOS BP compressed file format) */
     PIO_IOTYPE_ADIOSC = 7,
 
-    /** HDF5 parallel */
+    /** HDF5 library (Parallel I/O, NetCDF4/HDF5 file format) */
     PIO_IOTYPE_HDF5 = 8,
 
-    /** HDF5 parallel with compression */
+    /** HDF5 library (Parallel I/O, NetCDF4/HDF5 compressed file format) */
     PIO_IOTYPE_HDF5C = 9
 };
 
