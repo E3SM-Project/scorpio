@@ -686,6 +686,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
   assert(ios->ioproc);
 
+  /* Step 1 : Process dimensions with no coordinate variables associated with it */
   for(i = 0; i < file->hdf5_num_dims; i++){
     /* For dimensions without an associated coordinate var, define them here. However since the
      * the user can call redef() multiple times define it only its not already defined/valid
@@ -832,6 +833,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
     }
   }
 
+  /* Step 2 : Process coordinate variables and associated dimensions */
   for(i = 0; i < file->hdf5_num_vars; i++){
     /* Note: For async I/O operations enddef() calls queued before
      * the HDF5 variable is defined will see partially initialized
@@ -913,7 +915,14 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
                        pio_get_fname_from_file(file), file->pio_ncid);
       }
     }
-    else{
+  }
+
+  /* Step 3 : Process rest of the variables (These are non-coordinate variables). The coordinate
+   * variables and associated dimensions need to be defined (Step 2) before we start processing
+   * all variables.
+   */
+  for(i = 0; i < file->hdf5_num_vars; i++){
+    if(!file->hdf5_vars[i].is_coord_var){
       /* Not a coordinate var */
       int ndims = file->hdf5_vars[i].ndims;
       if(ndims > 0){
@@ -936,7 +945,6 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
       }
     }
   }
-
   return PIO_NOERR;
 }
 
