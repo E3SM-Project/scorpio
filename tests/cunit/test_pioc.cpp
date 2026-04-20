@@ -3,9 +3,31 @@
  *
  * Ed Hartnett
  */
-#include <pio.h>
-#include <pio_internal.h>
-#include <pio_tests.h>
+#include <cassert>
+#include <cstdlib>
+#include <cstring>
+
+#include "pio_config.h"
+#include "pio.h"
+#include "pio_internal.h"
+#include "pio_tests.h"
+
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
+#include "gptl.h"
+#endif
+#endif
+
+#define LOG_RANK0(rank, ...)                     \
+            do{                                   \
+                if(rank == 0)                     \
+                {                                 \
+                    fprintf(stderr, __VA_ARGS__); \
+                }                                 \
+            }while(0);
+
+static const int FAIL = -1;
+
 
 /* The number of tasks this test should run on. */
 #define TARGET_NTASKS 4
@@ -97,7 +119,7 @@ int create_decomposition(int ntasks, int my_rank, int iosysid, int dim1_len, int
     elements_per_pe = dim1_len / ntasks;
 
     /* Allocate space for the decomposition array. */
-    if (!(compdof = malloc(elements_per_pe * sizeof(PIO_Offset))))
+    if (!(compdof = (PIO_Offset *) malloc(elements_per_pe * sizeof(PIO_Offset))))
         return PIO_ENOMEM;
 
     /* Describe the decomposition. The new init_decomp uses a 0-based
@@ -218,10 +240,10 @@ int test_darray(int iosysid, int ioid, int num_flavors, int *flavor, int my_rank
             ERR(ret);
 
         /* Write some data. */
-        PIO_Offset arraylen = 1;
+        const PIO_Offset arraylen = 1;
         float fillvalue = 0.0;
         float *fillvaluep = fv ? &fillvalue : NULL;
-        float test_data[arraylen];
+        float test_data[1];
         for (int f = 0; f < arraylen; f++)
             test_data[f] = my_rank * 10 + f;
         if ((ret = PIOc_write_darray(ncid, varid, ioid, arraylen, test_data, fillvaluep)))
@@ -464,24 +486,24 @@ int check_error_strings(int my_rank, int num_tries, int *errcode,
     int ret;
 
     /* Try each test code. */
-    for (int try = 0; try < num_tries; try++)
+    for (int i = 0; i < num_tries; i++)
     {
         char errstr[PIO_MAX_NAME + 1];
 
         /* Get the error string for this errcode. */
-        if ((ret = PIOc_strerror(errcode[try], errstr, PIO_MAX_NAME)))
+        if ((ret = PIOc_strerror(errcode[i], errstr, PIO_MAX_NAME)))
             return ret;
 
-        printf("%d for errcode = %d message = %s\n", my_rank, errcode[try], errstr);
+        printf("%d for errcode = %d message = %s\n", my_rank, errcode[i], errstr);
 
         /* Check that it was as expected. */
-        if (strncmp(errstr, expected[try], strlen(expected[try])))
+        if (strncmp(errstr, expected[i], strlen(expected[i])))
         {
-            printf("%d expected %s got %s\n", my_rank, expected[try], errstr);
+            printf("%d expected %s got %s\n", my_rank, expected[i], errstr);
             return ERR_AWFUL;
         }
         if (!my_rank)
-            printf("%d errcode = %d passed\n", my_rank, errcode[try]);
+            printf("%d errcode = %d passed\n", my_rank, errcode[i]);
     }
 
     return PIO_NOERR;
@@ -1639,7 +1661,7 @@ int test_malloc_iodesc2(int iosysid, int my_rank)
     for (int t = 0; t < num_types; t++)
     {
 
-        if ((ret = malloc_iodesc(ios, test_type[t], 1, &iodesc)))
+        if ((ret = malloc_iodesc(ios, test_type[t], 1, 1, &iodesc)))
             return ret;
         if (iodesc->mpitype != mpi_type[t])
             return ERR_WRONG;
@@ -1648,6 +1670,8 @@ int test_malloc_iodesc2(int iosysid, int my_rank)
         ioid = pio_add_to_iodesc_list(iodesc, MPI_COMM_NULL);
         if (iodesc->firstregion)
             free_region_list(iodesc->firstregion);
+        free(iodesc->map);
+        free(iodesc->dimlen);
         if ((ret = pio_delete_iodesc_from_list(ioid)))
             return ret;
     }
@@ -2180,10 +2204,289 @@ int test_all(int iosysid, int num_flavors, int *flavor, int my_rank, MPI_Comm te
     return PIO_NOERR;
 }
 
-/* Run all tests. */
-int main(int argc, char **argv)
+/* Run non-async PIO tests. */
+static int run_tests_no_async(int my_rank, int num_flavors, int *flavor,
+                               MPI_Comm test_comm, int target_ntasks)
 {
-    /* Change the 5th arg to 3 to turn on logging. */
-    return run_test_main(argc, argv, MIN_NTASKS, TARGET_NTASKS, 3,
-                         TEST_NAME, dim_len, COMPONENT_COUNT, NUM_IO_PROCS);
+    int niotasks = target_ntasks;
+    int ioproc_stride = 1;
+    int ioproc_start = 0;
+    PIO_Offset elements_per_pe;
+    int iosysid;
+    int ioid;
+    PIO_Offset *compdof;
+    int slice_dimlen[2];
+    int ret;
+
+    slice_dimlen[0] = X_DIM_LEN;
+    slice_dimlen[1] = Y_DIM_LEN;
+
+    /* Initialize the PIO IO system. */
+    if ((ret = PIOc_Init_Intracomm(test_comm, niotasks, ioproc_stride,
+                                   ioproc_start, PIO_REARR_SUBSET, &iosysid)))
+        return ret;
+
+    /* Describe the decomposition. This is a 0-based array, so don't add 1! */
+    elements_per_pe = X_DIM_LEN * Y_DIM_LEN / target_ntasks;
+    if (!(compdof = (PIO_Offset *)malloc(elements_per_pe * sizeof(PIO_Offset))))
+        return PIO_ENOMEM;
+    for (int i = 0; i < elements_per_pe; i++)
+        compdof[i] = my_rank * elements_per_pe + i;
+
+    /* Create the PIO decomposition for this test. */
+    if ((ret = PIOc_init_decomp(iosysid, PIO_FLOAT, 2, slice_dimlen,
+                                (PIO_Offset)elements_per_pe, compdof, &ioid, 0,
+                                NULL, NULL)))
+    {
+        free(compdof);
+        return ret;
+    }
+    free(compdof);
+
+    /* Run tests. */
+    if ((ret = test_all(iosysid, num_flavors, flavor, my_rank, test_comm, 0)))
+        return ret;
+
+    /* Free the PIO decomposition. */
+    if ((ret = PIOc_freedecomp(iosysid, ioid)))
+        return ret;
+
+    /* Finalize PIO system. */
+    if ((ret = PIOc_finalize(iosysid)))
+        return ret;
+
+    return PIO_NOERR;
+}
+
+/* Run async PIO tests. */
+static int run_tests_async(int my_rank, int num_flavors, int *flavor,
+                            MPI_Comm test_comm, int component_count,
+                            int num_io_procs, int target_ntasks)
+{
+    int iosysid[COMPONENT_COUNT];
+    int num_procs[COMPONENT_COUNT];
+    MPI_Comm io_comm;
+    MPI_Comm comp_comm[COMPONENT_COUNT];
+    int mpierr;
+    int ret;
+
+    num_procs[0] = target_ntasks - 1;
+
+    /* Is the current process a computation task? */
+    int comp_task = my_rank < num_io_procs ? 0 : 1;
+
+    /* Initialize the IO system. */
+    if ((ret = PIOc_init_async(test_comm, num_io_procs, NULL, component_count,
+                               num_procs, NULL, &io_comm, comp_comm,
+                               PIO_REARR_BOX, iosysid)))
+        return ret;
+
+    /* All the netCDF calls are only executed on the computation tasks. */
+    if (comp_task)
+    {
+        for (int c = 0; c < component_count; c++)
+        {
+            if ((ret = test_all(iosysid[c], num_flavors, flavor, my_rank,
+                                comp_comm[0], 1)))
+                return ret;
+
+            /* Finalize the IO system. */
+            if ((ret = PIOc_finalize(iosysid[c])))
+                return ret;
+            if ((mpierr = MPI_Comm_free(&comp_comm[c])))
+                return PIO_EIO;
+        }
+    }
+    else
+    {
+        if ((mpierr = MPI_Comm_free(&io_comm)))
+            return PIO_EIO;
+    }
+
+    return PIO_NOERR;
+}
+
+int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
+{
+    int nerrs = 0, ret = PIO_NOERR;
+    assert((comm != MPI_COMM_NULL) && (wrank >= 0) && (wsz > 0) && num_errors);
+
+    if (wsz < MIN_NTASKS)
+    {
+        LOG_RANK0(wrank, "ERROR: Need at least %d tasks.\n", MIN_NTASKS);
+        *num_errors += 1;
+        return 1;
+    }
+
+    /* Change error handling so we can test invalid parameters. */
+    if ((ret = PIOc_set_iosystem_error_handling(PIO_DEFAULT, PIO_RETURN_ERROR, NULL)))
+    {
+        LOG_RANK0(wrank,
+            "PIOc_set_iosystem_error_handling() FAILED, ret = %d\n", ret);
+        *num_errors += 1;
+        return ret;
+    }
+
+    int num_flavors;
+    int flavor[NUM_FLAVORS];
+
+    /* Figure out iotypes. */
+    if ((ret = get_iotypes(&num_flavors, flavor)))
+    {
+        LOG_RANK0(wrank, "get_iotypes() FAILED, ret = %d\n", ret);
+        *num_errors += 1;
+        return ret;
+    }
+    LOG_RANK0(wrank, "Running tests for %d flavors\n", num_flavors);
+
+    /* Run tests without async feature. */
+    try
+    {
+        ret = run_tests_no_async(wrank, num_flavors, flavor, comm, wsz);
+    }
+    catch(...)
+    {
+        ret = PIO_EINTERNAL;
+    }
+    if (ret != PIO_NOERR)
+    {
+        LOG_RANK0(wrank, "run_tests_no_async() FAILED, ret = %d\n", ret);
+        nerrs++;
+    }
+    else
+    {
+        LOG_RANK0(wrank, "run_tests_no_async() PASSED\n");
+    }
+
+    /* Run tests with async. */
+    try
+    {
+        ret = run_tests_async(wrank, num_flavors, flavor, comm, COMPONENT_COUNT,
+                              NUM_IO_PROCS, wsz);
+    }
+    catch(...)
+    {
+        ret = PIO_EINTERNAL;
+    }
+    if (ret != PIO_NOERR)
+    {
+        LOG_RANK0(wrank, "run_tests_async() FAILED, ret = %d\n", ret);
+        nerrs++;
+    }
+    else
+    {
+        LOG_RANK0(wrank, "run_tests_async() PASSED\n");
+    }
+
+    *num_errors += nerrs;
+    return nerrs;
+}
+
+int main(int argc, char *argv[])
+{
+    int ret;
+    int wrank, wsz;
+    int num_errors;
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
+    ret = GPTLinitialize();
+    if (ret != 0)
+    {
+        LOG_RANK0(wrank, "GPTLinitialize() FAILED, ret = %d\n", ret);
+        return ret;
+    }
+#endif /* TIMING_INTERNAL */
+#endif /* TIMING */
+
+    ret = MPI_Init(&argc, &argv);
+    if (ret != MPI_SUCCESS)
+    {
+        LOG_RANK0(wrank, "MPI_Init() FAILED, ret = %d\n", ret);
+        return ret;
+    }
+
+    ret = MPI_Comm_rank(MPI_COMM_WORLD, &wrank);
+    if (ret != MPI_SUCCESS)
+    {
+        LOG_RANK0(wrank, "MPI_Comm_rank() FAILED, ret = %d\n", ret);
+        MPI_Finalize();
+        return ret;
+    }
+    ret = MPI_Comm_size(MPI_COMM_WORLD, &wsz);
+    if (ret != MPI_SUCCESS)
+    {
+        LOG_RANK0(wrank, "MPI_Comm_size() FAILED, ret = %d\n", ret);
+        MPI_Finalize();
+        return ret;
+    }
+
+    /* Create a communicator with exactly TARGET_NTASKS tasks. */
+    MPI_Comm test_comm;
+    if (wsz > TARGET_NTASKS)
+    {
+        int color = (wrank < TARGET_NTASKS) ? 0 : 1;
+        int key = wrank;
+        ret = MPI_Comm_split(MPI_COMM_WORLD, color, key, &test_comm);
+        if (ret != MPI_SUCCESS)
+        {
+            LOG_RANK0(wrank, "MPI_Comm_split() FAILED, ret = %d\n", ret);
+            MPI_Finalize();
+            return ret;
+        }
+    }
+    else
+    {
+        ret = MPI_Comm_dup(MPI_COMM_WORLD, &test_comm);
+        if (ret != MPI_SUCCESS)
+        {
+            LOG_RANK0(wrank, "MPI_Comm_dup() FAILED, ret = %d\n", ret);
+            MPI_Finalize();
+            return ret;
+        }
+    }
+
+    /* Turn on logging. */
+    if ((ret = PIOc_set_log_level(3)))
+    {
+        LOG_RANK0(wrank, "PIOc_set_log_level() FAILED, ret = %d\n", ret);
+        MPI_Comm_free(&test_comm);
+        MPI_Finalize();
+        return ret;
+    }
+
+    num_errors = 0;
+    if (wrank < TARGET_NTASKS)
+    {
+        ret = test_driver(test_comm, wrank, TARGET_NTASKS, &num_errors);
+        if (ret != 0)
+        {
+            LOG_RANK0(wrank, "Test driver FAILED\n");
+        }
+        else
+        {
+            LOG_RANK0(wrank, "All tests PASSED\n");
+        }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Comm_free(&test_comm);
+    MPI_Finalize();
+
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
+    ret = GPTLfinalize();
+    if (ret != 0)
+    {
+        LOG_RANK0(wrank, "GPTLfinalize() FAILED, ret = %d\n", ret);
+        return ret;
+    }
+#endif /* TIMING_INTERNAL */
+#endif /* TIMING */
+
+    if (num_errors != 0)
+    {
+        LOG_RANK0(wrank, "Total errors = %d\n", num_errors);
+        return FAIL;
+    }
+    return 0;
 }
