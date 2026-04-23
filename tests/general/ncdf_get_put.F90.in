@@ -939,9 +939,13 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_md2mdplus1_var
       start(4) = tstep
       count(4) = 1
       pval_start = (tstep - 1) * (MAX_ROWS * MAX_COLS * MAX_LEVS)
-      ret = PIO_put_var(pio_file, pio_4dvar, start, count,&
-              pval_3d(:,:,:)+pval_start)
-      PIO_TF_CHECK_ERR(ret, "Failed to put 4d var:" // trim(filename))
+      if((iotypes(i) == PIO_IOTYPE_ADIOS) .or. (iotypes(i) == PIO_IOTYPE_ADIOSC)) then
+        PIO_TF_LOG(0,*) "Skipping write/put of 4d var (NOT SUPPORTED) :", iotype_descs(i)
+      else
+        ret = PIO_put_var(pio_file, pio_4dvar, start, count,&
+                pval_3d(:,:,:)+pval_start)
+        PIO_TF_CHECK_ERR(ret, "Failed to put 4d var:" // trim(filename))
+      end if
     end do
 
 #ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
@@ -974,15 +978,19 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_md2mdplus1_var
 
     PIO_TF_CHECK_VAL((gval_3d, exp_val_3d), "Got wrong value (3d var)")
 
-    gval_4d = 0
-    ret = PIO_get_var(pio_file, pio_4dvar, gval_4d)
-    PIO_TF_CHECK_ERR(ret, "Failed to get 4d var:" // trim(filename))
+    if((iotypes(i) == PIO_IOTYPE_ADIOS) .or. (iotypes(i) == PIO_IOTYPE_ADIOSC)) then
+      PIO_TF_LOG(0,*) "Skipping read/get of 4d var (WRITE/PUT NOT SUPPORTED) :", iotype_descs(i)
+    else
+      gval_4d = 0
+      ret = PIO_get_var(pio_file, pio_4dvar, gval_4d)
+      PIO_TF_CHECK_ERR(ret, "Failed to get 4d var:" // trim(filename))
 
-    ! Special code to handle 4d vals is required since the framework
-    ! currently does not support comparing 4d arrays
-    do tstep=1,MAX_TIMES
-      PIO_TF_CHECK_VAL((gval_4d(:,:,:,tstep), exp_val_4d(:,:,:,tstep)), "Got wrong value (4d var)")
-    end do
+      ! Special code to handle 4d vals is required since the framework
+      ! currently does not support comparing 4d arrays
+      do tstep=1,MAX_TIMES
+        PIO_TF_CHECK_VAL((gval_4d(:,:,:,tstep), exp_val_4d(:,:,:,tstep)), "Got wrong value (4d var)")
+      end do
+    end if
 
     call PIO_closefile(pio_file)
     call PIO_deletefile(pio_tf_iosystem_, filename);
