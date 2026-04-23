@@ -454,7 +454,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_1dvar_ls_buf
   Implicit none
   type(file_desc_t) :: pio_file
   character(len=PIO_TF_MAX_STR_LEN) :: filename
-  type(var_desc_t)  :: pio_var, pio_cvar
+  type(var_desc_t)  :: pio_svar, pio_lvar, pio_scvar, pio_lcvar
   integer :: pio_dim
 
   integer, parameter :: DIM_LEN = 200
@@ -469,8 +469,10 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_1dvar_ls_buf
 
   integer, dimension(:), allocatable :: iotypes
   character(len=PIO_TF_MAX_STR_LEN), dimension(:), allocatable :: iotype_descs
-  character(len=*), parameter :: PIO_VAR_NAME = 'dummy_var_put_val'
-  character(len=*), parameter :: PIO_CVAR_NAME = 'dummy_var_put_cval'
+  character(len=*), parameter :: PIO_SVAR_NAME = 'dummy_svar_put_val'
+  character(len=*), parameter :: PIO_LVAR_NAME = 'dummy_lvar_put_val'
+  character(len=*), parameter :: PIO_SCVAR_NAME = 'dummy_svar_put_cval'
+  character(len=*), parameter :: PIO_LCVAR_NAME = 'dummy_lvar_put_cval'
   integer :: num_iotypes
   integer :: i, j, ret
 
@@ -509,34 +511,54 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_1dvar_ls_buf
     ret = PIO_def_dim(pio_file, 'dummy_dim_put_val', DIM_LEN, pio_dim)
     PIO_TF_CHECK_ERR(ret, "Failed to define dim:" // trim(filename))
 
-    ret = PIO_def_var(pio_file, PIO_VAR_NAME, PIO_TF_DATA_TYPE, (/pio_dim/), pio_var)
-    PIO_TF_CHECK_ERR(ret, "Failed to define var:" // trim(filename))
+    ret = PIO_def_var(pio_file, PIO_SVAR_NAME, PIO_TF_DATA_TYPE, (/pio_dim/), pio_svar)
+    PIO_TF_CHECK_ERR(ret, "Failed to define var (smaller than user buffer):" // trim(filename))
 
-    ret = PIO_def_var(pio_file, PIO_CVAR_NAME, PIO_char, (/pio_dim/), pio_cvar)
-    PIO_TF_CHECK_ERR(ret, "Failed to define char var:" // trim(filename))
+    ret = PIO_def_var(pio_file, PIO_LVAR_NAME, PIO_TF_DATA_TYPE, (/pio_dim/), pio_lvar)
+    PIO_TF_CHECK_ERR(ret, "Failed to define var (larger than user buffer):" // trim(filename))
+
+    ret = PIO_def_var(pio_file, PIO_SCVAR_NAME, PIO_char, (/pio_dim/), pio_scvar)
+    PIO_TF_CHECK_ERR(ret, "Failed to define char var (smaller than user buffer):" // trim(filename))
+
+    ret = PIO_def_var(pio_file, PIO_LCVAR_NAME, PIO_char, (/pio_dim/), pio_lcvar)
+    PIO_TF_CHECK_ERR(ret, "Failed to define char var (larger than user buffer):" // trim(filename))
 
     ret = PIO_enddef(pio_file)
     PIO_TF_CHECK_ERR(ret, "Failed to enddef:" // trim(filename))
 
     ! Put and get the values using a user buffer that is larger than the
     ! variable
-    ret = PIO_put_var(pio_file, pio_var, lpval);
-    PIO_TF_CHECK_ERR(ret, "Failed to put var:" // trim(filename))
+    ret = PIO_put_var(pio_file, pio_svar, lpval);
+    PIO_TF_CHECK_ERR(ret, "Failed to put var (smaller than user buffer)):" // trim(filename))
 
-    ret = PIO_put_var(pio_file, pio_cvar, lpcval);
-    PIO_TF_CHECK_ERR(ret, "Failed to put char var:" // trim(filename))
+    ret = PIO_put_var(pio_file, pio_scvar, lpcval);
+    PIO_TF_CHECK_ERR(ret, "Failed to put char var (smaller than user buffer):" // trim(filename))
+
+    ! Put the values using a user buffer that is smaller than the
+    ! variable and get it with a larger buffer
+    ret = PIO_put_var(pio_file, pio_lvar, spval);
+    PIO_TF_CHECK_ERR(ret, "Failed to put var (larger than user buffer):" // trim(filename))
+
+    ret = PIO_put_var(pio_file, pio_lcvar, spcval);
+    PIO_TF_CHECK_ERR(ret, "Failed to put char var (larger than user buffer):" // trim(filename))
 
 #ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
     call PIO_closefile(pio_file)
 
-    ret = PIO_openfile(pio_tf_iosystem_, pio_file, iotypes(i), filename, PIO_write)
+    ret = PIO_openfile(pio_tf_iosystem_, pio_file, iotypes(i), filename, PIO_nowrite)
     PIO_TF_CHECK_ERR(ret, "Failed to reopen:" // trim(filename))
 
-    ret = PIO_inq_varid(pio_file, PIO_VAR_NAME, pio_var)
-    PIO_TF_CHECK_ERR(ret, "Failed to get scalar var:" // trim(filename))
+    ret = PIO_inq_varid(pio_file, PIO_SVAR_NAME, pio_svar)
+    PIO_TF_CHECK_ERR(ret, "Failed to get var (smaller than user buffer):" // trim(filename))
 
-    ret = PIO_inq_varid(pio_file, PIO_CVAR_NAME, pio_cvar)
-    PIO_TF_CHECK_ERR(ret, "Failed to get scalar char var:" // trim(filename))
+    ret = PIO_inq_varid(pio_file, PIO_LVAR_NAME, pio_lvar)
+    PIO_TF_CHECK_ERR(ret, "Failed to get var (larger than user buffer):" // trim(filename))
+
+    ret = PIO_inq_varid(pio_file, PIO_SCVAR_NAME, pio_scvar)
+    PIO_TF_CHECK_ERR(ret, "Failed to get char var (smaller than user buffer):" // trim(filename))
+
+    ret = PIO_inq_varid(pio_file, PIO_LCVAR_NAME, pio_lcvar)
+    PIO_TF_CHECK_ERR(ret, "Failed to get char var (larger than user buffer):" // trim(filename))
 #else
     call PIO_syncfile(pio_file)
 #endif
@@ -546,38 +568,15 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_1dvar_ls_buf
       lgcval(j:j) = ''
     end do
 
-    ret = PIO_get_var(pio_file, pio_var, lgval);
-    PIO_TF_CHECK_ERR(ret, "Failed to get var:" // trim(filename))
+    ret = PIO_get_var(pio_file, pio_svar, lgval);
+    PIO_TF_CHECK_ERR(ret, "Failed to get var (smaller than user buffer):" // trim(filename))
 
-    PIO_TF_CHECK_VAL((lgval, lpval), "Get with large user buffer : Got wrong value")
+    PIO_TF_CHECK_VAL((lgval, lpval), "Get variable written with large user buffer : Got wrong value")
 
-    ret = PIO_get_var(pio_file, pio_cvar, lgcval);
-    PIO_TF_CHECK_ERR(ret, "Failed to get char var:" // trim(filename))
+    ret = PIO_get_var(pio_file, pio_scvar, lgcval);
+    PIO_TF_CHECK_ERR(ret, "Failed to get char var (smaller than user buffer):" // trim(filename))
 
-    PIO_TF_CHECK_VAL((lgcval, lpcval), "Get with large user buffer : Got wrong value")
-
-    ! Put the values using a user buffer that is smaller than the
-    ! variable and get it with a larger buffer
-    ret = PIO_put_var(pio_file, pio_var, spval);
-    PIO_TF_CHECK_ERR(ret, "Failed to put var:" // trim(filename))
-
-    ret = PIO_put_var(pio_file, pio_cvar, spcval);
-    PIO_TF_CHECK_ERR(ret, "Failed to put char var:" // trim(filename))
-
-#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
-    call PIO_closefile(pio_file)
-
-    ret = PIO_openfile(pio_tf_iosystem_, pio_file, iotypes(i), filename, PIO_nowrite)
-    PIO_TF_CHECK_ERR(ret, "Failed to reopen:" // trim(filename))
-
-    ret = PIO_inq_varid(pio_file, PIO_VAR_NAME, pio_var)
-    PIO_TF_CHECK_ERR(ret, "Failed to get scalar var:" // trim(filename))
-
-    ret = PIO_inq_varid(pio_file, PIO_CVAR_NAME, pio_cvar)
-    PIO_TF_CHECK_ERR(ret, "Failed to get scalar char var:" // trim(filename))
-#else
-    call PIO_syncfile(pio_file)
-#endif
+    PIO_TF_CHECK_VAL((lgcval, lpcval), "Get variable written with large user buffer : Got wrong value")
 
   do j=1,DIM_SMALL_LEN
     lpcval(j:j) = spcval(j:j)
@@ -600,13 +599,13 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_1dvar_ls_buf
 
     ! Note: Getting a variable with a buffer smaller than the size of the variable
     ! is an error, so use a large buffer for reading this data
-    ret = PIO_get_var(pio_file, pio_var, lgval);
-    PIO_TF_CHECK_ERR(ret, "Failed to get var:" // trim(filename))
+    ret = PIO_get_var(pio_file, pio_lvar, lgval);
+    PIO_TF_CHECK_ERR(ret, "Failed to get var (larger than user buffer):" // trim(filename))
 
-    PIO_TF_CHECK_VAL((lgval, lpval), "Get with large user buffer : Got wrong value")
+    PIO_TF_CHECK_VAL((lgval, lpval), "Get variable written with small user buffer : Got wrong value")
 
-    ret = PIO_get_var(pio_file, pio_cvar, lgcval);
-    PIO_TF_CHECK_ERR(ret, "Failed to get char var:" // trim(filename))
+    ret = PIO_get_var(pio_file, pio_lcvar, lgcval);
+    PIO_TF_CHECK_ERR(ret, "Failed to get char var (larger than user buffer):" // trim(filename))
 
     ! Since the variable is written out with a smaller buffer (than the size of the
     ! variable), the rest of the variable might contain invalid/uninitialized
@@ -614,7 +613,7 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_1dvar_ls_buf
     ! results
     lgcval(DIM_SMALL_LEN+1:DIM_LARGE_LEN) = ''
 
-    PIO_TF_CHECK_VAL((lgcval, lpcval), "Get with large user buffer : Got wrong value")
+    PIO_TF_CHECK_VAL((lgcval, lpcval), "Get variable written with small user buffer : Got wrong value")
 
     call PIO_closefile(pio_file)
     call PIO_deletefile(pio_tf_iosystem_, filename);
