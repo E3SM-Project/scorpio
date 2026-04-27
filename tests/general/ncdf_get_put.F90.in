@@ -1925,8 +1925,12 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_misc_str
     PIO_TF_CHECK_ERR(ret, "Failed to put 2d array of strings in file " // trim(filename))
 
     ! This calls put_var_3d_text()
-    ret = PIO_put_var(pio_file, var3d, exp_str3d);
-    PIO_TF_CHECK_ERR(ret, "Failed to put 3d array of strings in file " // trim(filename))
+    if((iotypes(i) == PIO_IOTYPE_ADIOS) .or. (iotypes(i) == PIO_IOTYPE_ADIOSC)) then
+      PIO_TF_LOG(0,*) "Skipping put/write of 3d string (NOT SUPPORTED for 4d char vars) :", iotype_descs(i)
+    else
+      ret = PIO_put_var(pio_file, var3d, exp_str3d);
+      PIO_TF_CHECK_ERR(ret, "Failed to put 3d array of strings in file " // trim(filename))
+    end if
 
     ! Sync data to disk
 #ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
@@ -1972,11 +1976,15 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_misc_str
     PIO_TF_CHECK_VAL((gstr2d, exp_str2d), "Got wrong value for 2d char var")
 
     ! This calls get_var_3d_text()
-    gstr3d = ''
-    ret = PIO_get_var(pio_file, var3d, gstr3d);
-    PIO_TF_CHECK_ERR(ret, "Failed to get 3d char var in file " // trim(filename))
+    ! Skip for ADIOS since we currently don't support put/write of
+    ! 4D char variables with ADIOS
+    if((iotypes(i) /= PIO_IOTYPE_ADIOS) .and. (iotypes(i) /= PIO_IOTYPE_ADIOSC)) then
+      gstr3d = ''
+      ret = PIO_get_var(pio_file, var3d, gstr3d);
+      PIO_TF_CHECK_ERR(ret, "Failed to get 3d char var in file " // trim(filename))
 
-    PIO_TF_CHECK_VAL((gstr3d, exp_str3d), "Got wrong value for 3d char var")
+      PIO_TF_CHECK_VAL((gstr3d, exp_str3d), "Got wrong value for 3d char var")
+    end if
 
     ! Re-write the variables in the file with a smaller (than the variable size)
     ! buffer
@@ -2085,8 +2093,14 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_misc_str
     cnt(4) = NUM_STEPS
 
     ! This calls put_vara_3d_text()
-    ret = PIO_put_var(pio_file, var3d, strt, cnt, exp_str3d);
-    PIO_TF_CHECK_ERR(ret, "Failed to put hslab of 3d array of strings in file " // trim(filename))
+    ! Skip for ADIOS since we currently don't support put/write of
+    ! 4D char variables with ADIOS
+    if((iotypes(i) == PIO_IOTYPE_ADIOS) .or. (iotypes(i) == PIO_IOTYPE_ADIOSC)) then
+      PIO_TF_LOG(0,*) "Skipping put/write of 3d string (NOT SUPPORTED for 4d char vars) :", iotype_descs(i)
+    else
+      ret = PIO_put_var(pio_file, var3d, strt, cnt, exp_str3d);
+      PIO_TF_CHECK_ERR(ret, "Failed to put hslab of 3d array of strings in file " // trim(filename))
+    end if
 
     ! Sync data to disk
 #ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
@@ -2122,9 +2136,13 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_misc_str
     PIO_TF_CHECK_VAL((gstr2d, exp_str2d), "Got wrong value for 2d char var written with hslab put")
 
     ! This calls get_var_3d_text()
-    gstr3d = ''
-    ret = PIO_get_var(pio_file, var3d, gstr3d);
-    PIO_TF_CHECK_ERR(ret, "Failed to get 3d char var in file " // trim(filename))
+    ! Skip for ADIOS since we currently don't support put/write of
+    ! 4D char variables with ADIOS
+    if((iotypes(i) /= PIO_IOTYPE_ADIOS) .and. (iotypes(i) /= PIO_IOTYPE_ADIOSC)) then
+      gstr3d = ''
+      ret = PIO_get_var(pio_file, var3d, gstr3d);
+      PIO_TF_CHECK_ERR(ret, "Failed to get 3d char var in file " // trim(filename))
+    end if
 
     PIO_TF_CHECK_VAL((gstr3d, exp_str3d), "Got wrong value for 3d char var written with hslab put")
 
@@ -2271,23 +2289,27 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_str_frames
     end do
 
     ! Write the 3d text variable, 1 2d array (row x col) of strings at a time
-    do step=1,NUM_STEPS
-      strt = 1
-      cnt = 0
-      strt(1) = 1
-      strt(2) = 1
-      strt(3) = 1
-      strt(4) = step
-      cnt(1) = STR_LEN
-      cnt(2) = NUM_ROWS
-      cnt(3) = NUM_COLS
-      cnt(4) = 1
+    if((iotypes(i) /= PIO_IOTYPE_ADIOS) .and. (iotypes(i) /= PIO_IOTYPE_ADIOSC)) then
+      do step=1,NUM_STEPS
+        strt = 1
+        cnt = 0
+        strt(1) = 1
+        strt(2) = 1
+        strt(3) = 1
+        strt(4) = step
+        cnt(1) = STR_LEN
+        cnt(2) = NUM_ROWS
+        cnt(3) = NUM_COLS
+        cnt(4) = 1
 
-      frame_str3d(:,:,1) = exp_str3d(:,:,step)
-      ! This calls put_vara_3d_text()
-      ret = PIO_put_var(pio_file, var3d, strt, cnt, frame_str3d);
-      PIO_TF_CHECK_ERR(ret, "Failed to put 3d array of strings 1 frame at a time in file " // trim(filename))
-    end do
+        frame_str3d(:,:,1) = exp_str3d(:,:,step)
+        ! This calls put_vara_3d_text()
+        ret = PIO_put_var(pio_file, var3d, strt, cnt, frame_str3d);
+        PIO_TF_CHECK_ERR(ret, "Failed to put 3d array of strings 1 frame at a time in file " // trim(filename))
+      end do
+    else
+      PIO_TF_LOG(0,*) "Skipping put/write of 4d char vars (NOT SUPPORTED), type :", iotype_descs(i)
+    end if
 
     ! Sync data to disk
 #ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
@@ -2323,11 +2345,14 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_str_frames
     PIO_TF_CHECK_VAL((gstr2d, exp_str2d), "Got wrong value for 2d char var")
 
     ! This calls get_var_3d_text()
-    gstr3d = ''
-    ret = PIO_get_var(pio_file, var3d, gstr3d);
-    PIO_TF_CHECK_ERR(ret, "Failed to get 3d char var in file " // trim(filename))
+    ! Skip for ADIOS since put/write of 4D vars is not supported right now
+    if((iotypes(i) /= PIO_IOTYPE_ADIOS) .and. (iotypes(i) /= PIO_IOTYPE_ADIOSC)) then
+      gstr3d = ''
+      ret = PIO_get_var(pio_file, var3d, gstr3d);
+      PIO_TF_CHECK_ERR(ret, "Failed to get 3d char var in file " // trim(filename))
 
-    PIO_TF_CHECK_VAL((gstr3d, exp_str3d), "Got wrong value for 3d char var")
+      PIO_TF_CHECK_VAL((gstr3d, exp_str3d), "Got wrong value for 3d char var")
+    end if
 
     call PIO_closefile(pio_file)
     call PIO_deletefile(pio_tf_iosystem_, filename);
@@ -2722,6 +2747,10 @@ PIO_TF_AUTO_TEST_SUB_BEGIN test_put_get_str_hslabs
     end do
 
     PIO_TF_LOG(0,*) "Testing type :", iotype_descs(i)
+    if((iotypes(i) == PIO_IOTYPE_ADIOS) .or. (iotypes(i) == PIO_IOTYPE_ADIOSC)) then
+      PIO_TF_LOG(0,*) "Skipping writing hyperslabs of strings in phases (Appending to files is not SUPPORTED),  type :", iotype_descs(i)
+      cycle
+    end if
     ret = PIO_createfile(pio_tf_iosystem_, pio_file, iotypes(i), filename, PIO_CLOBBER)
     PIO_TF_CHECK_ERR(ret, "Failed to open:" // trim(filename))
 
