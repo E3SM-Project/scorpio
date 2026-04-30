@@ -3139,6 +3139,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     file->io_fstats = (spio_io_fstats_summary_t *) calloc(sizeof(spio_io_fstats_summary_t), 1);
     if(!(file->io_fstats))
     {
+        delete(file->pmtx);
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "Creating file (%s) failed. Out of memory allocating %lld bytes for caching file I/O statistics", filename, (unsigned long long) (sizeof(spio_io_fstats_summary_t)));
     }
@@ -3844,6 +3845,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        delete(file->pmtx);
         free(file->io_fstats);
         free(file);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -3865,6 +3867,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        delete(file->pmtx);
         free(file->io_fstats);
         free(file);
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
@@ -5418,6 +5421,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
 
+        delete(file->pmtx);
         free(file->io_fstats);
         free(file);
         PIO_get_avail_iotypes(avail_iotypes, PIO_MAX_NAME);
@@ -5491,6 +5495,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->rd_timer_name);
     spio_ltimer_stop(file->io_fstats->tot_timer_name);
+    delete(file->pmtx);
     free(file->io_fstats);
     free(file);
     return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -5503,6 +5508,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
       spio_ltimer_stop(ios->io_fstats->tot_timer_name);
       spio_ltimer_stop(file->io_fstats->rd_timer_name);
       spio_ltimer_stop(file->io_fstats->tot_timer_name);
+      delete(file->pmtx);
       free(file->io_fstats);
       free(file);
       return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -5517,6 +5523,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->rd_timer_name);
     spio_ltimer_stop(file->io_fstats->tot_timer_name);
+    delete(file->pmtx);
     free(file->io_fstats);
     free(file);
     LOG((1, "PIOc_openfile_retry failed, ierr = %d", ierr));
