@@ -1702,10 +1702,6 @@ int PIOc_set_hint_impl(int iosysid, const char *hint, const char *hintval)
     return PIO_NOERR;
 }
 
-int spio_close_soft_closed_files(iosystem_desc_t *iosys)
-{
-}
-
 /**
  * Clean up internal data structures, free MPI resources, and exit the
  * pio library.
