@@ -11,7 +11,9 @@
 //#undef NDEBUG
 //#endif
 
-typedef long bufsize;
+#include <cstddef>
+
+typedef size_t bufsize;
 
 #if defined(__cplusplus)
 extern "C" {

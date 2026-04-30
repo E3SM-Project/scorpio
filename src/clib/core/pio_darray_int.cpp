@@ -2374,11 +2374,18 @@ void cn_buffer_report(iosystem_desc_t *ios, bool collective)
 
     LOG((2, "cn_buffer_report ios->iossysid = %d collective = %d",
          ios->iosysid, collective));
-    long bget_stats[5];
-    long bget_mins[5];
-    long bget_maxs[5];
+    bufsize curalloc = 0, totfree = 0, maxfree = 0;
+    long nget = 0, nrel = 0;
 
-    bstats(bget_stats, bget_stats+1,bget_stats+2,bget_stats+3,bget_stats+4);
+    bstats(&curalloc, &totfree, &maxfree, &nget, &nrel);
+
+    long bget_stats[5] = {static_cast<long>(curalloc),
+                          static_cast<long>(totfree),
+                          static_cast<long>(maxfree),
+                          nget, nrel};
+    long bget_mins[5] = {0};
+    long bget_maxs[5] = {0};
+
     if (collective)
     {
         LOG((3, "cn_buffer_report calling MPI_Reduce ios->comp_comm = %d", ios->comp_comm));

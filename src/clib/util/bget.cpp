@@ -1292,8 +1292,8 @@ void bufdump(void *buf)
     }
 
     while (bdlen > 0) {
-        int i, dupes = 0;
-        bufsize l = bdlen;
+        int dupes = 0;
+        bufsize i = 0, l = bdlen;
         char bhex[50], bascii[20];
 
         if (l > 16) {
