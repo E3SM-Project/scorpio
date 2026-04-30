@@ -1348,17 +1348,16 @@ void bpoold(void *buf, int dumpalloc, int dumpfree)
                 bufdump((void *) (((char *) b) + sizeof(struct bhead)));
             }
         } else {
-            char *lerr = "";
-
             assert(bs > 0);
             if ((b->ql.blink->ql.flink != b) ||
                 (b->ql.flink->ql.blink != b)) {
-                lerr = "  (Bad free list links)";
+                LOG((0, "Free block:       size %6ld bytes. (Bad free list links)", (long) bs));
             }
-            LOG((0, "Free block:       size %6ld bytes.%s",
-                     (long) bs, lerr));
+            else{
+                LOG((0, "Free block:       size %6ld bytes.", (long) bs));
+            }
 #ifdef FreeWipe
-            lerr = ((char *) b) + sizeof(struct bfhead);
+            char *lerr = ((char *) b) + sizeof(struct bfhead);
             if ((bs > sizeof(struct bfhead)) && ((*lerr != 0x55) ||
                                                  (memcmp(lerr, lerr + 1,
                                                          (MemSize) (bs - (sizeof(struct bfhead) + 1))) != 0))) {
@@ -1391,21 +1390,18 @@ int bpoolv(void *buf)
         if (bs < 0) {
             bs = -bs;
         } else {
-            char *lerr = "";
-
             assert(bs > 0);
             if (bs <= 0) {
                 return 0;
             }
             if ((b->ql.blink->ql.flink != b) ||
                 (b->ql.flink->ql.blink != b)) {
-                LOG((0, "Free block: size %6ld bytes.  (Bad free list links)",
-                         (long) bs));
+                LOG((0, "Free block: size %6ld bytes.  (Bad free list links)", (long) bs));
                 assert(0);
                 return 0;
             }
 #ifdef FreeWipe
-            lerr = ((char *) b) + sizeof(struct bfhead);
+            char *lerr = ((char *) b) + sizeof(struct bfhead);
             if ((bs > sizeof(struct bfhead)) && ((*lerr != 0x55) ||
                                                  (memcmp(lerr, lerr + 1,
                                                          (MemSize) (bs - (sizeof(struct bfhead) + 1))) != 0))) {
