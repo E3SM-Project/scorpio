@@ -3160,17 +3160,33 @@ int PIOc_enddef_impl(int ncid)
       }
     }
 #endif /* _NETCDF */
+
+    /* For NetCDF I/O types whether "this file is in define mode before enddef() is called" is
+     * handled by the low-level NetCDF enddef() calls. For HDF5 and ADIOS we handle it explicitly
+     */
 #ifdef _HDF5
     if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+      if(file->in_def_mode){
 #if PIO_USE_ASYNC_WR_THREAD
-      ierr = spio_iosys_async_hdf5_enddef_op_add(file);
+        ierr = spio_iosys_async_hdf5_enddef_op_add(file);
 #else
-      ierr = spio_hdf5_enddef(ios, file);
+        ierr = spio_hdf5_enddef(ios, file);
 #endif /* PIO_USE_ASYNC_WR_THREAD */
+      }
+      else{
+        ierr = pio_err(ios, file, PIO_EINTERNAL, __FILE__, __LINE__,
+                    "Ending the define mode for file (%s) failed. The file is not in define mode.", pio_get_fname_from_file(file));
+      }
     }
 #endif /* _HDF5 */
 
-    /* Do nothing for ADIOS I/O types */
+    if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
+      /* Do nothing - no "enddef" - for ADIOS I/O types. Just a sanity check here */
+      if(!file->in_def_mode){
+        ierr = pio_err(ios, file, PIO_EINTERNAL, __FILE__, __LINE__,
+                        "Ending the define mode for file (%s) failed. The file is not in define mode.", pio_get_fname_from_file(file));
+      }
+    }
   }
 
   ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
@@ -3180,6 +3196,9 @@ int PIOc_enddef_impl(int ncid)
     return pio_err(ios, file, ierr, __FILE__, __LINE__,
                     "Ending the define mode for file (%s) failed. Low-level I/O library API failed", pio_get_fname_from_file(file));
   }
+
+  /* File no longer in "define mode" */
+  file->in_def_mode = false;
   LOG((3, "PIOc_enddef_impl succeeded"));
 
   spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -3262,9 +3281,18 @@ int PIOc_redef_impl(int ncid)
       case PIO_IOTYPE_NETCDF4C:
       case PIO_IOTYPE_NETCDF4P:
       case PIO_IOTYPE_NETCDF4P_NCZARR:
-            if(file->do_io) { ierr = nc_redef(file->fh); break; }
+            if(file->do_io) { ierr = nc_redef(file->fh); }
+            /* Unlike PnetCDF ncmpi_redef() call, NetCDF does not fail for multiple redef() calls
+             * So perform the sanity checks in the "default:" case for NetCDF I/O types */
+            /* break; */
 #endif /* _NETCDF */
-      default:  /* Do nothing : PIO_IOTYPE_ADIOS, PIO_IOTYPE_ADIOSC, PIO_IOTYPE_HDF5, PIO_IOTYPE_HDF5C */ break;
+      default:
+            /* Do nothing : Just some sanity checks */
+            if(file->in_def_mode){
+              ierr = pio_err(ios, file, PIO_EINTERNAL, __FILE__, __LINE__,
+                              "Changing the define mode (redef) for file (%s) failed. The file is already in define mode.", pio_get_fname_from_file(file));
+            }
+            break;
     }
   }
 
@@ -3275,6 +3303,9 @@ int PIOc_redef_impl(int ncid)
     return pio_err(ios, file, ierr, __FILE__, __LINE__,
                     "Changing the define mode (redef) for file (%s) failed. Low-level I/O library API failed", pio_get_fname_from_file(file));
   }
+
+  file->in_def_mode = true;
+
   LOG((3, "PIOc_redef_impl succeeded"));
 
   spio_ltimer_stop(ios->io_fstats->tot_timer_name);

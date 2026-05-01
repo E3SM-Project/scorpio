@@ -938,6 +938,9 @@ typedef struct file_desc_t
      * creating NetCDF files to accommodate anticipated changes. */
     bool reserve_extra_header_space;
 
+    /** True if the file is in "define mode", false otherwise */
+    bool in_def_mode;
+
     /** True if this is an existing file reopened */
     bool is_reopened;
 } file_desc_t;

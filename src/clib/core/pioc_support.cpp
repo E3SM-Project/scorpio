@@ -3158,6 +3158,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     /* Fill in some file values. */
     file->fh = -1;
     file->reserve_extra_header_space = true; /* Set to true for creating output NetCDF files only. */
+    file->in_def_mode = true; /* The file is in "define mode" when created */
     file->is_reopened = false;
     strncpy(file->fname, filename, PIO_MAX_NAME);
     pio_create_uniq_str(ios, NULL, tname, "tmp_", "_file");
@@ -4876,6 +4877,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   /* Fill in some file values. */
   file->fh = -1;
   file->reserve_extra_header_space = false; /* Set to true for creating output NetCDF files only. */
+  file->in_def_mode = false; /* The file is NOT in "define mode" when opened */
   file->is_reopened = true;
   strncpy(file->fname, filename, PIO_MAX_NAME);
   pio_create_uniq_str(ios, NULL, tname, "tmp_", "_file");
