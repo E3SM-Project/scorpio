@@ -1202,69 +1202,42 @@ int check_mpi(iosystem_desc_t *ios, file_desc_t *file, int mpierr,
     return PIO_NOERR;
 }
 
-/**
- * Check the result of a netCDF API call.
- * (Collective call for file/ios with error handler != PIO_RETURN_ERROR)
- *
- * PIO_INTERNAL_ERROR : Abort (inside PIO) on error from any MPI process
- * PIO_RETURN_ERROR : Return error back to the user (Allow the user to
- * handle the error. Each MPI process just returns the error code back
- * to the user)
- * PIO_BCAST_ERROR : Broadcast error code from I/O process with rank 0
- * (in the I/O communicator) to all processes.
- * PIO_REDUCE_ERROR : Reduce error codes across all processes (and log
- * the error codes from each process). This error handler detects error
- * in any process.
- *
- * @param ios pointer to the iosystem description struct. Ignored if NULL.
- * @param file pointer to the PIO structure describing this file. Ignored if NULL.
- * @param status the return value from the netCDF call.
- * @param fname the name of the code file.
- * @param line the line number of the netCDF call in the code.
- * @return the error code
- */
-int check_netcdf(iosystem_desc_t *ios, file_desc_t *file, int status,
-                  const char *fname, int line)
+int spio_handle_err(iosystem_desc_t *ios, file_desc_t *file, int eh,
+                  int status, const char *fname, int line)
 {
-    int eh = default_error_handler; /* Error handler that will be used. */
     char errmsg[PIO_MAX_NAME + 1];  /* Error message. */
-    int ioroot;
-    MPI_Comm comm;
+    int ioroot = 0;
+    MPI_Comm comm = MPI_COMM_NULL;
     int mpierr = MPI_SUCCESS;
 
     /* User must provide this. */
     assert(ios || file);
     assert(fname);
 
-    LOG((1, "check_netcdf status = %d fname = %s line = %d", status, fname, line));
-
-    /* Find the error handler. Error handlers associated with file has
-     * priority over ios error handlers.
-     */
-    if(file){
-        eh = file->iosystem->error_handler;
-        ioroot = file->iosystem->ioroot;
-        comm = file->iosystem->my_comm;
-    }
-    else{
-        assert(ios);
-        eh = ios->error_handler;
-        ioroot = ios->ioroot;
-        comm = ios->my_comm;
-    }
+    LOG((1, "spio_handle_err status = %d fname = %s line = %d", status, fname, line));
 
     assert( (eh == PIO_INTERNAL_ERROR) ||
             (eh == PIO_BCAST_ERROR) ||
             (eh == PIO_RETURN_ERROR) ||
             (eh == PIO_REDUCE_ERROR) );
-    LOG((2, "check_netcdf chose error handler = %d", eh));
+
+    LOG((2, "spio_handle_err chose error handler = %d", eh));
+    if(file){
+        ioroot = file->iosystem->ioroot;
+        comm = file->iosystem->my_comm;
+    }
+    else{
+        assert(ios);
+        ioroot = ios->ioroot;
+        comm = ios->my_comm;
+    }
 
     /* Get an error message. */
     if(status != PIO_NOERR){
         if(eh == PIO_INTERNAL_ERROR){
             int ret = PIOc_strerror_impl(status, errmsg, PIO_MAX_NAME);
             assert(ret == PIO_NOERR);
-            LOG((1, "check_netcdf errmsg = %s", errmsg));
+            LOG((1, "spio_handle_err errmsg = %s", errmsg));
             piodie(fname, line, "FATAL ERROR: %s (file = %s)", errmsg, (file)?(file->fname):"UNKNOWN");
         }
     }
@@ -1343,6 +1316,44 @@ int check_netcdf(iosystem_desc_t *ios, file_desc_t *file, int status,
 
     /* For PIO_RETURN_ERROR, just return the error. */
     return status;
+}
+
+/**
+ * Check the result of a netCDF API call.
+ * (Collective call for file/ios with error handler != PIO_RETURN_ERROR)
+ *
+ * PIO_INTERNAL_ERROR : Abort (inside PIO) on error from any MPI process
+ * PIO_RETURN_ERROR : Return error back to the user (Allow the user to
+ * handle the error. Each MPI process just returns the error code back
+ * to the user)
+ * PIO_BCAST_ERROR : Broadcast error code from I/O process with rank 0
+ * (in the I/O communicator) to all processes.
+ * PIO_REDUCE_ERROR : Reduce error codes across all processes (and log
+ * the error codes from each process). This error handler detects error
+ * in any process.
+ *
+ * @param ios pointer to the iosystem description struct. Ignored if NULL.
+ * @param file pointer to the PIO structure describing this file. Ignored if NULL.
+ * @param status the return value from the netCDF call.
+ * @param fname the name of the code file.
+ * @param line the line number of the netCDF call in the code.
+ * @return the error code
+ */
+int check_netcdf(iosystem_desc_t *ios, file_desc_t *file, int status,
+                  const char *fname, int line)
+{
+  /* User must provide this. */
+  assert(ios || file);
+  assert(fname);
+
+  LOG((1, "check_netcdf status = %d fname = %s line = %d", status, fname, line));
+
+  /* Find the error handler. Error handlers associated with file has
+   * priority over ios error handlers.
+   */
+  int eh = (file) ? (file->iosystem->error_handler) : (ios->error_handler);
+
+  return spio_handle_err(ios, file, eh, status, fname, line);
 }
 
 /**
@@ -3851,7 +3862,10 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
     }
 
-    ierr = check_netcdf(ios, file, ierr, __FILE__, __LINE__);
+    /* Ensure that we handle all errors, irrespective of what error handle is
+     * set by the user, when creating files
+     */
+    ierr = spio_handle_err(ios, file, PIO_REDUCE_ERROR, ierr, __FILE__, __LINE__);
     /* If there was an error, free the memory we allocated and handle error. */
     if (ierr != PIO_NOERR)
     {
@@ -5515,7 +5529,10 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
     }
   }
 
-  ierr = check_netcdf(ios, file, ierr, __FILE__, __LINE__);
+  /* Ensure that we handle all errors, irrespective of the error handler
+   * set by the user, when opening a file
+   */
+  ierr = spio_handle_err(ios, file, PIO_REDUCE_ERROR, ierr, __FILE__, __LINE__);
   /* If there was an error, free allocated memory and deal with the error. */
   if(ierr != PIO_NOERR){
     int tmp_iotype = file->iotype;

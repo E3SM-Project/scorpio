@@ -152,6 +152,8 @@ extern "C" {
     int pio_add_to_iosystem_list(iosystem_desc_t *ios, MPI_Comm comm);
 
     /* Check the return code from a netCDF call, with ios pointer. */
+    int spio_handle_err(iosystem_desc_t *ios, file_desc_t *file, int eh,
+                        int status, const char *fname, int line);
     int check_netcdf(iosystem_desc_t *ios, file_desc_t *file, int status,
                       const char *fname, int line);
 
