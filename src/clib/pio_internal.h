@@ -367,9 +367,6 @@ extern "C" {
     int spio_pnetcdf_inq_type(int ncid, nc_type xtype, char *name,
                               PIO_Offset *sizep);
 
-    /* Handle end and re-defs. */
-    int spio_change_def(int ncid, int is_enddef);
-
     /* Remove a directory in the filesystem */
     int spio_remove_directory(const char *path);
 

@@ -3005,7 +3005,186 @@ int PIOc_set_fill_impl(int ncid, int fillmode, int *old_modep)
  */
 int PIOc_enddef_impl(int ncid)
 {
-    return spio_change_def(ncid, 1);
+  iosystem_desc_t *ios;  /* Pointer to io system information. */
+  file_desc_t *file;     /* Pointer to file information. */
+  int ierr = PIO_NOERR;  /* Return code from function calls. */
+
+  LOG((2, "PIOc_enddef_impl ncid = %d", ncid));
+
+  /* Find the info about this file. When I check the return code
+   * here, some tests fail. ???*/
+  if((ierr = pio_get_file(ncid, &file))){
+    return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
+                    "Ending the define mode for file (ncid = %d) failed. Invalid file id", ncid);
+  }
+  assert(file);
+  ios = file->iosystem;
+  assert(ios);
+  spio_ltimer_start(ios->io_fstats->tot_timer_name);
+  spio_ltimer_start(file->io_fstats->tot_timer_name);
+
+  /* If async is in use, and this is not an IO task, bcast the parameters. */
+  if(ios->async){
+    int msg = PIO_MSG_ENDDEF;
+
+    PIO_SEND_ASYNC_MSG(ios, msg, &ierr, ncid);
+    if(ierr != PIO_NOERR){
+      LOG((1, "Error sending async msg for PIO_MSG_ENDDEF"));
+      spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+      spio_ltimer_stop(file->io_fstats->tot_timer_name);
+      return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                      "Ending the define mode for file (%s) failed. Error sending async msg, PIO_MSG_ENDDEF, on iosystem (iosysid=%d)", pio_get_fname_from_file(file), ios->iosysid);
+    }
+  }
+
+#if PIO_USE_ASYNC_WR_THREAD
+  /* FIXME: Relax this wait */
+  /*
+  ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+  if(ierr != PIO_NOERR){
+    return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                   "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "Error waiting on all pending asynchronous HDF5 ops",
+                   pio_get_fname_from_file(file), file->pio_ncid);
+  }
+  */
+#endif
+
+  /* If this is an IO task, then call the netCDF function. */
+  LOG((3, "PIOc_enddef_impl ios->ioproc = %d", ios->ioproc));
+  if(ios->ioproc){
+    LOG((3, "PIOc_enddef_impl calling netcdf function file->fh = %d file->do_io = %d iotype = %d",
+         file->fh, file->do_io, file->iotype));
+
+    /* NetCDF and PnetCDF by default do not reserve any extra space in
+     * the NetCDF file headers (compactness etc). However this can be a
+     * problem (performance related) when renaming variables etc since
+     * this information is stored in the NetCDF header. Adding more
+     * information into the header requires the libraries to resize the
+     * file, extend the header space and copy the contents of the file
+     * (similar to realloc).
+     *
+     * The solution for the performance issue is to reserve some extra
+     * space in the header when creating NetCDF files. The current calls
+     * to nc_enddef()/ncmpi_enddef() need to be replaced with nc__enddef
+     * ()/ncmpi__enddef() (note the double underscore).
+     *
+     * This reservation should be made only once: after the header section
+     * is expanded, a new reservation may involve moving (shifting) data,
+     * which can be very expensive if the data sections are huge.
+     */
+#ifdef _PNETCDF
+    if(file->iotype == PIO_IOTYPE_PNETCDF){
+      /* ncmpi__enddef has been available since PnetCDF 1.5.0 (PNETCDF_MIN_VER_REQD is currently 1.8.1):
+         int ncmpi__enddef(int ncid,
+                           MPI_Offset h_minfree,
+                           MPI_Offset v_align,
+                           MPI_Offset v_minfree,
+                           MPI_Offset r_align);
+
+         The usual call of ncmpi_enddef(ncid) is equivalent to ncmpi__enddef(ncid, 0, 0, 0, 0).
+
+         Call ncmpi__enddef with appropriate arguments instead of ncmpi_enddef:
+          - To reserve a sufficiently large space for the file header if it is expected
+            to expand (set h_minfree > 0 explicitly).
+            See https://github.com/E3SM-Project/scorpio/issues/436
+
+          - To prevent PnetCDF (versions prior to 1.13.0) from implicitly selecting the
+            file striping size to align the header extent (set v_align > 0 explicitly).
+            See https://github.com/E3SM-Project/scorpio/issues/566
+       */
+
+      /* Sets the pad at the end of the "header" section. */
+      MPI_Offset h_minfree = 0; /* Unless extra header space is requested, this can be left as default (0) */
+
+      /* Controls the alignment of the beginning of the data section for fixed-size/record variables. */
+      const MPI_Offset v_align = 4; /* For fixed-size variables, needs to be left as the default (4 bytes) */
+      const MPI_Offset r_align = 4; /* For record variables, needs to be left as the default (4 bytes) */
+
+      /* Sets the pad at the end of the data section for fixed-size variables. */
+      const MPI_Offset v_minfree = 0; /* This can be left as default (0) */
+
+      if(file->reserve_extra_header_space){
+        /* The recommended size by Charlie Zender (NCO developer) is 10 KB */
+        assert(PIO_RESERVED_FILE_HEADER_SIZE >= 0);
+        h_minfree = PIO_RESERVED_FILE_HEADER_SIZE;
+
+        file->reserve_extra_header_space = false;
+      }
+
+      ierr = ncmpi__enddef(file->fh, h_minfree, v_align, v_minfree, r_align);
+    }
+#endif /* _PNETCDF */
+#ifdef _NETCDF
+    if(((file->iotype == PIO_IOTYPE_NETCDF) || (file->iotype == PIO_IOTYPE_NETCDF4C) ||
+        (file->iotype == PIO_IOTYPE_NETCDF4P) || (file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR)) &&
+        file->do_io){
+      LOG((3, "PIOc_enddef_impl calling nc_enddef file->fh = %d", file->fh));
+
+      /* We only reserve header space for CLASSIC NetCDF files */
+      bool reserve_extra_header_space = (file->iotype == PIO_IOTYPE_NETCDF) &&
+                                        file->reserve_extra_header_space;
+      bool enddef_complete = false;
+
+      /* CAUTION: nc__enddef may not be available on future NetCDF implementations. */
+#ifdef NETCDF_C_NC__ENDDEF_EXISTS
+      if(reserve_extra_header_space){
+        /* Sets the pad at the end of the "header" section.
+         * The recommended size by Charlie Zender (NCO developer) is 10 KB */
+        assert(PIO_RESERVED_FILE_HEADER_SIZE >= 0);
+        const MPI_Offset h_minfree = PIO_RESERVED_FILE_HEADER_SIZE;
+
+        /* Controls the alignment of the beginning of the data section for fixed-size/record variables. */
+        const size_t v_align = 4; /* For fixed-size variables, needs to be left as the default (4 bytes) */
+        const size_t r_align = 4; /* For record variables, needs to be left as the default (4 bytes) */
+
+        /* Sets the pad at the end of the data section for fixed-size variables. */
+        const size_t v_minfree = 0; /* This can be left as default (0) */
+
+        /* nc__enddef has been available since NetCDF 3.x (NETCDF_C_MIN_VER_REQD is currently 4.3.3) */
+        ierr = nc__enddef(file->fh, h_minfree, v_align, v_minfree, r_align);
+
+        file->reserve_extra_header_space = false;
+
+        enddef_complete = true;
+      }
+#endif
+
+      if(!enddef_complete){
+        /* The default method for enddef for all NetCDF4 I/O types (and also for PIO_IOTYPE_NETCDF when we
+         * don't require header expansion OR when nc__enddef() is unavailable to expand the header
+         * According to NCO user guide, nc__enddef will improve speed of future metadata expansion with
+         * classic and 64bit NetCDF files, though not necessarily with NetCDF4 files.
+         */
+        ierr = nc_enddef(file->fh);
+      }
+    }
+#endif /* _NETCDF */
+#ifdef _HDF5
+    if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+#if PIO_USE_ASYNC_WR_THREAD
+      ierr = spio_iosys_async_hdf5_enddef_op_add(file);
+#else
+      ierr = spio_hdf5_enddef(ios, file);
+#endif /* PIO_USE_ASYNC_WR_THREAD */
+    }
+#endif /* _HDF5 */
+
+    /* Do nothing for ADIOS I/O types */
+  }
+
+  ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
+  if(ierr != PIO_NOERR){
+    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+    return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                    "Ending the define mode for file (%s) failed. Low-level I/O library API failed", pio_get_fname_from_file(file));
+  }
+  LOG((3, "PIOc_enddef_impl succeeded"));
+
+  spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+  spio_ltimer_stop(file->io_fstats->tot_timer_name);
+  return ierr;
 }
 
 /**
@@ -3024,7 +3203,83 @@ int PIOc_enddef_impl(int ncid)
  */
 int PIOc_redef_impl(int ncid)
 {
-    return spio_change_def(ncid, 0);
+  iosystem_desc_t *ios;  /* Pointer to io system information. */
+  file_desc_t *file;     /* Pointer to file information. */
+  int ierr = PIO_NOERR;  /* Return code from function calls. */
+
+  LOG((2, "PIOc_redef_impl ncid = %d ", ncid));
+
+  /* Find the info about this file. When I check the return code
+   * here, some tests fail. ???*/
+  if((ierr = pio_get_file(ncid, &file))){
+    return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
+                    "Changing the define mode (redef) for file (ncid = %d) failed. Invalid file id", ncid);
+  }
+  assert(file);
+  ios = file->iosystem;
+  assert(ios);
+  spio_ltimer_start(ios->io_fstats->tot_timer_name);
+  spio_ltimer_start(file->io_fstats->tot_timer_name);
+
+  /* If async is in use, and this is not an IO task, bcast the parameters. */
+  if(ios->async){
+    int msg = PIO_MSG_REDEF;
+
+    PIO_SEND_ASYNC_MSG(ios, msg, &ierr, ncid);
+    if(ierr != PIO_NOERR){
+      LOG((1, "Error sending async msg for PIO_MSG_REDEF"));
+      spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+      spio_ltimer_stop(file->io_fstats->tot_timer_name);
+      return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                      "Changing the define mode (redef) for file (%s) failed. Error sending async msg, PIO_MSG_REDEF, on iosystem (iosysid=%d)", pio_get_fname_from_file(file), ios->iosysid);
+    }
+  }
+
+#if PIO_USE_ASYNC_WR_THREAD
+  /* FIXME: Relax this wait */
+  /*
+  ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+  if(ierr != PIO_NOERR){
+    return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                   "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "Error waiting on all pending asynchronous HDF5 ops",
+                   pio_get_fname_from_file(file), file->pio_ncid);
+  }
+  */
+#endif
+
+  /* If this is an IO task, then call the netCDF function. */
+  LOG((3, "PIOc_redef_impl ios->ioproc = %d", ios->ioproc));
+  if(ios->ioproc){
+    LOG((3, "PIOc_redef calling netcdf function file->fh = %d file->do_io = %d iotype = %d",
+         file->fh, file->do_io, file->iotype));
+    switch(file->iotype){
+#ifdef _PNETCDF
+      case PIO_IOTYPE_PNETCDF:  ierr = ncmpi_redef(file->fh); break;
+#endif
+#ifdef _NETCDF
+      case PIO_IOTYPE_NETCDF:
+      case PIO_IOTYPE_NETCDF4C:
+      case PIO_IOTYPE_NETCDF4P:
+      case PIO_IOTYPE_NETCDF4P_NCZARR:
+            if(file->do_io) { ierr = nc_redef(file->fh); break; }
+#endif /* _NETCDF */
+      default:  /* Do nothing : PIO_IOTYPE_ADIOS, PIO_IOTYPE_ADIOSC, PIO_IOTYPE_HDF5, PIO_IOTYPE_HDF5C */ break;
+    }
+  }
+
+  ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
+  if(ierr != PIO_NOERR){
+    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+    return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                    "Changing the define mode (redef) for file (%s) failed. Low-level I/O library API failed", pio_get_fname_from_file(file));
+  }
+  LOG((3, "PIOc_redef_impl succeeded"));
+
+  spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+  spio_ltimer_stop(file->io_fstats->tot_timer_name);
+  return ierr;
 }
 
 /**
