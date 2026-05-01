@@ -5581,46 +5581,42 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #endif
   }
 
-  /* Check if the file has unlimited dimensions */
-  if(!ios->async || !ios->ioproc){
-    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-    spio_ltimer_stop(file->io_fstats->rd_timer_name);
-    spio_ltimer_stop(file->io_fstats->tot_timer_name);
-
-    ierr = PIOc_inq_unlimdims_impl(*ncidp, &(file->num_unlim_dimids), NULL);
-    if(ierr != PIO_NOERR){
-      spio_file_mvcache_finalize(file);
-      return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                        "Opening file (%s) failed. Although the file was opened successfully, querying the number of unlimited dimensions in the file failed", filename);
-    }
-
-    if(file->num_unlim_dimids > 0){
-      file->unlim_dimids = (int *)malloc(file->num_unlim_dimids * sizeof(int));
-      if(!file->unlim_dimids){
-        spio_file_mvcache_finalize(file);
-        return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Opening file (%s) failed. Out of memory allocating %lld bytes for caching the unlimited dimension ids", filename, (unsigned long long) (file->num_unlim_dimids * sizeof(int)));
-      }
-      ierr = PIOc_inq_unlimdims_impl(*ncidp, NULL, file->unlim_dimids);
-      if(ierr != PIO_NOERR){
-        spio_file_mvcache_finalize(file);
-        return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                        "Opening file (%s) failed. Although the file was opened successfully, querying the unlimited dimensions in the file failed", filename);
-      }
-    }
-
-    spio_ltimer_start(ios->io_fstats->rd_timer_name);
-    spio_ltimer_start(ios->io_fstats->tot_timer_name);
-    spio_ltimer_start(file->io_fstats->rd_timer_name);
-    spio_ltimer_start(file->io_fstats->tot_timer_name);
-    LOG((3, "File has %d unlimited dimensions", file->num_unlim_dimids));
-  }
-
   spio_ltimer_stop(ios->io_fstats->rd_timer_name);
   spio_ltimer_stop(ios->io_fstats->tot_timer_name);
   spio_ltimer_stop(file->io_fstats->rd_timer_name);
   spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+  /* Check if the file has unlimited dimensions */
+  if(!ios->async || !ios->ioproc){
+    ierr = PIOc_inq_unlimdims_impl(*ncidp, &(file->num_unlim_dimids), NULL);
+    if(ierr != PIO_NOERR){
+      ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
+                        "Opening file (%s) failed. Although the file was opened successfully, querying the number of unlimited dimensions in the file failed", filename);
+    }
+
+    if((ierr == PIO_NOERR) && (file->num_unlim_dimids > 0)){
+      file->unlim_dimids = (int *)malloc(file->num_unlim_dimids * sizeof(int));
+      if(!file->unlim_dimids){
+        ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Opening file (%s) failed. Out of memory allocating %lld bytes for caching the unlimited dimension ids", filename, (unsigned long long) (file->num_unlim_dimids * sizeof(int)));
+      }
+      if(ierr == PIO_NOERR){
+        ierr = PIOc_inq_unlimdims_impl(*ncidp, NULL, file->unlim_dimids);
+        if(ierr != PIO_NOERR){
+          ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
+                          "Opening file (%s) failed. Although the file was opened successfully, querying the unlimited dimensions in the file failed", filename);
+        }
+      }
+    }
+
+    if(ierr != PIO_NOERR){
+      pio_delete_file_from_list(file->pio_ncid);
+    }
+    else{
+      LOG((3, "File has %d unlimited dimensions", file->num_unlim_dimids));
+    }
+  }
+
   return ierr;
 }
 
