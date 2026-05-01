@@ -502,6 +502,23 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
           }
           break;
       /* FIXME: Handle fillvalues for HDF5 */
+      case PIO_IOTYPE_HDF5:
+      case PIO_IOTYPE_HDF5C:
+  #if PIO_USE_ASYNC_WR_THREAD
+          ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, iodesc,
+                                                    DARRAY_FILL, frame);
+          if(ierr != PIO_NOERR){
+            return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                            "Writing multiple variables to file (%s, ncid=%d) failed. Internal error queing async task to write variable fillvalues in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
+          }
+  #else
+          if((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
+                                             DARRAY_FILL, frame))){
+            return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                            "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable fillvalues in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
+          }
+  #endif
+          break;
       case PIO_IOTYPE_NETCDF4C:
       case PIO_IOTYPE_NETCDF:
           if((ierr = write_darray_multi_serial(file, nvars, fndims, varids, iodesc,
@@ -522,6 +539,12 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
         brel(vdesc0->fillbuf);
         vdesc0->fillbuf = NULL;
       }
+  #if !PIO_USE_ASYNC_WR_THREAD
+      if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+        assert(file->dt_converter);
+        static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->free(ioid);
+      }
+  #endif
     }
   }
 
