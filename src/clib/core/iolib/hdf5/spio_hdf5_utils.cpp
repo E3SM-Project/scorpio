@@ -1309,10 +1309,22 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
 int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file)
 {
   int i = 0;
+  int ierr = PIO_NOERR;
 
   assert(ios && file);
   assert((file->iotype == PIO_IOTYPE_HDF5) || ((file->iotype == PIO_IOTYPE_HDF5C)));
   assert(ios->ioproc);
+
+  /* Handle pending defines here
+   * e.g. If user calls close() without an enddef()
+   */
+  ierr = spio_hdf5_enddef(ios, file);
+  if(ierr != PIO_NOERR){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Closing file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "Processing pending defines (variables, dimensions) failed",
+                   pio_get_fname_from_file(file), file->pio_ncid);
+  }
 
   /* Since close is always an async op, when async thread is used, we do not need
    * to explicitly wait for async ops to complete
