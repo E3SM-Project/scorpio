@@ -5178,6 +5178,15 @@ int PIOc_copy_att_impl(int incid, int ivarid, const char *name,
           ierr = check_netcdf(ios, ifile, ierr, __FILE__, __LINE__);
           break;
 #endif
+#ifdef _HDF5
+    case PIO_IOTYPE_HDF5:
+    case PIO_IOTYPE_HDF5C:
+          if(ios->ioproc){
+            ierr = spio_hdf5_copy_att(ifile->iosystem, ifile, ivarid, name, ofile, ovarid);
+          }
+          ierr = check_netcdf(ios, ifile, ierr, __FILE__, __LINE__);
+          break;
+#endif
     default:
           {
             /* Get the attribute from the input file and put it in the
@@ -5187,32 +5196,42 @@ int PIOc_copy_att_impl(int incid, int ivarid, const char *name,
             PIO_Offset att_len = 0, type_sz = 0;
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             GPTLstop(ifile->io_fstats->tot_timer_name);
-            ierr = PIOc_inq_att_impl(ifile->fh, ivarid, name, &att_type, &att_len);
+            ierr = PIOc_inq_att_impl(incid, ivarid, name, &att_type, &att_len);
             if(ierr != PIO_NOERR){
+              spio_ltimer_start(ios->io_fstats->tot_timer_name);
+              GPTLstart(ifile->io_fstats->tot_timer_name);
               ierr = pio_err(ios, ifile, ierr, __FILE__, __LINE__,
                       "Copying attribute, %s, associated with variable %s (varid=%d) in file %s (ncid=%d) to file %s (ncid=%d) failed. Inquiring attribute type and length in file %s (ncid=%d) failed", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, pio_get_fname_from_file(ofile), oncid, pio_get_fname_from_file(ifile), incid);
               break;
             }
-            ierr = PIOc_inq_type_impl(ifile->fh, att_type, NULL, &type_sz);
+            ierr = PIOc_inq_type_impl(incid, att_type, NULL, &type_sz);
             if(ierr != PIO_NOERR){
+              spio_ltimer_start(ios->io_fstats->tot_timer_name);
+              GPTLstart(ifile->io_fstats->tot_timer_name);
               ierr = pio_err(ios, ifile, ierr, __FILE__, __LINE__,
                       "Copying attribute, %s, associated with variable %s (varid=%d) in file %s (ncid=%d) to file %s (ncid=%d) failed. Inquiring attribute type size (attribute type = %x) failed", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, pio_get_fname_from_file(ofile), oncid, att_type);
               break;
             }
             void *pbuf = malloc(type_sz * att_len);
             if(!pbuf){
+              spio_ltimer_start(ios->io_fstats->tot_timer_name);
+              GPTLstart(ifile->io_fstats->tot_timer_name);
               ierr = pio_err(ios, ifile, PIO_ENOMEM, __FILE__, __LINE__,
                       "Copying attribute, %s, associated with variable %s (varid=%d) in file %s (ncid=%d) to file %s (ncid=%d) failed. Unable to allocate %lld bytes to temporarily cache the attribute for copying", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, pio_get_fname_from_file(ofile), oncid, (long long int) (type_sz * att_len));
               break;
             }
-            ierr = PIOc_get_att_impl(ifile->fh, ivarid, name, pbuf);
+            ierr = PIOc_get_att_impl(incid, ivarid, name, pbuf);
             if(ierr != PIO_NOERR){
+              spio_ltimer_start(ios->io_fstats->tot_timer_name);
+              GPTLstart(ifile->io_fstats->tot_timer_name);
               ierr = pio_err(ios, ifile, ierr, __FILE__, __LINE__,
                       "Copying attribute, %s, associated with variable %s (varid=%d) in file %s (ncid=%d) to file %s (ncid=%d) failed. Getting attribute from file %s (ncid=%d) failed", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, pio_get_fname_from_file(ofile), oncid, pio_get_fname_from_file(ifile), incid);
               break;
             }
-            ierr = PIOc_put_att_impl(ofile->fh, ovarid, name, att_type, att_len, pbuf);
+            ierr = PIOc_put_att_impl(oncid, ovarid, name, att_type, att_len, pbuf);
             if(ierr != PIO_NOERR){
+              spio_ltimer_start(ios->io_fstats->tot_timer_name);
+              GPTLstart(ifile->io_fstats->tot_timer_name);
               ierr = pio_err(ios, ifile, ierr, __FILE__, __LINE__,
                       "Copying attribute, %s, associated with variable %s (varid=%d) in file %s (ncid=%d) to file %s (ncid=%d) failed. Putting/Writing attribute to file %s (ncid=%d, varid=%d) failed", name, pio_get_vname_from_file(ifile, ivarid), ivarid, pio_get_fname_from_file(ifile), incid, pio_get_fname_from_file(ofile), oncid, pio_get_fname_from_file(ofile), oncid, ovarid);
               break;

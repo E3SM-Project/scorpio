@@ -18,6 +18,9 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
 
 int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file);
 
+int spio_hdf5_copy_att(iosystem_desc_t *ios, file_desc_t *ifile, int ivarid, const char *name,
+                        file_desc_t *ofile, int ovarid);
+
 int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const char *name,
                       nc_type atttype, PIO_Offset len, const void *op);
 

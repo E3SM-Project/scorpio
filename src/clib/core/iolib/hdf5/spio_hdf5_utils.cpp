@@ -678,7 +678,7 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
   return PIO_NOERR;
 }
 
-int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
+static int spio_hdf5_sync_defs(iosystem_desc_t *ios, file_desc_t *file)
 {
   int i = 0, ret = PIO_NOERR;
 
@@ -698,7 +698,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
       dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
       if(dcpl_id == H5I_INVALID_HID){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to create a new dataset creation property list",
                        pio_get_fname_from_file(file), file->pio_ncid);
       }
@@ -709,7 +709,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
 #if 0
       if(H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED) < 0){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to set tracking and indexing of attribute creation order",
                        pio_get_fname_from_file(file), file->pio_ncid);
       }
@@ -724,7 +724,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
 
         if(H5Pset_chunk(dcpl_id, 1, chunk_dims) < 0){
           return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                         "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                         "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                          "The low level (HDF5) I/O library call failed to set the size of the chunks used to store a chunked layout dataset",
                          pio_get_fname_from_file(file), file->pio_ncid);
         }
@@ -733,7 +733,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
       space_id = H5Screate_simple(1, dims, max_dims);
       if(space_id == H5I_INVALID_HID){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to create a new simple dataspace",
                        pio_get_fname_from_file(file), file->pio_ncid);
       }
@@ -743,7 +743,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
                                space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
       if(dimscale_id < 0){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to create a new dataset (%s) that will be converted to a dimension scale",
                        pio_get_fname_from_file(file), file->pio_ncid, file->hdf5_dims[i].name);
       }
@@ -753,7 +753,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
 
       if(H5DSset_scale(dimscale_id, dimscale_name) < 0){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to convert a dataset (for dimension %s) to a dimension scale",
                        pio_get_fname_from_file(file), file->pio_ncid, file->hdf5_dims[i].name);
       }
@@ -767,7 +767,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
       hid_t dimid_space_id = H5Screate(H5S_SCALAR);
       if(dimid_space_id == H5I_INVALID_HID){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to create a new scalar dataspace",
                        pio_get_fname_from_file(file), file->pio_ncid);
       }
@@ -783,7 +783,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
                                   H5T_NATIVE_INT, dimid_space_id, H5P_DEFAULT, H5P_DEFAULT);
         if(dimid_att_id == H5I_INVALID_HID){
           return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                         "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                         "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                          "The low level (HDF5) I/O library call failed to create a new attribute (%s) attached to a dimension scale (%s)",
                          pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_dims[i].name);
         }
@@ -791,42 +791,42 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
       else{
         /* Error determining whether an attribute with a given name exists on an object */
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to determine whether an attribute (%s) exists on a dimension scale (%s)",
                        pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_dims[i].name);
       }
 
       if(H5Awrite(dimid_att_id, H5T_NATIVE_INT, &i) < 0){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to write an attribute (%s) attached to a dimension scale (%s)",
                        pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_dims[i].name);
       }
 
       if(H5Sclose(dimid_space_id) < 0){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to release a scalar dataspace",
                        pio_get_fname_from_file(file), file->pio_ncid);
       }
 
       if(H5Aclose(dimid_att_id) < 0){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to close an attribute (%s) attached to a dimension scale (%s)",
                        pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_dims[i].name);
       }
 
       if(H5Sclose(space_id) < 0){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to release a simple dataspace",
                        pio_get_fname_from_file(file), file->pio_ncid);
       }
 
       if(H5Pclose(dcpl_id) < 0){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to close a dataset creation property list",
                        pio_get_fname_from_file(file), file->pio_ncid);
       }
@@ -854,7 +854,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
       if(attr_exists < 0){
         /* Error determining whether an attribute with a given name exists on an object */
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to determine whether an attribute (%s) exists on a dimension scale (%s)",
                        pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_vars[i].name);
       }
@@ -868,7 +868,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
 
       if(H5DSset_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_vars[i].name) < 0){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to convert a dataset (for coordinate variable %s) to a dimension scale",
                        pio_get_fname_from_file(file), file->pio_ncid, file->hdf5_vars[i].name);
       }
@@ -880,7 +880,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
       hid_t dimid_space_id = H5Screate(H5S_SCALAR);
       if(dimid_space_id == H5I_INVALID_HID){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to create a new scalar dataspace",
                        pio_get_fname_from_file(file), file->pio_ncid);
       }
@@ -889,28 +889,28 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
                                 H5T_NATIVE_INT, dimid_space_id, H5P_DEFAULT, H5P_DEFAULT);
       if(dimid_att_id == H5I_INVALID_HID){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to create a new attribute (%s) attached to a dimension scale (%s)",
                        pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_vars[i].name);
       }
 
       if(H5Awrite(dimid_att_id, H5T_NATIVE_INT, &dimid) < 0){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to write an attribute (%s) attached to a dimension scale (%s)",
                        pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_vars[i].name);
       }
 
       if(H5Aclose(dimid_att_id) < 0){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to close an attribute (%s) attached to a dimension scale (%s)",
                        pio_get_fname_from_file(file), file->pio_ncid, attr_name, file->hdf5_vars[i].name);
       }
 
       if(H5Sclose(dimid_space_id) < 0){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                       "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                        "The low level (HDF5) I/O library call failed to release a scalar dataspace",
                        pio_get_fname_from_file(file), file->pio_ncid);
       }
@@ -930,7 +930,7 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
         for(int j = 0; j < ndims; j++){
           if(H5DSattach_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_dims[dimids[j]].hdf5_dataset_id, j) < 0){
             return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                           "Ending the define mode for file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
                            "The low level (HDF5) I/O library call failed to attach a dimension scale (for dimension %s) to %dth dimension of a dataset (for variable %s)",
                            pio_get_fname_from_file(file), file->pio_ncid, file->hdf5_dims[dimids[j]].name, j, file->hdf5_vars[i].name);
           }
@@ -945,6 +945,82 @@ int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
       }
     }
   }
+  return PIO_NOERR;
+}
+
+int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file)
+{
+  return spio_hdf5_sync_defs(ios, file);
+}
+
+int spio_hdf5_copy_att(iosystem_desc_t *ios, file_desc_t *ifile, int ivarid, const char *name,
+                        file_desc_t *ofile, int ovarid)
+{
+  int ret = PIO_NOERR;
+
+  assert(ios && ifile && ofile && name);
+  assert((ifile->iotype == PIO_IOTYPE_HDF5) || (ifile->iotype == PIO_IOTYPE_HDF5C));
+  assert((ofile->iotype == PIO_IOTYPE_HDF5) || (ofile->iotype == PIO_IOTYPE_HDF5C));
+  assert(ios->ioproc);
+
+  /* Error message template */
+  const std::string err_msg = std::string("Copying attribute (") + name + ") associated with variable (varid=" + std::to_string(ivarid) + " in input file (" + pio_get_fname_from_file(ifile) + ", ncid=" + std::to_string(ifile->pio_ncid) + ") to variable (varid=" + std::to_string(ovarid) + ") in file (" + pio_get_fname_from_file(ofile) + ", ncid=" + std::to_string(ofile->pio_ncid) + ") using HDF5 iotype failed.";
+
+  /* Sync any pending defs (attributes) */
+  ret = spio_hdf5_sync_defs(ios, ifile);
+  if(ret == PIO_NOERR){ ret = spio_hdf5_sync_defs(ios, ofile); }
+
+  /* Read attribute from the input file */
+  hid_t iloc_id = (ivarid == PIO_GLOBAL) ? ifile->hdf5_file_id : ifile->hdf5_vars[ivarid].hdf5_dataset_id;
+
+  hid_t iattr_id = H5Aopen(iloc_id, name, H5P_DEFAULT);
+  if(iattr_id == H5I_INVALID_HID){
+      const std::string lerr_msg = " The low level (HDF5) I/O library call failed to open attribute in input file";
+      return pio_err(ios, ifile, PIO_EHDF5ERR, __FILE__, __LINE__, "%s", (err_msg + lerr_msg).c_str());
+  }
+
+  hsize_t asize = H5Aget_storage_size(iattr_id);
+  hid_t h5_space = H5Aget_space(iattr_id);
+  hid_t h5_xtype = H5Aget_type(iattr_id);
+  if((asize <= 0) || (h5_space == H5I_INVALID_HID) || (h5_xtype == H5I_INVALID_HID)){
+    const std::string lerr_msg = std::string(" The low level (HDF5) I/O library call to ") + ((asize <= 0) ? " get storage size failed" : ((h5_space == H5I_INVALID_HID) ? " get dataspace of attribute failed" : " get type of attribute failed"));
+    if(h5_xtype != H5I_INVALID_HID) { H5Tclose(h5_xtype); }
+    if(h5_space != H5I_INVALID_HID) { H5Sclose(h5_space); }
+    H5Aclose(iattr_id);
+    return pio_err(ios, ifile, PIO_EHDF5ERR, __FILE__, __LINE__, "%s", (err_msg + lerr_msg).c_str());
+  }
+
+  void *abuf = malloc(static_cast<std::size_t>(asize));
+  if(!abuf){
+    const std::string lerr_msg = std::string(" Allocating ") + std::to_string(static_cast<std::size_t>(asize)) + " bytes for reading attribute failed";
+    H5Tclose(h5_xtype); H5Sclose(h5_space); H5Aclose(iattr_id);
+    return pio_err(ios, ifile, PIO_ENOMEM, __FILE__, __LINE__, "%s", (err_msg + lerr_msg).c_str());
+  }
+
+  if(H5Aread(iattr_id, h5_xtype, abuf) < 0){
+    const std::string lerr_msg = " Reading attribute from input file failed";
+    free(abuf); H5Tclose(h5_xtype); H5Sclose(h5_space); H5Aclose(iattr_id);
+    return pio_err(ios, ifile, PIO_ENOMEM, __FILE__, __LINE__, "%s", (err_msg + lerr_msg).c_str());
+  }
+
+  /* Create attribute in output file and write to it */
+  hid_t oloc_id = (ovarid == PIO_GLOBAL) ? ofile->hdf5_file_id : ofile->hdf5_vars[ovarid].hdf5_dataset_id;
+
+  hid_t oattr_id = H5Acreate2(oloc_id, name, h5_xtype, h5_space, H5P_DEFAULT, H5P_DEFAULT);
+  if(oattr_id == H5I_INVALID_HID){
+    const std::string lerr_msg = " Creating attribute in ouput file failed";
+    free(abuf); H5Tclose(h5_xtype); H5Sclose(h5_space); H5Aclose(iattr_id);
+    return pio_err(ios, ofile, PIO_ENOMEM, __FILE__, __LINE__, "%s", (err_msg + lerr_msg).c_str());
+  }
+
+  if(H5Awrite(oattr_id, h5_xtype, abuf) < 0){
+    const std::string lerr_msg = " Writing attribute to output file failed";
+    H5Aclose(oattr_id); free(abuf); H5Tclose(h5_xtype); H5Sclose(h5_space); H5Aclose(iattr_id);
+    return pio_err(ios, ofile, PIO_ENOMEM, __FILE__, __LINE__, "%s", (err_msg + lerr_msg).c_str());
+  }
+
+  H5Aclose(oattr_id); free(abuf); H5Tclose(h5_xtype); H5Sclose(h5_space); H5Aclose(iattr_id);
+
   return PIO_NOERR;
 }
 
