@@ -79,11 +79,12 @@ endif ()
 #==============================================================================
 
 # Exclude tests that require more than 1 procs when using the MPI serial library
-if (WITH_PNETCDF)
+if (WITH_PNETCDF AND PnetCDF_FOUND)
   add_spio_executable (test_pnetcdf TRUE "" test_pnetcdf.c)
   add_spio_executable (test_pnetcdf_4d TRUE "" test_pnetcdf_4d.cpp)
+
+  add_dependencies (tests test_pnetcdf test_pnetcdf_4d)
 endif ()
-add_dependencies (tests test_pnetcdf test_pnetcdf_4d)
 
 set (SPIO_TEST_MAX_NPROCS 4)
 
