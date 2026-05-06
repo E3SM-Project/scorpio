@@ -1,10 +1,7 @@
 /**
  * @file
  * Some initialization and support functions.
- * @author Jim Edwards
- * @date  2014
  *
- * @see http://code.google.com/p/parallelio/
  */
 
 #include <pio_config.h>
@@ -59,7 +56,6 @@ extern int blocksize;
  * @param active pointer that gets true if IO system is active, false
  * otherwise.
  * @returns 0 on success, error code otherwise
- * @author Jim Edwards
  */
 int PIOc_iosystem_is_active_impl(int iosysid, bool *active)
 {
@@ -86,7 +82,6 @@ int PIOc_iosystem_is_active_impl(int iosysid, bool *active)
  *
  * @param ncid the ncid of an open file
  * @returns 1 if file is open, 0 otherwise.
- * @author Jim Edwards
  */
 int PIOc_File_is_Open_impl(int ncid)
 {
@@ -153,7 +148,6 @@ static const char *PIO_error_handler_to_string(int eh)
  * @param method the error handling method
  * @returns old error handler
  * @ingroup PIO_error_method
- * @author Jim Edwards
  */
 int PIOc_Set_File_Error_Handling_impl(int ncid, int method)
 {
@@ -186,7 +180,6 @@ int PIOc_Set_File_Error_Handling_impl(int ncid, int method)
  * @param ncid the ncid of the open file
  * @param varid the variable ID
  * @returns 0 on success, error code otherwise
- * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_advanceframe_impl(int ncid, int varid)
 {
@@ -240,7 +233,6 @@ int PIOc_advanceframe_impl(int ncid, int varid)
  * first record, 1 for the second
  * @return PIO_NOERR for no error, or error code.
  * @ingroup PIO_setframe
- * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_setframe_impl(int ncid, int varid, int frame)
 {
@@ -379,7 +371,6 @@ int PIOc_setframe_impl(int ncid, int varid, int frame)
  * @param numiotasks a pointer taht gets the number of IO
  * tasks. Ignored if NULL.
  * @returns 0 on success, error code otherwise
- * @author Ed Hartnett
  */
 int PIOc_get_numiotasks_impl(int iosysid, int *numiotasks)
 {
@@ -405,7 +396,6 @@ int PIOc_get_numiotasks_impl(int iosysid, int *numiotasks)
  * @param ioid IO description ID of an IO decomposition that represents the
  *        variable layout.
  * @returns the local size (size on the local process) of the variable.
- * @author Jim Edwards
  */
 int PIOc_get_local_array_size_impl(int ioid)
 {
@@ -429,7 +419,6 @@ int PIOc_get_local_array_size_impl(int ioid)
  * @param method the error handling method
  * @returns old error handler
  * @ingroup PIO_error_method
- * @author Jim Edwards
  */
 int PIOc_Set_IOSystem_Error_Handling_impl(int iosysid, int method)
 {
@@ -461,7 +450,6 @@ int PIOc_Set_IOSystem_Error_Handling_impl(int iosysid, int method)
  * if NULL.
  * @returns 0 for success, error code otherwise.
  * @ingroup PIO_error_method
- * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_set_iosystem_error_handling_impl(int iosysid, int method, int *old_method)
 {
@@ -1046,7 +1034,6 @@ int PIOc_init_decomp_impl(int iosysid, int pio_type, int ndims, const int *gdiml
  * @param pointer that gets the IO ID.
  * @returns 0 for success, error code otherwise
  * @ingroup PIO_initdecomp
- * @author Jim Edwards
  */
 int PIOc_InitDecomp_bc_impl(int iosysid, int pio_type, int ndims, const int *gdimlen,
                        const long int *start, const long int *count, int *ioidp)
@@ -1260,7 +1247,6 @@ static int init_adios_comm(iosystem_desc_t *ios)
  * @param iosysidp index of the defined system descriptor.
  * @return 0 on success, otherwise a PIO error code.
  * @ingroup PIO_init
- * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, int base,
                         int rearr, int *iosysidp)
@@ -1613,7 +1599,6 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
  * @param rearr_opts the rearranger options
  * @param iosysidp a pointer that gets the IO system ID
  * @returns 0 for success, error code otherwise
- * @author Jim Edwards
  */
 int PIOc_Init_Intracomm_from_F90_impl(int f90_comp_comm,
                                  const int num_iotasks, const int stride,
@@ -1658,7 +1643,6 @@ int PIOc_Init_Intracomm_from_F90_impl(int f90_comp_comm,
  * @param hint the hint for MPI
  * @param hintval the value of the hint
  * @returns 0 for success, or PIO_BADID if iosysid can't be found.
- * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_set_hint_impl(int iosysid, const char *hint, const char *hintval)
 {
@@ -1709,7 +1693,6 @@ int PIOc_set_hint_impl(int iosysid, const char *hint, const char *hintval)
  * @param iosysid: the io system ID provided by PIOc_Init_Intracomm().
  * @returns 0 for success or non-zero for error.
  * @ingroup PIO_finalize
- * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_finalize_impl(int iosysid)
 {
@@ -1926,7 +1909,6 @@ int PIOc_finalize_impl(int iosysid)
  * @param ioproc a pointer that gets 1 if task is an IO task, 0
  * otherwise. Ignored if NULL.
  * @returns 0 for success, or PIO_BADID if iosysid can't be found.
- * @author Jim Edwards
  */
 int PIOc_iam_iotask_impl(int iosysid, bool *ioproc)
 {
@@ -1952,7 +1934,6 @@ int PIOc_iam_iotask_impl(int iosysid, bool *ioproc)
  * @param iorank a pointer that gets the io rank, or -1 if task is not
  * in the IO communicator. Ignored if NULL.
  * @returns 0 for success, or PIO_BADID if iosysid can't be found.
- * @author Jim Edwards
  */
 int PIOc_iotask_rank_impl(int iosysid, int *iorank)
 {
@@ -1975,7 +1956,6 @@ int PIOc_iotask_rank_impl(int iosysid, int *iorank)
  *
  * @param iotype the io type to check
  * @returns 1 if iotype is in build, 0 if not.
- * @author Jim Edwards
  */
 int PIOc_iotype_available_impl(int iotype)
 {
@@ -2078,7 +2058,6 @@ int PIOc_iotype_available_impl(int iotype)
  *
  * @return PIO_NOERR on success, error code otherwise.
  * @ingroup PIO_init
- * @author Ed Hartnett
  */
 int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_list,
                     int component_count, const int *num_procs_per_comp, const int **proc_list,
@@ -3235,7 +3214,6 @@ int PIOc_Init_Intercomm_from_F90_impl(int component_count, int f90_peer_comm,
  * @param newblocksize the new blocksize.
  * @returns 0 for success.
  * @ingroup PIO_set_blocksize
- * @author Jim Edwards
  */
 int PIOc_set_blocksize_impl(int newblocksize)
 {

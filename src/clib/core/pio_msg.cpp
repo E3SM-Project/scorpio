@@ -5,7 +5,6 @@
  * messages from the computation nodes, and responds to messages by
  * running the appropriate netCDF function.
  *
- * @author Ed Hartnett
  */
 
 #include <pio_config.h>
@@ -1076,7 +1075,6 @@ int recv_async_msg(iosystem_desc_t *ios, int msg, ...)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int inq_type_handler(iosystem_desc_t *ios)
 {
@@ -1126,7 +1124,6 @@ int inq_type_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int inq_format_handler(iosystem_desc_t *ios)
 {
@@ -1172,7 +1169,6 @@ int inq_format_handler(iosystem_desc_t *ios)
  * @param ios pointer to the iosystem info.
  * @returns 0 for success, error code otherwise.
  * @internal
- * @author Ed Hartnett
  */
 int set_fill_handler(iosystem_desc_t *ios)
 {
@@ -1220,7 +1216,6 @@ int set_fill_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int create_file_handler(iosystem_desc_t *ios)
 {
@@ -1261,7 +1256,6 @@ int create_file_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int close_file_handler(iosystem_desc_t *ios)
 {
@@ -1301,7 +1295,6 @@ int close_file_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int inq_handler(iosystem_desc_t *ios)
 {
@@ -1357,7 +1350,6 @@ int inq_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int inq_unlimdims_handler(iosystem_desc_t *ios)
 {
@@ -1409,7 +1401,6 @@ int inq_unlimdims_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int inq_dim_handler(iosystem_desc_t *ios, int msg)
 {
@@ -1460,7 +1451,6 @@ int inq_dim_handler(iosystem_desc_t *ios, int msg)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int inq_dimid_handler(iosystem_desc_t *ios)
 {
@@ -1507,7 +1497,6 @@ int inq_dimid_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int inq_att_handler(iosystem_desc_t *ios)
 {
@@ -1557,7 +1546,6 @@ int inq_att_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int inq_attname_handler(iosystem_desc_t *ios)
 {
@@ -1605,7 +1593,6 @@ int inq_attname_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int inq_attid_handler(iosystem_desc_t *ios)
 {
@@ -1652,7 +1639,6 @@ int inq_attid_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int att_put_handler(iosystem_desc_t *ios)
 {
@@ -1709,7 +1695,6 @@ int att_put_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Jayesh Krishna
  */
 int att_copy_handler(iosystem_desc_t *ios)
 {
@@ -1751,7 +1736,6 @@ int att_copy_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int att_get_handler(iosystem_desc_t *ios)
 {
@@ -1813,7 +1797,6 @@ int att_get_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int put_vars_handler(iosystem_desc_t *ios)
 {
@@ -1933,7 +1916,6 @@ int put_vars_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int get_vars_handler(iosystem_desc_t *ios)
 {
@@ -2328,7 +2310,6 @@ int inq_var_deflate_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int inq_varid_handler(iosystem_desc_t *ios)
 {
@@ -2366,7 +2347,6 @@ int inq_varid_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int sync_file_handler(iosystem_desc_t *ios)
 {
@@ -2405,7 +2385,6 @@ int sync_file_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int setframe_handler(iosystem_desc_t *ios)
 {
@@ -2447,7 +2426,6 @@ int setframe_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int advanceframe_handler(iosystem_desc_t *ios)
 {
@@ -2487,7 +2465,6 @@ int advanceframe_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int change_def_file_handler(iosystem_desc_t *ios, int msg)
 {
@@ -2530,7 +2507,6 @@ int change_def_file_handler(iosystem_desc_t *ios, int msg)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int def_var_handler(iosystem_desc_t *ios)
 {
@@ -2805,7 +2781,6 @@ int set_var_chunk_cache_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int def_dim_handler(iosystem_desc_t *ios)
 {
@@ -2848,7 +2823,6 @@ int def_dim_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int rename_dim_handler(iosystem_desc_t *ios)
 {
@@ -2892,7 +2866,6 @@ int rename_dim_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int rename_var_handler(iosystem_desc_t *ios)
 {
@@ -2936,7 +2909,6 @@ int rename_var_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int rename_att_handler(iosystem_desc_t *ios)
 {
@@ -2980,7 +2952,6 @@ int rename_att_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int delete_att_handler(iosystem_desc_t *ios)
 {
@@ -3024,7 +2995,6 @@ int delete_att_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int open_file_handler(iosystem_desc_t *ios)
 {
@@ -3070,7 +3040,6 @@ int open_file_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int delete_file_handler(iosystem_desc_t *ios)
 {
@@ -3191,7 +3160,6 @@ int initdecomp_dof_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int write_darray_multi_handler(iosystem_desc_t *ios)
 {
@@ -3297,7 +3265,6 @@ int write_darray_multi_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int readdarray_handler(iosystem_desc_t *ios)
 {
@@ -3336,7 +3303,6 @@ int readdarray_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int seterrorhandling_handler(iosystem_desc_t *ios)
 {
@@ -3382,7 +3348,6 @@ int seterrorhandling_handler(iosystem_desc_t *ios)
  * @param ios pointer to the iosystem_desc_t data.
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
- * @author Ed Hartnett
  */
 int set_chunk_cache_handler(iosystem_desc_t *ios)
 {
@@ -3426,7 +3391,6 @@ int set_chunk_cache_handler(iosystem_desc_t *ios)
  * @param ios pointer to the iosystem_desc_t data.
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
- * @author Ed Hartnett
  */
 int get_chunk_cache_handler(iosystem_desc_t *ios)
 {
@@ -3480,7 +3444,6 @@ int get_chunk_cache_handler(iosystem_desc_t *ios)
  * @param ios pointer to the iosystem_desc_t data.
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
- * @author Ed Hartnett
  */
 int get_var_chunk_cache_handler(iosystem_desc_t *ios)
 {
@@ -3533,7 +3496,6 @@ int get_var_chunk_cache_handler(iosystem_desc_t *ios)
  * @param ios pointer to the iosystem_desc_t data.
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
- * @author Ed Hartnett
  */
 int freedecomp_handler(iosystem_desc_t *ios)
 {
@@ -3574,7 +3536,6 @@ int freedecomp_handler(iosystem_desc_t *ios)
  * @returns 0 for success, PIO_EIO for MPI Bcast errors, or error code
  * from netCDF base function.
  * @internal
- * @author Ed Hartnett
  */
 int finalize_handler(iosystem_desc_t *ios, int index)
 {
@@ -3616,7 +3577,6 @@ int finalize_handler(iosystem_desc_t *ios, int index)
  * @param iosys pointer to pointer to iosystem info
  * @param io_comm MPI communicator for IO
  * @returns 0 for success, error code otherwise.
- * @author Ed Hartnett
  */
 int pio_msg_handler2(int io_rank, int component_count, iosystem_desc_t **iosys,
                      MPI_Comm io_comm)

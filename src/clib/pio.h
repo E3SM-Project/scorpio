@@ -1,10 +1,7 @@
 /**
  * @file
  * Public headers for the PIO C interface.
- * @author Jim Edwards
- * @date  2014
  *
- * @see http://code.google.com/p/parallelio/
  */
 
 #ifndef _PIO_H_

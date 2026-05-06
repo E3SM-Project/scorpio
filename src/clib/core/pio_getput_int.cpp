@@ -3,10 +3,7 @@
  * Internal PIO functions to get and put attributes and data
  * (excluding varm functions).
  *
- * @author Ed Hartnett
- * @date  2016
  *
- * @see http://code.google.com/p/parallelio/
  */
 
 #include <pio_config.h>
@@ -31,7 +28,6 @@
  * @param len the length of the attribute array.
  * @param op a pointer with the attribute data.
  * @return PIO_NOERR for success, error code otherwise.
- * @author Ed Hartnett
  */
 int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
                     PIO_Offset len, nc_type memtype, const void *op)
@@ -569,7 +565,6 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
  * of type memtype.
  * @param ip a pointer that will get the attribute value.
  * @return PIO_NOERR for success, error code otherwise.
- * @author Ed Hartnett
  */
 int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void *ip)
 {
@@ -992,7 +987,6 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
  * will be used. Use special PIO_LONG_INTERNAL for _long() functions.
  * @param buf pointer to the data to be written.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                      const PIO_Offset *stride, nc_type xtype, void *buf)
@@ -2223,7 +2217,6 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
  * @param xtype the netcdf type of the variable.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int spio_get_var1_tc(int ncid, int varid, const PIO_Offset *index, nc_type xtype,
                      void *buf)
@@ -2270,7 +2263,6 @@ int spio_get_var1_tc(int ncid, int varid, const PIO_Offset *index, nc_type xtype
  * @param xtype the netcdf type of the variable.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int spio_get_var_tc(int ncid, int varid, nc_type xtype, void *buf)
 {
@@ -2371,7 +2363,6 @@ int spio_get_var_tc(int ncid, int varid, nc_type xtype, void *buf)
  * @param buf pointer to the data to be written.
  *
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                      const PIO_Offset *stride, nc_type xtype, const void *buf)
@@ -3439,7 +3430,6 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
  * @param op pointer to the data to be written.
  *
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int spio_put_var1_tc(int ncid, int varid, const PIO_Offset *index, nc_type xtype,
                      const void *op)
@@ -3496,7 +3486,6 @@ int spio_put_var1_tc(int ncid, int varid, const PIO_Offset *index, nc_type xtype
  * @param op pointer to the data to be written.
  *
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int spio_put_var_tc(int ncid, int varid, nc_type xtype, const void *op)
 {

@@ -473,7 +473,6 @@ io_desc_t *pio_get_iodesc_from_id(int ioid)
  *
  * @param ioid The id of the I/O descriptor (io_desc_t) to delete
  * @returns 0 on success, error code otherwise.
- * @author Jayesh Krishna
  */
 int pio_delete_iodesc_from_list(int ioid)
 {

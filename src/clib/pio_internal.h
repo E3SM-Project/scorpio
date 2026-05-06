@@ -1,10 +1,7 @@
 /**
  * @file
  * Private headers and defines for the PIO C interface.
- * @author Jim Edwards
- * @date  2014
  *
- * @see http://code.google.com/p/parallelio/
  */
 
 #ifndef __PIO_INTERNAL__

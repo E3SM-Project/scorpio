@@ -3933,7 +3933,6 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
  * @param ncid the file->fh for this file (the real netCDF ncid, not
  * the pio_ncid).
  * @returns 0 if file is OK, error code otherwise.
- * @author Ed Hartnett
  */
 int check_unlim_use(int ncid)
 {
@@ -4799,7 +4798,6 @@ static size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *con
  *
  * @return 0 for success, error code otherwise.
  * @ingroup PIO_openfile
- * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *filename,
                         int mode, int retry)
@@ -5639,7 +5637,6 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
  *
  * @return 0 for success, error code otherwise.
  * @ingroup PIO_openfile
- * @author Ed Hartnett
  */
 int openfile_int(int iosysid, int *ncidp, int *iotype, const char *filename,
                  int mode, int retry)

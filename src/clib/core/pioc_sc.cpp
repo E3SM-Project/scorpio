@@ -2,8 +2,6 @@
  * @file
  * Compute start and count arrays for the box rearranger
  *
- * @author Jim Edwards
- * @date  2014
  */
 #include <pio_config.h>
 #include <pio.h>

@@ -2,10 +2,7 @@
  * @file
  * PIO functions to get data (excluding varm functions).
  *
- * @author Ed Hartnett
- * @date  2016
  *
- * @see http://code.google.com/p/parallelio/
  */
 
 #include <pio_config.h>
@@ -31,7 +28,6 @@
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vars_text_impl(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                        const PIO_Offset *stride, char *buf)
@@ -58,7 +54,6 @@ int PIOc_get_vars_text_impl(int ncid, int varid, const PIO_Offset *start, const 
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vars_uchar_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, const PIO_Offset *stride, unsigned char *buf)
@@ -85,7 +80,6 @@ int PIOc_get_vars_uchar_impl(int ncid, int varid, const PIO_Offset *start,
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vars_schar_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, const PIO_Offset *stride, signed char *buf)
@@ -113,7 +107,6 @@ int PIOc_get_vars_schar_impl(int ncid, int varid, const PIO_Offset *start,
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vars_ushort_impl(int ncid, int varid, const PIO_Offset *start,
                          const PIO_Offset *count, const PIO_Offset *stride, unsigned short *buf)
@@ -140,7 +133,6 @@ int PIOc_get_vars_ushort_impl(int ncid, int varid, const PIO_Offset *start,
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vars_short_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, const PIO_Offset *stride, short *buf)
@@ -167,7 +159,6 @@ int PIOc_get_vars_short_impl(int ncid, int varid, const PIO_Offset *start,
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vars_uint_impl(int ncid, int varid, const PIO_Offset *start,
                        const PIO_Offset *count, const PIO_Offset *stride, unsigned int *buf)
@@ -194,7 +185,6 @@ int PIOc_get_vars_uint_impl(int ncid, int varid, const PIO_Offset *start,
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vars_int_impl(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                       const PIO_Offset *stride, int *buf)
@@ -221,7 +211,6 @@ int PIOc_get_vars_int_impl(int ncid, int varid, const PIO_Offset *start, const P
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vars_long_impl(int ncid, int varid, const PIO_Offset *start,
                        const PIO_Offset *count, const PIO_Offset *stride, long *buf)
@@ -248,7 +237,6 @@ int PIOc_get_vars_long_impl(int ncid, int varid, const PIO_Offset *start,
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vars_float_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, const PIO_Offset *stride, float *buf)
@@ -276,7 +264,6 @@ int PIOc_get_vars_float_impl(int ncid, int varid, const PIO_Offset *start,
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vars_double_impl(int ncid, int varid, const PIO_Offset *start,
                          const PIO_Offset *count, const PIO_Offset *stride, double *buf)
@@ -304,7 +291,6 @@ int PIOc_get_vars_double_impl(int ncid, int varid, const PIO_Offset *start,
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vars_ulonglong_impl(int ncid, int varid, const PIO_Offset *start,
                             const PIO_Offset *count, const PIO_Offset *stride,
@@ -332,7 +318,6 @@ int PIOc_get_vars_ulonglong_impl(int ncid, int varid, const PIO_Offset *start,
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vars_longlong_impl(int ncid, int varid, const PIO_Offset *start,
                            const PIO_Offset *count, const PIO_Offset *stride, long long *buf)
@@ -356,7 +341,6 @@ int PIOc_get_vars_longlong_impl(int ncid, int varid, const PIO_Offset *start,
  * the variable will be used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vara_text_impl(int ncid, int varid, const PIO_Offset *start,
                        const PIO_Offset *count, char *buf)
@@ -380,7 +364,6 @@ int PIOc_get_vara_text_impl(int ncid, int varid, const PIO_Offset *start,
  * the variable will be used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vara_uchar_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, unsigned char *buf)
@@ -404,7 +387,6 @@ int PIOc_get_vara_uchar_impl(int ncid, int varid, const PIO_Offset *start,
  * the variable will be used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vara_schar_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, signed char *buf)
@@ -429,7 +411,6 @@ int PIOc_get_vara_schar_impl(int ncid, int varid, const PIO_Offset *start,
  * the variable will be used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vara_ushort_impl(int ncid, int varid, const PIO_Offset *start,
                          const PIO_Offset *count, unsigned short *buf)
@@ -453,7 +434,6 @@ int PIOc_get_vara_ushort_impl(int ncid, int varid, const PIO_Offset *start,
  * the variable will be used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vara_short_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, short *buf)
@@ -477,7 +457,6 @@ int PIOc_get_vara_short_impl(int ncid, int varid, const PIO_Offset *start,
  * the variable will be used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vara_long_impl(int ncid, int varid, const PIO_Offset *start,
                        const PIO_Offset *count, long *buf)
@@ -501,7 +480,6 @@ int PIOc_get_vara_long_impl(int ncid, int varid, const PIO_Offset *start,
  * the variable will be used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vara_uint_impl(int ncid, int varid, const PIO_Offset *start,
                        const PIO_Offset *count, unsigned int *buf)
@@ -525,7 +503,6 @@ int PIOc_get_vara_uint_impl(int ncid, int varid, const PIO_Offset *start,
  * the variable will be used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vara_int_impl(int ncid, int varid, const PIO_Offset *start,
                       const PIO_Offset *count, int *buf)
@@ -549,7 +526,6 @@ int PIOc_get_vara_int_impl(int ncid, int varid, const PIO_Offset *start,
  * the variable will be used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vara_float_impl(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, float *buf)
@@ -573,7 +549,6 @@ int PIOc_get_vara_float_impl(int ncid, int varid, const PIO_Offset *start,
  * the variable will be used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vara_double_impl(int ncid, int varid, const PIO_Offset *start,
                          const PIO_Offset *count, double *buf)
@@ -598,7 +573,6 @@ int PIOc_get_vara_double_impl(int ncid, int varid, const PIO_Offset *start,
  * the variable will be used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vara_ulonglong_impl(int ncid, int varid, const PIO_Offset *start,
                             const PIO_Offset *count, unsigned long long *buf)
@@ -622,7 +596,6 @@ int PIOc_get_vara_ulonglong_impl(int ncid, int varid, const PIO_Offset *start,
  * the variable will be used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vara_longlong_impl(int ncid, int varid, const PIO_Offset *start,
                            const PIO_Offset *count, long long *buf)
@@ -640,7 +613,6 @@ int PIOc_get_vara_longlong_impl(int ncid, int varid, const PIO_Offset *start,
  * @param varid the variable ID number
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var_text_impl(int ncid, int varid, char *buf)
 {
@@ -657,7 +629,6 @@ int PIOc_get_var_text_impl(int ncid, int varid, char *buf)
  * @param varid the variable ID number
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var_uchar_impl(int ncid, int varid, unsigned char *buf)
 {
@@ -674,7 +645,6 @@ int PIOc_get_var_uchar_impl(int ncid, int varid, unsigned char *buf)
  * @param varid the variable ID number
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var_schar_impl(int ncid, int varid, signed char *buf)
 {
@@ -691,7 +661,6 @@ int PIOc_get_var_schar_impl(int ncid, int varid, signed char *buf)
  * @param varid the variable ID number
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var_ushort_impl(int ncid, int varid, unsigned short *buf)
 {
@@ -708,7 +677,6 @@ int PIOc_get_var_ushort_impl(int ncid, int varid, unsigned short *buf)
  * @param varid the variable ID number
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var_short_impl(int ncid, int varid, short *buf)
 {
@@ -725,7 +693,6 @@ int PIOc_get_var_short_impl(int ncid, int varid, short *buf)
  * @param varid the variable ID number
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var_uint_impl(int ncid, int varid, unsigned int *buf)
 {
@@ -742,7 +709,6 @@ int PIOc_get_var_uint_impl(int ncid, int varid, unsigned int *buf)
  * @param varid the variable ID number
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var_int_impl(int ncid, int varid, int *buf)
 {
@@ -759,7 +725,6 @@ int PIOc_get_var_int_impl(int ncid, int varid, int *buf)
  * @param varid the variable ID number
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var_long_impl(int ncid, int varid, long *buf)
 {
@@ -776,7 +741,6 @@ int PIOc_get_var_long_impl(int ncid, int varid, long *buf)
  * @param varid the variable ID number
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var_float_impl(int ncid, int varid, float *buf)
 {
@@ -793,7 +757,6 @@ int PIOc_get_var_float_impl(int ncid, int varid, float *buf)
  * @param varid the variable ID number
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var_double_impl(int ncid, int varid, double *buf)
 {
@@ -810,7 +773,6 @@ int PIOc_get_var_double_impl(int ncid, int varid, double *buf)
  * @param varid the variable ID number
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var_ulonglong_impl(int ncid, int varid, unsigned long long *buf)
 {
@@ -827,7 +789,6 @@ int PIOc_get_var_ulonglong_impl(int ncid, int varid, unsigned long long *buf)
  * @param varid the variable ID number
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var_longlong_impl(int ncid, int varid, long long *buf)
 {
@@ -847,7 +808,6 @@ int PIOc_get_var_longlong_impl(int ncid, int varid, long long *buf)
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var1_text_impl(int ncid, int varid, const PIO_Offset *index, char *buf)
 {
@@ -867,7 +827,6 @@ int PIOc_get_var1_text_impl(int ncid, int varid, const PIO_Offset *index, char *
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var1_uchar_impl(int ncid, int varid, const PIO_Offset *index, unsigned char *buf)
 {
@@ -887,7 +846,6 @@ int PIOc_get_var1_uchar_impl(int ncid, int varid, const PIO_Offset *index, unsig
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var1_schar_impl(int ncid, int varid, const PIO_Offset *index, signed char *buf)
 {
@@ -907,7 +865,6 @@ int PIOc_get_var1_schar_impl(int ncid, int varid, const PIO_Offset *index, signe
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var1_ushort_impl(int ncid, int varid, const PIO_Offset *index, unsigned short *buf)
 {
@@ -927,7 +884,6 @@ int PIOc_get_var1_ushort_impl(int ncid, int varid, const PIO_Offset *index, unsi
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var1_short_impl(int ncid, int varid, const PIO_Offset *index, short *buf)
 {
@@ -949,7 +905,6 @@ int PIOc_get_var1_short_impl(int ncid, int varid, const PIO_Offset *index, short
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var1_uint_impl(int ncid, int varid, const PIO_Offset *index, unsigned int *buf)
 {
@@ -969,7 +924,6 @@ int PIOc_get_var1_uint_impl(int ncid, int varid, const PIO_Offset *index, unsign
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var1_long_impl(int ncid, int varid, const PIO_Offset *index, long *buf)
 {
@@ -989,7 +943,6 @@ int PIOc_get_var1_long_impl(int ncid, int varid, const PIO_Offset *index, long *
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var1_int_impl(int ncid, int varid, const PIO_Offset *index, int *buf)
 {
@@ -1009,7 +962,6 @@ int PIOc_get_var1_int_impl(int ncid, int varid, const PIO_Offset *index, int *bu
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var1_float_impl(int ncid, int varid, const PIO_Offset *index, float *buf)
 {
@@ -1029,7 +981,6 @@ int PIOc_get_var1_float_impl(int ncid, int varid, const PIO_Offset *index, float
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var1_double_impl(int ncid, int varid, const PIO_Offset *index, double *buf)
 {
@@ -1049,7 +1000,6 @@ int PIOc_get_var1_double_impl(int ncid, int varid, const PIO_Offset *index, doub
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var1_ulonglong_impl(int ncid, int varid, const PIO_Offset *index,
                              unsigned long long *buf)
@@ -1070,7 +1020,6 @@ int PIOc_get_var1_ulonglong_impl(int ncid, int varid, const PIO_Offset *index,
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var1_longlong_impl(int ncid, int varid, const PIO_Offset *index,
                            long long *buf)
@@ -1089,7 +1038,6 @@ int PIOc_get_var1_longlong_impl(int ncid, int varid, const PIO_Offset *index,
  * @param varid the variable ID number
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var_impl(int ncid, int varid, void *buf)
 {
@@ -1110,7 +1058,6 @@ int PIOc_get_var_impl(int ncid, int varid, void *buf)
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_var1_impl(int ncid, int varid, const PIO_Offset *index, void *buf)
 {
@@ -1134,7 +1081,6 @@ int PIOc_get_var1_impl(int ncid, int varid, const PIO_Offset *index, void *buf)
  * the variable will be used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vara_impl(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                   void *buf)
@@ -1162,7 +1108,6 @@ int PIOc_get_vara_impl(int ncid, int varid, const PIO_Offset *start, const PIO_O
  * used.
  * @param buf pointer that will get the data.
  * @return PIO_NOERR on success, error code otherwise.
- * @author Ed Hartnett
  */
 int PIOc_get_vars_impl(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                   const PIO_Offset *stride, void *buf)
