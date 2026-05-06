@@ -276,6 +276,7 @@ void pio_viobuf_free(void *p)
  */
 int pio_async_pnetcdf_write_kwait(void *f)
 {
+#ifdef HAVE_PNETCDF
   int ret;
   file_desc_t *file = (file_desc_t *)f;
   assert(file);
@@ -363,6 +364,9 @@ int pio_async_pnetcdf_write_kwait(void *f)
   }
 
   return PIO_NOERR;
+#else
+  assert(0);
+#endif
 }
 
 /* Wait only for rearr async ops on a file */
