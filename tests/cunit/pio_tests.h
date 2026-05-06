@@ -1,8 +1,6 @@
 /**
  * @file
  * Include file for tests for the Parallel IO library.
- * @author Ed Hartnett
- * @date 9/13/2016
  */
 
 #ifndef _PIO_TESTS_H

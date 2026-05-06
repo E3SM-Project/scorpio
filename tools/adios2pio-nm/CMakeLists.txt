@@ -88,8 +88,16 @@ endif ()
 #==============================================================================
 #  DEFINE THE TARGET LIBRARY
 #==============================================================================
+# FIXME: Remove this hack once we fix E3SM dependency for this lib
+macro(create_dummy_adios_lib )
+  set(spio_dummy_adios2pio_nm_lib_src "${CMAKE_CURRENT_BINARY_DIR}/spio_dummy_adios2pio_nm_lib.cxx")
+  file(WRITE "${spio_dummy_adios2pio_nm_lib_src}" "/* DUMMY FILE */")
+  add_library(adios2pio-nm-lib ${spio_dummy_adios2pio_nm_lib_src})
+endmacro()
+
 SET(SRC ${SCORPIO_SOURCE_DIR}/util/argparser.cxx adios2pio-nm.cxx)
-add_library(adios2pio-nm-lib ${SCORPIO_SOURCE_DIR}/util/spio_misc_tool_utils.cxx adios2pio-nm-lib.cxx)
+add_library(adios2pio-nm-lib-objs OBJECT ${SCORPIO_SOURCE_DIR}/util/spio_misc_tool_utils.cxx adios2pio-nm-lib.cxx)
+create_dummy_adios_lib()
 include_directories(
   "${PROJECT_SOURCE_DIR}"   # to find foo/foo.h
   "${PROJECT_BINARY_DIR}")  # to find foo/config.h
@@ -115,8 +123,9 @@ else ()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif ()
 
-target_include_directories(adios2pio-nm-lib PRIVATE
+target_include_directories(adios2pio-nm-lib-objs PRIVATE
   ${SCORPIO_SOURCE_DIR}/src/clib
+  ${SCORPIO_SOURCE_DIR}/src/clib/util
   ${SCORPIO_BINARY_DIR}/src/clib
   ${SCORPIO_SOURCE_DIR}/util
   ${PnetCDF_C_INCLUDE_DIRS}
@@ -126,6 +135,7 @@ target_include_directories(adios2pio-nm-lib PRIVATE
 
 target_include_directories(adios2pio-nm.exe PRIVATE
   ${SCORPIO_SOURCE_DIR}/src/clib
+  ${SCORPIO_SOURCE_DIR}/src/clib/util
   ${SCORPIO_BINARY_DIR}/src/clib
   ${SCORPIO_SOURCE_DIR}/util
   ${PnetCDF_C_INCLUDE_DIRS}
@@ -135,8 +145,12 @@ target_include_directories(adios2pio-nm.exe PRIVATE
 
 # Adding path to internal GPTL lib, if needed
 if (PIO_ENABLE_TIMING)
-  if (NOT GPTL_C_FOUND)
-    target_include_directories(adios2pio-nm-lib
+  if (GPTL_C_FOUND)
+    target_include_directories(adios2pio-nm-lib-objs
+      PRIVATE ${GPTL_C_INCLUDE_DIRS})
+  else ()
+    # Use internal GPTL lib
+    target_include_directories(adios2pio-nm-lib-objs
       PRIVATE ${PROJECT_SOURCE_DIR}/../src/gptl)
     target_include_directories(adios2pio-nm.exe
       PRIVATE ${PROJECT_SOURCE_DIR}/../src/gptl)
@@ -144,75 +158,76 @@ if (PIO_ENABLE_TIMING)
 endif ()
 
 # System and compiler CPP directives
-target_compile_definitions (adios2pio-nm-lib
+target_compile_definitions (adios2pio-nm-lib-objs
   PRIVATE ${CMAKE_SYSTEM_DIRECTIVE})
-target_compile_definitions (adios2pio-nm-lib
+target_compile_definitions (adios2pio-nm-lib-objs
   PUBLIC ${CMAKE_C_COMPILER_DIRECTIVE})
 # Skip MPI C++ headers/bindings for MPICH lib
-target_compile_definitions (adios2pio-nm-lib
+target_compile_definitions (adios2pio-nm-lib-objs
   PUBLIC MPICH_SKIP_MPICXX)
 # Skip MPI C++ headers/bindings for OpenMPI lib
-target_compile_definitions (adios2pio-nm-lib
+target_compile_definitions (adios2pio-nm-lib-objs
   PUBLIC OMPI_SKIP_MPICXX)
 # Skip MPI C++ headers/bindings for SGI MPT lib
-target_compile_definitions (adios2pio-nm-lib
+target_compile_definitions (adios2pio-nm-lib-objs
   PUBLIC MPI_NO_CPPBIND)
 
 # Set external lib compiler/link flags
 if (PnetCDF_C_FOUND)
-  target_include_directories (adios2pio-nm-lib
+  target_include_directories (adios2pio-nm-lib-objs
     PUBLIC ${PnetCDF_C_INCLUDE_DIRS})
-  target_compile_definitions (adios2pio-nm-lib
+  target_compile_definitions (adios2pio-nm-lib-objs
     PUBLIC _PNETCDF)
-  target_link_libraries (adios2pio-nm-lib
+  target_link_libraries (adios2pio-nm-lib-objs
     PUBLIC ${PnetCDF_C_LIBRARIES})
 else ()
-  target_compile_definitions (adios2pio-nm-lib
+  target_compile_definitions (adios2pio-nm-lib-objs
     PUBLIC _NOPNETCDF)
 endif ()
 
 if (NetCDF_C_FOUND)
-  target_include_directories (adios2pio-nm-lib
+  target_include_directories (adios2pio-nm-lib-objs
     PUBLIC ${NetCDF_C_INCLUDE_DIRS})
-  target_compile_definitions (adios2pio-nm-lib
+  target_compile_definitions (adios2pio-nm-lib-objs
     PUBLIC _NETCDF)
-  target_link_libraries (adios2pio-nm-lib
+  target_link_libraries (adios2pio-nm-lib-objs
     PUBLIC ${NetCDF_C_LIBRARIES})
   if (${NetCDF_C_HAS_PARALLEL})
-    target_compile_definitions (adios2pio-nm-lib
+    target_compile_definitions (adios2pio-nm-lib-objs
       PUBLIC _NETCDF4)
   endif ()
 else ()
-  target_compile_definitions (adios2pio-nm-lib
+  target_compile_definitions (adios2pio-nm-lib-objs
     PUBLIC _NONETCDF)
 endif ()
 
 if (ADIOS2_FOUND)
-  target_compile_definitions (adios2pio-nm-lib
+  target_compile_definitions (adios2pio-nm-lib-objs
     PRIVATE _ADIOS2)
-  target_link_libraries (adios2pio-nm-lib
+  target_link_libraries (adios2pio-nm-lib-objs
     PUBLIC adios2::adios2)
 else ()
-  target_compile_definitions (adios2pio-nm-lib
+  target_compile_definitions (adios2pio-nm-lib-objs
     PUBLIC _NOADIOS)
 endif ()
 
 # Add the extra (user-specified) compile/link options
-target_include_directories (adios2pio-nm-lib
+target_include_directories (adios2pio-nm-lib-objs
   PUBLIC ${PIO_C_EXTRA_INCLUDE_DIRS})
-target_link_libraries (adios2pio-nm-lib
+target_link_libraries (adios2pio-nm-lib-objs
   PUBLIC ${PIO_C_EXTRA_LIBRARIES})
-target_compile_options (adios2pio-nm-lib
+target_compile_options (adios2pio-nm-lib-objs
   PRIVATE ${PIO_C_EXTRA_COMPILE_OPTIONS})
-target_compile_definitions (adios2pio-nm-lib
+target_compile_definitions (adios2pio-nm-lib-objs
   PUBLIC ${PIO_C_EXTRA_COMPILE_DEFINITIONS})
 if (PIO_C_EXTRA_LINK_FLAGS)
-  set_target_properties(adios2pio-nm-lib PROPERTIES
+  set_target_properties(adios2pio-nm-lib-objs PROPERTIES
     LINK_FLAGS ${PIO_C_EXTRA_LINK_FLAGS})
 endif ()
 
-TARGET_LINK_LIBRARIES(adios2pio-nm-lib PRIVATE pioc)
-TARGET_LINK_LIBRARIES(adios2pio-nm.exe PRIVATE adios2pio-nm-lib)
+#TARGET_LINK_LIBRARIES(adios2pio-nm-lib-objs PRIVATE pioc)
+TARGET_LINK_LIBRARIES(adios2pio-nm-lib-objs PRIVATE spio_default_public_options)
+TARGET_LINK_LIBRARIES(adios2pio-nm.exe PRIVATE adios2pio-nm-lib-objs)
 
 #==============================================================================
 #  INSTALL

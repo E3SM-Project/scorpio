@@ -199,8 +199,6 @@ int test_cint_mvcache(int wrank)
 {
   file_desc_t file;
 
-  std::memset(&file, 0, sizeof(file_desc_t));
-
   /* Initialize the mvcache associated with this dummy file */
   spio_file_mvcache_init(&file);
 

@@ -55,11 +55,25 @@
 /** Striping unit hint in bytes for a Lustre or GPFS file system. */
 #define PIO_STRIPING_UNIT @PIO_STRIPING_UNIT@
 
+/** If MPI File sync needs to be explicitly disabled (default : false) */
+#define SPIO_DISABLE_HDF5_MPI_FILE_SYNC @SPIO_DISABLE_HDF5_MPI_FILE_SYNC@
+
 /** Extra bytes reserved in the header when creating NetCDF files. */
 #define PIO_RESERVED_FILE_HEADER_SIZE @PIO_RESERVED_FILE_HEADER_SIZE@
 
 /** Set chunk size (in bytes) for HDF5/PnetCDF chunked variables. */
 #define PIO_CHUNK_SIZE @PIO_CHUNK_SIZE@
+
+/** Set dimension chunk info for HDF5 chunked variables.
+  * Expected format: "DIM1_NAME:DIM1_CHUNK_SZ;DIM2_NAME:DIM2_CHUNK_SZ;"
+  */
+#define SPIO_DIM_CHUNK_INFO "@SPIO_DIM_CHUNK_INFO@"
+
+/** Set the constraints/regex for enabling chunking of variables
+  * Regex format is same as the one used for PIO_SAVE_DECOMPS_REGEX
+  * e.g. '(VAR=\".*test_var1.*\")&&(FILE=\".*testfile1\")'
+  */
+#define SPIO_ENABLE_CHUNKING_REGEX "@SPIO_ENABLE_CHUNKING_REGEX@"
 
 /** Maximum number of I/O decompositions registered with ADIOS type */
 #define PIO_MAX_ADIOS_DECOMPS @PIO_MAX_ADIOS_DECOMPS@
@@ -168,5 +182,15 @@
 /** Set to 1 if the library is configured to use PnetCDF independent data mode,
  *  0 otherwise */
 #define PIO_USE_INDEP_MODE @USE_INDEP_MODE@
+
+/** Set to 1 if the library is configured to use asynchronous I/O
+ *  0 otherwise */
+#define PIO_USE_ASYNC_WR_THREAD @USE_ASYNC_WR_THREAD@
+
+/** Maximum wait for asynchronous I/O operations (in milliseconds) */
+#define SPIO_ASYNC_OP_WAIT_TIMEOUT @SPIO_ASYNC_OP_WAIT_TIMEOUT@
+
+/** Number of threads performing asynchronous I/O operations */
+#define SPIO_ASYNC_NTHREADS @SPIO_ASYNC_NTHREADS@
 
 #endif /* _PIO_CONFIG_ */
