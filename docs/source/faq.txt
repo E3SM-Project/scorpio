@@ -17,15 +17,39 @@
 
    Here is a list of frequently asked questions and their answers.
 <dl>
-<dt>How do I specify which tasks perform IO?  </dt>
-    <dd>This is done in the call to \ref PIO_init which has two interfaces: init_intracom and init_intercom.  
-  <ul><li> In the init_intracom interface, use the num_iotasks and stride variables to specify the total number of io tasks and the stride between them with respect to the mpi communicator, comp_comm, which is provided.  You can also use the optional base argument to shift the first IO task away from the first computational task, this is often desirable because the applications first computational task often has higher memory requirements than other tasks.   IO tasks are a subset of the tasks defined in comp_comm.
-<li> In the init_intercom interface, IO tasks are a disjoint set of tasks from those in the computational communicator.  <b>This interface is still experimental and not recommended for production use at this time. </b>
-</ul>
-Note that num_iotasks is the maximum number of IO tasks to use for an IO operation.   The size of the field being read or written along with the tunable blocksize parameter, \ref PIO_set_blocksize, determines the actual number of tasks used for a given IO operation.
-</dd>
-<dt>How do I test if SCORPIO is installed and working correctly? </dt> 
-    <dd>The SCORPIO Library distribution contains a testpio subdirectory with a number of programs to test the SCORPIO library. Please see the \ref examp page for details. </dd>
-
+<dt>Does SCORPIO support Fortran/C/C++/Python applications?</dt>
+  <dd>SCORPIO supports Fortran and C APIs. The C++ applications can use the C APIs. We currently don't support/test Python scripts/applications. For more information refer to \ref api</dd>
+<dt>Why should I use SCORPIO instead of directly using the low-level I/O libraries like NetCDF?</dt>
+  <dd>The SCORPIO library includes many performance enhancements to improve I/O throughput of applications. The I/O library also allows users to seamlessly use multiple I/O libraries and switch between the libraries within the same application</dd>
+<dt>What are the I/O libraries supported by SCORPIO?</dt>
+  <dd>SCORPIO supports I/O using PnetCDF, NetCDF, HDF5 and ADIOS2 I/O libraries. The data is written out in the NetCDF3/NetCDF4 file formats using PnetCDF, NetCDF and HDF5 libraries. The data is written out in ADIOS BP file format using the ADIOS2 library. There are tools to convert output in the ADIOS BP file format to NetCDF.</dd>
+<dt>Can I use SCORPIO if I have only one of the supported low-level I/O libraries (e.g. PnetCDF) installed on my system?</dt>
+  <dd>Yes, however the library assumes that you have at least the NetCDF or PnetCDF library installed on your machine.</dd>
+<dt>Does SCORPIO support I/O without any low-level I/O libraries?</dt>
+  <dd>We currently do not support I/O (e.g. direct Posix, MPI I/O etc) without the supported low-level I/O libraries</dd>
+<dt>Do you distribute spack builds (or other pre-built binaries) for the library releases?</dt>
+  <dd>Spack binaries of recent versions of SCORPIO is available [here](https://packages.spack.io/package.html?name=e3sm-scorpio)</dd>
+<dt>Can I install SCORPIO on a generic linux laptop/desktop?</dt>
+  <dd>Yes, please refer to \ref mach_walkthrough for more information</dd>
+<dt>Does SCORPIO support GPUs?</dt>
+  <dd>No, we currently assume that all buffers passed to SCORPIO are CPU buffers.</dd>
+<dt>Does SCORPIO support I/O data compression?</dt>
+  <dd>Yes, SCORPIO supports lossless and lossy I/O data compression using NetCDF, HDF5 and ADIOS2 I/O libraries.</dd>
+<dt>Does SCORPIO support asynchronous I/O?<dt>
+  <dd>Yes, SCORPIO supports asynchronous I/O using asynchronous threads for making progress on I/O calls (currently supported only for the HDF5 I/O library) and using asynchronous I/O processes (A separate set of asynchronous I/O processes that are forwarded and make progress on all I/O calls, see \ref PIO_init for more information)</dd>
+<dt>How do I install SCORPIO on my machine?<dt>
+  <dd>SCORPIO uses CMake for configuring the library and assumes that an MPI library is available on the system. See \ref install for more information</dd>
+<dt>Can I use SCORPIO if my application runs on a single process?</dt>
+  <dd>The SCORPIO library uses MPI and assumes that the application is an MPI application (calls MPI\_Init() before initializing the library). The library supports MPI applications that run using a single process.</dd>
+<dt>How do I integrate the SCORPIO library into my application?</dt>
+  <dd>The API supported by the library is available at \ref api. See \ref usage_overview for an overview of how to use the SCORPIO library</dd>
+<dt>Can I specify the MPI processes performing I/O (write data to the file system)?</dt>
+  <dd>The MPI processes that perform I/O (processes that write data to the file system) and the stride between the I/O processes are specified using arguments to the \ref PIO_init api. Please refer to the API documention (\ref PIO_init) for more information. However note that all APIs are collective calls and involve all the MPI processes (that are part of the MPI communicator specified while initializing the library)</dd>
+<dt>How many I/O processes are recommended for an MPI application?</dt>
+  <dd>We recommend, as a starting point, assigning one I/O process per compute node on a supercomputer</dd>
+<dt>Can I initialize (and finalize) the library multiple times in an application?</dt>
+  <dd>Yes, applications typically initialize (\ref PIO_init) the library multiple times for different MPI communicators used by the different components in the application. e.g. An earth system application calls \ref PIO_init for each model component (e.g. atmosphere, ocean, land components use different MPI communicators and initialize the library per component)</dd>
+<dt>How do I reference the SCORPIO library in research publications?</dt>
+  <dd>See \ref acknowledgement for information on how to cite the library in research publications</dd>
 </dl>
 */

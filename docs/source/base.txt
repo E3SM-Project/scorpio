@@ -36,6 +36,7 @@ This user's guide provides information on how to use the SCORPIO library and an 
  - \ref api
  - \ref contributing_code
 
+\anchor acknowledgement
 ### Acknowledgement ###
 The SCORPIO library can be acknowledged in publications by referring to the research publication below,
 <pre>
@@ -59,7 +60,7 @@ abstractNote = {The SCORPIO (Software for Caching Output and Reads for Parallel 
 }
 </pre>
 
-
+\anchor licence
 ### License ###
 The SCORPIO library is available under a BSD 3-clause license. Please see LICENSE.txt for details
 
