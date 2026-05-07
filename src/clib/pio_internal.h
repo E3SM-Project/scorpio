@@ -1,10 +1,7 @@
 /**
  * @file
  * Private headers and defines for the PIO C interface.
- * @author Jim Edwards
- * @date  2014
  *
- * @see http://code.google.com/p/parallelio/
  */
 
 #ifndef __PIO_INTERNAL__
@@ -22,7 +19,6 @@
 #define NETCDF_INT_FLOAT_SIZE 4
 #define NETCDF_DOUBLE_INT64_SIZE 8
 
-#include <bget.h>
 #include <limits.h>
 #include <math.h>
 #ifdef SPIO_ENABLE_GPTL_TIMING
@@ -31,7 +27,10 @@
 #include "gptl_skel.h"
 #endif
 #include <assert.h>
-#include "spio_ltimer.h"
+#include "util/bget.h"
+#include "util/spio_ltimer.h"
+#include "pio_types.hpp"
+#include <string>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -70,6 +69,16 @@ extern "C" {
         bool isend;
     } pio_swapm_defaults;
 
+    /** swapm request */
+    typedef struct pio_swapm_req
+    {
+        MPI_Request *rcvids;
+        int nrcvids;
+
+        MPI_Request *sndids;
+        int nsndids;
+    } pio_swapm_req;
+
     /* Handle an error in the PIO library. */
 #ifdef __GNUC__
     /* Specify that pio_err() uses printf style formatting. This
@@ -107,10 +116,13 @@ extern "C" {
     int  pio_add_to_iodesc_list(io_desc_t *iodesc, MPI_Comm comm);
     io_desc_t *pio_get_iodesc_from_id(int ioid);
     int pio_delete_iodesc_from_list(int ioid);
+    int pio_delete_all_iodescs(int iosysid);
     int pio_num_iosystem(int *niosysid);
 
     int pio_get_file(int ncid, file_desc_t **filep);
     int pio_delete_file_from_list(int ncid);
+    int spio_close_all_files_and_delete_from_list(int iosysid);
+    int spio_close_soft_closed_file(const char *filename);
     int pio_add_to_file_list(file_desc_t *file, MPI_Comm comm);
 
     /* Get a description of the variable represented by varid */
@@ -128,10 +140,17 @@ extern "C" {
     int openfile_int(int iosysid, int *ncidp, int *iotype, const char *filename,
                      int mode, int retry);
 
+    /* Close the file ("hard close") */
+    int spio_wait_on_hard_close(iosystem_desc_t *ios, file_desc_t *file);
+    int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file, bool sync_with_ioprocs);
+    int spio_soft_closefile(iosystem_desc_t *ios, file_desc_t *file);
+
     iosystem_desc_t *pio_get_iosystem_from_id(int iosysid);
     int pio_add_to_iosystem_list(iosystem_desc_t *ios, MPI_Comm comm);
 
     /* Check the return code from a netCDF call, with ios pointer. */
+    int spio_handle_err(iosystem_desc_t *ios, file_desc_t *file, int eh,
+                        int status, const char *fname, int line);
     int check_netcdf(iosystem_desc_t *ios, file_desc_t *file, int status,
                       const char *fname, int line);
 
@@ -179,6 +198,15 @@ extern "C" {
     int pio_swapm(const void *sendbuf, const int *sendcounts, const int *sdispls, const MPI_Datatype *sendtypes,
                   void *recvbuf, const int *recvcounts, const int *rdispls, const MPI_Datatype *recvtypes,
                   MPI_Comm comm, const rearr_comm_fc_opt_t *fc);
+
+    /* Non blocking wait for pio swapm user request */
+    int pio_swapm_iwait(void *p, bool &flag);
+
+    /* Blocking wait for pio swapm user request */
+    int pio_swapm_wait(void *p);
+
+    /* Free a pio swapm request */
+    void pio_swapm_req_free(void *p);
 
     void PIO_Offset_size(MPI_Datatype *dtype, int *tsize);
     PIO_Offset GCDblocksize(int arrlen, const PIO_Offset *arr_in);
@@ -228,11 +256,11 @@ extern "C" {
     int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf, void *rbuf);
 
     /* Move data from compute tasks to IO tasks. */
-    int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf, void *rbuf,
-                          int nvars);
+    int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file,
+                          const void *sbuf, void *rbuf, int nvars);
 
     /* Allocate and initialize storage for decomposition information. */
-    int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims, io_desc_t **iodesc);
+    int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims, int maplen, io_desc_t **iodesc);
     void performance_tune_rearranger(iosystem_desc_t *ios, io_desc_t *iodesc);
 
     /* Flush contents of multi-buffer to disk. */
@@ -336,9 +364,6 @@ extern "C" {
     int spio_pnetcdf_inq_type(int ncid, nc_type xtype, char *name,
                               PIO_Offset *sizep);
 
-    /* Handle end and re-defs. */
-    int spio_change_def(int ncid, int is_enddef);
-
     /* Remove a directory in the filesystem */
     int spio_remove_directory(const char *path);
 
@@ -367,7 +392,7 @@ extern "C" {
                                 char *history, char *source, char *version, int *fortran_order);
 
     /* Create a unique PIO string */
-    int pio_create_uniq_str(iosystem_desc_t *ios, io_desc_t *iodesc, char *str, int len, const char *prefix, const char *suffix);
+    void pio_create_uniq_str(iosystem_desc_t *ios, io_desc_t *iodesc, std::string &str, const std::string &prefix, const std::string &suffix);
 
     /* Set the size limit for each block of requests to wait */
     int set_file_req_block_size_limit(file_desc_t *file, PIO_Offset sz);
@@ -403,11 +428,6 @@ extern "C" {
                                                  const char *name, const adios2_type type, const size_t ndims,
                                                  const size_t *shape, const size_t *start, const size_t *count,
                                                  const adios2_constant_dims constant_dims);
-#endif
-
-#ifdef _HDF5
-    hid_t nc_type_to_hdf5_type(nc_type xtype);
-    PIO_Offset hdf5_get_nc_type_size(nc_type xtype);
 #endif
 
 /* Asynchronous I/O services start with the following seq num */
@@ -684,26 +704,8 @@ const char *pio_get_vnames_from_file_id(int pio_file_id,
 const char *pio_async_msg_to_string(int msg);
 #define PIO_IS_NULL(p) ((p) ? "not NULL" : "NULL")
 
-/* Some helper functions internally used by HDF5 IO type */
-#ifdef _HDF5
-hid_t spio_nc_type_to_hdf5_type(nc_type xtype);
-
-int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filename);
-
-int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
-                      nc_type xtype, int ndims, const int *dimidsp, int varid);
-
-int spio_hdf5_enddef(iosystem_desc_t *ios, file_desc_t *file);
-
-int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const char *name,
-                      nc_type atttype, PIO_Offset len, const void *op);
-
-int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
-                      const PIO_Offset *start, const PIO_Offset *count,
-                      const PIO_Offset *stride, nc_type xtype, const void *buf);
-
-int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file);
-#endif
+int spio_find_start_count(int ndims, const int *dimlen, int fndims, var_desc_t *vdesc,
+                     io_region *region, size_t *start, size_t *count);
 
 #if defined(__cplusplus)
 }

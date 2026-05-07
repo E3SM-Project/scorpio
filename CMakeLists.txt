@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.7)
+cmake_minimum_required (VERSION 3.7...4.0.1)
 project (SCORPIO C CXX Fortran)
 #cmake_policy(VERSION 3.5.2)
 
@@ -49,6 +49,7 @@ option (PIO_USE_MALLOC       "Use native malloc (instead of bget package)"  OFF)
 option (PIO_USE_INDEP_MODE   "Use PnetCDF independent data mode"            ON)
 option (PIO_MICRO_TIMING     "Enable internal micro timers"                 OFF)
 option (PIO_SAVE_DECOMPS     "Dump the decomposition information"           OFF)
+option (PIO_USE_ASYNC_WR_THREAD    "Use an asynchronous thread for writes (Requires C++11 support)" OFF)
 option (PIO_LIMIT_CACHED_IO_REGIONS  "Limit the number of non-contiguous regions in an IO process" OFF)
 option (WITH_PNETCDF         "Require the use of PnetCDF"                   ON)
 option (WITH_NETCDF          "Require the use of NetCDF"                    ON)
@@ -158,6 +159,12 @@ else()
   message (STATUS "Disabling saving I/O decompositions (default)")
 endif()
 
+set(USE_ASYNC_WR_THREAD 0)
+if(PIO_USE_ASYNC_WR_THREAD)
+  message(STATUS "Using asynchronous I/O thread for writes")
+  set(USE_ASYNC_WR_THREAD 1)
+endif()
+
 if(PIO_LIMIT_CACHED_IO_REGIONS)
   set(LIMIT_CACHED_IO_REGIONS 1)
   if(NOT DEFINED PIO_MAX_CACHED_IO_REGIONS)
@@ -211,6 +218,14 @@ else()
   endif()
 endif()
 
+# Default - Do not disable MPI file syncing for HDF5 output files
+set(SPIO_DISABLE_HDF5_MPI_FILE_SYNC 0)
+if(FQDN_SITENAME MATCHES "^compute-386")
+  # On ANL compute nodes with NFS+ROMIO, disable MPI file syncing for HDF5 output
+  message(STATUS "Disabling HDF5 file syncing")
+  set(SPIO_DISABLE_HDF5_MPI_FILE_SYNC 1)
+endif()
+
 set(USE_INDEP_MODE 0)
 if(PIO_USE_INDEP_MODE)
   if(FQDN_SITENAME MATCHES "^chrlogin" OR FQDN_SITENAME MATCHES "^compute-240" OR FQDN_SITENAME MATCHES "^compute-386")
@@ -249,6 +264,28 @@ if(DEFINED PIO_CHUNK_SIZE)
 else()
   set(PIO_CHUNK_SIZE ${DEF_SPIO_CHUNK_SIZE})
   message(STATUS "Setting chunk size (in bytes) for HDF5/PnetCDF chunked variables, requested bytes = " ${PIO_CHUNK_SIZE} " (default)")
+endif()
+
+# Expected format for SPIO_DIM_CHUNK_INFO = "DIM1_NAME:DIM1_CHUNK_SZ;DIM2_NAME:DIM2_CHUNK_SZ;"
+# e.g. "time:1;lev:8;"   ---> Each chunk has 1 time dimension (time) and 8 levels (lev)
+if(DEFINED SPIO_DIM_CHUNK_INFO)
+  message(STATUS "Using user-specified dimension chunk info, " ${SPIO_DIM_CHUNK_INFO})
+endif()
+
+# Add more constraints on where chunking is enabled. Specify a regex that matches the variable and file name where chunking
+# is enabled. Chunking will be disabled for all other variables
+# The regex is same as the one used to save decompositions
+# e.g. -DSPIO_ENABLE_CHUNKING_REGEX:STRING='(VAR=\".*U.*\")&&(FILE=\".*e3sm_fgi.*\")'
+#       Chunking is enabled only on variables with names that match ".*U.*" in files with names that match ".*e3sm_fgi.*"
+if(DEFINED SPIO_ENABLE_CHUNKING_REGEX)
+  if(DEFINED SPIO_DIM_CHUNK_INFO)
+    message(STATUS "Using user-specified regex," ${SPIO_ENABLE_CHUNKING_REGEX} " to decide when to enable chunking of variables")
+  else()
+    message(STATUS "WARNING: SPIO_ENABLE_CHUNKING_REGEX was defined but SPIO_DIM_CHUNK_INFO was not defined, disabling SPIO_ENABLE_CHUNKING_REGEX")
+    set(SPIO_ENABLE_CHUNKING_REGEX "*")
+  endif()
+else()
+  set(SPIO_ENABLE_CHUNKING_REGEX "*")
 endif()
 
 if(WITH_ADIOS2)
@@ -322,6 +359,32 @@ else()
   set(SPIO_HDF5_FLUSH_AFTER_COLL_WR 0)
   if(WITH_HDF5)
     message(STATUS "Disable flush after collective write for HDF5 I/O type (default)")
+  endif()
+endif()
+
+# Asynchronous I/O options
+# Maximum wait for asynchronous I/O operations (in milliseconds)
+if(NOT DEFINED SPIO_ASYNC_OP_WAIT_TIMEOUT)
+  # 2 minutes = 2 * 60 * 1000 milliseconds
+  set(SPIO_ASYNC_OP_WAIT_TIMEOUT 120000)
+  if(PIO_USE_ASYNC_WR_THREAD)
+    message(STATUS "Setting timeout for asynchronous I/O operations to ${SPIO_ASYNC_OP_WAIT_TIMEOUT} ms (default)")
+  endif()
+else()
+  if(PIO_USE_ASYNC_WR_THREAD)
+    message(STATUS "Setting timeout for asynchronous I/O operations to ${SPIO_ASYNC_OP_WAIT_TIMEOUT} ms")
+  endif()
+endif()
+
+# Maximum number of threads performing asynchronous I/O operations
+if(NOT DEFINED SPIO_ASYNC_NTHREADS)
+  set(SPIO_ASYNC_NTHREADS 1)
+  if(PIO_USE_ASYNC_WR_THREAD)
+    message(STATUS "Setting number of asynchronous I/O threads to ${SPIO_ASYNC_NTHREADS} (default)")
+  endif()
+else()
+  if(PIO_USE_ASYNC_WR_THREAD)
+    message(STATUS "Setting number of asynchronous I/O threads to ${SPIO_ASYNC_NTHREADS}")
   endif()
 endif()
 

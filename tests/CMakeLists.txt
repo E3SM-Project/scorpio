@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.7)
+cmake_minimum_required (VERSION 3.7...4.0.1)
 project (PIOTests C Fortran)
 
 #==============================================================================
@@ -23,3 +23,7 @@ if (PIO_ENABLE_FORTRAN)
 endif()
 
 add_subdirectory (cunit)
+
+if (WITH_PNETCDF)
+  add_subdirectory (pnetcdf)
+endif ()

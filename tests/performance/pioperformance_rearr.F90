@@ -7,7 +7,8 @@ program pioperformance_rearr
   use mpi
 #endif
   use pio, only : pio_iotype_netcdf, pio_iotype_pnetcdf, pio_iotype_netcdf4p, &
-       pio_iotype_netcdf4c, pio_iotype_adios, pio_iotype_hdf5, pio_rearr_subset, pio_rearr_box, PIO_MAX_NAME,&
+       pio_iotype_netcdf4c, pio_iotype_adios, pio_iotype_hdf5,&
+        pio_rearr_subset, pio_rearr_box, pio_rearr_any, pio_rearr_contig, PIO_MAX_NAME,&
         pio_rearr_opt_t, pio_rearr_comm_p2p, pio_rearr_comm_coll,&
         pio_rearr_comm_fc_2d_disable, pio_rearr_comm_fc_1d_comp2io,&
         pio_rearr_comm_fc_1d_io2comp, pio_rearr_comm_fc_2d_enable,&
@@ -19,7 +20,7 @@ program pioperformance_rearr
   integer, parameter :: MAX_IO_TASK_ARRAY_SIZE=256, MAX_DECOMP_FILES=256
   integer, parameter :: MAX_FNAME_LEN = 1024
   integer, parameter :: MAX_PIO_TYPENAME_LEN = 8
-  integer, parameter :: MAX_PIO_TYPES = 4, MAX_PIO_REARRS = 2
+  integer, parameter :: MAX_PIO_TYPES = 4, MAX_PIO_REARRS = 4
   integer, parameter :: MAX_NVARS = 12
 
   character(len=*), parameter :: PIO_NML_FNAME = 'pioperf_rearr.nl'
@@ -34,6 +35,7 @@ program pioperformance_rearr
   integer :: vs, varsize(MAX_NVARS) !  Local size of array for idealized decomps
   logical :: unlimdimindof
   type(pio_rearr_opt_t) :: rearr_opts
+  integer :: log_level
 #ifdef BGQTRY
   external :: print_memusage
 #endif
@@ -60,6 +62,10 @@ program pioperformance_rearr
   call CheckMPIreturn(__LINE__,ierr)
   if(mype==0) then
      Mastertask=.true.
+     if(mype == 0) then
+        print *, 'SCORPIO REPLAY TOOL'
+        print *, '======================='
+      endif
   else
      Mastertask=.false.
   endif
@@ -75,9 +81,13 @@ program pioperformance_rearr
   varsize = 0
   varsize(1) = 1
   unlimdimindof=.false.
+  log_level = 0
+  if(mype == 0) then
+    print *, "Reading user input..."
+  endif
   call read_user_input(mype, decompfile, piotypes, rearrangers,&
         niotasks, nframes, unlimdimindof, nvars, varsize,&
-        rearr_opts, ierr)
+        rearr_opts, log_level, ierr)
 
 #ifdef SPIO_ENABLE_GPTL_TIMING
 #ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
@@ -92,6 +102,8 @@ program pioperformance_rearr
   if(rearrangers(1)==0) then
     rearrangers(1)=1
     rearrangers(2)=2
+    rearrangers(3)=3
+    rearrangers(4)=4
   endif  
 
   do i=1,MAX_DECOMP_FILES
@@ -103,7 +115,7 @@ program pioperformance_rearr
               if(nvars(nv)>0) then
                  call pioperformance_rearrtest(decompfile(i), piotypes(1:niotypes),&
                       mype, npe, rearrangers, rearr_opts, niotasks, nframes,&
-                      nvars(nv), varsize(vs),unlimdimindof) 
+                      nvars(nv), varsize(vs),unlimdimindof, log_level)
               endif
            enddo
         endif
@@ -263,7 +275,7 @@ contains
   ! Parse a single command line arg
   subroutine parse_and_process_input(argv, decompfiles, piotypes,&
         rearrangers, niotasks, nframes, unlimdimindof, nvars, varsize,&
-        rearr_opts, ierr)
+        rearr_opts, log_level, ierr)
     character(len=*), intent(in)  :: argv
     character(len=MAX_FNAME_LEN), intent(out) :: decompfiles(MAX_DECOMP_FILES)
     integer, intent(out) :: piotypes(MAX_PIO_TYPES)
@@ -274,6 +286,7 @@ contains
     integer, intent(out) :: nvars(MAX_NVARS)
     integer, intent(out) :: varsize(MAX_NVARS)
     type(pio_rearr_opt_t), intent(out) :: rearr_opts
+    integer, intent(out) :: log_level
     integer, intent(out) :: ierr
 
     integer, parameter :: MAX_PIO_REARR_OPT_LEN = 128
@@ -351,6 +364,9 @@ contains
       else if (argv(:pos) == "--pio-varsize=") then
         call init_arr_from_list(argv(pos+1:), iarr=varsize, ierr=ierr)
         !print *, "Read varsize : ", varsize
+      else if (argv(:pos) == "--pio-log-level=") then
+        read(argv(pos+1:), *) log_level
+        !print *, "Read varsize : ", varsize
       end if
     end if
 
@@ -359,7 +375,7 @@ contains
   ! Parse command line user options
   subroutine read_cmd_line_input(decompfile, piotypes, rearrangers,&
         niotasks, nframes, unlimdimindof, nvars, varsize,&
-        rearr_opts, ierr)
+        rearr_opts, log_level, ierr)
     character(len=MAX_FNAME_LEN), intent(out) :: decompfile(MAX_DECOMP_FILES)
     integer, intent(out) :: piotypes(MAX_PIO_TYPES)
     integer, intent(out) :: rearrangers(MAX_PIO_REARRS)
@@ -369,6 +385,7 @@ contains
     integer, intent(out) :: nvars(MAX_NVARS)
     integer, intent(out) :: varsize(MAX_NVARS)
     type(pio_rearr_opt_t), intent(out) :: rearr_opts
+    integer, intent(out) :: log_level
     integer, intent(out) :: ierr
 
     integer, parameter :: MAX_STDIN_ARG_LEN = 8192
@@ -380,7 +397,7 @@ contains
       call get_command_argument(i, argv)
       call parse_and_process_input(argv, decompfile, piotypes, rearrangers,&
             niotasks, nframes, unlimdimindof, nvars, varsize,&
-            rearr_opts, ierr)
+            rearr_opts, log_level, ierr)
     end do
 
   end subroutine read_cmd_line_input
@@ -536,7 +553,7 @@ contains
   ! read (and override) the command line options
   subroutine read_user_input(mype, decompfile, piotypes, rearrangers,&
         niotasks, nframes, unlimdimindof, nvars, varsize,&
-        rearr_opts, ierr)
+        rearr_opts, log_level, ierr)
     integer, intent(in) :: mype
     character(len=MAX_FNAME_LEN), intent(out) :: decompfile(MAX_DECOMP_FILES)
     integer, intent(out) :: piotypes(MAX_PIO_TYPES)
@@ -547,11 +564,13 @@ contains
     integer, intent(out) :: nvars(MAX_NVARS)
     integer, intent(out) :: varsize(MAX_NVARS)
     type(pio_rearr_opt_t), intent(out) :: rearr_opts
+    integer, intent(out) :: log_level
     integer, intent(out) :: ierr
 
     character(len=MAX_PIO_TYPENAME_LEN) :: pio_typenames(MAX_PIO_TYPES)
 
     pio_typenames = ' '
+    log_level = 0
 
     if(mype == 0) then
       ! Read namelist file
@@ -561,7 +580,7 @@ contains
       ! Allow user to override the values via command line
       call read_cmd_line_input(decompfile, piotypes, rearrangers,&
             niotasks, nframes, unlimdimindof, nvars, varsize,&
-            rearr_opts, ierr)
+            rearr_opts, log_level, ierr)
     end if
 
     call MPI_Bcast(decompfile,MAX_FNAME_LEN*MAX_DECOMP_FILES,MPI_CHARACTER,0, MPI_COMM_WORLD,ierr)
@@ -572,6 +591,7 @@ contains
     call MPI_Bcast(unlimdimindof, 1, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
     call MPI_Bcast(nvars, MAX_NVARS, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
     call MPI_Bcast(varsize, MAX_NVARS, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
+    call MPI_Bcast(log_level, 1, MPI_INTEGER, 0, MPI_COMM_WORLD,ierr)
 
     call bcast_rearr_opts(rearr_opts)
 
@@ -579,7 +599,7 @@ contains
 
   subroutine pioperformance_rearrtest(filename, piotypes, mype, npe_base, &
        rearrangers, rearr_opts, niotasks,nframes, nvars, varsize,&
-       unlimdimindof)
+       unlimdimindof, log_level)
     use pio
     character(len=*), intent(in) :: filename
     integer, intent(in) :: mype, npe_base
@@ -591,6 +611,7 @@ contains
     integer, intent(in) :: nvars
     integer, intent(in) :: varsize
     logical, intent(in) :: unlimdimindof
+    integer, intent(in) :: log_level
     integer(kind=PIO_Offset_kind), pointer :: compmap(:)
     integer :: ntasks
     integer :: comm
@@ -622,7 +643,7 @@ contains
     integer,  parameter :: c0 = -1
     double precision, parameter :: cd0 = 1.0e30
     integer :: nvarmult
-    character(len=*), parameter :: rearr_name(MAX_PIO_REARRS) = (/'   BOX','SUBSET'/)
+    character(len=*), parameter :: rearr_name(MAX_PIO_REARRS) = (/'   BOX','SUBSET','   ANY','CONTIG'/)
 
     nullify(compmap)
 
@@ -635,16 +656,10 @@ contains
 #else
        call pio_readdof(filename, ndims, gdims, compmap, MPI_COMM_WORLD)
 #endif
-
-!    print *,__FILE__,__LINE__,' gdims=',ndims
     endif
     maplen = size(compmap)
-!    color = 0
-!    if(maplen>0) then
-       color = 1
-!    endif
 
-    call MPI_Comm_split(MPI_COMM_WORLD, color, mype, comm, ierr)
+    comm = MPI_COMM_WORLD
 
     call MPI_Comm_size(comm, npe,  ierr)
     call CheckMPIreturn(__LINE__,ierr)
@@ -664,24 +679,36 @@ contains
           gmaplen = product(gdims)
        endif
     
+#ifdef VARINT
        allocate(ifld(maplen,nvars))
        allocate(ifld_in(maplen,nvars,nframes))
+       ifld = PIO_FILL_INT
+#endif
 
+#ifdef VARREAL
        allocate(rfld(maplen,nvars))
        allocate(rfld_in(maplen,nvars,nframes))
+       rfld = PIO_FILL_FLOAT
+#endif
 
+#ifdef VARDOUBLE
        allocate(dfld(maplen,nvars))
        allocate(dfld_in(maplen,nvars,nframes))
-
-       ifld = PIO_FILL_INT
-       rfld = PIO_FILL_FLOAT
        dfld = PIO_FILL_DOUBLE
+#endif
+
        do nv=1,nvars
           do j=1,maplen
              if(compmap(j) > 0) then
+#ifdef VARINT
                ifld(j,nv) = int(compmap(j))
-               dfld(j,nv) = ifld(j,nv)/1000000.0
-               rfld(j,nv) = 1.0E5*ifld(j,nv)
+#endif
+#ifdef VARREAL
+               rfld(j,nv) = 1.0E5*int(compmap(j))
+#endif
+#ifdef VARDOUBLE
+               dfld(j,nv) = int(compmap(j))/1000000.0
+#endif
              endif
           enddo
         enddo
@@ -693,17 +720,14 @@ contains
        do k=1,size(piotypes)
           iotype = piotypes(k)
           call MPI_Barrier(comm,ierr)
-          if(mype==0) then
-             !print *,'iotype=',piotypes(k)
-          endif
           if(iotype==PIO_IOTYPE_PNETCDF) then
              mode = PIO_64BIT_DATA
           else
              mode = 0
           endif
-          do rearrtype=1,2
+          do rearrtype=1,4
              rearr = rearrangers(rearrtype)
-             if(rearr /= PIO_REARR_SUBSET .and. rearr /= PIO_REARR_BOX) exit
+             if(rearr /= PIO_REARR_SUBSET .and. rearr /= PIO_REARR_BOX .and. rearr /= PIO_REARR_ANY .and. rearr /= PIO_REARR_CONTIG) exit
 
              do n=niomin,niomax
                 ntasks = niotasks(n)
@@ -713,11 +737,13 @@ contains
 
                 call pio_init(mype, comm, ntasks, 0, stride, PIO_REARR_SUBSET,&
                   iosystem, rearr_opts=rearr_opts)
+
+                ierr = PIO_set_log_level(log_level)
                    
                 write(fname, '(a,i1,a,i5.5,a,i5.5,a,i5.5,a,i1,a,i5.5,a,i5.5,a)') 'pioperf-rearr-', rearr, &
                       '-ncomptasks-', npe, '-niotasks-', ntasks, '-stride-', stride, '-iotype-', iotype, &
                       '-nframes-',nframes,'-nvars-',nvars,'.nc'
-		
+
                 ierr =  PIO_CreateFile(iosystem, File, iotype, trim(fname), mode)
 
                 call WriteMetadata(File, gdims, vari, varr, vard, unlimdimindof)
@@ -738,14 +764,11 @@ contains
                 endif
 
                 wall(1) = MPI_Wtime()
-                ! print *,__FILE__,__LINE__,minval(dfld),maxval(dfld),minloc(dfld),maxloc(dfld)
 
                 do frame=1,nframes
                    recnum = frame
                    if( unlimdimindof) then
                       recnum = 1 + (frame-1)*gdims(ndims)
-!                      compmap = compmap2 + (frame-1)*gdims(ndims)
-!                      print *,__FILE__,__LINE__,compmap
 #ifdef VARINT
                       call PIO_InitDecomp(iosystem, PIO_INT, gdims, compmap, iodesc_i4, rearr=rearr)
 #endif
@@ -756,10 +779,8 @@ contains
                       call PIO_InitDecomp(iosystem, PIO_DOUBLE, gdims, compmap, iodesc_r8, rearr=rearr)
 #endif
                    endif
-                   !if(mype==0) print *,__FILE__,__LINE__,'Frame: ',recnum
 
                    do nv=1,nvars   
-                      !if(mype==0) print *,__FILE__,__LINE__,'var: ',nv
 #ifdef VARINT
                       call PIO_setframe(File, vari(nv), recnum)
                       call pio_write_darray(File, vari(nv), iodesc_i4, ifld(:,nv)    , ierr, fillval= PIO_FILL_INT)
@@ -787,7 +808,6 @@ contains
                 enddo
                 wall_wr_darr(2) = MPI_Wtime()
                 call pio_closefile(File)
-
 
                 call MPI_Barrier(comm,ierr)
 
@@ -892,15 +912,12 @@ contains
 #ifdef VARINT
 #ifdef DEBUG
                              write(*,'(a11,i2,a9,i11,a9,i11,a9,i2)') & 
-			        ' Int    PE=',mype,'ifld=',ifld(j,nv),' ifld_in=',ifld_in(j,nv,frame),' compmap=',compmap(j)
+                              ' Int    PE=',mype,'ifld=',ifld(j,nv),' ifld_in=',ifld_in(j,nv,frame),' compmap=',compmap(j)
 #endif
                             if(ifld(j,nv) /= ifld_in(j,nv,frame)) then
-                               !if(errorcnt < 10) then
-                               !   print *,__LINE__,'Int: ',mype,j,nv,ifld(j,nv),ifld_in(j,nv,frame),compmap(j)
-                               !endif
                                write(*,*) '***ERROR:Mismatch!***'
                                write(*,'(a11,i2,a9,i11,a9,i11,a9,i2)') & 
-			         ' Int    PE=',mype,'ifld=',ifld(j,nv),' ifld_in=',ifld_in(j,nv,frame),' compmap=',compmap(j)
+                                ' Int    PE=',mype,'ifld=',ifld(j,nv),' ifld_in=',ifld_in(j,nv,frame),' compmap=',compmap(j)
 
                                errorcnt = errorcnt+1
                             endif
@@ -908,16 +925,13 @@ contains
 #ifdef VARREAL
 #ifdef DEBUG
                             write(*,'(a11,i2,a9,f11.2,a9,f11.2,a9,i2)') &
-			        ' Real   PE=',mype,'rfld=',rfld(j,nv),' rfld_in=',rfld_in(j,nv,frame),' compmap=',compmap(j)
+                              ' Real   PE=',mype,'rfld=',rfld(j,nv),' rfld_in=',rfld_in(j,nv,frame),' compmap=',compmap(j)
 #endif
                             
                             if(rfld(j,nv) /= rfld_in(j,nv,frame) ) then
-                               !if(errorcnt < 10) then
-                               !   print *,__LINE__,'Real:', mype,j,nv,rfld(j,nv),rfld_in(j,nv,frame),compmap(j)
-                               !endif
                                write(*,*) '***ERROR:Mismatch!***'
                                write(*,'(a11,i2,a9,f11.2,a9,f11.2,a9,i2)') &
-			         ' Real   PE=',mype,'rfld=',rfld(j,nv),' rfld_in=',rfld_in(j,nv,frame),' compmap=',compmap(j)
+                                ' Real   PE=',mype,'rfld=',rfld(j,nv),' rfld_in=',rfld_in(j,nv,frame),' compmap=',compmap(j)
 
                                errorcnt = errorcnt+1                           
                             endif
@@ -925,15 +939,12 @@ contains
 #ifdef VARDOUBLE
 #ifdef DEBUG
                             write(*,'(a11,i2,a9,d11.4,a9,d11.4,a9,i2)') &
-			        'Double PE=',mype,'dfld=',dfld(j,nv),'dfld_in=',dfld_in(j,nv,frame),'compmap=',compmap(j)
+                              'Double PE=',mype,'dfld=',dfld(j,nv),'dfld_in=',dfld_in(j,nv,frame),'compmap=',compmap(j)
 #endif
                             if(dfld(j,nv) /= dfld_in(j,nv,frame) ) then
-                               !if(errorcnt < 10) then
-                               !   print *,__LINE__,'Dbl:',mype,j,nv,dfld(j,nv),dfld_in(j,nv,frame),compmap(j)
-                               !endif
                                write(*,*) '***ERROR:Mismatch!***'
                                write(*,'(a11,i2,a9,d11.4,a9,d11.4,a9,i2)') &
-			        'Double PE=',mype,'dfld=',dfld(j,nv),'dfld_in=',dfld_in(j,nv,frame),'compmap=',compmap(j)
+                                'Double PE=',mype,'dfld=',dfld(j,nv),'dfld_in=',dfld_in(j,nv,frame),'compmap=',compmap(j)
 
                                errorcnt = errorcnt+1
                             endif
@@ -964,7 +975,7 @@ contains
                         rearr_name(rearr), piotypes(k), ntasks, nvars, &
                         nvarmult*nvars*nframes*gmaplen*4.0D0/(1048576.0*wall(2))
 #ifdef BGQTRY 
-  call print_memusage()
+                  call print_memusage()
 #endif
                 end if
 #ifdef VARREAL                
@@ -982,13 +993,12 @@ contains
        enddo
        deallocate(compmap)
        deallocate(gdims)
-       deallocate(ifld)
-       deallocate(ifld_in)
-       deallocate(rfld)
-       deallocate(dfld)
-       deallocate(dfld_in)
-       deallocate(rfld_in)
-       call MPI_Comm_free(comm, ierr)
+        if(allocated(ifld)) deallocate(ifld)
+        if(allocated(ifld_in))  deallocate(ifld_in)
+        if(allocated(rfld)) deallocate(rfld)
+        if(allocated(rfld_in))  deallocate(rfld_in)
+        if(allocated(dfld)) deallocate(dfld)
+        if(allocated(dfld_in))  deallocate(dfld_in)
     endif
 
   end subroutine pioperformance_rearrtest
