@@ -13,83 +13,35 @@
  * Documents produced by Doxygen are derivative works derived from the
  * input used in their production; they are not affected by this license.
  *
- */ /*! \page decomp Describing decompositions
+ */ /*! \page decomp I/O Decomposition
 
-One of the advantages of using SCORPIO is the ability to describe the way
-data is decomposed across compute processes and reusing it for reading
-and writing any data that uses the same decomposition. Another major
-advantage is the feature in SCORPIO to rearrange data before using low
-level I/O libraries like NetCDF and PnetCDF to write data to disk.
+The SCORPIO library supports APIs (see \ref PIO_initdecomp) that allows users to specify how the user data is distributed/decomposed across the application compute processes. The application can create many such I/O decompositions, and use it to read/write data from input/output files. The library also provides a set of data rearrangers that automatically rearranges data in the compute processes for optimizing I/O performance. The data in the compute processes is rearranged to a subset of the compute processes, the I/O processes, that eventually call the low-level I/O libraries (NetCDF, PnetCDF, HDF5, ADIOS2) to read from and write data to the file system. See the \ref PIO_init API documentation on how to specify the I/O processes for an I/O system.
 
-The I/O decompositions can be defined by the user using the 
-\ref PIO_initdecomp API.
-The algorithm used to rearrange data can be specified when initializing
-the SCORPIO I/O system using the \ref PIO_init API. All decompositions
-created on the I/O system, using \ref PIO_initdecomp, use the
-rearrangment method specified while initializing the I/O system.
-SCORPIO provides two methods to rearrange data from compute processes to
-I/O processes,
-  - Box rearrangement
-  - Subset rearrangement
+The library provides the following I/O data rearrangers,
+- Box rearranger (PIO_REARR_BOX)
+- Subset rearranger (PIO_REARR_SUBSET)
+- Contig rearranger (PIO_REARR_CONTIG)
 
-\section BOXREARR Box rearrangement
+To disable data rearrangement use the subset rearranger (PIO_REARR_SUBSET) and set every compute process to an I/O process (see \ref PIO_init for information on how to set the I/O process rank/stride)
 
-In this method data is rearranged from compute to IO tasks such that
-each I/O task contains a contiguous block of data.
-In this case each compute task will transfer data to one or more IO tasks.
+\section box_rearr Box rearranger
+The box rearranger rearranges data, for a model/file variable (see \ref PIO_def_var), across the compute processes to the I/O processes such that each I/O process has a contiguous chunk/block/box of the variable data. The data rearrangement essentially involves an alltoall communication between the compute and I/O processes. Most low-level I/O libraries expect a contiguous chunk of the variable in the read/write APIs.
 
-\section SUBSETREARR Subset rearrangement
+\anchor box_rearranger_fig
+\image html box_rearranger.jpg Box rearranger width=30%
+Consider a simple I/O decomposition with 8 data elements distributed across 4 MPI processes as shown in figure (\ref box_rearranger_fig) above. The MPI/compute processes 0 & 2 are the I/O processes. When using this I/O decomposition to write a 1D array/variable with 8 elements, the box rearranger rearranges data in the 4 compute/MPI processes to the 2 I/O processes. As shown in the figure all the rearranged data elements in an I/O process are contiguous. You can see that I/O process 0 receives data from MPI processes 0 & 2 (and depending on the I/O decomposition might end up received data from any MPI process).
 
-In this method each IO task is associated with a unique subset of
-compute tasks and data is rearranged to each I/O task by
-rearranging data between compute processes belonging to the subset
-associated with the I/O task. Since data rearrangement is confined
-to a subset of tasks, each I/O task is not guaranteed to have a
-single contiguous block of data. Any futher data rearrangment
-required before writing data to disk is delegated to the low level
-I/O libraries like NetCDF and PnetCDF.
+\section subset_rearr Subset rearranger
+The subset rearranger partitions the compute processes such that each I/O process gathers data from a contiguous subset of compute processes. Since the data rearrangement occurs among subsets of the compute processes and I/O processes it avoids an alltoall communication among all the processes. However, unlike the box rearranger, the data in the I/O processes may not be contiguous chunks of the variable.
 
-As an example suppose we have a global two dimensional grid of size 4x5 decomposed over 5 tasks. We represent the two dimensional grid in terms of offset from the initial element ie
-<pre>
-     0  1  2  3 
-     4  5  6  7 
-     8  9 10 11
-    12 13 14 15
-    16 17 18 19 
-</pre>
-Now suppose this data is distributed over the compute tasks as follows:
-<pre>
-0: {   0  4 8 12  } 
-1: {  16 1 5 9  } 
-2: {  13 17 2 6  } 
-3: {  10 14 18 3  } 
-4: {   7 11 15 19  } 
-</pre>
+\image html subset_rearranger.jpg Subset rearranger width=30%
+Using the same I/O decomposition discussed above (\ref box_rearr), in the case of the subset rearranger the rearrangement only happens among compute processes within a subset of processes. In the figure above the MPI processes 0 & 1 belong to the first subset and data from these processes are gathered into the 1st I/O process (MPI process with rank 0). The I/O process 0 does not communicate with any compute process from other subsets of processes (e.g. In the case above, I/O process 0 never receives data from MPI process 2 & 3). Also, note that the data in each I/O process in not contiguous. I/O process 0 has four contiguous regions of data (each region of size=1 in this case).
 
-If we have 2 io tasks the Box rearranger would give:
-<pre>
-0: { 0  1  2  3  4  5  6  7  8  9  }
-1: { 10 11 12 13 14 15 16 17 18 19 }
-</pre>
-While the subset rearranger would give:
-<pre>
-0: { 0  1  4  5  8  9  12 16 }
-1: { 2  3  6  7  10 11 13 14 17 18 19 }
-</pre>
+\section contig_rearr Contig rearranger
+\image html contig_rearr_proc_layout.jpg Contig rearranger width=30%
+The contig rearranger aggregates data from compute processes to a set (subset of the compute processes) of aggregating processes. The data in the aggregating processes is rearranged to the I/O processes such that each I/O process has a single contiguous chunk (in the linear layout of the data in the file system) of data. The figure above shows a simple I/O decomposition with 20 data elements. The aggregating process A1 aggregates data from compute processes C1 and C2, and contains two contiguous chunks of data (chunk1 = [1, 6], chunk2 = [20]). Once the data is rearranged from aggregating processes to the I/O processes, the I/O process 0 contains a single contiguous chunk of data (chunk 1 = [1, 5]) that is written out using the low-level I/O libraries. However, note that depending on the I/O decomposition, the data chunk in an I/O process may still not be a contiguous chunk of the variable.
 
-Note that while the box rearranger gives a data layout which is well
-balanced and well suited for the underlying io library, it had to
-communicate with every compute task to do so.  On the other hand the
-subset rearranger communicated with only a portion of the compute tasks
-but requires more work on the part of the underlying io library to complete
-the operation.
-
-Also note if every task is an IO task then the box rearranger will need
-to do an alltoall communication, while the subset rearranger does none.
-In fact using the subset rearranger with every compute task an IO task
-provides a measure of what you might expect the performance of the underlying
-IO library to be if it were used without SCORPIO.
-
-
+\image html contig_rearranger.jpg Data rearrangement in Contig rearranger width=30%
+Again, using the toy I/O decomposition discussed above (\ref box_rearr), in the case of the contig rearranger the data in the compute processes are first aggregated into a set of aggregator processes. In the figure above data from MPI process 0 & 1 are aggregated to aggregating process 0 (also MPI rank 0, compute process 0). The aggregated data is rearranged from the aggregating processes to the I/O processes. Each I/O process, depending on the I/O decomposition, can potentially receive data from any aggregating process.
 */
 
