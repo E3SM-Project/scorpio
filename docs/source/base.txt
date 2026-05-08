@@ -19,6 +19,8 @@
 
 \mainpage Software for Caching Output and Reads for Parallel I/O (SCORPIO)
 
+\image html Scorpio_arch.jpg Scorpio Architecture width=30%
+
 The SCORPIO (Software for Caching Output and Reads for Parallel I/O) library was developed to improve the ability of component models of the Energy Exascale Earth System Model ([E3SM](https://github.com/E3SM-Project/E3SM)) to perform I/O efficiently by leveraging other low-level I/O libraries. The SCORPIO library was derived from the Parallel I/O library (PIO) that has been developed over several years to improve the ability of component models of the Community Earth System Model (CESM) and Energy Exascale Earth System Model (E3SM) to perform I/O. However the generic interface provided by the library can be used by a wide range of structured and unstructured grid applications. SCORPIO includes support for many low-level I/O libraries like [NetCDF](https://www.unidata.ucar.edu/software/netcdf), [PnetCDF](https://parallel-netcdf.github.io/), [HDF5](https://www.hdfgroup.org/solutions/hdf5/) and [ADIOS2](https://adios2.readthedocs.io/en/latest/).
 
 SCORPIO continues to support the API supported by the PIO library and includes C and Fortran APIs compatible with the PIO library. The library also includes improvements in user data caching and aggregation algorithms that significantly improve I/O performance. A new decomposition strategy has been introduced which gives the user more ability to tune I/O performance.
