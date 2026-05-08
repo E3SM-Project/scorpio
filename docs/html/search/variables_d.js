@@ -1,20 +1,7 @@
 var searchData=
 [
-  ['r4_1787',['r4',['../namespacepio__kinds.html#adf174a9a2674e372db60ed78eba41de6',1,'pio_kinds']]],
-  ['r8_1788',['r8',['../namespacepio__kinds.html#ad543e4ef384abaf8bd6e5543fd76f10f',1,'pio_kinds']]],
-  ['rb_5fpend_1789',['rb_pend',['../structfile__desc__t.html#a488d3457335575d36286f557fbb46228',1,'file_desc_t::rb_pend()'],['../structvar__desc__t.html#a5682566fbee04d823fdef2bf7644c27e',1,'var_desc_t::rb_pend()']]],
-  ['rcount_1790',['rcount',['../structio__desc__t.html#aff1ad34793e462c3807ebb3c1384dea9',1,'io_desc_t']]],
-  ['readbuffer_1791',['readbuffer',['../structpioexample_1_1pioexampleclass.html#a526361acbf70a77e0afe9d19498bba3b',1,'pioexample::pioexampleclass']]],
-  ['rearr_5fopts_1792',['rearr_opts',['../structio__desc__t.html#afe6b16e1e8f774639b0de1328f8981c9',1,'io_desc_t::rearr_opts()'],['../structiosystem__desc__t.html#a90c06b85112d2cbcef262b8a8c0aea12',1,'iosystem_desc_t::rearr_opts()']]],
-  ['rearranger_1793',['rearranger',['../structio__desc__t.html#a0b342635e05c4858cf057f28298f8213',1,'io_desc_t']]],
-  ['rec_5fvar_1794',['rec_var',['../structvar__desc__t.html#ab17f520dc332988370bdfbcfe0234476',1,'var_desc_t']]],
-  ['record_1795',['record',['../structvar__desc__t.html#a778c09b345537506feafa4f92705b6f5',1,'var_desc_t']]],
-  ['recordvar_1796',['recordvar',['../structwmulti__buffer.html#a52b790e294ce52e2b364f584abdbf9d8',1,'wmulti_buffer']]],
-  ['request_1797',['request',['../structvar__desc__t.html#afe58a0dd1a4e439098833e9dfa0e7102',1,'var_desc_t']]],
-  ['request_5fsz_1798',['request_sz',['../structvar__desc__t.html#a22a4d9b91a0926e90bece8c9db21d6f9',1,'var_desc_t']]],
-  ['reserve_5fextra_5fheader_5fspace_1799',['reserve_extra_header_space',['../structfile__desc__t.html#a51b862d97ccc779e0f885a5f1a4ec4ec',1,'file_desc_t']]],
-  ['resultlen_1800',['resultlen',['../darray__async_8c.html#aeb75303058f3be9b462de7ba3f6b03a7',1,'resultlen():&#160;darray_async.c'],['../darray__no__async_8c.html#aeb75303058f3be9b462de7ba3f6b03a7',1,'resultlen():&#160;darray_no_async.c'],['../example1_8c.html#aeb75303058f3be9b462de7ba3f6b03a7',1,'resultlen():&#160;example1.c'],['../example2_8c.html#aeb75303058f3be9b462de7ba3f6b03a7',1,'resultlen():&#160;example2.c'],['../put__var_8c.html#aeb75303058f3be9b462de7ba3f6b03a7',1,'resultlen():&#160;put_var.c']]],
-  ['rfrom_1801',['rfrom',['../structio__desc__t.html#aeb38b39c426eb0cce7c8e27d15eb67fd',1,'io_desc_t']]],
-  ['rindex_1802',['rindex',['../structio__desc__t.html#a1c5a340bb797121121f8c17203e5fb3c',1,'io_desc_t']]],
-  ['rtype_1803',['rtype',['../structio__desc__t.html#a2ebce2622d8c52bdaf07e00350acadce',1,'io_desc_t']]]
+  ['spio_5fgenf90_5fpath_0',['SPIO_GENF90_PATH',['../src_2flib_2_c_make_lists_8txt.html#ae8ea76773daad0cc7ebba775ceedbad9',1,'CMakeLists.txt']]],
+  ['start_1',['start',['../structpio__types_1_1decompmap__t.html#a62487611f9a9332c44cf7ca1ac89ebb0',1,'pio_types::decompmap_t']]],
+  ['start_5fdata_5fval_2',['START_DATA_VAL',['../put__var_8c.html#ae6425cf092ad3bbbdb3cc8a46600f210',1,'put_var.c']]],
+  ['stride_3',['stride',['../structpioexample_1_1pioexampleclass.html#a7db2a2d4a3a90efb1d15304a1302f367',1,'pioexample::pioexampleclass']]]
 ];

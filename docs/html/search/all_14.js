@@ -1,6 +1,11 @@
 var searchData=
 [
-  ['wb_5fpend_1019',['wb_pend',['../structvar__desc__t.html#a6270a7518887488992d69a475a4bc3cd',1,'var_desc_t::wb_pend()'],['../structfile__desc__t.html#ac9a71721afce75fb929c4aa04d5fd0da',1,'file_desc_t::wb_pend()']]],
-  ['wmulti_5fbuffer_1020',['wmulti_buffer',['../structwmulti__buffer.html',1,'wmulti_buffer'],['../pio_8h.html#a06a5b8953d4e0be753739a6050c23c2c',1,'wmulti_buffer():&#160;pio.h']]],
-  ['writevar_1021',['writevar',['../structpioexample_1_1pioexampleclass.html#afcbe92804a76647173f0097f97869b05',1,'pioexample::pioexampleclass']]]
+  ['var_5fdesc_5ft_0',['var_desc_t',['../structpio__types_1_1var__desc__t.html',1,'pio_types']]],
+  ['var_5fname_1',['var_name',['../darray__async_8c.html#a73de0b1772c59096554d6a846feff376',1,'VAR_NAME:&#160;darray_async.c'],['../darray__no__async_8c.html#a73de0b1772c59096554d6a846feff376',1,'VAR_NAME:&#160;darray_no_async.c'],['../example1_8c.html#a73de0b1772c59096554d6a846feff376',1,'VAR_NAME:&#160;example1.c'],['../example2_8c.html#a73de0b1772c59096554d6a846feff376',1,'VAR_NAME:&#160;example2.c']]],
+  ['var_5fname_5fd0_2',['VAR_NAME_D0',['../put__var_8c.html#aeb4f959fbd13b3f6a528a0303c7216ec',1,'put_var.c']]],
+  ['var_5fname_5fd1_3',['VAR_NAME_D1',['../put__var_8c.html#a2a4ac56ad53684dc20775844e8b5d529',1,'put_var.c']]],
+  ['var_5fname_5fd2_4',['VAR_NAME_D2',['../put__var_8c.html#a3d1a54dc9dba5ea337b63d139eca7f61',1,'put_var.c']]],
+  ['variables_5',['Reading and Writing distributed variables',['../api.html#readwrite',1,'']]],
+  ['variables_20and_20metadata_6',['Routines for defining variables and metadata',['../api.html#utilnc',1,'']]],
+  ['varid_7',['varid',['../structpio__types_1_1var__desc__t.html#a7a78cf2fb5cc4fde75aec7fb27da33d6',1,'pio_types::var_desc_t']]]
 ];
