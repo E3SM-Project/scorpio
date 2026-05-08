@@ -14,15 +14,13 @@
  * input used in their production; they are not affected by this license.
  *
  */ /*! \page faq Frequently Asked Questions 
-
-   Here is a list of frequently asked questions and their answers.
 <dl>
 <dt>Does SCORPIO support Fortran/C/C++/Python applications?</dt>
   <dd>SCORPIO supports Fortran and C APIs. The C++ applications can use the C APIs. We currently don't support/test Python scripts/applications. For more information refer to \ref api</dd>
 <dt>Why should I use SCORPIO instead of directly using the low-level I/O libraries like NetCDF?</dt>
   <dd>The SCORPIO library includes many performance enhancements to improve I/O throughput of applications. The I/O library also allows users to seamlessly use multiple I/O libraries and switch between the libraries within the same application</dd>
 <dt>What are the I/O libraries supported by SCORPIO?</dt>
-  <dd>SCORPIO supports I/O using PnetCDF, NetCDF, HDF5 and ADIOS2 I/O libraries. The data is written out in the NetCDF3/NetCDF4 file formats using PnetCDF, NetCDF and HDF5 libraries. The data is written out in ADIOS BP file format using the ADIOS2 library. There are tools to convert output in the ADIOS BP file format to NetCDF.</dd>
+  <dd>SCORPIO supports I/O using PnetCDF, NetCDF, HDF5 and ADIOS2 I/O libraries. The data is written out in the NetCDF3/NetCDF4 file formats using PnetCDF, NetCDF and HDF5 libraries. The data is written out in ADIOS BP file format using the ADIOS2 library. There are tools, provided with the library, to convert output in the ADIOS BP file format to NetCDF.</dd>
 <dt>Can I use SCORPIO if I have only one of the supported low-level I/O libraries (e.g. PnetCDF) installed on my system?</dt>
   <dd>Yes, however the library assumes that you have at least the NetCDF or PnetCDF library installed on your machine.</dd>
 <dt>Does SCORPIO support I/O without any low-level I/O libraries?</dt>
@@ -48,7 +46,9 @@
 <dt>How many I/O processes are recommended for an MPI application?</dt>
   <dd>We recommend, as a starting point, assigning one I/O process per compute node on a supercomputer</dd>
 <dt>Can I initialize (and finalize) the library multiple times in an application?</dt>
-  <dd>Yes, applications typically initialize (\ref PIO_init) the library multiple times for different MPI communicators used by the different components in the application. e.g. An earth system application calls \ref PIO_init for each model component (e.g. atmosphere, ocean, land components use different MPI communicators and initialize the library per component)</dd>
+  <dd>Yes, applications typically initialize (\ref PIO_init) the library multiple times for different MPI communicators used by the different components in the application. e.g. An earth system model calls \ref PIO_init for each model component (e.g. atmosphere, ocean, land components use different MPI communicators and initialize the library per component)</dd>
+<dt>Can I write an array of type X in memory to a variable of type Y in the file (e.g. Can I write an array of doubles to a variable of floats of the same size)?</dt>
+  <dd>Yes, the library performs datatype conversion, if supported/valid, for the user as needed. The I/O decomposition (\ref PIO_initdecomp) used for writing the data (\ref PIO_write_darray , \ref PIO_put_var) contains the information of the type (type X) of the variable in memory and its used for datatype convertion, as needed.</dd>
 <dt>How do I reference the SCORPIO library in research publications?</dt>
   <dd>See \ref acknowledgement for information on how to cite the library in research publications</dd>
 </dl>
