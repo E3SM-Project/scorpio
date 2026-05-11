@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['rearr_5fcomm_5ffc_5fopt_1042',['rearr_comm_fc_opt',['../structrearr__comm__fc__opt.html',1,'']]],
-  ['rearr_5fopt_1043',['rearr_opt',['../structrearr__opt.html',1,'']]]
+  ['var_5fdesc_5ft_0',['var_desc_t',['../structpio__types_1_1var__desc__t.html',1,'pio_types']]]
 ];

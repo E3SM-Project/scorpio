@@ -21,6 +21,7 @@
 /*! \page intro Introduction 
 The Software for Caching Output and Reads for Parallel I/O (SCORPIO) is a high level parallel I/O library for MPI applications that use structured and unstructured grids. The library includes software abstractions to represent how the application data is decomposed in memory across multiple MPI processes and algorithms to optimize reading and writing this data to the file system. The library allows developers to easily switch between using different low-level I/O libraries ([NetCDF](https://www.unidata.ucar.edu/software/netcdf), [PnetCDF](https://parallel-netcdf.github.io/), [HDF5](https://www.hdfgroup.org/solutions/hdf5/) and [ADIOS2](https://adios2.readthedocs.io/en/latest/)) in their applications.
 
+\anchor usage_overview
 ### SCORPIO Usage Overview ###
 <ol>
 <li> Initialize the SCORPIO library using the \ref PIO_init API. The API returns an "I/O system" that is associated with the MPI communicator passed by the user. All calls on this I/O system are collective. The application can initialize the library multiple times, if needed.  </li>

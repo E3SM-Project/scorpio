@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['io_5fdesc_5ft_1027',['io_desc_t',['../structio__desc__t.html',1,'io_desc_t'],['../structpio__types_1_1io__desc__t.html',1,'pio_types::io_desc_t']]],
-  ['io_5fregion_1028',['io_region',['../structio__region.html',1,'']]],
-  ['iosystem_5fdesc_5ft_1029',['iosystem_desc_t',['../structiosystem__desc__t.html',1,'iosystem_desc_t'],['../structpio__types_1_1iosystem__desc__t.html',1,'pio_types::iosystem_desc_t']]]
+  ['pio_5frearr_5fcomm_5ffc_5fopt_5ft_0',['pio_rearr_comm_fc_opt_t',['../structpio__types_1_1pio__rearr__comm__fc__opt__t.html',1,'pio_types']]],
+  ['pio_5frearr_5fopt_5ft_1',['pio_rearr_opt_t',['../structpio__types_1_1pio__rearr__opt__t.html',1,'pio_types']]],
+  ['pioexampleclass_2',['pioexampleclass',['../structpioexample_1_1pioexampleclass.html',1,'pioexample']]]
 ];
