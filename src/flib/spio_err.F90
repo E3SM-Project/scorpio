@@ -217,8 +217,10 @@ CONTAINS
     IF(PRESENT(ierr)) THEN
       ierr = INT(cerr)
     ELSE
-      WRITE(log_msg, *) "Setting the log level to ", lvl, "failed, err = ", cerr
-      ret = pio_error(MPI_COMM_WORLD, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+      IF(cerr /= PIO_NOERR) THEN
+        WRITE(log_msg, *) "Setting the log level to ", lvl, "failed, err = ", cerr
+        ret = pio_error(MPI_COMM_WORLD, INT(cerr), __FILE__, __LINE__, trim(log_msg))
+      END IF
     END IF
 
   END SUBROUTINE pio_setdebuglevel
