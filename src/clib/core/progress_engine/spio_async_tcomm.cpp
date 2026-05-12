@@ -12,7 +12,9 @@ thread_local bool SPIO_Util::TComm_info::is_thread_init_ = false;
 
 SPIO_Util::TComm_info::TComm_info(MPI_Comm union_comm, int union_comm_rank, int union_comm_io_root, int union_comm_comp_root, MPI_Comm io_comm, int io_comm_rank, bool is_io_master, MPI_Comm comp_comm, int comp_comm_rank, bool is_comp_master, MPI_Comm intercomm, MPI_Comm my_comm, MPI_Comm node_comm): union_comm_rank_(union_comm_rank), union_comm_io_root_(union_comm_io_root), union_comm_comp_root_(union_comm_comp_root), io_comm_rank_(io_comm_rank), is_io_master_(is_io_master), comp_comm_rank_(comp_comm_rank), is_comp_master_(is_comp_master)
 {
+#if PIO_USE_ASYNC_WR_THREAD
   tids_ = PIO_Util::PIO_async_tpool_manager::get_tpool_instance()->get_thread_ids();  
+#endif
 
   /* Total number of comms = Main/Default thread + Number of threads in thread pool
    * Main thread info is the first in the list
