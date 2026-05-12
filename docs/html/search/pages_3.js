@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['frequently_20asked_20questions_2046',['Frequently Asked Questions',['../faq.html',1,'']]]
+  ['decomposition_0',['I/O Decomposition',['../decomp.html',1,'']]]
 ];
