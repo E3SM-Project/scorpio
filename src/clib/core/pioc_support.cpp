@@ -5750,8 +5750,11 @@ int iotype_is_valid(int iotype)
 
     /* Some builds include hdf5. */
 #ifdef _HDF5
-    if ((iotype == PIO_IOTYPE_HDF5) || (iotype == PIO_IOTYPE_HDF5C))
-        ret++;
+    if(iotype == PIO_IOTYPE_HDF5) { ret++; }
+#ifdef _SPIO_HDF5_USE_COMPRESSION
+    if(iotype == PIO_IOTYPE_HDF5C) { ret++; }
+#endif
+
 #endif /* _HDF5 */
 
     return ret;
