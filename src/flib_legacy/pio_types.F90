@@ -123,21 +123,24 @@ module pio_types
         iotype_pnetcdf = PIO_iotype_pnetcdf,                &
         iotype_netcdf  = PIO_iotype_netcdf
 
-
 !>
 !! @defgroup PIO_rearr_method PIO_rearr_method
 !! @public
-!! @brief The three choices to control rearrangement are:
+!! @brief The choices to control rearrangement are:
 !! @details
-!!  - PIO_rearr_none : Do not use any form of rearrangement
-!!  - PIO_rearr_box : Use a PIO internal box rearrangement
-!! -  PIO_rearr_subset : Use a PIO internal subsetting rearrangement
-!! -  PIO_rearr_any : Let the library choose the rearranger
+!!  - PIO_rearr_box : Box rearranger (Use internal box data rearrangement)
+!!  - PIO_rearr_subset : Subset rearranger (Use internal subset data rearrangement)
+!!  - PIO_rearr_any : Any rearranger (Let the library choose the optimal rearrangement)
+!!  - PIO_rearr_contig : Contig rearranger (Unsupported data rearrangement method, will default to box)
+!!
+!! (To disable data rearrangement use PIO_rearr_subset and set every compute process
+!!  as an I/O process)
 !>
 
     integer(i4), public, parameter :: PIO_rearr_box =  1
     integer(i4), public, parameter :: PIO_rearr_subset =  2
     integer(i4), public, parameter :: PIO_rearr_any = 3
+    integer(i4), public, parameter :: PIO_rearr_contig =  4
 
 !>
 !! @public

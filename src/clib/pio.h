@@ -1236,7 +1236,7 @@ enum PIO_IOTYPE
 };
 
 /**
- * These are the supported output data rearrangement methods.
+ * These are the output data rearrangement methods.
  */
 enum PIO_REARRANGERS
 {
@@ -1247,7 +1247,10 @@ enum PIO_REARRANGERS
     PIO_REARR_SUBSET = 2,
 
     /** Let the library choose the rearranger. */
-    PIO_REARR_ANY = 3
+    PIO_REARR_ANY = 3,
+
+    /** Contig rearranger - Not supported (if used, will default/reset to PIO_REARR_BOX) */
+    PIO_REARR_CONTIG = 4
 };
 
 /**

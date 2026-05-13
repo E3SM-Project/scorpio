@@ -807,6 +807,13 @@ int PIOc_InitDecomp_impl(int iosysid, int pio_type, int ndims, const int *gdimle
         iodesc->rearranger = ios->default_rearranger;
     else
         iodesc->rearranger = *rearranger;
+
+    /* Contig rearranger is not supported right now, reset to box */
+    if(iodesc->rearranger == PIO_REARR_CONTIG){
+      PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, "Contig rearranger is not supported, resetting to box rearranger");
+      iodesc->rearranger = PIO_REARR_BOX;
+    }
+
     LOG((2, "iodesc->rearranger = %d", iodesc->rearranger));
 
     /* In scenarios involving ultra-high resolution E3SM/SCREAM cases,
