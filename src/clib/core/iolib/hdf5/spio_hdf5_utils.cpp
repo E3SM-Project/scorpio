@@ -922,7 +922,10 @@ static int spio_hdf5_sync_defs(iosystem_desc_t *ios, file_desc_t *file)
    * all variables.
    */
   for(i = 0; i < file->hdf5_num_vars; i++){
-    if(!file->hdf5_vars[i].is_coord_var){
+    /* Note: The def_var for this variable could still be cached (waiting to be executed in future),
+     * so proceed attaching the scale only for "defined vars"
+     */
+    if(!file->hdf5_vars[i].is_coord_var && (file->hdf5_vars[i].hdf5_dataset_id != H5I_INVALID_HID)){
       /* Not a coordinate var */
       int ndims = file->hdf5_vars[i].ndims;
       if(ndims > 0){
