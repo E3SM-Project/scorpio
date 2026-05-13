@@ -16,7 +16,9 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, const int *io_proc_list, i
     pio_init_gptl();
 #endif
 #endif
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_init_async");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_init_async");
@@ -46,7 +48,9 @@ int PIOc_init_intercomm(int component_count, const MPI_Comm peer_comm,
     pio_init_gptl();
 #endif
 #endif
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_Init_Intercommx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_init_intercomm");
@@ -88,7 +92,9 @@ int PIOc_Init_Intercomm_from_F90(int component_count, int f90_peer_comm,
     pio_init_gptl();
 #endif
 #endif
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_Init_Intercommx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_Init_Intercomm_from_F90");
@@ -126,7 +132,9 @@ int PIOc_Init_Intercomm_from_F90(int component_count, int f90_peer_comm,
 
 int PIOc_get_numiotasks(int iosysid, int *numiotasks)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_numiotasks");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_num_iotasks");
@@ -149,7 +157,9 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
     pio_init_gptl();
 #endif
 #endif
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_Init_Intracommx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_Init_Intracomm");
@@ -176,7 +186,9 @@ int PIOc_Init_Intracomm_from_F90(int f90_comp_comm,
     pio_init_gptl();
 #endif
 #endif
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_Init_Intracommx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_Init_Intracomm_from_F90");
@@ -197,7 +209,9 @@ int PIOc_Init_Intracomm_from_F90(int f90_comp_comm,
 /* Finalize an I/O system */
 int PIOc_finalize(int iosysid)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_finalize");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_finalize");
@@ -212,7 +226,9 @@ int PIOc_finalize(int iosysid)
 /* Set error handling for entire io system. */
 int PIOc_Set_IOSystem_Error_Handling(int iosysid, int method)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_Set_IOSystem_Error_Handling");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_Set_IOSystem_Error_Handling");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).add_arg("method", method).flush();
@@ -224,7 +240,9 @@ int PIOc_Set_IOSystem_Error_Handling(int iosysid, int method)
 /* Set error handling for entire io system. */
 int PIOc_set_iosystem_error_handling(int iosysid, int method, int *old_method)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_set_iosystem_error_handling");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_set_iosystem_error_handling");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).add_arg("method", method).
@@ -236,7 +254,9 @@ int PIOc_set_iosystem_error_handling(int iosysid, int method, int *old_method)
 
 int PIOc_iam_iotask(int iosysid, bool *ioproc)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_iam_iotask");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_iam_iotask");
@@ -252,7 +272,9 @@ int PIOc_iam_iotask(int iosysid, bool *ioproc)
 
 int PIOc_iotask_rank(int iosysid, int *iorank)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_iotask_rank");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_iotask_rank");
@@ -268,7 +290,9 @@ int PIOc_iotask_rank(int iosysid, int *iorank)
 
 int PIOc_iosystem_is_active(int iosysid, bool *active)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_iosystem_is_active");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_iosystem_is_active");
@@ -284,7 +308,9 @@ int PIOc_iosystem_is_active(int iosysid, bool *active)
 
 int PIOc_iotype_available(int iotype)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_iotype_available");
+#endif
   /* FIXME: Figure out how to trace these non I/O system specific calls */
   return PIOc_iotype_available_impl(iotype);
 }
@@ -295,7 +321,9 @@ int PIOc_set_rearr_opts(int iosysid, int comm_type, int fcd,
                         bool enable_hs_i2c, bool enable_isend_i2c,
                         int max_pend_req_i2c)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_set_rearr_opts");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_set_rearr_opts");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).
@@ -316,7 +344,9 @@ int PIOc_set_rearr_opts(int iosysid, int comm_type, int fcd,
 
 int PIOc_set_hint(int iosysid, const char *hint, const char *hintval)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_set_hint");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_set_hint");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).
@@ -328,7 +358,9 @@ int PIOc_set_hint(int iosysid, const char *hint, const char *hintval)
 int PIOc_set_chunk_cache(int iosysid, int iotype, PIO_Offset size, PIO_Offset nelems,
                          float preemption)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_set_chunk_cache");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_set_chunk_cache");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).add_arg("iotype", iotype).
@@ -342,7 +374,9 @@ int PIOc_set_chunk_cache(int iosysid, int iotype, PIO_Offset size, PIO_Offset ne
 int PIOc_get_chunk_cache(int iosysid, int iotype, PIO_Offset *sizep, PIO_Offset *nelemsp,
                          float *preemptionp)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_chunk_cache");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_chunk_cache");
@@ -362,7 +396,9 @@ int PIOc_get_chunk_cache(int iosysid, int iotype, PIO_Offset *sizep, PIO_Offset 
 
 int PIOc_set_blocksize(int newblocksize)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_set_blocksize");
+#endif
   /* FIXME: Figure out how to trace these non I/O system specific calls */
   return PIOc_set_blocksize_impl(newblocksize);
 }
@@ -370,7 +406,9 @@ int PIOc_set_blocksize(int newblocksize)
 /* Set the IO node data buffer size limit. */
 PIO_Offset PIOc_set_buffer_size_limit(PIO_Offset limit)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_set_buffer_size_limit");
+#endif
   /* FIXME: Figure out how to trace these non I/O system specific calls */
   return PIOc_set_buffer_size_limit_impl(limit);
 }

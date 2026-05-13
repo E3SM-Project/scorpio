@@ -8,7 +8,9 @@
 /* APIs for file variables */
 int PIOc_inq_varid(int ncid, const char *name, int *varidp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_varx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_varid");
@@ -27,7 +29,9 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
 int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, int *ndimsp,
                  int *dimidsp, int *nattsp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_varx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_var");
@@ -58,7 +62,9 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
 
 int PIOc_inq_varname(int ncid, int varid, char *name, int namelen)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_varx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_varname");
@@ -75,7 +81,9 @@ int PIOc_inq_varname(int ncid, int varid, char *name, int namelen)
 
 int PIOc_inq_vartype(int ncid, int varid, nc_type *xtypep)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_varx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_vartype");
@@ -92,7 +100,9 @@ int PIOc_inq_vartype(int ncid, int varid, nc_type *xtypep)
 
 int PIOc_inq_varndims(int ncid, int varid, int *ndimsp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_varx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_varndims");
@@ -109,7 +119,9 @@ int PIOc_inq_varndims(int ncid, int varid, int *ndimsp)
 
 int PIOc_inq_vardimid(int ncid, int varid, int *dimidsp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_varx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_vardimid");
@@ -130,7 +142,9 @@ int PIOc_inq_vardimid(int ncid, int varid, int *dimidsp)
 
 int PIOc_inq_varnatts(int ncid, int varid, int *nattsp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_varx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_varnatts");
@@ -148,7 +162,9 @@ int PIOc_inq_varnatts(int ncid, int varid, int *nattsp)
 int PIOc_def_var(int ncid, const char *name, nc_type xtype,  int ndims,
                  const int *dimidsp, int *varidp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_def_var");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   assert(ndims >= 0);
@@ -169,7 +185,9 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype,  int ndims,
 
 int PIOc_set_fill(int ncid, int fillmode, int *old_modep)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_set_fill");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_set_fill");
@@ -186,7 +204,9 @@ int PIOc_set_fill(int ncid, int fillmode, int *old_modep)
 
 int PIOc_def_var_fill(int ncid, int varid, int no_fill, const void *fill_value)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_def_var_fill");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_def_var_fill");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("varid", varid).
@@ -197,7 +217,9 @@ int PIOc_def_var_fill(int ncid, int varid, int no_fill, const void *fill_value)
 
 int PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_var_fill");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("varid", varid).
@@ -208,7 +230,9 @@ int PIOc_inq_var_fill(int ncid, int varid, int *no_fill, void *fill_valuep)
 
 int PIOc_rename_var(int ncid, int varid, const char *name)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_rename_var");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_rename_var");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("varid", varid).
@@ -221,7 +245,9 @@ int PIOc_rename_var(int ncid, int varid, const char *name)
 int PIOc_def_var_deflate(int ncid, int varid, int shuffle, int deflate,
                          int deflate_level)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_def_var_deflate");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_def_var_deflate");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("varid", varid).
@@ -234,7 +260,9 @@ int PIOc_def_var_deflate(int ncid, int varid, int shuffle, int deflate,
 int PIOc_inq_var_deflate(int ncid, int varid, int *shufflep, int *deflatep,
                          int *deflate_levelp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_varx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_var_deflate");
@@ -261,7 +289,9 @@ int PIOc_inq_var_szip(int ncid, int varid, int *options_maskp, int *pixels_per_b
 
 int PIOc_def_var_chunking(int ncid, int varid, int storage, const PIO_Offset *chunksizesp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_def_var_chunking");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_def_var_chunking");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("varid", varid).
@@ -272,7 +302,9 @@ int PIOc_def_var_chunking(int ncid, int varid, int storage, const PIO_Offset *ch
 
 int PIOc_inq_var_chunking(int ncid, int varid, int *storagep, PIO_Offset *chunksizesp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_varx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_var_chunking");
@@ -290,7 +322,9 @@ int PIOc_inq_var_chunking(int ncid, int varid, int *storagep, PIO_Offset *chunks
 
 int PIOc_def_var_endian(int ncid, int varid, int endian)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_def_var_endian");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_def_var_endian");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("varid", varid).
@@ -301,7 +335,9 @@ int PIOc_def_var_endian(int ncid, int varid, int endian)
 
 int PIOc_inq_var_endian(int ncid, int varid, int *endianp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_varx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_var_endian");
@@ -319,7 +355,9 @@ int PIOc_inq_var_endian(int ncid, int varid, int *endianp)
 int PIOc_set_var_chunk_cache(int ncid, int varid, PIO_Offset size, PIO_Offset nelems,
                              float preemption)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_set_var_chunk_cache");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_set_var_chunk_cache");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("varid", varid).
@@ -333,7 +371,9 @@ int PIOc_set_var_chunk_cache(int ncid, int varid, PIO_Offset size, PIO_Offset ne
 int PIOc_get_var_chunk_cache(int ncid, int varid, PIO_Offset *sizep, PIO_Offset *nelemsp,
                              float *preemptionp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_varx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_get_var_chunk_cache");

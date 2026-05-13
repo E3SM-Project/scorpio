@@ -8,7 +8,9 @@
 /* ================= Read/Write APIs for distributed data ================ */
 int PIOc_advanceframe(int ncid, int varid)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_advanceframe");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_advanceframe");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("varid", varid).flush();
@@ -18,7 +20,9 @@ int PIOc_advanceframe(int ncid, int varid)
 
 int PIOc_setframe(int ncid, int varid, int frame)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_setframe");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_setframe");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("varid", varid).
@@ -30,7 +34,9 @@ int PIOc_setframe(int ncid, int varid, int frame)
 int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const void *array,
                       const void *fillvalue)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_write_darray");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_write_darray");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("varid", varid).
@@ -43,7 +49,9 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const 
 int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars, PIO_Offset arraylen,
                             const void *array, const int *frame, const void **fillvalue, bool flushtodisk)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_write_darray_multi");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_write_darray_multi");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("*varids", varids).
@@ -59,7 +67,9 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars, PI
 
 int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *array)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_read_darray");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_read_darray");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("varid", varid).
@@ -71,7 +81,9 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *a
 
 int PIOc_get_local_array_size(int ioid)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_get_local_array_size");
+#endif
   /* FIXME: How should we trace these non I/O system specific functions? */
   return PIOc_get_local_array_size_impl(ioid);
 }

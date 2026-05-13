@@ -9,7 +9,9 @@
 int PIOc_put_vars(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                   const PIO_Offset *stride, const void *buf)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -22,7 +24,9 @@ int PIOc_put_vars(int ncid, int varid, const PIO_Offset *start, const PIO_Offset
 int PIOc_put_vars_text(int ncid, int varid, const PIO_Offset *start,
                        const PIO_Offset *count, const PIO_Offset *stride, const char *op)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_text");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -36,9 +40,11 @@ int PIOc_put_vars_schar(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, const PIO_Offset *stride,
                         const signed char *op)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
-  SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_shcar");
+  SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_schar");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
     add_arg("varid", varid).add_arg("*start", start).add_arg("*count", count).
     add_arg("*stride", stride).add_arg("*op", op).flush();
@@ -49,7 +55,9 @@ int PIOc_put_vars_schar(int ncid, int varid, const PIO_Offset *start,
 int PIOc_put_vars_short(int ncid, int varid, const PIO_Offset *start,
                         const PIO_Offset *count, const PIO_Offset *stride, const short *op)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_short");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -62,7 +70,9 @@ int PIOc_put_vars_short(int ncid, int varid, const PIO_Offset *start,
 int PIOc_put_vars_int(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                       const PIO_Offset *stride, const int *op)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_int");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -75,7 +85,9 @@ int PIOc_put_vars_int(int ncid, int varid, const PIO_Offset *start, const PIO_Of
 int PIOc_put_vars_float(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                         const PIO_Offset *stride, const float *op)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_float");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -88,7 +100,9 @@ int PIOc_put_vars_float(int ncid, int varid, const PIO_Offset *start, const PIO_
 int PIOc_put_vars_double(int ncid, int varid, const PIO_Offset *start,
                          const PIO_Offset *count, const PIO_Offset *stride, const double *op)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_double");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -101,7 +115,9 @@ int PIOc_put_vars_double(int ncid, int varid, const PIO_Offset *start,
 int PIOc_put_vars_long(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                        const PIO_Offset *stride, const long *op)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_long");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -114,7 +130,9 @@ int PIOc_put_vars_long(int ncid, int varid, const PIO_Offset *start, const PIO_O
 int PIOc_put_vars_uchar(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                         const PIO_Offset *stride, const unsigned char *op)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_uchar");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -127,7 +145,9 @@ int PIOc_put_vars_uchar(int ncid, int varid, const PIO_Offset *start, const PIO_
 int PIOc_put_vars_ushort(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                          const PIO_Offset *stride, const unsigned short *op)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_ushort");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -140,7 +160,9 @@ int PIOc_put_vars_ushort(int ncid, int varid, const PIO_Offset *start, const PIO
 int PIOc_put_vars_uint(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                        const PIO_Offset *stride, const unsigned int *op)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_uint");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -153,7 +175,9 @@ int PIOc_put_vars_uint(int ncid, int varid, const PIO_Offset *start, const PIO_O
 int PIOc_put_vars_longlong(int ncid, int varid, const PIO_Offset *start, const PIO_Offset *count,
                            const PIO_Offset *stride, const long long *op)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_longlong");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -167,7 +191,9 @@ int PIOc_put_vars_ulonglong(int ncid, int varid, const PIO_Offset *start,
                             const PIO_Offset *count, const PIO_Offset *stride,
                             const unsigned long long *op)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_ulonglong");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
