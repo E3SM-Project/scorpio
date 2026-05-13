@@ -44,7 +44,7 @@ int PIOc_put_vars_schar(int ncid, int varid, const PIO_Offset *start,
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_put_varx");
 #endif
 #if SPIO_ENABLE_API_TRACING
-  SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_shcar");
+  SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_put_vars_schar");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
     add_arg("varid", varid).add_arg("*start", start).add_arg("*count", count).
     add_arg("*stride", stride).add_arg("*op", op).flush();
