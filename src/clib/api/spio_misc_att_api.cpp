@@ -9,7 +9,9 @@
 /* APIs for file/variable attributes */
 int PIOc_rename_att(int ncid, int varid, const char *name, const char *newname)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_rename_att");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_rename_att");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -21,7 +23,9 @@ int PIOc_rename_att(int ncid, int varid, const char *name, const char *newname)
 
 int PIOc_del_att(int ncid, int varid, const char *name)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_del_att");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_del_att");
   tr.set_file_id(ncid).add_arg("ncid", ncid).
@@ -33,7 +37,9 @@ int PIOc_del_att(int ncid, int varid, const char *name)
 int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
                  PIO_Offset *lenp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_attx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_att");
@@ -52,7 +58,9 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
 
 int PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_attx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_attid");
@@ -70,7 +78,9 @@ int PIOc_inq_attid(int ncid, int varid, const char *name, int *idp)
 
 int PIOc_inq_attlen(int ncid, int varid, const char *name, PIO_Offset *lenp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_attx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_attlen");
@@ -88,7 +98,9 @@ int PIOc_inq_attlen(int ncid, int varid, const char *name, PIO_Offset *lenp)
 
 int PIOc_inq_atttype(int ncid, int varid, const char *name, nc_type *xtypep)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_attx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_atttype");
@@ -106,7 +118,9 @@ int PIOc_inq_atttype(int ncid, int varid, const char *name, nc_type *xtypep)
 
 int PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_inq_attx");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_inq_attname");
@@ -124,7 +138,9 @@ int PIOc_inq_attname(int ncid, int varid, int attnum, char *name)
 
 int PIOc_copy_att(int incid, int ivarid, const char *name, int oncid, int ovarid)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_copy_att");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_copy_att");
   tr.set_file_id(incid).add_arg("incid", incid).

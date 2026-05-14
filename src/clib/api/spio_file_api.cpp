@@ -8,7 +8,9 @@
 /* ================= File APIs ================= */
 int PIOc_deletefile(int iosysid, const char *filename)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_deletefile");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_deletefile");
   tr.set_iosys_id(iosysid).add_arg("iosysid", iosysid).
@@ -19,7 +21,9 @@ int PIOc_deletefile(int iosysid, const char *filename)
 
 int PIOc_createfile(int iosysid, int *ncidp, const int *iotype, const char *fname, int mode)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_createfile");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_createfile");
@@ -37,7 +41,9 @@ int PIOc_createfile(int iosysid, int *ncidp, const int *iotype, const char *fnam
 
 int PIOc_create(int iosysid, const char *path, int cmode, int *ncidp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_create");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_create");
@@ -55,7 +61,9 @@ int PIOc_create(int iosysid, const char *path, int cmode, int *ncidp)
 
 int PIOc_openfile(int iosysid, int *ncidp, int *iotype, const char *fname, int mode)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_openfile");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_openfile");
@@ -73,7 +81,9 @@ int PIOc_openfile(int iosysid, int *ncidp, int *iotype, const char *fname, int m
 
 int PIOc_openfile2(int iosysid, int *ncidp, int *iotype, const char *fname, int mode)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_openfile2");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_openfile2");
@@ -92,7 +102,9 @@ int PIOc_openfile2(int iosysid, int *ncidp, int *iotype, const char *fname, int 
 int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype,
                         const char *filename, int mode, int retry)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_openfile_retry");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_openfile_retry");
@@ -110,7 +122,9 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype,
 
 int PIOc_open(int iosysid, const char *path, int mode, int *ncidp)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_open");
+#endif
   int ret = PIO_NOERR;
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_open");
@@ -128,7 +142,9 @@ int PIOc_open(int iosysid, const char *path, int mode, int *ncidp)
 
 int PIOc_closefile(int ncid)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_closefile");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_closefile");
   tr.set_file_id(ncid).add_arg("ncid", ncid).flush();
@@ -138,7 +154,9 @@ int PIOc_closefile(int ncid)
 
 int PIOc_File_is_Open(int ncid)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_File_is_Open");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_File_is_Open");
   tr.set_file_id(ncid).add_arg("ncid", ncid).flush();
@@ -149,7 +167,9 @@ int PIOc_File_is_Open(int ncid)
 /* Set the error hanlding for a file. */
 int PIOc_Set_File_Error_Handling(int ncid, int method)
 {
+#if SPIO_ENABLE_API_TIMING
   //SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_Set_File_Error_Handling");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_Set_File_Error_Handling");
   tr.set_file_id(ncid).add_arg("ncid", ncid).add_arg("method", method).flush();
@@ -159,7 +179,9 @@ int PIOc_Set_File_Error_Handling(int ncid, int method)
 
 int PIOc_sync(int ncid)
 {
+#if SPIO_ENABLE_API_TIMING
   SPIO_Util::GPTL_Util::GPTL_timer func_timer("SPIO:PIOc_sync");
+#endif
 #if SPIO_ENABLE_API_TRACING
   SPIO_Util::Tracer::Timed_func_call_tracer tr("PIOc_sync");
   tr.set_file_id(ncid).add_arg("ncid", ncid).flush();
