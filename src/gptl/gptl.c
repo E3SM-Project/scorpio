@@ -4005,7 +4005,7 @@ static int collect_data(const int iam,
       if ((ret = MPI_Send (count, 1, MPI_INTEGER, procid, taga, comm)) != MPI_SUCCESS)
         return GPTLerror ("%s rank %d: Bad return from MPI_Send=%d\n", thisfunc, iam, ret);
 
-      if ( count != 0) {
+      if ( count && (*count != 0) ) {
         if ((ret = MPI_Recv (&signal, 1, MPI_INTEGER, procid, tagb, comm, MPI_STATUS_IGNORE)) != MPI_SUCCESS)
           return GPTLerror ("%s rank %d: Bad return from MPI_Recv=%d\n", thisfunc, iam, ret);
         if ((ret = MPI_Send (timerlist[0], (*count) * (MAX_CHARS + 1), MPI_CHAR, procid, tagb, comm)) != MPI_SUCCESS)
@@ -5987,7 +5987,7 @@ static int threadinit (void)
   if (nthreads != -1)
     return GPTLerror ("Unthreaded %s: MUST only be called once", thisfunc);
 
-  nthreads = 0;
+  nthreads = 1;
   maxthreads = 1;
   return 0;
 }
@@ -6014,7 +6014,6 @@ static inline int get_thread_num ()
   }
 #endif
 
-  nthreads = 1;
   return 0;
 }
 
