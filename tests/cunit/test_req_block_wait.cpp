@@ -1,4 +1,3 @@
-#include "mpi.h"
 #include "pio.h"
 #include "pio_internal.h"
 #include "pio_minmax.h"
