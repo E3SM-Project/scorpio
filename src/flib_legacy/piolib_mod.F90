@@ -338,10 +338,14 @@ contains
 !! @brief sets the level of debug information output to stdout by pio
 !! @details
 !! @param level : default value is 0, allowed values 0-6
+!! @param ierr : (Optional) return value
 !<
-  subroutine setdebuglevel(level)
+  subroutine setdebuglevel(level, ierr)
     integer(i4), intent(in) :: level
-    integer :: ierr
+    integer(i4), optional, intent(out) :: ierr
+
+    integer :: ret
+
     if(level.eq.0) then
        debug=.false.
        debugio=.false.
@@ -371,10 +375,15 @@ contains
        debugio=.true.
        debugasync=.true.
     end if
-    ierr = PIO_set_log_level(level)
-    if(ierr /= PIO_NOERR) then
+
+    ret = PIO_set_log_level(level)
+    if(ret /= PIO_NOERR) then
       ! This is not a fatal error
-      print *, __PIO_FILE__, __LINE__, "Setting log level failed, ierr =",ierr
+      print *, __PIO_FILE__, __LINE__, "Setting log level failed, ret =", ret
+    end if
+
+    if(present(ierr)) then
+      ierr = ret
     end if
   end subroutine setdebuglevel
 
