@@ -89,11 +89,9 @@ int PIO_Util::PIO_async_tpool::dequeue_and_process(
 PIO_Util::PIO_async_tpool *
           PIO_Util::PIO_async_tpool_manager::get_tpool_instance(void )
 {
-  /* We need to make NUM_THREADS configurable by the user (compile-time) */
-  const int NUM_THREADS = SPIO_ASYNC_NTHREADS;
   if(tpool_ == NULL){
     LOG((2, "PIO_async_tpool_manager:get_tpool_instance: Creating new tpool instance"));
-    tpool_ = new PIO_Util::PIO_async_tpool(NUM_THREADS);
+    tpool_ = new PIO_Util::PIO_async_tpool(get_num_threads());
   }
   else{
     LOG((2, "PIO_async_tpool_manager:get_tpool_instance: Retrieving tpool instance"));
