@@ -12,8 +12,13 @@ thread_local bool SPIO_Util::TComm_info::is_thread_init_ = false;
 
 SPIO_Util::TComm_info::TComm_info(MPI_Comm union_comm, int union_comm_rank, int union_comm_io_root, int union_comm_comp_root, MPI_Comm io_comm, int io_comm_rank, bool is_io_master, MPI_Comm comp_comm, int comp_comm_rank, bool is_comp_master, MPI_Comm intercomm, MPI_Comm my_comm, MPI_Comm node_comm): union_comm_rank_(union_comm_rank), union_comm_io_root_(union_comm_io_root), union_comm_comp_root_(union_comm_comp_root), io_comm_rank_(io_comm_rank), is_io_master_(is_io_master), comp_comm_rank_(comp_comm_rank), is_comp_master_(is_comp_master)
 {
+  int nthreads = 1;
 #if PIO_USE_ASYNC_WR_THREAD
-  tids_ = PIO_Util::PIO_async_tpool_manager::get_tpool_instance()->get_thread_ids();  
+  nthreads += PIO_Util::PIO_async_tpool_manager::get_num_threads();
+  if(io_comm != MPI_COMM_NULL){
+    tids_ = PIO_Util::PIO_async_tpool_manager::get_tpool_instance()->get_thread_ids();
+    assert(static_cast<int>(tids_.size()) == nthreads - 1);
+  }
 #endif
 
   /* Total number of comms = Main/Default thread + Number of threads in thread pool
@@ -29,7 +34,7 @@ SPIO_Util::TComm_info::TComm_info(MPI_Comm union_comm, int union_comm_rank, int 
   node_comms_.push_back(node_comm);
 
   int ret = MPI_SUCCESS;
-  for(std::size_t i = 0; i < tids_.size(); i++){
+  for(int i = 0; i < nthreads - 1; i++){
     MPI_Comm tmp_union_comm = MPI_COMM_NULL;
     if(union_comm != MPI_COMM_NULL){
       ret = MPI_Comm_dup(union_comm, &tmp_union_comm); assert(ret == MPI_SUCCESS);
@@ -128,10 +133,13 @@ SPIO_Util::TComm_info::~TComm_info()
    * Free other comms
    */
 
+  int nthreads = 1;
+#if PIO_USE_ASYNC_WR_THREAD
   /* Number of threads including the main thread */
-  std::size_t nthreads = tids_.size() + 1;
-  assert(union_comms_.size() == nthreads);
-  for(std::size_t tidx = 1; tidx < nthreads; tidx++){
+  nthreads += PIO_Util::PIO_async_tpool_manager::get_num_threads();
+#endif
+  assert(static_cast<int>(union_comms_.size()) == nthreads);
+  for(int tidx = 1; tidx < nthreads; tidx++){
     if(union_comms_[tidx] != MPI_COMM_NULL) { MPI_Comm_free(&union_comms_[tidx]); }
     if(io_comms_[tidx] != MPI_COMM_NULL) { MPI_Comm_free(&io_comms_[tidx]); }
     if(comp_comms_[tidx] != MPI_COMM_NULL) { MPI_Comm_free(&comp_comms_[tidx]); }
