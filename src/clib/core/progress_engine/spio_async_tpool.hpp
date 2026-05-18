@@ -27,6 +27,7 @@ class PIO_async_tpool{
 
 class PIO_async_tpool_manager{
   public:
+    static int get_num_threads(void) { return SPIO_ASYNC_NTHREADS; }
     static PIO_async_tpool *get_tpool_instance(void );
     ~PIO_async_tpool_manager();
   private:
