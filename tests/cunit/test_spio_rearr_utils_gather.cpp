@@ -221,12 +221,17 @@ int test_gatherw_contig_block_decomp(MPI_Comm comm, int wrank, int wsz)
       recvcounts[i] = 1;
       rdispls[i] = i * LOCAL_SZ * sizeof(double);
 
+#ifndef MPI_SERIAL
       ret = MPI_Type_dup(sendtype, &(recvtypes[i]));
+#else
+      /* MPI serial does not support MPI_Type_dup() */
+      ret = MPI_Type_contiguous(LOCAL_SZ, MPI_DOUBLE, &(recvtypes[i]));
+#endif
       if(ret == MPI_SUCCESS){
         ret = MPI_Type_commit(&(recvtypes[i]));
       }
       if(ret != MPI_SUCCESS){
-        LOG_RANK0(wrank, "ERROR: Unable to create MPI dup of send type to recv doubles\n");
+        LOG_RANK0(wrank, "ERROR: Unable to create recv type (same as send type) to recv doubles\n");
         return PIO_EINTERNAL;
       }
     }

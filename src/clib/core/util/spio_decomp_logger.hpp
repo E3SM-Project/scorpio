@@ -190,7 +190,12 @@ namespace SPIO_Util{
       int ret = MPI_SUCCESS;
       
       ret = MPI_Comm_dup(ucomm, &comm); assert(ret == MPI_SUCCESS);
+#ifndef MPI_SERIAL
       ret = MPI_Comm_split_type(comm, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, &agg_comm); assert(ret == MPI_SUCCESS);
+#else
+      /* MPI serial library does not have support for MPI_Comm_split_type() */
+      ret = MPI_Comm_dup(comm, &agg_comm); assert(ret == MPI_SUCCESS);
+#endif
       ret = MPI_Comm_rank(agg_comm, &agg_comm_rank); assert(ret == MPI_SUCCESS);
 
       int color = (agg_comm_rank == 0) ? 0 : MPI_UNDEFINED;
