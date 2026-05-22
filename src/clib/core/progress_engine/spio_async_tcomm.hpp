@@ -5,8 +5,17 @@
 #include <thread>
 #include <chrono>
 #include <list>
-#include "mpi.h"
+#include <vector>
 #include "pio_config.h"
+#ifdef MPI_SERIAL
+extern "C" {
+#endif
+
+#include "mpi.h"
+
+#ifdef MPI_SERIAL
+}
+#endif
 #include "spio_async_tpool.hpp"
 
 namespace SPIO_Util{

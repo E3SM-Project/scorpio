@@ -1547,8 +1547,13 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
 
     /* Create the node local comm - all procs in comp_comm that are local to
      * this compute node (share memory) */
+#ifndef MPI_SERIAL
     mpierr = MPI_Comm_split_type(ios->comp_comm, MPI_COMM_TYPE_SHARED, 0,
               ios->info, &(ios->node_comm));
+#else
+    /* MPI serial library does not support MPI_Comm_split_type() */
+    mpierr = MPI_Comm_dup(ios->comp_comm, &(ios->node_comm));
+#endif
     if(mpierr != MPI_SUCCESS){
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
     }
@@ -2472,8 +2477,13 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
 
                 /* Create the node local comm - all procs in comp_comm that are local to
                  * this compute node (share memory) */
+#ifndef MPI_SERIAL
                 mpierr = MPI_Comm_split_type(my_iosys->comp_comm, MPI_COMM_TYPE_SHARED, 0,
                           my_iosys->info, &(my_iosys->node_comm));
+#else
+                /* MPI serial lib does not support MPI_Comm_split_type() */
+                mpierr = MPI_Comm_dup(my_iosys->comp_comm, &(my_iosys->node_comm));
+#endif
                 if(mpierr != MPI_SUCCESS){
                     return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
                 }
@@ -3072,8 +3082,13 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
 
                 /* Create the node local comm - all procs in comp_comm that are local to
                  * this compute node (share memory) */
+#ifndef MPI_SERIAL
                 ret = MPI_Comm_split_type(iosys[i]->comp_comm, MPI_COMM_TYPE_SHARED, 0,
                           iosys[i]->info, &(iosys[i]->node_comm));
+#else
+                /* MPI Serial lib does not support MPI_Comm_split_type() */
+                ret = MPI_Comm_dup(iosys[i]->comp_comm, &(iosys[i]->node_comm));
+#endif
                 if(ret != MPI_SUCCESS){
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
