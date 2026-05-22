@@ -974,24 +974,9 @@ int PIOc_closefile_impl(int ncid)
       if(ios->ioproc){
         soft_close = true;
       }
-      else{
-        /* Wait on all hdf5 async ops before a "hard close" */
-        /*
+      /* To wait on all hdf5 async ops before a "hard close" (for debugging)
         ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
-        if(ierr != PIO_NOERR){
-          return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                          "Closing file (%s, ncid=%d) failed. Error sending async msg PIO_MSG_CLOSE_FILE", pio_get_fname_from_file(file), ncid);
-        }
-        */
-      }
-    }
-    else{
-      /* Wait on all hdf5 async ops before a "hard close" */
-      ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
-      if(ierr != PIO_NOERR){
-        return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                        "Closing file (%s, ncid=%d) failed. Error sending async msg PIO_MSG_CLOSE_FILE", pio_get_fname_from_file(file), ncid);
-      }
+      */
     }
 #endif
 
