@@ -345,9 +345,6 @@ typedef struct io_desc_t
 
     /* Number of pending async ops using this I/O desc */
     std::atomic_int nasync_pend_ops;
-
-    /** Pointer to the next io_desc_t in the list. */
-    struct io_desc_t *next;
 } io_desc_t;
 
 /* Forward decl for I/O file summary stats info */
