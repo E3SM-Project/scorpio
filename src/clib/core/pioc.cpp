@@ -535,7 +535,7 @@ static int subset_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const
   int ret = PIO_NOERR;
 
   assert(ios && iodesc);
-  assert(iodesc->map && iodesc->dimlen);
+  assert(((iodesc->maplen == 0) || iodesc->map) && iodesc->dimlen);
 
   iodesc->num_aiotasks = ios->num_iotasks;
   LOG((2, "creating subset rearranger iodesc->num_aiotasks = %d", iodesc->num_aiotasks));
@@ -552,7 +552,7 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
 {
   int ret = PIO_NOERR;
   assert(ios && iodesc);
-  assert(iodesc->map && iodesc->dimlen && iodesc->firstregion);
+  assert(((iodesc->maplen == 0) || iodesc->map) && ((iodesc->ndims == 0) || iodesc->dimlen) && iodesc->firstregion);
 
   if(ios->ioproc){
     /*  Unless the user specifies the start and count for each
@@ -652,7 +652,7 @@ static int contig_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const
   int ret = PIO_NOERR;
 
   assert(ios && iodesc);
-  assert(iodesc->map && iodesc->dimlen);
+  assert(((iodesc->maplen == 0) || iodesc->map) && ((iodesc->ndims == 0) || iodesc->dimlen));
 
   if(iostart && iocount){
     /* FIXME: We should at least convert iostart/iocount arrays to decomp maps */
@@ -746,7 +746,6 @@ static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, 
                       const PIO_Offset *iostart, const PIO_Offset *iocount, bool map_zero_based=false)
 {
   iosystem_desc_t *ios;  /* Pointer to io system information. */
-  io_desc_t *iodesc;     /* The IO description. */
   int mpierr = MPI_SUCCESS;  /* Return code from MPI function calls. */
   int ierr;              /* Return code. */
 
@@ -810,22 +809,7 @@ static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, 
     }
   }
 
-  /* Allocate space for the iodesc info. This also allocates the
-   * first region and copies the rearranger opts into this
-   * iodesc. */
-  if((ierr = malloc_iodesc(ios, pio_type, ndims, maplen, &iodesc))){
-    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                    "Initializing the PIO decomposition failed. Out of memory allocating memory for I/O descriptor (ndims = %d, maplen = %d)", ndims, maplen);
-  }
-
-  /* Set the rearranger. */
-  if(!rearranger){
-    iodesc->rearranger = ios->default_rearranger;
-  }
-  else{
-    iodesc->rearranger = *rearranger;
-  }
-  LOG((2, "iodesc->rearranger = %d", iodesc->rearranger));
+  int rearr = (rearranger) ? *rearranger : ios->default_rearranger;
 
   /* In scenarios involving ultra-high resolution E3SM/SCREAM cases,
    * the default BOX rearranger may encounter significant performance
@@ -844,45 +828,20 @@ static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, 
    * potentially negating the benefits of reduced initialization time
    * associated with this approach.
    */
-  if(iodesc->rearranger == PIO_REARR_ANY){
-    iodesc->rearranger = spio_get_opt_pio_rearr(ios, maplen);
-  }
+  if(rearr == PIO_REARR_ANY) { rearr = spio_get_opt_pio_rearr(ios, maplen); }
 
-  /* Cache the local decomposition map */
-  if(map_zero_based){
-    /* BOX and SUBSET rearrangers expect map to the 1-based */
-    if((iodesc->rearranger == PIO_REARR_BOX) || (iodesc->rearranger == PIO_REARR_SUBSET)){
-      std::transform(compmap, compmap + maplen, iodesc->map,
-        [](PIO_Offset off) { return off + 1; });
-    }
-    else{
-      std::copy(compmap, compmap + maplen, iodesc->map);
-    }
-  }
-  else{
-    /* The decomposition map is 1-based */
-    if(iodesc->rearranger == PIO_REARR_CONTIG){
-      /* CONTIG rearranger expects map to be 0-based */
-      std::transform(compmap, compmap + maplen, iodesc->map,
-        [](PIO_Offset off) { return off - 1; });
-    }
-    else{
-      std::copy(compmap, compmap + maplen, iodesc->map);
-    }
-  }
-
-  /* Cache the dimension lengths */
-  std::copy(gdimlen, gdimlen + ndims, iodesc->dimlen);
+  std::shared_ptr<io_desc_t> iodesc = std::make_shared<io_desc_t>(ios, pio_type,
+    ndims, gdimlen, maplen, compmap, rearr, map_zero_based);
 
   /* Initialize the rearranger */
   if(iodesc->rearranger == PIO_REARR_SUBSET){
-    ierr = subset_rearranger_init(ios, iodesc, iostart, iocount);
+    ierr = subset_rearranger_init(ios, iodesc.get(), iostart, iocount);
   }
   else if(iodesc->rearranger == PIO_REARR_BOX){
-    ierr = box_rearranger_init(ios, iodesc, iostart, iocount);
+    ierr = box_rearranger_init(ios, iodesc.get(), iostart, iocount);
   }
   else if(iodesc->rearranger == PIO_REARR_CONTIG){
-    ierr = contig_rearranger_init(ios, iodesc, iostart, iocount);
+    ierr = contig_rearranger_init(ios, iodesc.get(), iostart, iocount);
   }
   else{
     return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
@@ -905,20 +864,21 @@ static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, 
      */
     comm = ios->union_comm;
   }
+
   *ioidp = pio_add_to_iodesc_list(iodesc, comm);
 
 #if PIO_SAVE_DECOMPS
   if(pio_save_decomps_regex_match(*ioidp, NULL, NULL)){
     std::string filename;
-    pio_create_uniq_str(ios, iodesc, filename, "piodecomp", ".dat");
+    pio_create_uniq_str(ios, iodesc.get(), filename, "piodecomp", ".dat");
 
     LOG((2, "Saving decomp map to %s", filename.c_str()));
     PIOc_writemap_impl(filename.c_str(), *ioidp, ndims, gdimlen, maplen, (PIO_Offset *)compmap, ios->my_comm);
 
     std::string log_fname;
-    pio_create_uniq_str(ios, iodesc, log_fname, "piodecomp", ".nc");
+    pio_create_uniq_str(ios, iodesc.get(), log_fname, "piodecomp", ".nc");
     SPIO_Util::Decomp_Util::Decomp_logger *logger = SPIO_Util::Decomp_Util::create_decomp_logger(ios->comp_comm, log_fname);
-    (*logger).write_only().open().put(iodesc).close();
+    (*logger).write_only().open().put(iodesc.get()).close();
     delete logger;
 
     iodesc->is_saved = true;
@@ -928,7 +888,7 @@ static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, 
 #endif
 
 #if PIO_ENABLE_LOGGING
-  dbg_log_iodesc(ios, iodesc);
+  dbg_log_iodesc(ios, iodesc.get());
 #endif /* PIO_ENABLE_LOGGING */            
 
   return PIO_NOERR;

@@ -30,6 +30,16 @@
 /* Name of test var. (Name of a Welsh town.)*/
 #define VAR_NAME "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch"
 
+iosystem_desc_t *create_dummy_iosystem(MPI_Comm test_comm)
+{
+  iosystem_desc_t *ios = static_cast<iosystem_desc_t *>(calloc(1, sizeof(iosystem_desc_t)));
+  assert(ios);
+
+  ios->union_comm = test_comm;
+
+  return ios;
+}
+
 /* Test some of the rearranger utility functions. */
 int test_rearranger_opts1(int iosysid)
 {
@@ -299,13 +309,15 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
 {
     int ret;
 
+    iosystem_desc_t *ios = create_dummy_iosystem(test_comm);
     {
         /* This is a simple test with one region containing 1 data
          * element. */
-        io_desc_t iodesc;
+        io_desc_t iodesc(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
         io_region *ior1;
         int ndims = 1;
 
+        iodesc.free_all_regions();
         /* This is how we allocate a region. */
         if ((ret = alloc_region2(NULL, ndims, &ior1)))
             return ret;
@@ -325,16 +337,17 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
         free(ior1->start);
         free(ior1->count);
         free(ior1);
-
+        iodesc.firstregion = NULL; 
     }
 
     {
         /* This also has a single region, but with 2 dims and count
          * values > 1. */
-        io_desc_t iodesc;
+        io_desc_t iodesc(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
         io_region *ior2;
         int ndims = 2;
 
+        iodesc.free_all_regions();
         /* This is how we allocate a region. */
         if ((ret = alloc_region2(NULL, ndims, &ior2)))
             return ret;
@@ -361,15 +374,17 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
         free(ior2->start);
         free(ior2->count);
         free(ior2);
+        iodesc.firstregion = NULL;
     }
 
     {
         /* This test has two regions of different sizes. */
-        io_desc_t iodesc;
+        io_desc_t iodesc(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
         io_region *ior3;
         io_region *ior4;
         int ndims = 2;
 
+        iodesc.free_all_regions();
         /* This is how we allocate a region. */
         if ((ret = alloc_region2(NULL, ndims, &ior4)))
             return ret;
@@ -400,7 +415,10 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
         free(ior3->start);
         free(ior3->count);
         free(ior3);
+        iodesc.firstregion = NULL;
     }
+
+    free(ios);
 
     return 0;
 }
@@ -409,7 +427,6 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
 int test_determine_fill(MPI_Comm test_comm)
 {
     iosystem_desc_t *ios;
-    io_desc_t *iodesc;
     int gsize[1] = {4};
     PIO_Offset compmap[1] = {1};
     int ret;
@@ -419,9 +436,8 @@ int test_determine_fill(MPI_Comm test_comm)
         return PIO_ENOMEM;
     ios->union_comm = test_comm;
 
+    io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
     /* Set up iodesc for test. */
-    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
-        return PIO_ENOMEM;
     iodesc->ndims = 1;
     iodesc->rearranger = PIO_REARR_SUBSET;
     iodesc->llen = 1;
@@ -440,8 +456,8 @@ int test_determine_fill(MPI_Comm test_comm)
         return ERR_WRONG;
 
     /* Free test resources. */
+    delete(iodesc);
     free(ios);
-    free(iodesc);
 
     return 0;
 }
@@ -535,7 +551,7 @@ int test_define_iodesc_datatypes()
     for (int r = 0; r < NUM_REARRANGERS; r++)
     {
         iosystem_desc_t ios;
-        io_desc_t iodesc;
+        io_desc_t iodesc(&ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
 
         /* Set up test for IO task with BOX rearranger to create one type. */
         ios.ioproc = 1; /* this is IO proc. */
@@ -586,13 +602,13 @@ int test_define_iodesc_datatypes()
             MPIERR(mpierr);
 
         /* Free resources. */
-        free(iodesc.rtype);
-        free(iodesc.sindex);
-        free(iodesc.scount);
-        free(iodesc.stype);
-        free(iodesc.rcount);
-        free(iodesc.rfrom);
-        free(iodesc.rindex);
+        free(iodesc.rtype); iodesc.rtype = NULL;
+        free(iodesc.sindex); iodesc.sindex = NULL;
+        free(iodesc.scount); iodesc.scount = NULL;
+        free(iodesc.stype); iodesc.stype = NULL;
+        free(iodesc.rcount); iodesc.rcount = NULL;
+        free(iodesc.rfrom); iodesc.rfrom = NULL;
+        free(iodesc.rindex); iodesc.rindex = NULL;
     }
 
     return 0;
@@ -602,7 +618,6 @@ int test_define_iodesc_datatypes()
 int test_compute_counts(MPI_Comm test_comm, int my_rank)
 {
     iosystem_desc_t *ios;
-    io_desc_t *iodesc;
     int dest_ioproc[TARGET_NTASKS] = {0, 1, 2, 3};
     PIO_Offset dest_ioindex[TARGET_NTASKS] = {0, 1, 2, 3};
     int ret;
@@ -627,8 +642,8 @@ int test_compute_counts(MPI_Comm test_comm, int my_rank)
         ios->compranks[i] = i;
 
     /* Initialize iodesc. */
-    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
-        return PIO_ENOMEM;
+    io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
+    assert(iodesc);
     iodesc->rearranger = PIO_REARR_BOX;
     iodesc->ndof = TARGET_NTASKS;
     iodesc->llen = TARGET_NTASKS;
@@ -650,16 +665,16 @@ int test_compute_counts(MPI_Comm test_comm, int my_rank)
             return ERR_WRONG;
 
     /* Free resources allocated in compute_counts(). */
-    free(iodesc->scount);
-    free(iodesc->sindex);
-    free(iodesc->rcount);
-    free(iodesc->rfrom);
-    free(iodesc->rindex);
+    free(iodesc->scount); iodesc->scount = NULL;
+    free(iodesc->sindex); iodesc->sindex = NULL;
+    free(iodesc->rcount); iodesc->rcount = NULL;
+    free(iodesc->rfrom); iodesc->rfrom = NULL;
+    free(iodesc->rindex); iodesc->rindex = NULL;
 
     /* Free test resources. */
     free(ios->ioranks);
     free(ios->compranks);
-    free(iodesc);
+    delete(iodesc);
     free(ios);
 
     return 0;
@@ -691,7 +706,6 @@ int test_init_decomp(int iosysid, MPI_Comm test_comm, int my_rank)
 int test_box_rearrange_create(MPI_Comm test_comm, int my_rank)
 {
     iosystem_desc_t *ios;
-    io_desc_t *iodesc;
     io_region *ior1;
     int maplen = MAPLEN2;
     PIO_Offset compmap[MAPLEN2] = {(my_rank * 2) + 1, ((my_rank + 1) * 2) + 1};
@@ -704,8 +718,8 @@ int test_box_rearrange_create(MPI_Comm test_comm, int my_rank)
         return PIO_ENOMEM;
 
     /* Allocate IO desc struct for this test. */
-    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
-        return PIO_ENOMEM;
+    io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
+    assert(iodesc);
 
     /* Default rearranger options. */
     iodesc->rearr_opts.comm_type = PIO_REARR_COMM_COLL;
@@ -783,19 +797,19 @@ int test_box_rearrange_create(MPI_Comm test_comm, int my_rank)
     /* } */
 
     /* Free resources allocated in compute_counts(). */
-    free(iodesc->scount);
-    free(iodesc->sindex);
-    free(iodesc->rcount);
-    free(iodesc->rfrom);
-    free(iodesc->rindex);
+    free(iodesc->scount); iodesc->scount = NULL;
+    free(iodesc->sindex); iodesc->sindex = NULL;
+    free(iodesc->rcount); iodesc->rcount = NULL;
+    free(iodesc->rfrom); iodesc->rfrom = NULL;
+    free(iodesc->rindex); iodesc->rindex = NULL;
 
     /* Free resources from test. */
     free(ior1->start);
     free(ior1->count);
-    free(ior1);
+    free(ior1); iodesc->firstregion = NULL;
     free(ios->ioranks);
     free(ios->compranks);
-    free(iodesc);
+    delete(iodesc);
     free(ios);
 
     return 0;
@@ -806,7 +820,6 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
 {
 #define MAPLEN2 2
     iosystem_desc_t *ios;
-    io_desc_t *iodesc;
     io_region *ior1;
     int maplen = MAPLEN2;
     PIO_Offset compmap[MAPLEN2] = {1, 0};
@@ -819,8 +832,8 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
         return PIO_ENOMEM;
 
     /* Allocate IO desc struct for this test. */
-    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
-        return PIO_ENOMEM;
+    io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
+    assert(iodesc);
 
     /* Default rearranger options. */
     iodesc->rearr_opts.comm_type = PIO_REARR_COMM_COLL;
@@ -898,19 +911,19 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
     }
 
     /* Free resources allocated in compute_counts(). */
-    free(iodesc->scount);
-    free(iodesc->sindex);
-    free(iodesc->rcount);
-    free(iodesc->rfrom);
-    free(iodesc->rindex);
+    free(iodesc->scount); iodesc->scount = NULL;
+    free(iodesc->sindex); iodesc->sindex = NULL;
+    free(iodesc->rcount); iodesc->rcount = NULL;
+    free(iodesc->rfrom); iodesc->rfrom = NULL;
+    free(iodesc->rindex); iodesc->rindex = NULL;
 
     /* Free resources from test. */
     free(ior1->start);
     free(ior1->count);
-    free(ior1);
+    free(ior1); iodesc->firstregion = NULL;
     free(ios->ioranks);
     free(ios->compranks);
-    free(iodesc);
+    delete(iodesc);
     free(ios);
 
     return 0;
@@ -922,7 +935,6 @@ int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
 {
 #define MAPLEN1 1
     iosystem_desc_t *ios;
-    io_desc_t *iodesc;
     io_region *ior1;
     int maplen = MAPLEN1;
     PIO_Offset compmap[MAPLEN1] = {0};
@@ -935,8 +947,8 @@ int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
         return PIO_ENOMEM;
 
     /* Allocate IO desc struct for this test. */
-    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
-        return PIO_ENOMEM;
+    io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
+    assert(iodesc);
 
     /* Default rearranger options. */
     iodesc->rearr_opts.comm_type = PIO_REARR_COMM_COLL;
@@ -990,16 +1002,16 @@ int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
         return ERR_WRONG;
 
     /* Free resources allocated in compute_counts(). */
-    free(iodesc->scount);
-    free(iodesc->sindex);
-    free(iodesc->rcount);
-    free(iodesc->rfrom);
-    free(iodesc->rindex);
+    free(iodesc->scount); iodesc->scount = NULL;
+    free(iodesc->sindex); iodesc->sindex = NULL;
+    free(iodesc->rcount); iodesc->rcount = NULL;
+    free(iodesc->rfrom); iodesc->rfrom = NULL;
+    free(iodesc->rindex); iodesc->rindex = NULL;
 
     /* Free resources from test. */
     free(ior1->start);
     free(ior1->count);
-    free(ior1);
+    free(ior1); iodesc->firstregion = NULL;
     free(ios->ioranks);
     free(ios->compranks);
     free(iodesc);
@@ -1012,7 +1024,6 @@ int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
 int test_default_subset_partition(MPI_Comm test_comm, int my_rank)
 {
     iosystem_desc_t *ios;
-    io_desc_t *iodesc;
     int mpierr;
     int ret;
 
@@ -1021,8 +1032,8 @@ int test_default_subset_partition(MPI_Comm test_comm, int my_rank)
         return PIO_ENOMEM;
 
     /* Allocate IO desc struct for this test. */
-    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
-        return PIO_ENOMEM;
+    io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
+    assert(iodesc);
 
     ios->ioproc = 1;
     ios->io_rank = my_rank;
@@ -1041,7 +1052,7 @@ int test_default_subset_partition(MPI_Comm test_comm, int my_rank)
         MPIERR(mpierr);
 
     /* Free resources from test. */
-    free(iodesc);
+    delete(iodesc);
     free(ios);
 
     return 0;
@@ -1051,7 +1062,6 @@ int test_default_subset_partition(MPI_Comm test_comm, int my_rank)
 int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
 {
     iosystem_desc_t *ios;
-    io_desc_t *iodesc;
     file_desc_t *file;
     void *sbuf = NULL;
     void *rbuf = NULL;
@@ -1075,8 +1085,8 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
         return PIO_ENOMEM;
 
     /* Allocate IO desc struct for this test. */
-    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
-        return PIO_ENOMEM;
+    io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
+    assert(iodesc);
 
     if (!(file = (file_desc_t *) calloc(1, sizeof(file_desc_t))))
         return PIO_ENOMEM;
@@ -1158,22 +1168,22 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
                     MPIERR(mpierr);
 
     /* Free resources allocated in library code. */
-    free(iodesc->rtype);
-    free(iodesc->sindex);
-    free(iodesc->scount);
-    free(iodesc->stype);
-    free(iodesc->rcount);
-    free(iodesc->rfrom);
-    free(iodesc->rindex);
+    free(iodesc->rtype); iodesc->rtype = NULL;
+    free(iodesc->sindex); iodesc->sindex = NULL;
+    free(iodesc->scount); iodesc->scount = NULL;
+    free(iodesc->stype); iodesc->stype = NULL;
+    free(iodesc->rcount); iodesc->rcount = NULL;
+    free(iodesc->rfrom); iodesc->rfrom = NULL;
+    free(iodesc->rindex); iodesc->rindex = NULL;
 
     /* Free resources from test. */
     free(ior1->start);
     free(ior1->count);
-    free(ior1);
+    free(ior1); iodesc->firstregion = NULL;
     free(ios->ioranks);
     free(ios->compranks);
     free(file);
-    free(iodesc);
+    delete(iodesc);
     free(ios);
     free(sbuf);
     free(rbuf);
@@ -1185,7 +1195,6 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
 int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
 {
     iosystem_desc_t *ios;
-    io_desc_t *iodesc;
     void *sbuf = NULL;
     void *rbuf = NULL;
     io_region *ior1;
@@ -1207,8 +1216,8 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
         return PIO_ENOMEM;
 
     /* Allocate IO desc struct for this test. */
-    if (!(iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t))))
-        return PIO_ENOMEM;
+    io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
+    assert(iodesc);
 
     ios->ioproc = 1;
     ios->io_rank = my_rank;
@@ -1288,21 +1297,21 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
                     MPIERR(mpierr);
 
     /* Free resources allocated in library code. */
-    free(iodesc->rtype);
-    free(iodesc->sindex);
-    free(iodesc->scount);
-    free(iodesc->stype);
-    free(iodesc->rcount);
-    free(iodesc->rfrom);
-    free(iodesc->rindex);
+    free(iodesc->rtype); iodesc->rtype = NULL;
+    free(iodesc->sindex); iodesc->sindex = NULL;
+    free(iodesc->scount); iodesc->scount = NULL;
+    free(iodesc->stype); iodesc->stype = NULL;
+    free(iodesc->rcount); iodesc->rcount = NULL;
+    free(iodesc->rfrom); iodesc->rfrom = NULL;
+    free(iodesc->rindex); iodesc->rindex = NULL;
 
     /* Free resources from test. */
     free(ior1->start);
     free(ior1->count);
-    free(ior1);
+    free(ior1); iodesc->firstregion = NULL;
     free(ios->ioranks);
     free(ios->compranks);
-    free(iodesc);
+    delete(iodesc);
     free(ios);
     free(sbuf);
     free(rbuf);

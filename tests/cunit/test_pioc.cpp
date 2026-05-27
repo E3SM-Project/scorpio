@@ -6,6 +6,8 @@
 #include <pio.h>
 #include <pio_internal.h>
 #include <pio_tests.h>
+#include <memory>
+#include <initializer_list>
 
 /* The number of tasks this test should run on. */
 #define TARGET_NTASKS 4
@@ -1629,7 +1631,6 @@ int test_malloc_iodesc2(int iosysid, int my_rank)
                                                MPI_UNSIGNED_LONG_LONG, MPI_CHAR};
     int ioid;
     iosystem_desc_t *ios;
-    io_desc_t *iodesc;
     int ret;
 
     if (!(ios = pio_get_iosystem_from_id(iosysid)))
@@ -1638,18 +1639,21 @@ int test_malloc_iodesc2(int iosysid, int my_rank)
     /* Test with each type. */
     for (int t = 0; t < num_types; t++)
     {
+        int gdimlen[] = {1};
+        PIO_Offset compmap[] = {1};
+        std::shared_ptr<io_desc_t> iodesc = std::make_shared<io_desc_t>(ios, test_type[t],
+          1, gdimlen,
+          1, compmap, PIO_REARR_BOX, false);
 
-        if ((ret = malloc_iodesc(ios, test_type[t], 1, 1, &iodesc)))
-            return ret;
         if (iodesc->mpitype != mpi_type[t])
             return ERR_WRONG;
         if (iodesc->ndims != 1)
             return ERR_WRONG;
         ioid = pio_add_to_iodesc_list(iodesc, MPI_COMM_NULL);
         if (iodesc->firstregion)
-            free_region_list(iodesc->firstregion);
-        free(iodesc->map);
-        free(iodesc->dimlen);
+            iodesc->free_region_list(iodesc->firstregion);
+        free(iodesc->map); iodesc->map = NULL;
+        free(iodesc->dimlen); iodesc->dimlen = NULL;
         if ((ret = pio_delete_iodesc_from_list(ioid)))
             return ret;
     }

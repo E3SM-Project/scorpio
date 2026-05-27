@@ -111,36 +111,20 @@ void free_iosystem(iosystem_desc_t *ios){
 
 io_desc_t *get_iodesc(int wrank, iosystem_desc_t *ios, const std::vector<PIO_Offset> &compmap, const std::vector<int> &gdimlen)
 {
-  io_desc_t *iodesc = NULL;
   int ret = PIO_NOERR;
 
-  ret = malloc_iodesc(ios, PIO_DOUBLE, static_cast<int>(gdimlen.size()), static_cast<int>(compmap.size()), &iodesc);
-  if(ret != PIO_NOERR){
+  io_desc_t *iodesc = new io_desc_t(ios, PIO_DOUBLE, static_cast<int>(gdimlen.size()), gdimlen.data(), static_cast<int>(compmap.size()), compmap.data(), PIO_REARR_BOX, false);
+  if(!iodesc){
     LOG_RANK0(wrank, "Unable to alloc mem for I/O desc\n");
     return iodesc;
   }
-
-  assert(iodesc->dimlen);
-  std::copy(gdimlen.cbegin(), gdimlen.cend(), iodesc->dimlen);
-
-  assert(iodesc->map);
-  std::copy(compmap.cbegin(), compmap.cend(), iodesc->map);
 
   return iodesc;
 }
 
 void free_iodesc(io_desc_t *iodesc)
 {
-  if(!iodesc){
-    return;
-  }
-
-  free(iodesc->firstregion->start);
-  free(iodesc->firstregion->count);
-  free(iodesc->firstregion);
-  free(iodesc->map);
-  free(iodesc->dimlen);
-  free(iodesc);
+  if(iodesc) { delete(iodesc); }
 }
 
 int test_create_decomp_logger(MPI_Comm comm, int wrank, int wsz)
