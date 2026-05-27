@@ -134,6 +134,7 @@ int pio_free_file(file_desc_t *file)
   }
 
   delete(file->pmtx);
+  delete(file->io_desc_refs);
 
   free(file->unlim_dimids);
   free(file->io_fstats);
@@ -462,6 +463,26 @@ io_desc_t *pio_get_iodesc_from_id(int ioid)
   io_desc_t *iodesc = NULL;
   try{
     iodesc = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.at(ioid).get();
+  } catch(const std::out_of_range &e){
+    LOG((1, "Finding I/O descriptor corresponding to ioid = %d failed. Invalid I/O descriptor id provided", ioid));
+  }
+
+  return iodesc;
+}
+
+/**
+ * Get a shared ptr to the I/O descriptor (io_desc_t) associated with a I/O descriptor id.
+ *
+ * @param ioid The id of the I/O descriptor (io_desc_t) to lookup
+ * @returns Shared pointer to the I/O descriptor (io_desc_t) associated with the id
+ */
+std::shared_ptr<io_desc_t> pio_get_iodesc_sptr_from_id(int ioid)
+{
+  LOG((2, "pio_get_iodesc_from_id(ioid=%d)", ioid));
+
+  std::shared_ptr<io_desc_t> iodesc;
+  try{
+    iodesc = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.at(ioid);
   } catch(const std::out_of_range &e){
     LOG((1, "Finding I/O descriptor corresponding to ioid = %d failed. Invalid I/O descriptor id provided", ioid));
   }

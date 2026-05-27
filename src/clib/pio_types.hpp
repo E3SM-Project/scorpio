@@ -50,6 +50,9 @@ extern "C" {
 #include <atomic>
 #include <mutex>
 #include <deque>
+#include <vector>
+#include <map>
+#include <memory>
 #include "core/progress_engine/spio_async_op.hpp"
 
 #ifdef PIO_MICRO_TIMING
@@ -953,6 +956,9 @@ typedef struct file_desc_t
 
     /** True if this is an existing file reopened */
     bool is_reopened;
+
+    /* Keep track of the I/O decompositions used by this file */
+    std::map<int, std::shared_ptr<io_desc_t> > *io_desc_refs;
 } file_desc_t;
 
 #endif // __PIO_TYPES_HPP__

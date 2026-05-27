@@ -79,7 +79,7 @@ struct Hdf5_wcache{
   int nvars;
   int fndims;
   std::vector<int> varids;
-  io_desc_t *iodesc;
+  std::shared_ptr<io_desc_t> iodesc;
   std::vector<int> frame;
 
   bool wr_fillbuf;
@@ -89,12 +89,12 @@ struct Hdf5_wcache{
   std::size_t fillbuf_sz;
 
   Hdf5_wcache(file_desc_t *file, int nvars, int fndims,
-    const int *varids, io_desc_t *iodesc, bool wr_fillbuf, const int *frame);
+    const int *varids, std::shared_ptr<io_desc_t> iodesc, bool wr_fillbuf, const int *frame);
   ~Hdf5_wcache();
 };
 
 Hdf5_wcache::Hdf5_wcache(file_desc_t *file, int nvars, int fndims,
-  const int *varids, io_desc_t *iodesc, bool wr_fillbuf, const int *frame):
+  const int *varids, std::shared_ptr<io_desc_t> iodesc, bool wr_fillbuf, const int *frame):
     file(file), nvars(nvars), fndims(fndims), iodesc(iodesc),
     wr_fillbuf(wr_fillbuf), iobuf(NULL), iobuf_sz(0),
     fillbuf(NULL), fillbuf_sz(0)
@@ -600,7 +600,7 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
   file_desc_t *file = wcache->file;
   int nvars = wcache->nvars;
   int fndims = wcache->fndims;
-  io_desc_t *iodesc = wcache->iodesc;
+  io_desc_t *iodesc = wcache->iodesc.get();
 
   assert(file && (nvars > 0) && (fndims > 0) && iodesc);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
@@ -829,7 +829,7 @@ void pio_iosys_async_op_hdf5_write_free(void *pdata)
 }
 
 int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
-      const int *varids, io_desc_t *iodesc, int fill, const int *frame)
+      const int *varids, std::shared_ptr<io_desc_t> iodesc, int fill, const int *frame)
 {
 #ifdef _HDF5
   int ret = PIO_NOERR;
