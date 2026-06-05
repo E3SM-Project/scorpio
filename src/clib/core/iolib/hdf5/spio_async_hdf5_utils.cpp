@@ -29,6 +29,7 @@ extern "C"{
 #include "spio_dbg_utils.hpp"
 #include "spio_dt_converter.hpp"
 #include "spio_hdf5_utils.hpp"
+#include "spio_async_tcomm.hpp"
 
 struct Hdf5_create_info{
   file_desc_t *file;
@@ -768,7 +769,7 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
   }
 
   /* FIXME: Is this barrier needed ? */
-  MPI_Barrier(ios->io_comm);
+  MPI_Barrier(ios->tcomm_info->get_io_comm());
 
   iodesc->nasync_pend_ops--;
   file->npend_ops--;
