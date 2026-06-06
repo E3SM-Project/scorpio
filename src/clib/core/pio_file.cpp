@@ -806,7 +806,12 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
         }
     }
 
+#if PIO_USE_ASYNC_WR_THREAD
+    /* FIXME: Use the iosystem/file error handlers once error handlers are multi-threaded */
+    ierr = spio_handle_err(NULL, file, PIO_RETURN_ERROR, ierr, __FILE__, __LINE__);
+#else
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
+#endif
     if(ierr != PIO_NOERR){
         LOG((1, "nc*_close failed, ierr = %d", ierr));
         return pio_err(NULL, file, ierr, __FILE__, __LINE__,
