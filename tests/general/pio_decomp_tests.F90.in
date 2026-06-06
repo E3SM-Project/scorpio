@@ -326,3 +326,110 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_write_1d_reuse_decomp
 
   call PIO_freedecomp(pio_tf_iosystem_, iodesc)
 PIO_TF_AUTO_TEST_SUB_END nc_write_1d_reuse_decomp
+
+! Create many decompositions and write to multiple files
+! (1 decomp per file, many vars per file, writes using the same buffer)
+! Note: For async+threaded case, the creation of the decompositions can
+! run in parallel to the writes to files
+PIO_TF_AUTO_TEST_SUB_BEGIN many_decomps_to_files
+  implicit none
+  integer, parameter :: NUM_FILES = 10
+  integer, parameter :: NUM_VARS = 20
+  integer, parameter :: VEC_LOCAL_SZ = 7
+  integer, dimension(VEC_LOCAL_SZ) :: compdof, compdof_rel_disps
+  integer, dimension(VEC_LOCAL_SZ) :: buf, rbuf
+  integer, dimension(1) :: dims
+  character(len=PIO_TF_MAX_STR_LEN) :: tmp_idx_str
+  character(len=*), parameter :: PIO_VAR_NAME = 'PIO_TF_test_var1'
+  character(len=*), parameter :: PIO_DIM_NAME = 'PIO_TF_test_var_dim1'
+
+  type :: test_file_info
+    character(len=PIO_TF_MAX_STR_LEN) :: filename
+    type(file_desc_t) :: pio_file
+    character(len=PIO_TF_MAX_STR_LEN) :: vnames(NUM_VARS)
+    type(var_desc_t)  :: pio_var(NUM_VARS)
+    integer :: pio_dim
+    type(io_desc_t) :: iodesc
+  end type test_file_info
+
+  type(test_file_info) :: tf_infos(NUM_FILES)
+
+  integer :: i, j, k, ierr
+  ! iotypes = valid io types
+  integer, dimension(:), allocatable :: iotypes
+  character(len=PIO_TF_MAX_STR_LEN), dimension(:), allocatable :: iotype_descs
+  integer :: num_iotypes
+
+  do i=1,VEC_LOCAL_SZ
+    compdof_rel_disps(i) = i
+  end do
+  dims(1) = VEC_LOCAL_SZ * pio_tf_world_sz_
+  compdof = VEC_LOCAL_SZ * pio_tf_world_rank_ + compdof_rel_disps
+  buf = pio_tf_world_rank_;
+
+  num_iotypes = 0
+  call PIO_TF_Get_nc_iotypes(iotypes, iotype_descs, num_iotypes)
+  do i=1,num_iotypes
+    PIO_TF_LOG(0,*) "Testing : PIO_TF_DATA_TYPE : ", iotype_descs(i)
+    do j=1,NUM_FILES
+      call PIO_initdecomp(pio_tf_iosystem_, PIO_int, dims, compdof, tf_infos(j)%iodesc)
+
+      write(tmp_idx_str, "(I0)") j
+      tf_infos(j)%filename = "many_decomps_to_files_test_" // trim(tmp_idx_str) // ".testfile"
+      ierr = PIO_createfile(pio_tf_iosystem_, tf_infos(j)%pio_file, iotypes(i), tf_infos(j)%filename, PIO_CLOBBER) 
+      PIO_TF_CHECK_ERR(ierr, "Could not create file " // trim(tf_infos(j)%filename))
+
+      ierr = PIO_def_dim(tf_infos(j)%pio_file, PIO_DIM_NAME, dims(1), tf_infos(j)%pio_dim)
+      PIO_TF_CHECK_ERR(ierr, "Failed to define a dim : " // trim(tf_infos(j)%filename))
+
+      do k=1,NUM_VARS
+        write(tmp_idx_str, "(I0)") k
+        tf_infos(j)%vnames(k) = PIO_VAR_NAME // trim(tmp_idx_str)
+        ierr = PIO_def_var(tf_infos(j)%pio_file, tf_infos(j)%vnames(k), PIO_int, (/tf_infos(j)%pio_dim/), tf_infos(j)%pio_var(k))
+        PIO_TF_CHECK_ERR(ierr, "Failed to define a var : " // trim(tf_infos(j)%filename))
+      end do
+
+      ierr = PIO_enddef(tf_infos(j)%pio_file)
+      PIO_TF_CHECK_ERR(ierr, "Failed to end redef mode : " // trim(tf_infos(j)%filename))
+
+      do k=1,NUM_VARS
+        ! Write the variable out
+        call PIO_write_darray(tf_infos(j)%pio_file, tf_infos(j)%pio_var(k), tf_infos(j)%iodesc, buf, ierr)
+        PIO_TF_CHECK_ERR(ierr, "Failed to write darray : " // trim(tf_infos(j)%filename))
+      end do
+
+    end do
+
+    do j=1,NUM_FILES
+      ! For async+threaded, the re-open should sync the file
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+      call PIO_closefile(tf_infos(j)%pio_file)
+
+      ierr = PIO_openfile(pio_tf_iosystem_, tf_infos(j)%pio_file, iotypes(i), tf_infos(j)%filename, PIO_nowrite)
+      PIO_TF_CHECK_ERR(ierr, "Could not reopen file " // trim(tf_infos(j)%filename))
+
+      do k=1,NUM_VARS
+        ierr = PIO_inq_varid(tf_infos(j)%pio_file, tf_infos(j)%vnames(k), tf_infos(j)%pio_var(k))
+        PIO_TF_CHECK_ERR(ierr, "Could not inq var1 file2 :" // trim(tf_infos(j)%filename))
+      end do
+#else
+      call PIO_syncfile(tf_infos(j)%pio_file)
+#endif
+      do k=1,NUM_VARS
+        rbuf = 0
+        call PIO_read_darray(tf_infos(j)%pio_file, tf_infos(j)%pio_var(k), tf_infos(j)%iodesc, rbuf, ierr)
+        PIO_TF_CHECK_ERR(ierr, "Failed to read darray : " // trim(tf_infos(j)%filename))
+
+        PIO_TF_CHECK_VAL((rbuf, buf), "Got wrong val")
+      end do
+
+      call PIO_closefile(tf_infos(j)%pio_file)
+      call PIO_deletefile(pio_tf_iosystem_, tf_infos(j)%filename)
+      call PIO_freedecomp(pio_tf_iosystem_, tf_infos(j)%iodesc)
+    end do
+  end do
+  if(allocated(iotypes)) then
+    deallocate(iotypes)
+    deallocate(iotype_descs)
+  end if
+PIO_TF_AUTO_TEST_SUB_END many_decomps_to_files
