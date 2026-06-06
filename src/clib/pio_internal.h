@@ -31,6 +31,7 @@
 #include "util/spio_ltimer.h"
 #include "pio_types.hpp"
 #include <string>
+#include <memory>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -113,8 +114,9 @@ extern "C" {
     int recv_async_msg(iosystem_desc_t *ios, int msg, ...);
 
     void pio_get_env(void);
-    int  pio_add_to_iodesc_list(io_desc_t *iodesc, MPI_Comm comm);
+    int  pio_add_to_iodesc_list(std::shared_ptr<io_desc_t> iodesc, MPI_Comm comm);
     io_desc_t *pio_get_iodesc_from_id(int ioid);
+    std::shared_ptr<io_desc_t> pio_get_iodesc_sptr_from_id(int ioid);
     int pio_delete_iodesc_from_list(int ioid);
     int pio_delete_all_iodescs(int iosysid);
     int pio_num_iosystem(int *niosysid);
@@ -142,6 +144,8 @@ extern "C" {
 
     /* Close the file ("hard close") */
     int spio_wait_on_hard_close(iosystem_desc_t *ios, file_desc_t *file);
+    void spio_add_iodesc_ref_to_file(file_desc_t *file, int ioid);
+    std::shared_ptr<io_desc_t> spio_get_iodesc_ref_from_file(file_desc_t *file, int ioid);
     int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file, bool sync_with_ioprocs);
     int spio_soft_closefile(iosystem_desc_t *ios, file_desc_t *file);
 
@@ -259,8 +263,6 @@ extern "C" {
     int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file,
                           const void *sbuf, void *rbuf, int nvars);
 
-    /* Allocate and initialize storage for decomposition information. */
-    int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims, int maplen, io_desc_t **iodesc);
     void performance_tune_rearranger(iosystem_desc_t *ios, io_desc_t *iodesc);
 
     /* Flush contents of multi-buffer to disk. */

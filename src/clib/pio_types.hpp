@@ -50,6 +50,9 @@ extern "C" {
 #include <atomic>
 #include <mutex>
 #include <deque>
+#include <vector>
+#include <map>
+#include <memory>
 #include "core/progress_engine/spio_async_op.hpp"
 
 #ifdef PIO_MICRO_TIMING
@@ -67,6 +70,8 @@ struct var_desc_t;
 namespace SPIO_Util{
   class TComm_info;
 }
+
+const int SPIO_INVALID_ID = -1;
 
 /** The viobuf_cache is used to cache the rearranged data for the
  * variable. The iobuf inside the cache is freed when the data
@@ -211,13 +216,17 @@ namespace SPIO{
   }
 }
 
+struct iosystem_desc_t;
+/* FIXME: Move io_desc_t to a proper class with public/private
+ * data members (instead of a struct with all public members)
+ */
 /**
  * IO descriptor structure.
  *
  * This structure defines the mapping for a given variable between
  * compute and IO decomposition.
  */
-typedef struct io_desc_t
+struct io_desc_t
 {
     /** The ID of this io_desc_t. */
     int ioid;
@@ -333,12 +342,10 @@ typedef struct io_desc_t
      * group. */
     MPI_Comm subset_comm;
 
-#if PIO_SAVE_DECOMPS
     /* Indicates whether this iodesc has been saved to disk (the
      * decomposition is dumped to disk)
      */
     bool is_saved;
-#endif
 
     /* FIXME: Once we have classes for subset/box this ptr should be to a base rearr class */
     SPIO::DataRearr::Contig_rearr *rearr;
@@ -346,9 +353,15 @@ typedef struct io_desc_t
     /* Number of pending async ops using this I/O desc */
     std::atomic_int nasync_pend_ops;
 
-    /** Pointer to the next io_desc_t in the list. */
-    struct io_desc_t *next;
-} io_desc_t;
+    io_desc_t(iosystem_desc_t *ios, int piotype, int ndims, const int *gdimlen,
+              int maplen, const PIO_Offset *compmap, int rearranger, bool map_zero_based);
+    void init_map(int maplen, const PIO_Offset *compmap, int rearranger, bool map_zero_based);
+    void free_region_list(io_region *phead);
+    void free_all_regions(void );
+    void free_mpi_types(MPI_Datatype *ptypes, int ntypes);
+    void free_all_mpi_types(void );
+    ~io_desc_t();
+};
 
 /* Forward decl for I/O file summary stats info */
 struct spio_io_fstats_summary;
@@ -943,6 +956,9 @@ typedef struct file_desc_t
 
     /** True if this is an existing file reopened */
     bool is_reopened;
+
+    /* Keep track of the I/O decompositions used by this file */
+    std::map<int, std::shared_ptr<io_desc_t> > *io_desc_refs;
 } file_desc_t;
 
 #endif // __PIO_TYPES_HPP__

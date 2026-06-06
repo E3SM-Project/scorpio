@@ -79,7 +79,7 @@ struct Hdf5_wcache{
   int nvars;
   int fndims;
   std::vector<int> varids;
-  io_desc_t *iodesc;
+  std::shared_ptr<io_desc_t> iodesc;
   std::vector<int> frame;
 
   bool wr_fillbuf;
@@ -87,7 +87,41 @@ struct Hdf5_wcache{
   std::size_t iobuf_sz;
   void *fillbuf;
   std::size_t fillbuf_sz;
+
+  Hdf5_wcache(file_desc_t *file, int nvars, int fndims,
+    const int *varids, std::shared_ptr<io_desc_t> iodesc, bool wr_fillbuf, const int *frame);
+  ~Hdf5_wcache();
 };
+
+Hdf5_wcache::Hdf5_wcache(file_desc_t *file, int nvars, int fndims,
+  const int *varids, std::shared_ptr<io_desc_t> iodesc, bool wr_fillbuf, const int *frame):
+    file(file), nvars(nvars), fndims(fndims), iodesc(iodesc),
+    wr_fillbuf(wr_fillbuf), iobuf(NULL), iobuf_sz(0),
+    fillbuf(NULL), fillbuf_sz(0)
+{
+  assert(file && (nvars > 0) && (fndims > 0) && varids && iodesc);
+
+  /* Cache varids and frames (one frame, the frame being written,
+   * for each varid)
+   */
+  this->varids.resize(nvars);
+  std::copy(varids, varids + nvars, this->varids.begin());
+
+  if(frame){
+    this->frame.resize(nvars);
+    std::copy(frame, frame + nvars, this->frame.begin());
+  }
+
+  /* FIXME: Copy/init iobuf and fillbuf here */
+}
+
+Hdf5_wcache::~Hdf5_wcache()
+{
+  /* Don't delete cached iodesc ptr (we don't own it) */
+
+  if(iobuf) { brel(iobuf); iobuf = NULL; }
+  if(fillbuf) { brel(fillbuf); fillbuf = NULL; }
+}
 
 /* Global vars */
 std::atomic<int> SPIO_Util::GVars::npend_hdf5_async_ops;
@@ -566,7 +600,7 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
   file_desc_t *file = wcache->file;
   int nvars = wcache->nvars;
   int fndims = wcache->fndims;
-  io_desc_t *iodesc = wcache->iodesc;
+  io_desc_t *iodesc = wcache->iodesc.get();
 
   assert(file && (nvars > 0) && (fndims > 0) && iodesc);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
@@ -787,25 +821,15 @@ void pio_iosys_async_op_hdf5_write_free(void *pdata)
   Hdf5_wcache *wcache = static_cast<struct Hdf5_wcache *>(pdata);
   assert(wcache);
 
-  /* Using swap trick to free vectors
-   * - swap vector with an empty local/temp vector that gets deallocated when func exits
-   */
-  //wcache->varids.clear();
-  std::vector<int>().swap(wcache->varids);
-  //wcache->frame.clear();
-  std::vector<int>().swap(wcache->frame);
 
-  if(wcache->iobuf){ brel(wcache->iobuf); }
-  if(wcache->fillbuf){ brel(wcache->fillbuf); }
-
-  free(wcache);
+  delete(wcache);
 #else // _HDF5
   assert(0);
 #endif // _HDF5
 }
 
 int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
-      const int *varids, io_desc_t *iodesc, int fill, const int *frame)
+      const int *varids, std::shared_ptr<io_desc_t> iodesc, int fill, const int *frame)
 {
 #ifdef _HDF5
   int ret = PIO_NOERR;
@@ -819,15 +843,8 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
     return PIO_NOERR;
   }
 
-  std::vector<int> vids(varids, varids + nvars);
-  std::vector<int> frms;
-  if(frame){
-    frms.resize(nvars);
-    std::copy(frame, frame + nvars, frms.begin());
-  }
-
-  Hdf5_wcache *wcache = static_cast<Hdf5_wcache *>(calloc(1, sizeof(Hdf5_wcache)));
-  *wcache = {file, nvars, fndims, vids, iodesc, frms, (fill) ? true : false, NULL, 0, NULL, 0};
+  Hdf5_wcache *wcache = new Hdf5_wcache(file, nvars, fndims, varids, iodesc,
+    (fill) ? true : false, frame);
 
   /* We need to copy the iobuf/fillbuf since the mvcache gets reused for future writes */
   /* Copy iobuf/fillvalue */

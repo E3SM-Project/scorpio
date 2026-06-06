@@ -12,6 +12,7 @@
 #include <thread>
 #include <chrono>
 #include <string>
+#include <algorithm>
 #include "spio_hdf5_utils.hpp"
 #include "spio_async_tcomm.hpp"
 
@@ -475,6 +476,41 @@ int spio_wait_on_hard_close(iosystem_desc_t *ios, file_desc_t *file)
   MPI_Barrier(ios->tcomm_info->get_union_comm());
 
   return PIO_NOERR;
+}
+
+void spio_add_iodesc_ref_to_file(file_desc_t *file, int ioid)
+{
+  assert(file && file->pmtx && file->io_desc_refs);
+
+  /* Get the lock before proceeding */
+  std::lock_guard<std::mutex> lg(*(file->pmtx));
+
+  /* Don't add duplicates, just one ref to iodesc used by file.
+   * When cached iodesc is used, for writing data, its used for all
+   * cached variables at once. So we just need one ref to iodesc here
+   */
+  std::shared_ptr<io_desc_t> iodesc = pio_get_iodesc_sptr_from_id(ioid);
+  file->io_desc_refs->insert({ioid, iodesc});
+}
+
+std::shared_ptr<io_desc_t> spio_get_iodesc_ref_from_file(file_desc_t *file, int ioid)
+{
+  assert(file && file->pmtx && file->io_desc_refs);
+
+  /* Get the lock before proceeding */
+  std::lock_guard<std::mutex> lg(*(file->pmtx));
+
+  /* Search through the cached I/O descs */
+  std::map<int, std::shared_ptr<io_desc_t> >::iterator iter = file->io_desc_refs->find(ioid);
+
+  if(iter != file->io_desc_refs->end()){
+    /* The caller now has ownership of this iodesc */
+    std::shared_ptr<io_desc_t> sp = iter->second;
+    file->io_desc_refs->erase(iter);
+    return sp;
+  }
+
+  return nullptr;
 }
 
 /* Close the file ("hard close")

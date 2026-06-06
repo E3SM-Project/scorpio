@@ -6,6 +6,7 @@ message(STATUS "===== Configuring SCORPIO C Core... =====")
 set (spio_core_src
   pio_spmd.cpp
   pioc_support.cpp
+  spio_iodesc_utils.cpp
   pioc.cpp
   pio_nc.cpp
   pio_getput_int.cpp

@@ -25,6 +25,8 @@
 #include "spio_dt_converter.hpp"
 #include "spio_async_utils.hpp"
 #include <string>
+#include <vector>
+#include <algorithm>
 
 /* uint64_t definition */
 #ifdef _ADIOS2
@@ -165,11 +167,13 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
                     "Writing multiple variables to file (%s, ncid=%d) failed. Trying to write to a read only file, try reopening the file in write mode (use the PIO_WRITE flag)", pio_get_fname_from_file(file), ncid);
   }
 
-  /* Get iodesc. */
-  if(!(iodesc = pio_get_iodesc_from_id(ioid))){
+  /* Get cached iodesc. */
+  std::shared_ptr<io_desc_t> sp_iodesc = spio_get_iodesc_ref_from_file(file, ioid);
+  if(!sp_iodesc){
     return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
                     "Writing multiple variables to file (%s, ncid=%d) failed. Invalid arguments, invalid PIO decomposition id (%d) provided", pio_get_fname_from_file(file), ncid, ioid);
   }
+  iodesc = sp_iodesc.get();
   pioassert(iodesc->rearranger == PIO_REARR_BOX || iodesc->rearranger == PIO_REARR_SUBSET || iodesc->rearranger == PIO_REARR_CONTIG,
             "unknown rearranger", __FILE__, __LINE__);
 
@@ -411,7 +415,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     case PIO_IOTYPE_HDF5:
     case PIO_IOTYPE_HDF5C:
 #if PIO_USE_ASYNC_WR_THREAD
-        ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, iodesc,
+        ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, sp_iodesc,
                                                   DARRAY_DATA, frame);
         if(ierr != PIO_NOERR){
           return pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -503,7 +507,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
       case PIO_IOTYPE_HDF5:
       case PIO_IOTYPE_HDF5C:
   #if PIO_USE_ASYNC_WR_THREAD
-          ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, iodesc,
+          ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, sp_iodesc,
                                                     DARRAY_FILL, frame);
           if(ierr != PIO_NOERR){
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -2469,6 +2473,9 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
     wmb->frame[wmb->num_arrays] = vdesc->record;
   }
   wmb->num_arrays++;
+
+  /* Cache a ref to the iodesc in the file */
+  spio_add_iodesc_ref_to_file(file, ioid);
 
   LOG((2, "wmb->num_arrays = %d iodesc->maxbytes / iodesc->mpitype_size = %d "
        "iodesc->ndof = %d iodesc->llen = %d", wmb->num_arrays,

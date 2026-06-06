@@ -19,11 +19,12 @@
 #include <mutex>
 #include <thread>
 #include <chrono>
+#include <memory>
 
 namespace SPIO_Util{
   namespace SPIO_Lists{
     namespace GVars{
-      std::map<int, io_desc_t *> pio_iodesc_list;
+      std::map<int, std::shared_ptr<io_desc_t> > pio_iodesc_list;
       std::map<int, iosystem_desc_t *> pio_iosystem_list;
       /* This list is independent of the I/O system because users only provide the
        * file id during a call - hence instead of deducing the I/O system that the file
@@ -133,6 +134,7 @@ int pio_free_file(file_desc_t *file)
   }
 
   delete(file->pmtx);
+  delete(file->io_desc_refs);
 
   free(file->unlim_dimids);
   free(file->io_fstats);
@@ -428,7 +430,7 @@ int pio_num_iosystem(int *niosys)
  * need to be unique
  * @returns the ioid of the newly added iodesc.
  */
-int pio_add_to_iodesc_list(io_desc_t *iodesc, MPI_Comm comm)
+int pio_add_to_iodesc_list(std::shared_ptr<io_desc_t> iodesc, MPI_Comm comm)
 {
   static int pio_iodesc_next_id = PIO_IODESC_START_ID;
 
@@ -460,7 +462,27 @@ io_desc_t *pio_get_iodesc_from_id(int ioid)
 
   io_desc_t *iodesc = NULL;
   try{
-    iodesc = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.at(ioid);  
+    iodesc = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.at(ioid).get();
+  } catch(const std::out_of_range &e){
+    LOG((1, "Finding I/O descriptor corresponding to ioid = %d failed. Invalid I/O descriptor id provided", ioid));
+  }
+
+  return iodesc;
+}
+
+/**
+ * Get a shared ptr to the I/O descriptor (io_desc_t) associated with a I/O descriptor id.
+ *
+ * @param ioid The id of the I/O descriptor (io_desc_t) to lookup
+ * @returns Shared pointer to the I/O descriptor (io_desc_t) associated with the id
+ */
+std::shared_ptr<io_desc_t> pio_get_iodesc_sptr_from_id(int ioid)
+{
+  LOG((2, "pio_get_iodesc_from_id(ioid=%d)", ioid));
+
+  std::shared_ptr<io_desc_t> iodesc;
+  try{
+    iodesc = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.at(ioid);
   } catch(const std::out_of_range &e){
     LOG((1, "Finding I/O descriptor corresponding to ioid = %d failed. Invalid I/O descriptor id provided", ioid));
   }
@@ -477,12 +499,12 @@ io_desc_t *pio_get_iodesc_from_id(int ioid)
 int pio_delete_iodesc_from_list(int ioid)
 {
   LOG((2, "pio_delete_iodesc_from_list(ioid=%d)", ioid));
-  std::map<int, io_desc_t *>::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.find(ioid);
+  std::map<int, std::shared_ptr<io_desc_t> >::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.find(ioid);
   if(iter != SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.end()){
-    io_desc_t *iodesc = (*iter).second;
+    std::shared_ptr<io_desc_t> iodesc = (*iter).second;
     assert(iodesc);
     if(iodesc->nasync_pend_ops == 0){
-      free(iodesc);
+      //delete(iodesc);
       SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.erase(iter);
     }
   }
@@ -507,9 +529,9 @@ int pio_delete_all_iodescs(int iosysid)
 {
   int ret = PIO_NOERR;
   /* Delete the head of the list, one at a time - to delete all I/O descs */
-  std::map<int, io_desc_t *>::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.begin();
+  std::map<int, std::shared_ptr<io_desc_t> >::iterator iter = SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.begin();
   while(iter != SPIO_Util::SPIO_Lists::GVars::pio_iodesc_list.end()){
-    io_desc_t *iodesc = (*iter).second;
+    io_desc_t *iodesc = (*iter).second.get();
     ret = spio_wait_async_iodesc_ops(iodesc);
     if(ret != PIO_NOERR){
       return pio_err(NULL, NULL, ret, __FILE__, __LINE__,
