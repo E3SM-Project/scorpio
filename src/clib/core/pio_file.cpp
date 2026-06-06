@@ -500,7 +500,11 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
 
     if(sync_with_ioprocs){
       //if(ios->ioproc) { while(file->npend_ops){} }
-      MPI_Barrier(ios->union_comm);
+      /* For I/O async threads the union comm is NULL comm */
+      MPI_Comm sync_comm = ios->tcomm_info->get_union_comm();
+      if(sync_comm != MPI_COMM_NULL){
+        MPI_Barrier(sync_comm);
+      }
     }
 
     if(file->is_hard_closed) { return PIO_NOERR; }
