@@ -16,6 +16,7 @@
 #include <functional>
 #include "spio_hdf5_utils.hpp"
 #include "spio_async_tcomm.hpp"
+#include "spio_dbg_utils.hpp"
 
 #ifdef _ADIOS2
 #include "../../tools/adios2pio-nm/adios2pio-nm-lib-c.h"
@@ -549,6 +550,7 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
 #endif
 
     assert(ios && file);
+    //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + file->fname);
 
     /* Get the lock before proceeding */
     std::lock_guard<std::mutex> lg(*(file->pmtx));
@@ -928,6 +930,7 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
 int spio_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
 {
   assert(ios && file && ios->ioproc);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + file->fname);
 
 #if PIO_USE_ASYNC_WR_THREAD
   return pio_iosys_async_file_close_op_add(file);
