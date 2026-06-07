@@ -64,6 +64,15 @@ namespace SPIO_Util{
       return ostr.str();
     }
 
+    class Stdout_logger{
+      public:
+        Stdout_logger(const std::string &info) : info_(info) { std::cout << "Entering " << info_.c_str() << "\n" << std::flush; }
+        ~Stdout_logger() { std::cout << "Leaving " << info_.c_str() << "\n" << std::flush; }
+
+      private:
+        const std::string info_;
+    };
+
     std::string get_iodesc_info(io_desc_t *ios);
 
     void get_stack_trace(std::vector<std::string> &st);

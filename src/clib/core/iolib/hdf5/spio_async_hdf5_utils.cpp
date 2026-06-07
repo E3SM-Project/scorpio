@@ -125,6 +125,7 @@ static inline void update_reg_infos_start_frame(std::vector<Util::RInfo> &reg_in
 
 void spio_iosys_async_op_hdf5_create_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
   if(pdata){
     delete(static_cast<Hdf5_create_info *>(pdata));
   }
@@ -137,6 +138,7 @@ int spio_iosys_async_op_hdf5_create(void *pdata)
   Hdf5_create_info *cinfo = static_cast<Hdf5_create_info *>(pdata);
 
   assert(cinfo && cinfo->file && cinfo->file->iosystem);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + cinfo->fname);
 
   ret = spio_hdf5_create(cinfo->file->iosystem, cinfo->file, cinfo->fname.c_str());
 
@@ -184,6 +186,7 @@ int spio_iosys_async_hdf5_create_op_add(file_desc_t *file, const char *filename)
 
 void spio_iosys_async_op_hdf5_def_var_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
   if(pdata){
     delete(static_cast<Hdf5_def_var_info *>(pdata));
   }
@@ -194,6 +197,7 @@ int spio_iosys_async_op_hdf5_def_var(void *pdata)
   int ret = PIO_NOERR;
 
   Hdf5_def_var_info *def_var_info = static_cast<Hdf5_def_var_info *>(pdata);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ": fname = " + def_var_info->file->fname + ", vname: " + def_var_info->vname);
 
   assert(def_var_info && def_var_info->file && def_var_info->file->iosystem);
 
@@ -247,6 +251,7 @@ int spio_iosys_async_hdf5_def_var_op_add(file_desc_t *file, const char *name,
 
 void spio_iosys_async_op_hdf5_put_att_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
   if(pdata){
     Hdf5_put_att_info *info = static_cast<Hdf5_put_att_info *>(pdata);
     free(info->abuf);
@@ -263,6 +268,7 @@ int spio_iosys_async_op_hdf5_put_att(void *pdata)
   assert(info && info->file && info->file->iosystem);
   assert((info->varid >= 0) || (info->varid == PIO_GLOBAL));
   assert(info->alen >= 0);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ": fname = " + info->file->fname + ", aname: " + info->aname);
 
   ret = spio_hdf5_put_att(info->file->iosystem, info->file,
           info->varid, info->aname.c_str(), info->atype,
@@ -322,6 +328,7 @@ int spio_iosys_async_hdf5_put_att_op_add(file_desc_t *file, int varid,
 
 void spio_iosys_async_op_hdf5_enddef_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
   if(pdata){
     delete(static_cast<Hdf5_enddef_info *>(pdata));
   }
@@ -334,6 +341,7 @@ int spio_iosys_async_op_hdf5_enddef(void *pdata)
   Hdf5_enddef_info *info = static_cast<Hdf5_enddef_info *>(pdata);
 
   assert(info && info->file && info->file->iosystem);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ": fname = " + info->file->fname);
 
   ret = spio_hdf5_enddef(info->file->iosystem, info->file);
 
@@ -381,6 +389,7 @@ int spio_iosys_async_hdf5_enddef_op_add(file_desc_t *file)
 
 void spio_iosys_async_op_hdf5_put_var_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
   if(pdata){
     Hdf5_put_var_info *info = static_cast<Hdf5_put_var_info *>(pdata);
     free(info->vbuf);
@@ -396,6 +405,7 @@ int spio_iosys_async_op_hdf5_put_var(void *pdata)
 
   assert(info && info->file && info->file->iosystem);
   assert((info->varid >= 0) || (info->varid == PIO_GLOBAL));
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ": fname = " + info->file->fname + ", varid=" + std::to_string(info->varid));
 
   ret = spio_hdf5_put_var(info->file->iosystem, info->file,
           info->varid,
@@ -477,6 +487,7 @@ int spio_iosys_async_hdf5_put_var_op_add(file_desc_t *file, int varid,
 
 void spio_iosys_async_op_hdf5_set_frame_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
   if(pdata){
     delete(static_cast<Hdf5_set_frame_info *>(pdata));
   }
@@ -489,6 +500,7 @@ int spio_iosys_async_op_hdf5_set_frame(void *pdata)
   Hdf5_set_frame_info *info = static_cast<Hdf5_set_frame_info *>(pdata);
 
   assert(info && info->file && info->file->iosystem);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ": fname = " + info->file->fname + ", frame=" + std::to_string(info->frame));
 
   ret = spio_hdf5_set_frame(info->file, info->varid, info->frame);
 
@@ -538,6 +550,7 @@ int spio_iosys_async_hdf5_set_frame_op_add(file_desc_t *file, int varid, int fra
 
 int spio_wait_all_hdf5_async_ops(int iosysid)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ", iosysid=" + std::to_string(iosysid));
   unsigned long long int sleep_time = 0;
   /* Sleep for 0.5 seconds */
   const int SLEEP_TIME_IN_MILLISECONDS = 500;
@@ -563,6 +576,7 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
   int ret = PIO_NOERR;
   Hdf5_wcache *wcache = static_cast<struct Hdf5_wcache *>(pdata);
   assert(wcache);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ", fname=" + wcache->file->fname + ", nvars=" + std::to_string(wcache->nvars));
 
   file_desc_t *file = wcache->file;
   int nvars = wcache->nvars;
@@ -784,6 +798,7 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
 
 void pio_iosys_async_op_hdf5_write_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
 #ifdef _HDF5
   Hdf5_wcache *wcache = static_cast<struct Hdf5_wcache *>(pdata);
   assert(wcache);
