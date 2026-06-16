@@ -762,9 +762,9 @@ static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, 
   SPIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer_wrapper ios_fstats_tot_timer(ios->io_fstats->tot_timer_name);
 
   /* Caller must provide these. */
-  if(!gdimlen || !compmap || !ioidp){
+  if(!gdimlen || ((maplen != 0) && !compmap) || !ioidp){
     return pio_err(ios, NULL, PIO_EINVAL, __FILE__, __LINE__,
-                    "Initializing the PIO decomposition failed. Invalid pointers (NULL) to gdimlen(%s) or compmap(%s) or ioidp (%s) provided", (gdimlen) ? "not NULL" : "NULL", (compmap) ? "not NULL" : "NULL", (ioidp) ? "not NULL" : "NULL");
+                    "Initializing the PIO decomposition failed. Invalid pointers (NULL) to gdimlen(%s) or compmap(%s, maplen=%d) or ioidp (%s) provided", (gdimlen) ? "not NULL" : "NULL", (compmap) ? "not NULL" : "NULL", maplen, (ioidp) ? "not NULL" : "NULL");
   }
 
   /* Check the dim lengths. */
