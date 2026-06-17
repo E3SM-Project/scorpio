@@ -68,7 +68,7 @@ CMake configuration options are specified in the "-DCONFIG_OPTION1=CONFIG_OPTION
 <li> <b>PIO_ENABLE_EXAMPLES</b>: Build SCORPIO examples available in SCORPIO_SOURCE/examples directory (default OFF) </li>
 <li> <b>PIO_INTERNAL_DOC</b>: BuildSCORPIO developer documentation (default OFF) </li>
 <li> <b>PIO_USE_MPISERIAL</b>: Build SCORPIO with the mpi-serial library instead of an MPI library (default OFF) </li>
-<li> <b>PIO_USE_MALLOC</b>: Use native malloc (instead of the BGET libarry) for memory allocations (default OFF) </li>
+<li> <b>PIO_USE_MALLOC</b>: Use native malloc (instead of the BGET library) for memory allocations (default ON) </li>
 <li> <b>PIO_USE_INDEP_MODE</b>: Enable PnetCDF independent data mode for non-distributed data, allowing MPI processes to write data independently (default ON) </li>
 <li> <b>WITH_PNETCDF</b>: Require the use of the PnetCDF library (default ON) </li>
 <li> <b>WITH_NETCDF</b>: Require the use of the NetCDF library (default ON) </li>
