@@ -99,7 +99,7 @@ void expand_region(int dim, const int *gdimlen, int maplen, const PIO_Offset *ma
     int expansion_done = 0;
 
     /* Check inputs. */
-    pioassert(dim >= 0 && gdimlen && maplen >= 0 && map && region_size >= 0 &&
+    pioassert(dim >= 0 && gdimlen && maplen >= 0 && ((maplen == 0) || map) && region_size >= 0 &&
               maplen >= region_size && region_stride >= 0 && max_size && count,
               "invalid input", __FILE__, __LINE__);
 
@@ -1218,7 +1218,7 @@ int determine_fill(iosystem_desc_t *ios, io_desc_t *iodesc, const int *gdimlen,
     int mpierr; /* Return code from MPI calls. */
 
     /* Check inputs. */
-    pioassert(ios && iodesc && gdimlen && compmap, "invalid input",
+    pioassert(ios && iodesc && gdimlen && ((iodesc->ndof == 0) || compmap), "invalid input",
               __FILE__, __LINE__);
 
     /* Determine size of data space. */
@@ -1298,7 +1298,7 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
 
     GPTLstart("PIO:box_rearrange_create");
     /* Check inputs. */
-    pioassert(ios && maplen >= 0 && compmap && gdimlen && ndims > 0 && iodesc,
+    pioassert(ios && maplen >= 0 && ((maplen == 0) || compmap) && gdimlen && ndims > 0 && iodesc,
               "invalid input", __FILE__, __LINE__);
     LOG((1, "box_rearrange_create maplen = %d ndims = %d ios->num_comptasks = %d "
          "ios->num_iotasks = %d", maplen, ndims, ios->num_comptasks, ios->num_iotasks));
@@ -1629,7 +1629,7 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
 
     GPTLstart("PIO:box_rearrange_create_with_holes");
     /* Check inputs. */
-    pioassert(ios && maplen >= 0 && compmap && gdimlen && ndims > 0 && iodesc,
+    pioassert(ios && maplen >= 0 && ((maplen == 0) || compmap) && gdimlen && ndims > 0 && iodesc,
               "invalid input", __FILE__, __LINE__);
     LOG((1, "box_rearrange_create maplen = %d ndims = %d ios->num_comptasks = %d "
          "ios->num_iotasks = %d", maplen, ndims, ios->num_comptasks, ios->num_iotasks));
@@ -1983,7 +1983,7 @@ int get_regions(int ndims, const int *gdimlen, int maplen, const PIO_Offset *map
     int ret;
 
     /* Check inputs. */
-    pioassert(ndims >= 0 && gdimlen && maplen >= 0 && maxregions && firstregion,
+    pioassert(ndims >= 0 && gdimlen && maplen >= 0 && ((maplen == 0) || map) && maxregions && firstregion,
               "invalid input", __FILE__, __LINE__);
     LOG((1, "get_regions ndims = %d maplen = %d", ndims, maplen));
 
@@ -2201,7 +2201,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
 
     GPTLstart("PIO:subset_rearrange_create");
     /* Check inputs. */
-    pioassert(ios && maplen >= 0 && compmap && gdimlen && ndims >= 0 && iodesc,
+    pioassert(ios && maplen >= 0 && ((maplen == 0) || compmap) && gdimlen && ndims >= 0 && iodesc,
               "invalid input", __FILE__, __LINE__);
 
     LOG((2, "subset_rearrange_create maplen = %d ndims = %d", maplen, ndims));

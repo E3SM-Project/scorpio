@@ -535,7 +535,7 @@ static int subset_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const
   int ret = PIO_NOERR;
 
   assert(ios && iodesc);
-  assert(iodesc->map && iodesc->dimlen);
+  assert(((iodesc->maplen == 0) || iodesc->map) && iodesc->dimlen);
 
   iodesc->num_aiotasks = ios->num_iotasks;
   LOG((2, "creating subset rearranger iodesc->num_aiotasks = %d", iodesc->num_aiotasks));
@@ -552,7 +552,7 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
 {
   int ret = PIO_NOERR;
   assert(ios && iodesc);
-  assert(iodesc->map && iodesc->dimlen && iodesc->firstregion);
+  assert(((iodesc->maplen == 0) || iodesc->map) && iodesc->dimlen && iodesc->firstregion);
 
   if(ios->ioproc){
     /*  Unless the user specifies the start and count for each
@@ -652,7 +652,7 @@ static int contig_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const
   int ret = PIO_NOERR;
 
   assert(ios && iodesc);
-  assert(iodesc->map && iodesc->dimlen);
+  assert(((iodesc->maplen == 0) || iodesc->map) && iodesc->dimlen);
 
   if(iostart && iocount){
     /* FIXME: We should at least convert iostart/iocount arrays to decomp maps */
@@ -849,25 +849,27 @@ static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, 
   }
 
   /* Cache the local decomposition map */
-  if(map_zero_based){
-    /* BOX and SUBSET rearrangers expect map to the 1-based */
-    if((iodesc->rearranger == PIO_REARR_BOX) || (iodesc->rearranger == PIO_REARR_SUBSET)){
-      std::transform(compmap, compmap + maplen, iodesc->map,
-        [](PIO_Offset off) { return off + 1; });
+  if(maplen > 0){
+    if(map_zero_based){
+      /* BOX and SUBSET rearrangers expect map to the 1-based */
+      if((iodesc->rearranger == PIO_REARR_BOX) || (iodesc->rearranger == PIO_REARR_SUBSET)){
+        std::transform(compmap, compmap + maplen, iodesc->map,
+          [](PIO_Offset off) { return off + 1; });
+      }
+      else{
+        std::copy(compmap, compmap + maplen, iodesc->map);
+      }
     }
     else{
-      std::copy(compmap, compmap + maplen, iodesc->map);
-    }
-  }
-  else{
-    /* The decomposition map is 1-based */
-    if(iodesc->rearranger == PIO_REARR_CONTIG){
-      /* CONTIG rearranger expects map to be 0-based */
-      std::transform(compmap, compmap + maplen, iodesc->map,
-        [](PIO_Offset off) { return off - 1; });
-    }
-    else{
-      std::copy(compmap, compmap + maplen, iodesc->map);
+      /* The decomposition map is 1-based */
+      if(iodesc->rearranger == PIO_REARR_CONTIG){
+        /* CONTIG rearranger expects map to be 0-based */
+        std::transform(compmap, compmap + maplen, iodesc->map,
+          [](PIO_Offset off) { return off - 1; });
+      }
+      else{
+        std::copy(compmap, compmap + maplen, iodesc->map);
+      }
     }
   }
 

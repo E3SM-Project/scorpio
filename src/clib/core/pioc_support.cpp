@@ -1725,9 +1725,11 @@ int malloc_iodesc(iosystem_desc_t *ios, int piotype, int ndims, int maplen,
     }
 
     /* Allocate memory for the local decomposition map */
-    if(!((*iodesc)->map = (PIO_Offset *) malloc(sizeof(PIO_Offset) * maplen))){
-      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Internal error while allocating memory (%lld bytes) to store I/O decomposition map", (unsigned long long) (sizeof(PIO_Offset) * maplen));
+    if(maplen > 0){
+      if(!((*iodesc)->map = (PIO_Offset *) malloc(sizeof(PIO_Offset) * maplen))){
+        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Internal error while allocating memory (%lld bytes) to store I/O decomposition map", (unsigned long long) (sizeof(PIO_Offset) * maplen));
+      }
     }
 
     /* Allocate memory for storing the dimension lengths of variables that use this decomposition */
@@ -1819,7 +1821,7 @@ int PIOc_freedecomp_impl(int iosysid, int ioid)
     }
 
     /* Free the map. */
-    free(iodesc->map);
+    if(iodesc->map) { free(iodesc->map); }
 
     /* Free the dimlens. */
     free(iodesc->dimlen);
