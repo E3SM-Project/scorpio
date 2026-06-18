@@ -1905,8 +1905,8 @@ int PIOc_readmap_txt_impl(const char *file, int *ndims, int **gdims, PIO_Offset 
   int rnpes, rversno;
   char rversstr[PIO_MAX_NAME], rnpesstr[PIO_MAX_NAME], rndimsstr[PIO_MAX_NAME];
   int j;
-  int *tdims;
-  PIO_Offset *tmap;
+  int *tdims = NULL;
+  PIO_Offset *tmap = NULL;
   MPI_Status status;
   PIO_Offset maplen;
   int mpierr = MPI_SUCCESS; /* Return code for MPI calls. */
@@ -1920,6 +1920,44 @@ int PIOc_readmap_txt_impl(const char *file, int *ndims, int **gdims, PIO_Offset 
   if((mpierr = MPI_Comm_size(comm, &npes))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
   if((mpierr = MPI_Comm_rank(comm, &myrank))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
 
+  /*
+   * Rank 0 reads the I/O decomposition info in the file and sends/bcasts it to all other processes.
+   * Rank 0 reads the I/O decomposition map for rank i and sends it to rank i and then proceeds
+   * to process I/O decomposition map for rank i + 1
+   *
+   * Format of the I/O decomposition map (in text format) is as follows
+   *====================================================
+    version <VERSION> npes <NUM_MPI_TASKS> ndims <NUM_DIMENSIONS_FOR_IO_DECOMP>
+    <GLOBAL_SIZE_OF_IO_DECOMP>
+    <MPI_COMM_RANK_0> <LOCAL_SIZE_OF_IO_DECOMP_IN_MPI_RANK_0>
+    <LOCAL_IO_DECOMP_IN_MPI_RANK_0>
+    <MPI_COMM_RANK_1> <LOCAL_SIZE_OF_IO_DECOMP_IN_MPI_RANK_1>
+    <LOCAL_IO_DECOMP_IN_MPI_RANK_1>
+    ...
+    <MPI_COMM_RANK_N-1> <LOCAL_SIZE_OF_IO_DECOMP_IN_MPI_RANK_N-1>
+    <LOCAL_IO_DECOMP_IN_MPI_RANK_N-1>
+
+    Obtained 10 stack frames.
+    <STACK_FRAME_OF_THE_INITDECOMP_API_CALL>
+    ioid  <IO_DECOMPOSITION_ID>
+   *====================================================
+   * e.g. 2 MPI processes, 1D I/O decomposition with 14 elements,
+   *  I/O decomp map in rank 0 : 14 elements
+   *  I/O decomp map in rank 1 : 0 elements
+   *====================================================
+    version 2001 npes 2 ndims 1
+    14
+    0 14
+    1 2 3 4 5 6 7 8 9 10 11 12 13 14
+    1 0
+
+    Obtained 10 stack frames.
+    /lib/x86_64-linux-gnu/libasan.so.6(+0x45c0e) [0x7fa6179c3c0e]
+    ./tests/general/pio_decomp_tests_1d(+0x1696d4) [0x5619e7bcc6d4]
+    ioid  512
+   *====================================================
+   */
+
   if(myrank == 0){
     FILE *fp = fopen(file, "r");
     if(!fp){
@@ -1927,6 +1965,7 @@ int PIOc_readmap_txt_impl(const char *file, int *ndims, int **gdims, PIO_Offset 
                 "Reading I/O decomposition from file (%s) failed. Opening the file failed", file);
     }
 
+    /* Read header : e.g. "version 2001 npes 2 ndims 1" */
     fscanf(fp,"%s%d%s%d%s%d\n",rversstr, &rversno, rnpesstr, &rnpes, rndimsstr, ndims);
 
     if(rversno != VERSNO){
@@ -1950,30 +1989,39 @@ int PIOc_readmap_txt_impl(const char *file, int *ndims, int **gdims, PIO_Offset 
     if((mpierr = MPI_Bcast(tdims, *ndims, MPI_INT, 0, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
 
     for(int i = 0; i < rnpes; i++){
+      /* Read maplength for MPI rank i : e.g. "0 14" */
       fscanf(fp, "%d %lld", &j, &maplen);
-      if(j != i){  // Not sure how this could be possible
+      if(j != i){
+        /* The I/O decomposition file is somehow corrupted, the I/O decomps are not in expected order (increasing MPI ranks) */
         return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
                         "Reading I/O decomposition from file (%s) failed. Corrupt/invalid entries in file. Expected decomposition info of process %d but read decomposition info of process %d instead", file, i, j);
       }
-      if(!(tmap = (PIO_Offset *) malloc(maplen * sizeof(PIO_Offset)))){
-        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes for storing I/O decomposition map", file, (unsigned long long) (maplen * sizeof(PIO_Offset)));
+      if(maplen > 0){
+        /* Read the local I/O decomposition map for MPI rank i */
+        if(!(tmap = (PIO_Offset *) malloc(maplen * sizeof(PIO_Offset)))){
+          return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                          "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes for storing I/O decomposition map", file, (unsigned long long) (maplen * sizeof(PIO_Offset)));
+        }
+        for(j = 0; j < maplen; j++) { fscanf(fp, "%lld ", tmap+j); }
       }
-      for(j = 0; j < maplen; j++) { fscanf(fp, "%lld ", tmap+j); }
 
+      /* Bcast the read map length, maplen, and the map, tmap, to MPI rank i */
       if(i > 0){
         if((mpierr = MPI_Send(&maplen, 1, PIO_OFFSET, i, i + npes, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
-        if((mpierr = MPI_Send(tmap, maplen, PIO_OFFSET, i, i, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
-        free(tmap);
+        if(maplen > 0){
+          if((mpierr = MPI_Send(tmap, maplen, PIO_OFFSET, i, i, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+          free(tmap);
+        }
       }
       else{
-        *map = tmap;
         *fmaplen = maplen;
+        *map = (maplen > 0) ? tmap : NULL;
       }
     }
     fclose(fp);
   }
   else{
+    /* Receive the header info from rank 0 */
     if((mpierr = MPI_Bcast(&rnpes, 1, MPI_INT, 0, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
     if((mpierr = MPI_Bcast(ndims, 1, MPI_INT, 0, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
     if(!(tdims = (int *) calloc(*ndims, sizeof(int)))){
@@ -1982,19 +2030,25 @@ int PIOc_readmap_txt_impl(const char *file, int *ndims, int **gdims, PIO_Offset 
     }
     if((mpierr = MPI_Bcast(tdims, *ndims, MPI_INT, 0, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
 
+    tmap = NULL;
     if(myrank < rnpes){
+      /* Receive I/O decomposition map length, maplen, and the map, tmap, from rank 0 */
       if((mpierr = MPI_Recv(&maplen, 1, PIO_OFFSET, 0, myrank + npes, comm, &status))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
-      if(!(tmap = (PIO_Offset *) malloc(maplen * sizeof(PIO_Offset)))){
-        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes to store I/O decomposition map", file, (unsigned long long) (maplen * sizeof(PIO_Offset)));
+      if(maplen > 0){
+        if(!(tmap = (PIO_Offset *) malloc(maplen * sizeof(PIO_Offset)))){
+          return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                          "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes to store I/O decomposition map", file, (unsigned long long) (maplen * sizeof(PIO_Offset)));
+        }
+        if((mpierr = MPI_Recv(tmap, maplen, PIO_OFFSET, 0, myrank, comm, &status))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
       }
-      if((mpierr = MPI_Recv(tmap, maplen, PIO_OFFSET, 0, myrank, comm, &status))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
-      *map = tmap;
     }
     else{
-      tmap = NULL;
+      /* If the I/O decomposition is read with an MPI comm of size greater than the one used to write it,
+       * all the MPI processes with rank > max_rank of the MPI comm used to write the decomp get 0 local map size
+       */
       maplen = 0;
     }
+    *map = tmap;
     *fmaplen = maplen;
   }
   *gdims = tdims;
