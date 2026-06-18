@@ -2888,117 +2888,99 @@ int PIOc_write_decomp_impl(const char *file, int iosysid, int ioid, MPI_Comm com
 int PIOc_writemap_impl(const char *file, int ioid, int ndims, const int *gdims, PIO_Offset maplen,
                   const PIO_Offset *map, MPI_Comm comm)
 {
-    int npes, myrank;
-    PIO_Offset *nmaplen = NULL;
-    MPI_Status status;
-    int i;
-    PIO_Offset *nmap;
-    int gdims_reversed[ndims];
-    int mpierr = MPI_SUCCESS; /* Return code for MPI calls. */
+  int npes, myrank;
+  PIO_Offset *nmaplen = NULL;
+  MPI_Status status;
+  int i;
+  PIO_Offset *nmap;
+  int gdims_reversed[ndims];
+  int mpierr = MPI_SUCCESS; /* Return code for MPI calls. */
 
-    LOG((1, "PIOc_writemap file = %s ioid = %d ndims = %d maplen = %d", file, ioid, ndims, maplen));
+  LOG((1, "PIOc_writemap file = %s ioid = %d ndims = %d maplen = %d", file, ioid, ndims, maplen));
 
-    if (!file || !gdims || !map)
-    {
-        return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
-                        "Writing I/O decomposition to file failed. Invalid arguments, file is %s (expected not NULL), gdims is %s (expected not NULL), map is %s (expected not NULL)", PIO_IS_NULL(file), PIO_IS_NULL(gdims), PIO_IS_NULL(map));
+  if(!file || !gdims || !map){
+    return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
+                    "Writing I/O decomposition to file failed. Invalid arguments, file is %s (expected not NULL), gdims is %s (expected not NULL), map is %s (expected not NULL)", PIO_IS_NULL(file), PIO_IS_NULL(gdims), PIO_IS_NULL(map));
+  }
+
+  if((mpierr = MPI_Comm_size(comm, &npes))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+  if((mpierr = MPI_Comm_rank(comm, &myrank))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+  LOG((2, "npes = %d myrank = %d", npes, myrank));
+
+  /* Allocate memory for the nmaplen. */
+  if(myrank == 0){
+    if(!(nmaplen = (PIO_Offset *) malloc(npes * sizeof(PIO_Offset)))){
+      return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Writing I/O decomposition to file (%s) failed. Out of memory allocating %lld bytes for array of map lengths", file, (unsigned long long) (npes * sizeof(PIO_Offset)));
+    }
+  }
+
+  if((mpierr = MPI_Gather(&maplen, 1, PIO_OFFSET, nmaplen, 1, PIO_OFFSET, 0, comm))){ return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+
+  /* Only rank 0 writes the file. */
+  if(myrank == 0){
+    FILE *fp;
+
+    /* Open the file to write. */
+    if(!(fp = fopen(file, "w"))){
+      return pio_err(NULL, NULL, PIO_EIO, __FILE__, __LINE__,
+                      "Writing I/O decomposition to file (%s) failed. Error opening the file", file);
     }
 
-    if ((mpierr = MPI_Comm_size(comm, &npes)))
-        return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-    if ((mpierr = MPI_Comm_rank(comm, &myrank)))
-        return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-    LOG((2, "npes = %d myrank = %d", npes, myrank));
-
-    /* Allocate memory for the nmaplen. */
-    if (myrank == 0)
-        if (!(nmaplen = (PIO_Offset *) malloc(npes * sizeof(PIO_Offset))))
-        {
-            return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Writing I/O decomposition to file (%s) failed. Out of memory allocating %lld bytes for array of map lengths", file, (unsigned long long) (npes * sizeof(PIO_Offset)));
-        }
-
-    if ((mpierr = MPI_Gather(&maplen, 1, PIO_OFFSET, nmaplen, 1, PIO_OFFSET, 0, comm)))
-        return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-
-    /* Only rank 0 writes the file. */
-    if (myrank == 0)
-    {
-        FILE *fp;
-
-        /* Open the file to write. */
-        if (!(fp = fopen(file, "w")))
-        {
-            return pio_err(NULL, NULL, PIO_EIO, __FILE__, __LINE__,
-                            "Writing I/O decomposition to file (%s) failed. Error opening the file", file);
-        }
-
-        /* Write the version and dimension info. */
-        fprintf(fp,"version %d npes %d ndims %d \n", VERSNO, npes, ndims);
-        if(fortran_order)
-        {
-            for(int i=0; i<ndims; i++)
-            {
-                gdims_reversed[i] = gdims[ndims - 1 - i];
-            }
-            gdims = gdims_reversed;
-        }
-        for (i = 0; i < ndims; i++)
-            fprintf(fp, "%d ", gdims[i]);
-        fprintf(fp, "\n");
-
-        /* Write the map. */
-        fprintf(fp, "0 %lld\n", nmaplen[0]);
-        for (i = 0; i < nmaplen[0]; i++)
-            fprintf(fp, "%lld ", map[i]);
-        fprintf(fp,"\n");
-
-        for (i = 1; i < npes; i++)
-        {
-            LOG((2, "creating nmap for i = %d", i));
-            nmap = (PIO_Offset *)malloc(nmaplen[i] * sizeof(PIO_Offset));
-            if (!nmap)
-            {
-                return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                "Writing I/O decomposition to file (%s) failed. Out of memory allocating %lld bytes for I/O decomposition map (map length = %lld) for process %d", file, (unsigned long long) (nmaplen[i] * sizeof(PIO_Offset)), (unsigned long long) nmaplen[i], i);
-            }
-
-            if ((mpierr = MPI_Send(&i, 1, MPI_INT, i, npes + i, comm)))
-                return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-            if ((mpierr = MPI_Recv(nmap, nmaplen[i], PIO_OFFSET, i, i, comm, &status)))
-                return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-            LOG((2,"MPI_Recv map complete"));
-
-            fprintf(fp, "%d %lld\n", i, nmaplen[i]);
-            for (int j = 0; j < nmaplen[i]; j++)
-                fprintf(fp, "%lld ", nmap[j]);
-            fprintf(fp, "\n");
-
-            free(nmap);
-        }
-        /* Free memory for the nmaplen. */
-        free(nmaplen);
-        fprintf(fp, "\n");
-        print_trace(fp);
-
-        /* Print the decomposition id */
-        fprintf(fp, "ioid\t%d\n", ioid);
-        /* Close the file. */
-        fclose(fp);
-        LOG((2,"decomp file closed."));
+    /* Write the version and dimension info. */
+    fprintf(fp,"version %d npes %d ndims %d \n", VERSNO, npes, ndims);
+    if(fortran_order){
+      for(int i=0; i<ndims; i++){
+        gdims_reversed[i] = gdims[ndims - 1 - i];
+      }
+      gdims = gdims_reversed;
     }
-    else
-    {
-        LOG((2,"ready to MPI_Recv..."));
-        if ((mpierr = MPI_Recv(&i, 1, MPI_INT, 0, npes+myrank, comm, &status)))
-            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-        LOG((2,"MPI_Recv got %d", i));
-        if ((mpierr = MPI_Send(map, maplen, PIO_OFFSET, 0, myrank, comm)))
-            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-        LOG((2,"MPI_Send map complete"));
-    }
+    for(i = 0; i < ndims; i++) { fprintf(fp, "%d ", gdims[i]); }
+    fprintf(fp, "\n");
 
-    return PIO_NOERR;
+    /* Write the map. */
+    fprintf(fp, "0 %lld\n", nmaplen[0]);
+    for(i = 0; i < nmaplen[0]; i++){ fprintf(fp, "%lld ", map[i]); }
+    fprintf(fp,"\n");
+
+    for(i = 1; i < npes; i++){
+      LOG((2, "creating nmap for i = %d", i));
+      nmap = (PIO_Offset *)malloc(nmaplen[i] * sizeof(PIO_Offset));
+      if(!nmap){
+        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Writing I/O decomposition to file (%s) failed. Out of memory allocating %lld bytes for I/O decomposition map (map length = %lld) for process %d", file, (unsigned long long) (nmaplen[i] * sizeof(PIO_Offset)), (unsigned long long) nmaplen[i], i);
+      }
+
+      if((mpierr = MPI_Send(&i, 1, MPI_INT, i, npes + i, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+      if((mpierr = MPI_Recv(nmap, nmaplen[i], PIO_OFFSET, i, i, comm, &status))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+      LOG((2,"MPI_Recv map complete"));
+
+      fprintf(fp, "%d %lld\n", i, nmaplen[i]);
+      for(int j = 0; j < nmaplen[i]; j++) { fprintf(fp, "%lld ", nmap[j]); }
+      fprintf(fp, "\n");
+
+      free(nmap);
+    }
+    /* Free memory for the nmaplen. */
+    free(nmaplen);
+    fprintf(fp, "\n");
+    print_trace(fp);
+
+    /* Print the decomposition id */
+    fprintf(fp, "ioid\t%d\n", ioid);
+    /* Close the file. */
+    fclose(fp);
+    LOG((2,"decomp file closed."));
+  }
+  else{
+    LOG((2,"ready to MPI_Recv..."));
+    if((mpierr = MPI_Recv(&i, 1, MPI_INT, 0, npes+myrank, comm, &status))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+    LOG((2,"MPI_Recv got %d", i));
+    if((mpierr = MPI_Send(map, maplen, PIO_OFFSET, 0, myrank, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+    LOG((2,"MPI_Send map complete"));
+  }
+
+  return PIO_NOERR;
 }
 
 /**
