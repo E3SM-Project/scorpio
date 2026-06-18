@@ -1901,134 +1901,104 @@ int PIOc_freedecomp_impl(int iosysid, int ioid)
 int PIOc_readmap_txt_impl(const char *file, int *ndims, int **gdims, PIO_Offset *fmaplen,
                  PIO_Offset **map, MPI_Comm comm)
 {
-    int npes, myrank;
-    int rnpes, rversno;
-    char rversstr[PIO_MAX_NAME], rnpesstr[PIO_MAX_NAME], rndimsstr[PIO_MAX_NAME];
-    int j;
-    int *tdims;
-    PIO_Offset *tmap;
-    MPI_Status status;
-    PIO_Offset maplen;
-    int mpierr = MPI_SUCCESS; /* Return code for MPI calls. */
+  int npes, myrank;
+  int rnpes, rversno;
+  char rversstr[PIO_MAX_NAME], rnpesstr[PIO_MAX_NAME], rndimsstr[PIO_MAX_NAME];
+  int j;
+  int *tdims;
+  PIO_Offset *tmap;
+  MPI_Status status;
+  PIO_Offset maplen;
+  int mpierr = MPI_SUCCESS; /* Return code for MPI calls. */
 
-    /* Check inputs. */
-    if (!file || !ndims || !gdims || !fmaplen || !map)
-    {
+  /* Check inputs. */
+  if(!file || !ndims || !gdims || !fmaplen || !map){
+    return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
+                    "Reading I/O decomposition failed. Invalid arguments provided, file is %s (expected not NULL), ndims is %s (expected not NULL), gdims is %s (expected not NULL), fmaplen is %s (expected not NULL), map is %s (expected not NULL)", PIO_IS_NULL(file), PIO_IS_NULL(ndims), PIO_IS_NULL(gdims), PIO_IS_NULL(fmaplen), PIO_IS_NULL(map));
+  }
+
+  if((mpierr = MPI_Comm_size(comm, &npes))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+  if((mpierr = MPI_Comm_rank(comm, &myrank))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+
+  if(myrank == 0){
+    FILE *fp = fopen(file, "r");
+    if(!fp){
+      return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
+                "Reading I/O decomposition from file (%s) failed. Opening the file failed", file);
+    }
+
+    fscanf(fp,"%s%d%s%d%s%d\n",rversstr, &rversno, rnpesstr, &rnpes, rndimsstr, ndims);
+
+    if(rversno != VERSNO){
+      return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
+                      "Reading I/O decomposition from file (%s) failed. Version mismatch. The version read from file, %d, does not match the expected/supported version (%d)", file, rversno, VERSNO);
+    }
+
+    if(rnpes < 1 || rnpes > npes){
+      return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
+                      "Reading I/O decomposition from file (%s) failed. Corrupt/Invalid entries in file. Number of PEs = %d (expected >= 1 && <= npes, %d)", file, rnpes, npes);
+    }
+
+    if((mpierr = MPI_Bcast(&rnpes, 1, MPI_INT, 0, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+    if((mpierr = MPI_Bcast(ndims, 1, MPI_INT, 0, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+    if(!(tdims = (int *) calloc(*ndims, sizeof(int)))){
+      return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes for temp buffer to store dimension ids", file, (unsigned long long) ((*ndims) * sizeof(int)));
+    }
+    for(int i = 0; i < *ndims; i++) { fscanf(fp,"%d ", tdims + i); }
+
+    if((mpierr = MPI_Bcast(tdims, *ndims, MPI_INT, 0, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+
+    for(int i = 0; i < rnpes; i++){
+      fscanf(fp, "%d %lld", &j, &maplen);
+      if(j != i){  // Not sure how this could be possible
         return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
-                        "Reading I/O decomposition failed. Invalid arguments provided, file is %s (expected not NULL), ndims is %s (expected not NULL), gdims is %s (expected not NULL), fmaplen is %s (expected not NULL), map is %s (expected not NULL)", PIO_IS_NULL(file), PIO_IS_NULL(ndims), PIO_IS_NULL(gdims), PIO_IS_NULL(fmaplen), PIO_IS_NULL(map));
-    }
+                        "Reading I/O decomposition from file (%s) failed. Corrupt/invalid entries in file. Expected decomposition info of process %d but read decomposition info of process %d instead", file, i, j);
+      }
+      if(!(tmap = (PIO_Offset *) malloc(maplen * sizeof(PIO_Offset)))){
+        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes for storing I/O decomposition map", file, (unsigned long long) (maplen * sizeof(PIO_Offset)));
+      }
+      for(j = 0; j < maplen; j++) { fscanf(fp, "%lld ", tmap+j); }
 
-    if ((mpierr = MPI_Comm_size(comm, &npes)))
-        return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-    if ((mpierr = MPI_Comm_rank(comm, &myrank)))
-        return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-
-    if (myrank == 0)
-    {
-        FILE *fp = fopen(file, "r");
-        if (!fp)
-        {
-            pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
-                    "Reading I/O decomposition from file (%s) failed. Opening the file failed", file);
-        }
-
-        fscanf(fp,"%s%d%s%d%s%d\n",rversstr, &rversno, rnpesstr, &rnpes, rndimsstr, ndims);
-
-        if (rversno != VERSNO)
-        {
-            return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
-                            "Reading I/O decomposition from file (%s) failed. Version mismatch. The version read from file, %d, does not match the expected/supported version (%d)", file, rversno, VERSNO);
-        }
-
-        if (rnpes < 1 || rnpes > npes)
-        {
-            return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
-                            "Reading I/O decomposition from file (%s) failed. Corrupt/Invalid entries in file. Number of PEs = %d (expected >= 1 && <= npes, %d)", file, rnpes, npes);
-        }
-
-        if ((mpierr = MPI_Bcast(&rnpes, 1, MPI_INT, 0, comm)))
-            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-        if ((mpierr = MPI_Bcast(ndims, 1, MPI_INT, 0, comm)))
-            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-        if (!(tdims = (int *) calloc(*ndims, sizeof(int))))
-        {
-            return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes for temp buffer to store dimension ids", file, (unsigned long long) ((*ndims) * sizeof(int)));
-        }
-        for (int i = 0; i < *ndims; i++)
-            fscanf(fp,"%d ", tdims + i);
-
-        if ((mpierr = MPI_Bcast(tdims, *ndims, MPI_INT, 0, comm)))
-            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-
-        for (int i = 0; i < rnpes; i++)
-        {
-            fscanf(fp, "%d %lld", &j, &maplen);
-            if (j != i)  // Not sure how this could be possible
-            {
-                return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
-                                "Reading I/O decomposition from file (%s) failed. Corrupt/invalid entries in file. Expected decomposition info of process %d but read decomposition info of process %d instead", file, i, j);
-            }
-            if (!(tmap = (PIO_Offset *) malloc(maplen * sizeof(PIO_Offset))))
-            {
-                return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes for storing I/O decomposition map", file, (unsigned long long) (maplen * sizeof(PIO_Offset)));
-            }
-            for (j = 0; j < maplen; j++)
-                fscanf(fp, "%lld ", tmap+j);
-
-            if (i > 0)
-            {
-                if ((mpierr = MPI_Send(&maplen, 1, PIO_OFFSET, i, i + npes, comm)))
-                    return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-                if ((mpierr = MPI_Send(tmap, maplen, PIO_OFFSET, i, i, comm)))
-                    return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-                free(tmap);
-            }
-            else
-            {
-                *map = tmap;
-                *fmaplen = maplen;
-            }
-        }
-        fclose(fp);
-    }
-    else
-    {
-        if ((mpierr = MPI_Bcast(&rnpes, 1, MPI_INT, 0, comm)))
-            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-        if ((mpierr = MPI_Bcast(ndims, 1, MPI_INT, 0, comm)))
-            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-        if (!(tdims = (int *) calloc(*ndims, sizeof(int))))
-        {
-            return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes for temp buffer to store dimension ids", file, (unsigned long long)((*ndims) * sizeof(int)));
-        }
-        if ((mpierr = MPI_Bcast(tdims, *ndims, MPI_INT, 0, comm)))
-            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-
-        if (myrank < rnpes)
-        {
-            if ((mpierr = MPI_Recv(&maplen, 1, PIO_OFFSET, 0, myrank + npes, comm, &status)))
-                return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-            if (!(tmap = (PIO_Offset *) malloc(maplen * sizeof(PIO_Offset))))
-            {
-                return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes to store I/O decomposition map", file, (unsigned long long) (maplen * sizeof(PIO_Offset)));
-            }
-            if ((mpierr = MPI_Recv(tmap, maplen, PIO_OFFSET, 0, myrank, comm, &status)))
-                return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
-            *map = tmap;
-        }
-        else
-        {
-            tmap = NULL;
-            maplen = 0;
-        }
+      if(i > 0){
+        if((mpierr = MPI_Send(&maplen, 1, PIO_OFFSET, i, i + npes, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+        if((mpierr = MPI_Send(tmap, maplen, PIO_OFFSET, i, i, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+        free(tmap);
+      }
+      else{
+        *map = tmap;
         *fmaplen = maplen;
+      }
     }
-    *gdims = tdims;
-    return PIO_NOERR;
+    fclose(fp);
+  }
+  else{
+    if((mpierr = MPI_Bcast(&rnpes, 1, MPI_INT, 0, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+    if((mpierr = MPI_Bcast(ndims, 1, MPI_INT, 0, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+    if(!(tdims = (int *) calloc(*ndims, sizeof(int)))){
+      return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes for temp buffer to store dimension ids", file, (unsigned long long)((*ndims) * sizeof(int)));
+    }
+    if((mpierr = MPI_Bcast(tdims, *ndims, MPI_INT, 0, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+
+    if(myrank < rnpes){
+      if((mpierr = MPI_Recv(&maplen, 1, PIO_OFFSET, 0, myrank + npes, comm, &status))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+      if(!(tmap = (PIO_Offset *) malloc(maplen * sizeof(PIO_Offset)))){
+        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Reading I/O decomposition from file (%s) failed. Out of memory allocating %lld bytes to store I/O decomposition map", file, (unsigned long long) (maplen * sizeof(PIO_Offset)));
+      }
+      if((mpierr = MPI_Recv(tmap, maplen, PIO_OFFSET, 0, myrank, comm, &status))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+      *map = tmap;
+    }
+    else{
+      tmap = NULL;
+      maplen = 0;
+    }
+    *fmaplen = maplen;
+  }
+  *gdims = tdims;
+  return PIO_NOERR;
 }
 
 /**
