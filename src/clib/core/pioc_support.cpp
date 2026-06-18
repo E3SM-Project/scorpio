@@ -2898,7 +2898,7 @@ int PIOc_writemap_impl(const char *file, int ioid, int ndims, const int *gdims, 
 
   LOG((1, "PIOc_writemap file = %s ioid = %d ndims = %d maplen = %d", file, ioid, ndims, maplen));
 
-  if(!file || !gdims || !map){
+  if(!file || !gdims || ((maplen > 0) && !map)){
     return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
                     "Writing I/O decomposition to file failed. Invalid arguments, file is %s (expected not NULL), gdims is %s (expected not NULL), map is %s (expected not NULL)", PIO_IS_NULL(file), PIO_IS_NULL(gdims), PIO_IS_NULL(map));
   }
@@ -2906,6 +2906,13 @@ int PIOc_writemap_impl(const char *file, int ioid, int ndims, const int *gdims, 
   if((mpierr = MPI_Comm_size(comm, &npes))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
   if((mpierr = MPI_Comm_rank(comm, &myrank))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
   LOG((2, "npes = %d myrank = %d", npes, myrank));
+
+  /* 1. Rank 0 gathers the maplen from all other processes
+   * 2. Rank 0 communicates with each rank to get the I/O decomposition map
+   *  2.1) Rank 0 sends a syncing ping to Rank i (by sending rank i to MPI process with rank i)
+   *  2.2) Rank 0 waits for I/O decomposition map from Rank i
+   * 3. Rank 0 writes out the I/O decomposition map
+   */
 
   /* Allocate memory for the nmaplen. */
   if(myrank == 0){
@@ -2915,6 +2922,7 @@ int PIOc_writemap_impl(const char *file, int ioid, int ndims, const int *gdims, 
     }
   }
 
+  /* FIXME: PIO_OFFSET vs MPI_OFFSET */
   if((mpierr = MPI_Gather(&maplen, 1, PIO_OFFSET, nmaplen, 1, PIO_OFFSET, 0, comm))){ return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
 
   /* Only rank 0 writes the file. */
@@ -2945,6 +2953,9 @@ int PIOc_writemap_impl(const char *file, int ioid, int ndims, const int *gdims, 
 
     for(i = 1; i < npes; i++){
       LOG((2, "creating nmap for i = %d", i));
+      fprintf(fp, "%d %lld\n", i, nmaplen[i]);
+      if(nmaplen[i] == 0) { continue; }
+
       nmap = (PIO_Offset *)malloc(nmaplen[i] * sizeof(PIO_Offset));
       if(!nmap){
         return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2955,10 +2966,8 @@ int PIOc_writemap_impl(const char *file, int ioid, int ndims, const int *gdims, 
       if((mpierr = MPI_Recv(nmap, nmaplen[i], PIO_OFFSET, i, i, comm, &status))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
       LOG((2,"MPI_Recv map complete"));
 
-      fprintf(fp, "%d %lld\n", i, nmaplen[i]);
       for(int j = 0; j < nmaplen[i]; j++) { fprintf(fp, "%lld ", nmap[j]); }
       fprintf(fp, "\n");
-
       free(nmap);
     }
     /* Free memory for the nmaplen. */
@@ -2973,11 +2982,13 @@ int PIOc_writemap_impl(const char *file, int ioid, int ndims, const int *gdims, 
     LOG((2,"decomp file closed."));
   }
   else{
-    LOG((2,"ready to MPI_Recv..."));
-    if((mpierr = MPI_Recv(&i, 1, MPI_INT, 0, npes+myrank, comm, &status))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
-    LOG((2,"MPI_Recv got %d", i));
-    if((mpierr = MPI_Send(map, maplen, PIO_OFFSET, 0, myrank, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
-    LOG((2,"MPI_Send map complete"));
+    if(maplen > 0){
+      LOG((2,"ready to MPI_Recv..."));
+      if((mpierr = MPI_Recv(&i, 1, MPI_INT, 0, npes+myrank, comm, &status))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+      LOG((2,"MPI_Recv got %d", i));
+      if((mpierr = MPI_Send(map, maplen, PIO_OFFSET, 0, myrank, comm))) { return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__); }
+      LOG((2,"MPI_Send map complete"));
+    }
   }
 
   return PIO_NOERR;
