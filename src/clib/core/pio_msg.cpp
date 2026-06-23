@@ -560,361 +560,315 @@ int init_async_msgs_sign(void )
 
 static int send_async_msg_valist(iosystem_desc_t *ios, int msg, va_list args)
 {
-    int mpierr = MPI_SUCCESS;
-    char *fmt = pio_async_msg_sign[msg];
-    int nargs = strlen(fmt);
-    int sz = 0, msz = 0;
+  int mpierr = MPI_SUCCESS;
+  char *fmt = pio_async_msg_sign[msg];
+  int nargs = strlen(fmt);
+  int sz = 0, msz = 0;
 
-    assert(ios && (msg > PIO_MSG_INVALID) && (msg < PIO_MAX_MSGS));
+  assert(ios && (msg > PIO_MSG_INVALID) && (msg < PIO_MAX_MSGS));
 
-    for(int i=0; i<nargs; i++)
-    {
-        if(mpierr == MPI_SUCCESS)
-        {
-            if(fmt[i] == 'c')
-            {
-                if(sz == 0)
-                {
-                    assert(msz > 0);
-                    sz = msz;
-                }
-                char *str = va_arg(args, char *);
-                mpierr = MPI_Bcast((void *)str, sz, MPI_CHAR, ios->compmaster, ios->intercomm);
-                sz = 0;
-                msz = 0;
-            }
-            else if(fmt[i] == 's')
-            {
-                /* Length/Size of the first string/array that follows it */
-                int iarg = va_arg(args, int);
-                sz = iarg;
-                assert(sz > 0);
-                mpierr = MPI_Bcast(&iarg, 1, MPI_INT, ios->compmaster, ios->intercomm);
-            }
-            else if(fmt[i] == 'S')
-            {
-                /* Length/Size of the first string/array that follows it */
-                PIO_Offset oarg = va_arg(args, PIO_Offset);
-                /* MPI only allows int counts */
-                sz = (int )oarg;
-                assert(sz > 0);
-                mpierr = MPI_Bcast(&oarg, 1, MPI_OFFSET, ios->compmaster, ios->intercomm);
-            }
-            else if(fmt[i] == 'm')
-            {
-                /* Length of the first string/array that follows it */
-                int iarg = va_arg(args, int);
-                msz = iarg;
-                assert(msz > 0);
-                mpierr = MPI_Bcast(&iarg, 1, MPI_INT, ios->compmaster, ios->intercomm);
-            }
-            else if(fmt[i] == 'M')
-            {
-                /* Length of the first string/array that follows it */
-                PIO_Offset oarg = va_arg(args, PIO_Offset);
-                /* MPI only allows int counts */
-                msz = (int )oarg;
-                assert(msz > 0);
-                mpierr = MPI_Bcast(&oarg, 1, MPI_OFFSET, ios->compmaster, ios->intercomm);
-            }
-            else if(fmt[i] == 'i')
-            {
-                int iarg = va_arg(args, int);
-                mpierr = MPI_Bcast(&iarg, 1, MPI_INT, ios->compmaster, ios->intercomm);
-            }
-            else if(fmt[i] == 'I')
-            {
-                if(sz == 0)
-                {
-                    assert(msz > 0);
-                    sz = msz;
-                }
-                int *iargp = va_arg(args, int *);
-                assert(sz > 0);
-                mpierr = MPI_Bcast((void *)iargp, sz, MPI_INT, ios->compmaster, ios->intercomm);
-                sz = 0;
-                msz = 0;
-            }
-            else if(fmt[i] == 'f')
-            {
-                /* float is promoted to double in varargs */
-                float farg = (float )va_arg(args, double);
-                mpierr = MPI_Bcast(&farg, 1, MPI_FLOAT, ios->compmaster, ios->intercomm);
-            }
-            else if(fmt[i] == 'F')
-            {
-                if(sz == 0)
-                {
-                    assert(msz > 0);
-                    sz = msz;
-                }
-                float *fargp = va_arg(args, float *);
-                assert(sz > 0);
-                mpierr = MPI_Bcast((void *)fargp, sz, MPI_FLOAT, ios->compmaster, ios->intercomm);
-                sz = 0;
-                msz = 0;
-            }
-            else if(fmt[i] == 'o')
-            {
-                PIO_Offset oarg = va_arg(args, PIO_Offset);
-                mpierr = MPI_Bcast(&oarg, 1, MPI_OFFSET, ios->compmaster, ios->intercomm);
-            }
-            else if(fmt[i] == 'O')
-            {
-                if(sz == 0)
-                {
-                    assert(msz > 0);
-                    sz = msz;
-                }
-                PIO_Offset *oargp = va_arg(args, PIO_Offset *);
-                assert(sz > 0);
-                mpierr = MPI_Bcast((void *)oargp, sz, MPI_OFFSET, ios->compmaster, ios->intercomm);
-                sz = 0;
-                msz = 0;
-            }
-            else if(fmt[i] == 'b')
-            {
-                /* FIXME: Individual bytes are sent as chars while a byte array is
-                 * sent as an array of bytes. Distinguish explicitly between chars
-                 * and bytes
-                 */
-                /* char is promoted to int in varargs */
-                char carg = (char )va_arg(args, int);
-                mpierr = MPI_Bcast(&carg, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
-            }
-            else if(fmt[i] == 'B')
-            {
-                if(sz == 0)
-                {
-                    assert(msz > 0);
-                    sz = msz;
-                }
-                char *cargp = va_arg(args, char *);
-                assert(sz > 0);
-                mpierr = MPI_Bcast(cargp, sz, MPI_BYTE, ios->compmaster, ios->intercomm);
-                sz = 0;
-                msz = 0;
-            }
-            else
-            {
-                LOG((1, "Invalid fmt for arg"));
-                assert(0);
-            }
+  for(int i=0; i<nargs; i++){
+    if(mpierr == MPI_SUCCESS){
+      if(fmt[i] == 'c'){
+        if(sz == 0){
+          sz = msz;
         }
+        char *str = va_arg(args, char *);
+        if(sz > 0){
+          mpierr = MPI_Bcast((void *)str, sz, MPI_CHAR, ios->compmaster, ios->intercomm);
+        }
+        sz = 0;
+        msz = 0;
+      }
+      else if(fmt[i] == 's'){
+        /* Length/Size of the first string/array that follows it */
+        int iarg = va_arg(args, int);
+        sz = iarg;
+        mpierr = MPI_Bcast(&iarg, 1, MPI_INT, ios->compmaster, ios->intercomm);
+      }
+      else if(fmt[i] == 'S'){
+        /* Length/Size of the first string/array that follows it */
+        PIO_Offset oarg = va_arg(args, PIO_Offset);
+        /* MPI only allows int counts */
+        sz = (int )oarg;
+        mpierr = MPI_Bcast(&oarg, 1, MPI_OFFSET, ios->compmaster, ios->intercomm);
+      }
+      else if(fmt[i] == 'm'){
+        /* Length of the first string/array that follows it */
+        int iarg = va_arg(args, int);
+        msz = iarg;
+        mpierr = MPI_Bcast(&iarg, 1, MPI_INT, ios->compmaster, ios->intercomm);
+      }
+      else if(fmt[i] == 'M'){
+        /* Length of the first string/array that follows it */
+        PIO_Offset oarg = va_arg(args, PIO_Offset);
+        /* MPI only allows int counts */
+        msz = (int )oarg;
+        mpierr = MPI_Bcast(&oarg, 1, MPI_OFFSET, ios->compmaster, ios->intercomm);
+      }
+      else if(fmt[i] == 'i'){
+        int iarg = va_arg(args, int);
+        mpierr = MPI_Bcast(&iarg, 1, MPI_INT, ios->compmaster, ios->intercomm);
+      }
+      else if(fmt[i] == 'I'){
+        if(sz == 0){
+          sz = msz;
+        }
+        int *iargp = va_arg(args, int *);
+        if(sz > 0){
+          mpierr = MPI_Bcast((void *)iargp, sz, MPI_INT, ios->compmaster, ios->intercomm);
+        }
+        sz = 0;
+        msz = 0;
+      }
+      else if(fmt[i] == 'f'){
+        /* float is promoted to double in varargs */
+        float farg = (float )va_arg(args, double);
+        mpierr = MPI_Bcast(&farg, 1, MPI_FLOAT, ios->compmaster, ios->intercomm);
+      }
+      else if(fmt[i] == 'F'){
+        if(sz == 0){
+          sz = msz;
+        }
+        float *fargp = va_arg(args, float *);
+        if(sz > 0){
+          mpierr = MPI_Bcast((void *)fargp, sz, MPI_FLOAT, ios->compmaster, ios->intercomm);
+        }
+        sz = 0;
+        msz = 0;
+      }
+      else if(fmt[i] == 'o'){
+        PIO_Offset oarg = va_arg(args, PIO_Offset);
+        mpierr = MPI_Bcast(&oarg, 1, MPI_OFFSET, ios->compmaster, ios->intercomm);
+      }
+      else if(fmt[i] == 'O'){
+        if(sz == 0){
+          sz = msz;
+        }
+        PIO_Offset *oargp = va_arg(args, PIO_Offset *);
+        if(sz > 0){
+          mpierr = MPI_Bcast((void *)oargp, sz, MPI_OFFSET, ios->compmaster, ios->intercomm);
+        }
+        sz = 0;
+        msz = 0;
+      }
+      else if(fmt[i] == 'b'){
+        /* FIXME: Individual bytes are sent as chars while a byte array is
+         * sent as an array of bytes. Distinguish explicitly between chars
+         * and bytes
+         */
+        /* char is promoted to int in varargs */
+        char carg = (char )va_arg(args, int);
+        mpierr = MPI_Bcast(&carg, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
+      }
+      else if(fmt[i] == 'B'){
+        if(sz == 0){
+          sz = msz;
+        }
+        char *cargp = va_arg(args, char *);
+        if(sz > 0){
+          mpierr = MPI_Bcast(cargp, sz, MPI_BYTE, ios->compmaster, ios->intercomm);
+        }
+        sz = 0;
+        msz = 0;
+      }
+      else{
+        LOG((1, "Invalid fmt for arg"));
+        assert(0);
+      }
     }
-    if(mpierr != MPI_SUCCESS)
-    {
-        LOG((1, "Error bcasting (send) async msg valist "));
-        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
-    }
+  }
+  if(mpierr != MPI_SUCCESS){
+    LOG((1, "Error bcasting (send) async msg valist "));
+    return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+  }
 
-    return PIO_NOERR;
+  return PIO_NOERR;
 }
 
 static int recv_async_msg_valist(iosystem_desc_t *ios, int msg, va_list args)
 {
-    int mpierr = MPI_SUCCESS;
-    char *fmt = pio_async_msg_sign[msg];
-    int nargs = strlen(fmt);
-    int sz = 0, msz = 0;
+  int mpierr = MPI_SUCCESS;
+  char *fmt = pio_async_msg_sign[msg];
+  int nargs = strlen(fmt);
+  int sz = 0, msz = 0;
 
-    assert(ios && (msg > PIO_MSG_INVALID) && (msg < PIO_MAX_MSGS));
+  assert(ios && (msg > PIO_MSG_INVALID) && (msg < PIO_MAX_MSGS));
 
-    for(int i=0; i<nargs; i++)
-    {
-        if(mpierr == MPI_SUCCESS)
-        {
-            if(fmt[i] == 'c')
-            {
-                char *str = NULL;
-                if(sz != 0)
-                {
-                    str = va_arg(args, char *);
-                }
-                else
-                {
-                    assert(msz > 0);
-                    sz = msz;
-                    char **strp = va_arg(args, char **);
-                    *strp = (char *)malloc(sz * sizeof(char ));
-                    str = *strp;
-                    if(!str)
-                    {
-                        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                        "Error receiving/parsing asynchronous message (msg=%d) in iosystem (iosysid=%d). Out of memory allocating %lld bytes for receiving a string", msg, ios->iosysid, (long long int) (sz * sizeof(char )));
-                    }
-                }
-                mpierr = MPI_Bcast((void *)str, sz, MPI_CHAR, ios->compmaster, ios->intercomm);
-                sz = 0;
-                msz = 0;
-            }
-            else if(fmt[i] == 's')
-            {
-                /* Length of the first character string that follows it */
-                int *iargp = va_arg(args, int *);
-                mpierr = MPI_Bcast(iargp, 1, MPI_INT, ios->compmaster, ios->intercomm);
-                sz = *iargp;
-                assert(sz > 0);
-            }
-            else if(fmt[i] == 'S')
-            {
-                /* Length of the first character string that follows it */
-                PIO_Offset *oargp = va_arg(args, PIO_Offset *);
-                mpierr = MPI_Bcast(oargp, 1, MPI_OFFSET, ios->compmaster, ios->intercomm);
-                /* MPI only allows int counts */
-                sz = (int )*oargp;
-                assert(sz > 0);
-            }
-            else if(fmt[i] == 'm')
-            {
-                /* Length of the first character string that follows it */
-                int *iargp = va_arg(args, int *);
-                mpierr = MPI_Bcast(iargp, 1, MPI_INT, ios->compmaster, ios->intercomm);
-                msz = *iargp;
-                assert(msz > 0);
-            }
-            else if(fmt[i] == 'M')
-            {
-                /* Length of the first character string that follows it */
-                PIO_Offset *oargp = va_arg(args, PIO_Offset *);
-                mpierr = MPI_Bcast(oargp, 1, MPI_OFFSET, ios->compmaster, ios->intercomm);
-                /* MPI only allows int counts */
-                msz = (int ) *oargp;
-                assert(msz > 0);
-            }
-            else if(fmt[i] == 'i')
-            {
-                int *iargp = va_arg(args, int *);
-                mpierr = MPI_Bcast(iargp, 1, MPI_INT, ios->compmaster, ios->intercomm);
-            }
-            else if(fmt[i] == 'I')
-            {
-                int *iargp = NULL;
-                if(sz != 0)
-                {
-                    iargp = va_arg(args, int *);
-                }
-                else
-                {
-                    assert(msz > 0);
-                    sz = msz;
-                    int **iargpp = va_arg(args, int **);
-                    *iargpp = (int *)malloc(sz * sizeof(int));
-                    iargp = *iargpp;
-                    if(!iargp)
-                    {
-                        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                        "Error receiving/parsing asynchronous message (msg=%d) in iosystem (iosysid=%d). Out of memory allocating %lld bytes for receiving an int array", msg, ios->iosysid, (long long int) (sz * sizeof(int )));
-                    }
-                }
-                mpierr = MPI_Bcast(iargp, sz, MPI_INT, ios->compmaster, ios->intercomm);
-                sz = 0;
-                msz = 0;
-            }
-            else if(fmt[i] == 'f')
-            {
-                float *fargp = va_arg(args, float *);
-                mpierr = MPI_Bcast(fargp, 1, MPI_FLOAT, ios->compmaster, ios->intercomm);
-            }
-            else if(fmt[i] == 'F')
-            {
-                float *fargp = NULL;
-                if(sz != 0)
-                {
-                    fargp = va_arg(args, float *);
-                }
-                else
-                {
-                    assert(msz > 0);
-                    sz = msz;
-                    float **fargpp = va_arg(args, float **);
-                    *fargpp = (float *)malloc(sz * sizeof(float));
-                    fargp = *fargpp;
-                    if(!fargp)
-                    {
-                        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                        "Error receiving/parsing asynchronous message (msg=%d) in iosystem (iosysid=%d). Out of memory allocating %lld bytes for receiving a float array", msg, ios->iosysid, (long long int) (sz * sizeof(float )));
-                    }
-                }
-                mpierr = MPI_Bcast(fargp, sz, MPI_FLOAT, ios->compmaster, ios->intercomm);
-                sz = 0;
-                msz = 0;
-            }
-            else if(fmt[i] == 'o')
-            {
-                PIO_Offset *oargp = va_arg(args, PIO_Offset *);
-                mpierr = MPI_Bcast((void *)oargp, 1, MPI_OFFSET, ios->compmaster, ios->intercomm);
-            }
-            else if(fmt[i] == 'O')
-            {
-                PIO_Offset *oargp = NULL;
-                if(sz != 0)
-                {
-                    oargp = va_arg(args, PIO_Offset *);
-                }
-                else
-                {
-                    assert(msz > 0);
-                    sz = msz;
-                    PIO_Offset **oargpp = va_arg(args, PIO_Offset **);
-                    *oargpp = (PIO_Offset *)malloc(sz * sizeof(PIO_Offset));
-                    oargp = *oargpp;
-                    if(!oargp)
-                    {
-                        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                        "Error receiving/parsing asynchronous message (msg=%d) in iosystem (iosysid=%d). Out of memory allocating %lld bytes for receiving an offset array", msg, ios->iosysid, (long long int) (sz * sizeof(PIO_Offset)));
-                    }
-                }
-                mpierr = MPI_Bcast((void *)oargp, sz, MPI_OFFSET, ios->compmaster, ios->intercomm);
-                sz = 0;
-                msz = 0;
-            }
-            else if(fmt[i] == 'b')
-            {
-                /* FIXME: Individual bytes are recvd as chars while a byte array is
-                 * recvd as an array of bytes. Distinguish explicitly between chars
-                 * and bytes
-                 */
-                char *cargp = va_arg(args, char *);
-                mpierr = MPI_Bcast(cargp, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
-            }
-            else if(fmt[i] == 'B')
-            {
-                char *cargp = NULL;
-                if(sz != 0)
-                {
-                    cargp = va_arg(args, char *);
-                }
-                else
-                {
-                    assert(msz > 0);
-                    sz = msz;
-                    char **cargpp = va_arg(args, char **);
-                    *cargpp = (char *)malloc(sz * sizeof(char));
-                    cargp = *cargpp;
-                    if(!cargp)
-                    {
-                        return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                        "Error receiving/parsing asynchronous message (msg=%d) in iosystem (iosysid=%d). Out of memory allocating %lld bytes for receiving a byte array", msg, ios->iosysid, (long long int) (sz * sizeof(char)));
-                    }
-                }
-                mpierr = MPI_Bcast((void *)cargp, sz, MPI_BYTE, ios->compmaster, ios->intercomm);
-                sz = 0;
-                msz = 0;
-            }
-            else
-            {
-                LOG((1, "Invalid fmt for arg"));
-                assert(0);
-            }
+  for(int i=0; i<nargs; i++){
+    if(mpierr == MPI_SUCCESS){
+      if(fmt[i] == 'c'){
+        char *str = NULL;
+        if(sz != 0){
+          str = va_arg(args, char *);
         }
+        else{
+          sz = msz;
+          char **strp = va_arg(args, char **);
+          if(sz > 0){
+            *strp = (char *)malloc(sz * sizeof(char ));
+            str = *strp;
+            if(!str){
+              return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                              "Error receiving/parsing asynchronous message (msg=%d) in iosystem (iosysid=%d). Out of memory allocating %lld bytes for receiving a string", msg, ios->iosysid, (long long int) (sz * sizeof(char )));
+            }
+          }
+        }
+        if(sz > 0){
+          mpierr = MPI_Bcast((void *)str, sz, MPI_CHAR, ios->compmaster, ios->intercomm);
+        }
+        sz = 0;
+        msz = 0;
+      }
+      else if(fmt[i] == 's'){
+        /* Length of the first character string that follows it */
+        int *iargp = va_arg(args, int *);
+        mpierr = MPI_Bcast(iargp, 1, MPI_INT, ios->compmaster, ios->intercomm);
+        sz = *iargp;
+      }
+      else if(fmt[i] == 'S'){
+        /* Length of the first character string that follows it */
+        PIO_Offset *oargp = va_arg(args, PIO_Offset *);
+        mpierr = MPI_Bcast(oargp, 1, MPI_OFFSET, ios->compmaster, ios->intercomm);
+        /* MPI only allows int counts */
+        sz = (int )*oargp;
+      }
+      else if(fmt[i] == 'm'){
+        /* Length of the first character string that follows it */
+        int *iargp = va_arg(args, int *);
+        mpierr = MPI_Bcast(iargp, 1, MPI_INT, ios->compmaster, ios->intercomm);
+        msz = *iargp;
+      }
+      else if(fmt[i] == 'M'){
+        /* Length of the first character string that follows it */
+        PIO_Offset *oargp = va_arg(args, PIO_Offset *);
+        mpierr = MPI_Bcast(oargp, 1, MPI_OFFSET, ios->compmaster, ios->intercomm);
+        /* MPI only allows int counts */
+        msz = (int ) *oargp;
+      }
+      else if(fmt[i] == 'i'){
+        int *iargp = va_arg(args, int *);
+        mpierr = MPI_Bcast(iargp, 1, MPI_INT, ios->compmaster, ios->intercomm);
+      }
+      else if(fmt[i] == 'I'){
+        int *iargp = NULL;
+        if(sz != 0){
+          iargp = va_arg(args, int *);
+        }
+        else{
+          sz = msz;
+          int **iargpp = va_arg(args, int **);
+          if(sz > 0){
+            *iargpp = (int *)malloc(sz * sizeof(int));
+            iargp = *iargpp;
+            if(!iargp){
+              return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                              "Error receiving/parsing asynchronous message (msg=%d) in iosystem (iosysid=%d). Out of memory allocating %lld bytes for receiving an int array", msg, ios->iosysid, (long long int) (sz * sizeof(int )));
+            }
+          }
+        }
+        if(sz > 0){
+          mpierr = MPI_Bcast(iargp, sz, MPI_INT, ios->compmaster, ios->intercomm);
+        }
+        sz = 0;
+        msz = 0;
+      }
+      else if(fmt[i] == 'f'){
+        float *fargp = va_arg(args, float *);
+        mpierr = MPI_Bcast(fargp, 1, MPI_FLOAT, ios->compmaster, ios->intercomm);
+      }
+      else if(fmt[i] == 'F'){
+        float *fargp = NULL;
+        if(sz != 0){
+          fargp = va_arg(args, float *);
+        }
+        else{
+          sz = msz;
+          float **fargpp = va_arg(args, float **);
+          if(sz > 0){
+            *fargpp = (float *)malloc(sz * sizeof(float));
+            fargp = *fargpp;
+            if(!fargp){
+              return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                              "Error receiving/parsing asynchronous message (msg=%d) in iosystem (iosysid=%d). Out of memory allocating %lld bytes for receiving a float array", msg, ios->iosysid, (long long int) (sz * sizeof(float )));
+            }
+          }
+        }
+        if(sz > 0){
+          mpierr = MPI_Bcast(fargp, sz, MPI_FLOAT, ios->compmaster, ios->intercomm);
+        }
+        sz = 0;
+        msz = 0;
+      }
+      else if(fmt[i] == 'o'){
+        PIO_Offset *oargp = va_arg(args, PIO_Offset *);
+        mpierr = MPI_Bcast((void *)oargp, 1, MPI_OFFSET, ios->compmaster, ios->intercomm);
+      }
+      else if(fmt[i] == 'O'){
+        PIO_Offset *oargp = NULL;
+        if(sz != 0){
+          oargp = va_arg(args, PIO_Offset *);
+        }
+        else{
+          sz = msz;
+          PIO_Offset **oargpp = va_arg(args, PIO_Offset **);
+          if(sz > 0){
+            *oargpp = (PIO_Offset *)malloc(sz * sizeof(PIO_Offset));
+            oargp = *oargpp;
+            if(!oargp){
+              return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                              "Error receiving/parsing asynchronous message (msg=%d) in iosystem (iosysid=%d). Out of memory allocating %lld bytes for receiving an offset array", msg, ios->iosysid, (long long int) (sz * sizeof(PIO_Offset)));
+            }
+          }
+        }
+        if(sz > 0){
+          mpierr = MPI_Bcast((void *)oargp, sz, MPI_OFFSET, ios->compmaster, ios->intercomm);
+        }
+        sz = 0;
+        msz = 0;
+      }
+      else if(fmt[i] == 'b'){
+        /* FIXME: Individual bytes are recvd as chars while a byte array is
+         * recvd as an array of bytes. Distinguish explicitly between chars
+         * and bytes
+         */
+        char *cargp = va_arg(args, char *);
+        mpierr = MPI_Bcast(cargp, 1, MPI_CHAR, ios->compmaster, ios->intercomm);
+      }
+      else if(fmt[i] == 'B'){
+        char *cargp = NULL;
+        if(sz != 0){
+          cargp = va_arg(args, char *);
+        }
+        else{
+          sz = msz;
+          char **cargpp = va_arg(args, char **);
+          if(sz > 0){
+            *cargpp = (char *)malloc(sz * sizeof(char));
+            cargp = *cargpp;
+            if(!cargp){
+              return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                              "Error receiving/parsing asynchronous message (msg=%d) in iosystem (iosysid=%d). Out of memory allocating %lld bytes for receiving a byte array", msg, ios->iosysid, (long long int) (sz * sizeof(char)));
+            }
+          }
+        }
+        if(sz > 0){
+          mpierr = MPI_Bcast((void *)cargp, sz, MPI_BYTE, ios->compmaster, ios->intercomm);
+        }
+        sz = 0;
+        msz = 0;
+      }
+      else{
+        LOG((1, "Invalid fmt for arg"));
+        assert(0);
+      }
     }
-    if(mpierr != MPI_SUCCESS)
-    {
-        LOG((1, "Error bcasting (recv) async msg valist "));
-        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
-    }
-    return PIO_NOERR;
+  }
+  if(mpierr != MPI_SUCCESS){
+    LOG((1, "Error bcasting (recv) async msg valist "));
+    return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+  }
+  return PIO_NOERR;
 }
 
 static int send_async_msg_hdr(iosystem_desc_t *ios, int msg, int seq_num, int prev_msg)
