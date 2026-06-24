@@ -1,24 +1,9 @@
 var searchData=
 [
-  ['target_5fntasks_0',['target_ntasks',['../darray__async_8c.html#a7efbebf26c0081f1894ee13b5f38aef6',1,'TARGET_NTASKS:&#160;darray_async.c'],['../darray__no__async_8c.html#a7efbebf26c0081f1894ee13b5f38aef6',1,'TARGET_NTASKS:&#160;darray_no_async.c']]],
-  ['test_5fadios_2ec_1',['test_adios.c',['../test__adios_8c.html',1,'']]],
-  ['test_5fhdf5_2ec_2',['test_hdf5.c',['../test__hdf5_8c.html',1,'']]],
-  ['test_5fname_3',['TEST_NAME',['../darray__async_8c.html#a57564a6694319222956aabe9936b2942',1,'darray_async.c']]],
-  ['testing_4',['testing',['../install.html#autotoc_md14',1,'CMake Configuration Options related to Testing'],['../install.html#autotoc_md17',1,'Testing'],['../test.html',1,'Testing']]],
-  ['testing_2etxt_5',['Testing.txt',['../_testing_8txt.html',1,'']]],
-  ['testpio_3a_20a_20regression_20and_20benchmarking_20code_6',['testpio: a regression and benchmarking code',['../testpio_example.html',1,'']]],
-  ['testpio_5fexample_2etxt_7',['testpio_example.txt',['../testpio__example_8txt.html',1,'']]],
-  ['tests_8',['tests',['../mach_walkthrough.html#autotoc_md28',1,'Building and running tests'],['../test.html#autotoc_md29',1,'Building SCORPIO Tests'],['../test.html#autotoc_md30',1,'Running SCORPIO tests']]],
-  ['the_20cam_20interface_9',['Description of the CAM Interface',['../_c_a_mexample.html#description',1,'']]],
-  ['through_10',['Install Walk-through',['../mach_walkthrough.html',1,'']]],
-  ['to_20inquire_20information_20about_20data_20in_20a_20file_11',['Routines to inquire information about data in a file',['../api.html#inqnc',1,'']]],
-  ['to_20pio_12',['Direct calls to PIO',['../_c_a_mexample.html#direct',1,'']]],
-  ['to_20testing_13',['CMake Configuration Options related to Testing',['../install.html#autotoc_md14',1,'']]],
-  ['typedouble_14',['TYPEDOUBLE',['../dtypes_8h.html#ab8801cf8de1dc074e89debca93959c3a',1,'dtypes.h']]],
-  ['typeint_15',['TYPEINT',['../dtypes_8h.html#ae20086e36f0a914391cb807cfb27b5d2',1,'dtypes.h']]],
-  ['typelogical_16',['TYPELOGICAL',['../dtypes_8h.html#a98a4f4f2c3933324f33414dfcddb5d14',1,'dtypes.h']]],
-  ['typelong_17',['TYPELONG',['../dtypes_8h.html#a3e40a46611692f131ba71362bbe616dd',1,'dtypes.h']]],
-  ['typeoffset_18',['TYPEOFFSET',['../dtypes_8h.html#a37539af4c09b18fb91f4915f64a087b6',1,'dtypes.h']]],
-  ['typereal_19',['TYPEREAL',['../dtypes_8h.html#a4e8c1d5093ac4ba0d242c1e29f55aaae',1,'dtypes.h']]],
-  ['typetext_20',['TYPETEXT',['../dtypes_8h.html#af204d3ec508a8cdc5b01eb02e4f9087a',1,'dtypes.h']]]
+  ['var_5fdesc_5ft_927',['var_desc_t',['../structpio__types_1_1var__desc__t.html',1,'pio_types']]],
+  ['var_5fname_928',['VAR_NAME',['../darray__async_8c.html#a73de0b1772c59096554d6a846feff376',1,'VAR_NAME():&#160;darray_async.c'],['../darray__no__async_8c.html#a73de0b1772c59096554d6a846feff376',1,'VAR_NAME():&#160;darray_no_async.c'],['../example1_8c.html#a73de0b1772c59096554d6a846feff376',1,'VAR_NAME():&#160;example1.c'],['../example2_8c.html#a73de0b1772c59096554d6a846feff376',1,'VAR_NAME():&#160;example2.c']]],
+  ['var_5fname_5fd0_929',['VAR_NAME_D0',['../put__var_8c.html#aeb4f959fbd13b3f6a528a0303c7216ec',1,'put_var.c']]],
+  ['var_5fname_5fd1_930',['VAR_NAME_D1',['../put__var_8c.html#a2a4ac56ad53684dc20775844e8b5d529',1,'put_var.c']]],
+  ['var_5fname_5fd2_931',['VAR_NAME_D2',['../put__var_8c.html#a3d1a54dc9dba5ea337b63d139eca7f61',1,'put_var.c']]],
+  ['varid_932',['varid',['../structpio__types_1_1var__desc__t.html#a7a78cf2fb5cc4fde75aec7fb27da33d6',1,'pio_types::var_desc_t']]]
 ];

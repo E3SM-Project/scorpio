@@ -1,6 +1,7 @@
 var searchData=
 [
-  ['enable_5fhs_0',['enable_hs',['../structpio__types_1_1pio__rearr__comm__fc__opt__t.html#a302c79b62ab18a7e342cdc5fe7e33cdf',1,'pio_types::pio_rearr_comm_fc_opt_t']]],
-  ['enable_5fisend_1',['enable_isend',['../structpio__types_1_1pio__rearr__comm__fc__opt__t.html#a397e466d5c4fcb58f2a055dce1c4df7a',1,'pio_types::pio_rearr_comm_fc_opt_t']]],
-  ['err_5fbuffer_2',['err_buffer',['../darray__async_8c.html#ab936652dd13083dc9181ec7886ab04b7',1,'err_buffer:&#160;darray_async.c'],['../darray__no__async_8c.html#ab936652dd13083dc9181ec7886ab04b7',1,'err_buffer:&#160;darray_no_async.c'],['../example1_8c.html#ab936652dd13083dc9181ec7886ab04b7',1,'err_buffer:&#160;example1.c'],['../example2_8c.html#ab936652dd13083dc9181ec7886ab04b7',1,'err_buffer:&#160;example2.c'],['../put__var_8c.html#ab936652dd13083dc9181ec7886ab04b7',1,'err_buffer:&#160;put_var.c']]]
+  ['databuffer_1530',['databuffer',['../structpioexample_1_1pioexampleclass.html#a154ba5b20555c9ba1c8674c064f3f8fb',1,'pioexample::pioexampleclass']]],
+  ['dim_5flen_1531',['dim_len',['../darray__async_8c.html#ae37b6362bb2ae8a148ffb3f91bf3f3c5',1,'dim_len():&#160;darray_async.c'],['../darray__no__async_8c.html#ae37b6362bb2ae8a148ffb3f91bf3f3c5',1,'dim_len():&#160;darray_no_async.c'],['../example2_8c.html#a0cdd029eb53af7edd1f798d8d2425b2b',1,'dim_len():&#160;example2.c']]],
+  ['dim_5fname_1532',['dim_name',['../darray__async_8c.html#a2d5a2aba365d6ae862b258115fca53f1',1,'dim_name():&#160;darray_async.c'],['../darray__no__async_8c.html#a2d5a2aba365d6ae862b258115fca53f1',1,'dim_name():&#160;darray_no_async.c'],['../example2_8c.html#a2ff6a13fe5da4f73ddbd691b94aaec9a',1,'dim_name():&#160;example2.c']]],
+  ['dimlen_1533',['dimlen',['../structpioexample_1_1pioexampleclass.html#a04793022c40b565f88a4ae49c91b23bd',1,'pioexample::pioexampleclass']]]
 ];
