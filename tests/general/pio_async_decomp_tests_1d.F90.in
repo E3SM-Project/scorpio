@@ -53,6 +53,57 @@ SUBROUTINE split_world_ncomms(ncomms, new_comm, new_rank, new_size, gcomm_idx)
   call MPI_Comm_rank(new_comm, new_rank, ierr)
 END SUBROUTINE split_world_ncomms
 
+! Get a 1d block decomposition with holes
+! If has_hole is TRUE, the decomposition is such that
+! # All even procs have VEC_LOCAL_SZ * 2 elements
+! # (the even procs take all elems from the odd procs)
+! # All odd procs have 0 elements
+! e.g. For VEC_LOCAL_SZ = 2,
+! e.g. 1)    [1,2,3,4] [] [5,6]
+! e.g. 2)    [1,2,3,4] [] [5,6,7,8] []
+! If has_hole is FALSE, the data is evenly divided among all procs
+! e.g. For VEC_LOCAL_SZ = 2,
+! e.g. 1)    [1,2] [3,4] [5,6]
+! e.g. 2)    [1,2] [3,4] [5,6] [7,8]
+SUBROUTINE get_1d_bc_with_holes_info(rank, sz, dims, start, count, has_hole)
+  integer, parameter :: VEC_LOCAL_SZ = 7
+  integer, intent(in) :: rank
+  integer, intent(in) :: sz
+  integer, dimension(1), intent(out) :: dims
+  integer, dimension(1), intent(out) :: start
+  integer, dimension(1), intent(out) :: count
+  logical, intent(in) :: has_hole
+
+  logical :: is_even_rank
+  integer :: iodd, ieven
+
+  is_even_rank = .false.
+  if (mod(rank, 2) == 0) then
+    is_even_rank = .true.
+  end if
+  dims(1) = VEC_LOCAL_SZ * sz
+  ! Number of odd and even procs before this rank
+  iodd = rank / 2
+  ieven = (rank + 1) / 2
+  if(has_hole) then
+    if (is_even_rank) then
+      if(rank + 1 < sz) then
+        count(1) = VEC_LOCAL_SZ * 2
+      else
+        count(1) = VEC_LOCAL_SZ
+      end if
+      start(1) = ieven * VEC_LOCAL_SZ * 2 + 1
+    else
+      count(1) = 0
+      start(1) = 0
+    end if
+  else
+    count(1) = VEC_LOCAL_SZ
+    start(1) = ieven * VEC_LOCAL_SZ + iodd * (VEC_LOCAL_SZ) + 1
+  end if
+
+END SUBROUTINE
+
 ! Async I/O as service test with 2 compute comms and 1 io comm
 ! The test writes data into two files, All info/data related
 ! to the first file is provided by the 1st compute comm and
@@ -207,3 +258,163 @@ PIO_TF_AUTO_TEST_SUB_BEGIN async_2comp_wr_1d
   end do
 PIO_TF_AUTO_TEST_SUB_END async_2comp_wr_1d
 
+! Async I/O as service test with 2 compute comms and 1 io comm
+! The test writes data into two files, All info/data related
+! to the first file is provided by the 1st compute comm and
+! all info/data related to the second file is provided by the
+! 2nd compute comm. Both compute comms share a single io comm
+! The I/O decomposition used to write data has "holes"
+PIO_TF_TEMPLATE<PIO_TF_PREDEF_TYPENAME PIO_TF_DATA_TYPE, PIO_TF_PREDEF_TYPENAME PIO_TF_FC_DATA_TYPE>
+PIO_TF_AUTO_TEST_SUB_BEGIN async_2comp_wr_1d_with_holes
+#ifndef NO_MPIMOD
+  use mpi
+  implicit none
+#else
+  implicit none
+  include 'mpif.h'
+#endif
+  ! Number of compute components
+  integer, parameter :: NUM_COMPONENTS = 2
+  ! Total number of comms = comms for each of NUM_COMPONENTS + io comm
+  integer :: ncomms = NUM_COMPONENTS + 1
+  ! We need to have at least one proc in each of comm
+  integer, parameter :: MIN_NUM_PROCS = NUM_COMPONENTS + 1
+  integer :: comp_comms(NUM_COMPONENTS)
+  type(iosystem_desc_t) :: iosys(NUM_COMPONENTS)
+  integer :: new_comm, io_comm
+  integer :: new_rank, new_size, i, j
+  ! gcomm_idx => Global index for the MPI comms
+  ! gcomp_idx => Global index for the compute components
+  integer :: gcomm_idx, gcomp_idx
+  ! is_io == .true. if proc is part of the io comp
+  logical :: is_io = .false.
+  integer, parameter :: NUM_REARRANGERS = 2
+  integer :: rearrs(NUM_REARRANGERS) = (/pio_rearr_subset,pio_rearr_box/)
+  character(len=PIO_TF_MAX_STR_LEN) :: rearrs_info(NUM_REARRANGERS) = (/"PIO_REARR_SUBSET","PIO_REARR_BOX   "/)
+
+  ! file1 is written out by comp1 and file2 is written out by comp2
+  character(len=PIO_TF_MAX_STR_LEN) :: fnames(NUM_COMPONENTS) = (/"pio_async_decomp_tests_file_comp1.nc","pio_async_decomp_tests_file_comp2.nc"/)
+  character(len=PIO_TF_MAX_STR_LEN) :: dimname = "PIO_TF_test_dim"
+  character(len=PIO_TF_MAX_STR_LEN) :: vname = "PIO_TF_test_var"
+
+  ! The size of vec/data written out from each compute proc
+  integer, parameter :: VEC_LOCAL_SZ = 7
+  integer, parameter :: NUM_DIMS = 1
+  type(var_desc_t) :: pio_var
+  type(file_desc_t) :: pio_file
+  type(io_desc_t) :: iodesc
+  integer :: dims(NUM_DIMS), pio_dim
+  integer, dimension(NUM_DIMS) :: start, count
+  !integer, dimension(VEC_LOCAL_SZ) :: compdof, compdof_rel_disps
+  integer, dimension(:), allocatable :: compdof
+  PIO_TF_FC_DATA_TYPE, dimension(:), allocatable :: wbuf, rbuf
+
+  integer, dimension(:), allocatable :: iotypes
+  character(len=PIO_TF_MAX_STR_LEN), dimension(:), allocatable :: iotype_descs
+  integer :: num_iotypes = 0
+
+  integer :: ret = PIO_NOERR
+
+  num_iotypes = 0
+  call PIO_TF_Get_nc_iotypes(iotypes, iotype_descs, num_iotypes)
+
+  do i=1,NUM_REARRANGERS
+    PIO_TF_LOG(0,*) "Testing rearr : ", trim(rearrs_info(i))
+    if(pio_tf_world_sz_ >= MIN_NUM_PROCS) then
+      ! Create three disjoint sets of IO procs and compute procs
+      call split_world_ncomms(ncomms, new_comm, new_rank, new_size, gcomm_idx)
+      !print *, "Split new comm, size = ", new_size, ", rank = ", new_rank, ", gcomm_idx = ", gcomm_idx
+
+      do j=1,NUM_COMPONENTS
+        comp_comms(j) = MPI_COMM_NULL
+      end do
+
+      ! Use first comm as the IO proc
+      is_io = .false.
+      if(gcomm_idx == 1) then
+        is_io = .true.
+      end if
+      gcomp_idx = gcomm_idx - 1
+
+      if(is_io) then
+        ! I/O proc
+        io_comm = new_comm
+        call PIO_init(NUM_COMPONENTS, pio_tf_comm_, comp_comms, io_comm,&
+              iosys, rearrs(i))
+      else
+        ! Compute proc
+        comp_comms(gcomp_idx) = new_comm
+        io_comm = MPI_COMM_NULL
+        call PIO_init(NUM_COMPONENTS, pio_tf_comm_, comp_comms, io_comm,&
+              iosys, rearrs(i))
+
+        ! Only compute procs send data
+        call get_1d_bc_with_holes_info(new_rank, new_size, dims, start, count, .true.)
+        allocate(wbuf(count(1)))
+        allocate(rbuf(count(1)))
+        allocate(compdof(count(1)))
+        do j=1,count(1)
+          wbuf(j) = start(1) + j - 1
+          compdof(j) = int(wbuf(j))
+        end do
+
+        ! Only compute procs call PIO function calls, I/O proc
+        ! waits inside PIO_init() waiting for commands from the
+        ! compute processes
+        call PIO_initdecomp(iosys(gcomp_idx), PIO_TF_DATA_TYPE, dims, compdof, iodesc)
+        deallocate(compdof)
+        !print *, "iosys idx = ", gcomp_idx, " = ", iosys(gcomp_idx)
+        do j=1,num_iotypes
+          PIO_TF_LOG(0,*) "Testing : PIO_TF_DATA_TYPE : ", iotype_descs(j)
+
+          ret = PIO_createfile(iosys(gcomp_idx), pio_file, iotypes(j), trim(fnames(gcomp_idx)), PIO_CLOBBER)
+          PIO_TF_CHECK_ERR(ret, new_comm, "Could not create file :" // trim(fnames(gcomp_idx)))
+
+          ret = PIO_def_dim(pio_file, trim(dimname), dims(1), pio_dim)
+          PIO_TF_CHECK_ERR(ret, new_comm, "Could not define dim :" // trim(fnames(gcomp_idx)))
+
+          ret = PIO_def_var(pio_file, trim(vname), PIO_TF_DATA_TYPE, (/pio_dim/), pio_var)
+          PIO_TF_CHECK_ERR(ret, new_comm, "Could not define var :" // trim(fnames(gcomp_idx)))
+
+          ret = PIO_enddef(pio_file)
+          PIO_TF_CHECK_ERR(ret, new_comm, "Could not enddef in file :" // trim(fnames(gcomp_idx)))
+
+          call PIO_write_darray(pio_file, pio_var, iodesc, wbuf, ret)
+          PIO_TF_CHECK_ERR(ret, new_comm, "Write darray failed :" // trim(fnames(gcomp_idx)))
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+          call PIO_closefile(pio_file)
+
+          ret = PIO_openfile(iosys(gcomp_idx), pio_file, iotypes(j), trim(fnames(gcomp_idx)), PIO_nowrite)
+          PIO_TF_CHECK_ERR(ret, new_comm, "Could not reopen file :" // trim(fnames(gcomp_idx)))
+
+          ret = PIO_inq_varid(pio_file, trim(vname), pio_var)
+          PIO_TF_CHECK_ERR(ret, new_comm, "Could not inq var:" // trim(fnames(gcomp_idx)))
+#else
+          call PIO_syncfile(pio_file)
+#endif
+
+          rbuf = -1
+          call PIO_read_darray(pio_file, pio_var, iodesc, rbuf, ret)
+          PIO_TF_CHECK_ERR(ret, new_comm, "Could read var :" // trim(fnames(gcomp_idx)))
+
+          ! FIXME: We don't have a PIO_TF_CHECK_VAL for a comm
+          !PIO_TF_CHECK_VAL((rbuf, wbuf), "Got wrong val")
+          PIO_TF_ASSERT(ALL(rbuf == wbuf), "Got wrong val")
+
+          call PIO_closefile(pio_file)
+          call PIO_deletefile(iosys(gcomp_idx), fnames(gcomp_idx))
+        end do
+        call PIO_freedecomp(iosys(gcomp_idx), iodesc)
+        deallocate(wbuf)
+        deallocate(rbuf)
+
+        do j=1,NUM_COMPONENTS
+          call PIO_finalize(iosys(j), ret)
+        end do
+      end if
+      call MPI_Comm_free(new_comm, ret)
+      PIO_TF_CHECK_ERR(ret, "PIO_init()/Finalize() failed")
+    end if
+  end do
+PIO_TF_AUTO_TEST_SUB_END async_2comp_wr_1d_with_holes
