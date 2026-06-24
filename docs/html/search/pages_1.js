@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['benchmarking_20code_0',['testpio: a regression and benchmarking code',['../testpio_example.html',1,'']]]
+  ['error_20handling_1865',['Error Handling',['../error.html',1,'']]],
+  ['examples_1866',['Examples',['../examp.html',1,'']]]
 ];

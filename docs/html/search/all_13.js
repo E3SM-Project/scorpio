@@ -1,6 +1,4 @@
 var searchData=
 [
-  ['usage_20overview_0',['SCORPIO Usage Overview',['../intro.html#autotoc_md8',1,'']]],
-  ['user_20interface_1',['SCORPIO user interface',['../api.html',1,'']]],
-  ['utility_20routines_2',['Misc Utility routines',['../api.html#utility',1,'']]]
+  ['writevar_933',['writevar',['../structpioexample_1_1pioexampleclass.html#afcbe92804a76647173f0097f97869b05',1,'pioexample::pioexampleclass']]]
 ];
