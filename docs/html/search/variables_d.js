@@ -1,7 +1,7 @@
 var searchData=
 [
-  ['spio_5fgenf90_5fpath_0',['SPIO_GENF90_PATH',['../src_2flib_2_c_make_lists_8txt.html#ae8ea76773daad0cc7ebba775ceedbad9',1,'CMakeLists.txt']]],
-  ['start_1',['start',['../structpio__types_1_1decompmap__t.html#a62487611f9a9332c44cf7ca1ac89ebb0',1,'pio_types::decompmap_t']]],
-  ['start_5fdata_5fval_2',['START_DATA_VAL',['../put__var_8c.html#ae6425cf092ad3bbbdb3cc8a46600f210',1,'put_var.c']]],
-  ['stride_3',['stride',['../structpioexample_1_1pioexampleclass.html#a7db2a2d4a3a90efb1d15304a1302f367',1,'pioexample::pioexampleclass']]]
+  ['r4_1635',['r4',['../namespacepio__kinds.html#adf174a9a2674e372db60ed78eba41de6',1,'pio_kinds']]],
+  ['r8_1636',['r8',['../namespacepio__kinds.html#ad543e4ef384abaf8bd6e5543fd76f10f',1,'pio_kinds']]],
+  ['readbuffer_1637',['readbuffer',['../structpioexample_1_1pioexampleclass.html#a526361acbf70a77e0afe9d19498bba3b',1,'pioexample::pioexampleclass']]],
+  ['resultlen_1638',['resultlen',['../darray__async_8c.html#aeb75303058f3be9b462de7ba3f6b03a7',1,'resultlen():&#160;darray_async.c'],['../darray__no__async_8c.html#aeb75303058f3be9b462de7ba3f6b03a7',1,'resultlen():&#160;darray_no_async.c'],['../example1_8c.html#aeb75303058f3be9b462de7ba3f6b03a7',1,'resultlen():&#160;example1.c'],['../example2_8c.html#aeb75303058f3be9b462de7ba3f6b03a7',1,'resultlen():&#160;example2.c'],['../put__var_8c.html#aeb75303058f3be9b462de7ba3f6b03a7',1,'resultlen():&#160;put_var.c']]]
 ];

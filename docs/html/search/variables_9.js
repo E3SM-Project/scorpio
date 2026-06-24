@@ -1,7 +1,5 @@
 var searchData=
 [
-  ['ncid_0',['ncid',['../structpio__types_1_1var__desc__t.html#a3e627795ff0f730475b7e6e2b30a2670',1,'pio_types::var_desc_t']]],
-  ['niotasks_1',['niotasks',['../structpioexample_1_1pioexampleclass.html#aa1fa3c0e1f613c945576ea89b2dd08c3',1,'pioexample::pioexampleclass']]],
-  ['ntasks_2',['ntasks',['../structpioexample_1_1pioexampleclass.html#aed46d08dad41443efa0062661adb947d',1,'pioexample::pioexampleclass']]],
-  ['numaggregator_3',['numaggregator',['../structpioexample_1_1pioexampleclass.html#ab5a1edadbb72cbdf6530dec85e431971',1,'pioexample::pioexampleclass']]]
+  ['max_5fpend_5freq_1558',['max_pend_req',['../structpio__types_1_1pio__rearr__comm__fc__opt__t.html#af88b46e06801e8e9055b1c1f78027412',1,'pio_types::pio_rearr_comm_fc_opt_t::max_pend_req()'],['../structrearr__comm__fc__opt.html#ac6aea4e835c71daa004ce1a69efaa5b8',1,'rearr_comm_fc_opt::max_pend_req()']]],
+  ['myrank_1559',['myrank',['../structpioexample_1_1pioexampleclass.html#ab13c8084ffcd8185cc8e92cadf5ef1d8',1,'pioexample::pioexampleclass']]]
 ];
