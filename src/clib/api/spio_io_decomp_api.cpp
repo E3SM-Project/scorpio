@@ -28,7 +28,9 @@ int PIOc_InitDecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, in
                               compmap, ioidp, rearr, iostart, iocount);
 
 #if SPIO_ENABLE_API_TRACING
+#if SPIO_ENABLE_API_DECOMP_TRACING
   tr.set_decomp_info((ioidp) ? (*ioidp) : -1, compmap, maplen);
+#endif
   tr.add_rval("*ioidp", (ioidp) ? (*ioidp) : -1);
 #endif
   return ret;
@@ -80,7 +82,9 @@ int PIOc_init_decomp(int iosysid, int pio_type, int ndims, const int *gdimlen, i
                                 compmap, ioidp, rearranger, iostart, iocount);
 
 #if SPIO_ENABLE_API_TRACING
+#if SPIO_ENABLE_API_DECOMP_TRACING
   tr.set_decomp_info((ioidp) ? (*ioidp) : -1, compmap, maplen);
+#endif
   tr.add_rval("*ioidp", (ioidp) ? (*ioidp) : -1);
 #endif
   return ret;

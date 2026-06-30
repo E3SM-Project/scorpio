@@ -1379,73 +1379,78 @@ int pio_err(iosystem_desc_t *ios, file_desc_t *file,
             int err_num, const char *fname, int line,
             const char *uerr_msg_fmt, ...)
 {
-    char err_msg[PIO_MAX_NAME + 1];
-    int err_handler = default_error_handler; /* Default error handler. */
-    int ret;
+  char err_msg[PIO_MAX_NAME + 1];
+  int err_handler = default_error_handler; /* Default error handler. */
+  int ret;
 
-    /* User must provide this. */
-    pioassert(fname, "file name must be provided", __FILE__, __LINE__);
+  /* User must provide this. */
+  pioassert(fname, "file name must be provided", __FILE__, __LINE__);
 
-    /* No harm, no foul. */
-    if (err_num == PIO_NOERR)
-        return PIO_NOERR;
+  /* No harm, no foul. */
+  if(err_num == PIO_NOERR) { return PIO_NOERR; }
 
-    /* Get the error message. */
-    if ((ret = PIOc_strerror_impl(err_num, err_msg, PIO_MAX_NAME)))
-        return ret;
+  /* Get the error message. */
+  ret = PIOc_strerror_impl(err_num, err_msg, PIO_MAX_NAME);
+  if(ret != PIO_NOERR) { return ret; }
 
-    /* PIO_MAX_NAME may not be enough to store the entire user error
-     * message, especially when long filenames are provided by the
-     * user in the message
+  /* PIO_MAX_NAME may not be enough to store the entire user error
+   * message, especially when long filenames are provided by the
+   * user in the message
+   */
+  const int UERR_MSG_MAX_LEN = 8192;
+  char uerr_msg[UERR_MSG_MAX_LEN + 1];
+  va_list argp;
+
+  va_start(argp, uerr_msg_fmt);
+  vsnprintf(uerr_msg, UERR_MSG_MAX_LEN, uerr_msg_fmt, argp);
+  va_end(argp);
+
+  /* If logging is in use, log an error message. */
+  LOG((1, "ERROR: %s. %s err_num = %d fname = %s line = %d", uerr_msg, err_msg, err_num, fname ? fname : "\0", line));
+
+  /* What error handler should we use? */
+  if(file){
+    ios = file->iosystem;
+    err_handler = ios->error_handler;
+  }
+  else if(ios){
+    err_handler = ios->error_handler;
+  }
+
+  LOG((2, "pio_err chose error handler = %d", err_handler));
+
+  /* Should we abort? */
+  if(err_handler == PIO_INTERNAL_ERROR){
+    /* For debugging only, this will print a traceback of the call tree.  */
+    piodie(fname, line, "An error occured, %s. %s (err=%d). Aborting since the error handler was set to PIO_INTERNAL_ERROR...", uerr_msg, err_msg, err_num);
+  }
+  else if(err_handler != PIO_RETURN_ERROR){
+    /* If the user does not explicitly ask to return error, print
+     * the error message in stderr on the root IO proc
      */
-    const int UERR_MSG_MAX_LEN = 8192;
-    char uerr_msg[UERR_MSG_MAX_LEN + 1];
-    va_list argp;
-    va_start(argp, uerr_msg_fmt);
-    vsnprintf(uerr_msg, UERR_MSG_MAX_LEN, uerr_msg_fmt, argp);
-    va_end(argp);
-
-    /* If logging is in use, log an error message. */
-    LOG((1, "ERROR: %s. %s err_num = %d fname = %s line = %d", uerr_msg, err_msg, err_num, fname ? fname : "\0", line));
-
-    /* What error handler should we use? */
-    if (file)
-    {
-        ios = file->iosystem;
-        err_handler = ios->error_handler;
+    bool print_err_msg = true;
+    if(ios){
+      if(ios->tcomm_info->get_union_comm() != MPI_COMM_NULL){
+        print_err_msg = (ios->tcomm_info->get_union_comm_rank() == ios->tcomm_info->get_union_comm_io_root()) ? true : false;
+      }
+      else if(ios->tcomm_info->get_io_comm() != MPI_COMM_NULL){
+        print_err_msg = (ios->tcomm_info->get_io_comm_rank() == 0) ? true : false;
+      }
     }
-    else if (ios)
-        err_handler = ios->error_handler;
 
-    LOG((2, "pio_err chose error handler = %d", err_handler));
-
-    /* Should we abort? */
-    if (err_handler == PIO_INTERNAL_ERROR)
-    {
-        /* For debugging only, this will print a traceback of the call tree.  */
-        piodie(fname, line, "An error occured, %s. %s (err=%d). Aborting since the error handler was set to PIO_INTERNAL_ERROR...", uerr_msg, err_msg, err_num);
-    }
-    else if (err_handler != PIO_RETURN_ERROR)
-    {
-        /* If the user does not explicitly ask to return error, print
-         * the error message in stderr on the root IO proc
-         */
-        bool print_err_msg = (ios) ? (ios->tcomm_info->get_union_comm_rank() == ios->tcomm_info->get_union_comm_io_root()) : true;
-
-        if (print_err_msg)
-        {
-            fprintf(stderr, "PIO: ERROR: %s. %s (error num=%d), (%s:%d)\n", uerr_msg, err_msg, err_num, (fname) ? fname : "\0", line);
+    if(print_err_msg){
+      fprintf(stderr, "PIO: ERROR: %s. %s (error num=%d), (%s:%d)\n", uerr_msg, err_msg, err_num, (fname) ? fname : "\0", line);
 #ifdef _HDF5
-            H5Eprint2(H5E_DEFAULT, stderr);
+      H5Eprint2(H5E_DEFAULT, stderr);
 #endif
-            fflush(stderr);
-        }
+      fflush(stderr);
     }
+  }
 
-    /* For PIO_BCAST_ERROR and PIO_RETURN_ERROR error handlers
-     * just return the error code back to the caller
-     */
-    return err_num;
+  /* For PIO_BCAST_ERROR and PIO_RETURN_ERROR error handlers
+   * just return the error code back to the caller
+   */
+  return err_num;
 }
 
 /**
@@ -3138,7 +3143,6 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 
 #if PIO_USE_ASYNC_WR_THREAD
     /* FIXME: Relax this wait */
-    /*
     if((*iotype != PIO_IOTYPE_HDF5) && (*iotype != PIO_IOTYPE_HDF5C)){
       ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
       if(ierr != PIO_NOERR){
@@ -3146,7 +3150,6 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                         "Creating file (%s) failed. Error waiting on all pending asynchronous HDF5 ops", filename);
       }
     }
-    */
 
     ierr = spio_close_soft_closed_file(filename);
     if(ierr != PIO_NOERR){
@@ -4862,13 +4865,13 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                     "Creating file (%s) failed. Error closing previous soft closed file", filename);
   }
 
-  //if(((*iotype == PIO_IOTYPE_HDF5) || (*iotype == PIO_IOTYPE_HDF5C)) && !(mode & PIO_WRITE)){
-  if((*iotype == PIO_IOTYPE_HDF5) || (*iotype == PIO_IOTYPE_HDF5C)){
-    ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
-    if(ierr != PIO_NOERR){
-      return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                      "Creating file (%s) failed. Error waiting on all pending asynchronous HDF5 ops", filename);
-    }
+  /* To wait on all hdf5 async ops (for debugging),
+   * ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+   */
+  ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+  if(ierr != PIO_NOERR){
+    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                    "Creating file (%s) failed. Error waiting on async ops", filename);
   }
 #endif
 
