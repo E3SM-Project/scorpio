@@ -2858,7 +2858,6 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 
 #if PIO_USE_ASYNC_WR_THREAD
     /* FIXME: Relax this wait */
-    /*
     if((*iotype != PIO_IOTYPE_HDF5) && (*iotype != PIO_IOTYPE_HDF5C)){
       ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
       if(ierr != PIO_NOERR){
@@ -2866,7 +2865,6 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                         "Creating file (%s) failed. Error waiting on all pending asynchronous HDF5 ops", filename);
       }
     }
-    */
 
     ierr = spio_close_soft_closed_file(filename);
     if(ierr != PIO_NOERR){
@@ -4591,6 +4589,11 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   /* To wait on all hdf5 async ops (for debugging),
    * ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
    */
+  ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+  if(ierr != PIO_NOERR){
+    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                    "Creating file (%s) failed. Error waiting on async ops", filename);
+  }
 #endif
 
   /* Allocate space for the file info. */
