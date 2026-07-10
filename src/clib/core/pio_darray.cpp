@@ -25,6 +25,8 @@
 #include "spio_dt_converter.hpp"
 #include "spio_async_utils.hpp"
 #include <string>
+#include <memory>
+#include <algorithm>
 
 /* uint64_t definition */
 #ifdef _ADIOS2
@@ -854,64 +856,44 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
                   "adios_to_mpi_type failed for file (%s)", pio_get_fname_from_file(file));
   }
 
-  int maplen = iodesc->maplen;
-  void *mapbuf = iodesc->map;
-  char need_to_free_mapbuf = 0;
+  /* Get the I/O decomposition map from iodesc
+   * 1) Handle the case of 0 and 1 sized I/O decomposition maps separately
+   * 2) Contig rearranger map is 0-based (BOX and SUBSET are 1-based maps), so convert
+   *    I/O decomposition maps that use contig rearranger to 1-based before saving it
+   *    (This allows BP to NC conversion using any rearranger)
+   */
+  assert((type == adios2_type_int64_t) || (type == adios2_type_uint64_t));
+  int maplen = -1;
+  void *mapbuf = NULL;
+  std::unique_ptr<PIO_Offset[]> tmp_mapbuf;
   if(iodesc->maplen < 1){
+    /* FIXME: Do we need to save a map of size 2? */
     maplen = 2;
-    mapbuf = (long*)calloc(2, sizeof(long));
-    if(mapbuf == NULL){
-      return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
-                     "Writing (ADIOS) decomposition (ioid=%d) to file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for map buffer",
-                     ioid, pio_get_fname_from_file(file), file->pio_ncid, (long long) (2 * sizeof(long)));
-    }
-    ((long*)mapbuf)[0] = 0;
-    ((long*)mapbuf)[1] = 0;
-    need_to_free_mapbuf = 1;
+    tmp_mapbuf = std::make_unique<PIO_Offset[]>(maplen);
+    tmp_mapbuf[0] = 0;
+    tmp_mapbuf[1] = 0;
+    mapbuf = static_cast<void *>(tmp_mapbuf.get());
   }
   else if(iodesc->maplen == 1){
-    maplen = iodesc->maplen + 1;
-    if(type == adios2_type_int32_t || type == adios2_type_uint32_t){
-      mapbuf = (int32_t*)calloc(maplen, sizeof(int32_t));
-      if(mapbuf == NULL){
-        return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
-                       "Writing (ADIOS) decomposition (ioid=%d) to file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for map buffer",
-                       ioid, pio_get_fname_from_file(file), file->pio_ncid, (long long) (maplen * sizeof(int32_t)));
-      }
-      ((int32_t*)mapbuf)[0] = (int32_t) (iodesc->map[0]);
-      ((int32_t*)mapbuf)[1] = 0;
+    /* FIXME: Do we need to save a map of size 2? */
+    maplen = 2;
+    tmp_mapbuf = std::make_unique<PIO_Offset[]>(maplen);
+    /* For contig rearr, convert map from 0-based to 1-based */
+    tmp_mapbuf[0] = ((iodesc->rearranger == PIO_REARR_CONTIG) ? (iodesc->map[0] + 1) : iodesc->map[0]);
+    tmp_mapbuf[1] = 0;
+    mapbuf = static_cast<void *>(tmp_mapbuf.get());
+  }
+  else{
+    maplen = iodesc->maplen;
+    if(iodesc->rearranger == PIO_REARR_CONTIG){
+      /* Convert map from 0-based to 1-based */
+      tmp_mapbuf = std::make_unique<PIO_Offset[]>(maplen);
+      std::transform(iodesc->map, iodesc->map + maplen, tmp_mapbuf.get(), [](PIO_Offset off) { return off + 1; });
+      mapbuf = static_cast<void *>(tmp_mapbuf.get());
     }
-    else if(type == adios2_type_int64_t || type == adios2_type_uint64_t){
-      mapbuf = (int64_t*)calloc(maplen, sizeof(int64_t));
-      if(mapbuf == NULL){
-        return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
-                       "Writing (ADIOS) decomposition (ioid=%d) to file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for map buffer",
-                       ioid, pio_get_fname_from_file(file), file->pio_ncid, (long long) (maplen * sizeof(int64_t)));
-      }
-      ((int64_t*)mapbuf)[0] = (int64_t) (iodesc->map[0]);
-      ((int64_t*)mapbuf)[1] = 0;
+    else{
+      mapbuf = iodesc->map;
     }
-    else if(type == adios2_type_int16_t || type == adios2_type_uint16_t){
-      mapbuf = (int16_t*)calloc(maplen, sizeof(int16_t));
-      if(mapbuf == NULL){
-        return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
-                       "Writing (ADIOS) decomposition (ioid=%d) to file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for map buffer",
-                       ioid, pio_get_fname_from_file(file), file->pio_ncid, (long long) (maplen * sizeof(int16_t)));
-      }
-      ((int16_t*)mapbuf)[0] = (int16_t) (iodesc->map[0]);
-      ((int16_t*)mapbuf)[1] = 0;
-    }
-    else if(type == adios2_type_int8_t || type == adios2_type_uint8_t){
-      mapbuf = (int8_t*)calloc(maplen, sizeof(int8_t));
-      if(mapbuf == NULL){
-        return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
-                       "Writing (ADIOS) decomposition (ioid=%d) to file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for map buffer",
-                       ioid, pio_get_fname_from_file(file), file->pio_ncid, (long long) (maplen * sizeof(int8_t)));
-      }
-      ((int8_t*)mapbuf)[0] = (int8_t) (iodesc->map[0]);
-      ((int8_t*)mapbuf)[1] = 0;
-    }
-    need_to_free_mapbuf = 1;
   }
 
   unsigned int inp_count = (unsigned int)maplen;
@@ -1059,10 +1041,7 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
     (file->num_written_blocks)++;
   }
 
-  if(need_to_free_mapbuf){
-    if(mapbuf != NULL) { free(mapbuf); }
-    mapbuf = NULL;
-  }
+  mapbuf = NULL;
 
   /* Write the attributes of decomp array */
   if(file->adios_io_process == 1 && file->adios_rank == 0){
