@@ -30,7 +30,9 @@
 #include "spio_decomp_logger.hpp"
 #include "spio_async_utils.hpp"
 #include "spio_hdf5_utils.hpp"
+#if PIO_USE_ASYNC_WR_THREAD
 #include "spio_async_hdf5_utils.hpp"
+#endif
 #include "spio_async_tcomm.hpp"
 #include <typeinfo>
 #include <vector>
