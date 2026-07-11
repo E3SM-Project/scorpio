@@ -21,6 +21,14 @@ target_include_directories(spio_default_private_options INTERFACE
 #  FIND EXTERNAL LIBRARIES/DEPENDENCIES
 #==============================================================================
 
+#===== Pthreads ======
+if (PIO_USE_ASYNC_WR_THREAD)
+  # Prefer usage of "-pthread" compile flag
+  set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+  find_package(Threads REQUIRED)
+  target_link_libraries (spio_default_private_options INTERFACE Threads::Threads)
+endif ()
+
 #===== MPI =====
 if (PIO_USE_MPISERIAL)
   find_package (MPISERIAL COMPONENTS C REQUIRED)
