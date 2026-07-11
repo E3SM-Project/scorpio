@@ -106,7 +106,7 @@ MPI_Info *SPIO_Util::TComm_info::create_mpi_info(void )
   int ret = MPI_SUCCESS;
   MPI_Info info;
 #if PIO_USE_ASYNC_WR_THREAD
-  std::mutex mtx;
+  static std::mutex mtx;
   std::lock_guard<std::mutex> lg(mtx);
 #endif
 
