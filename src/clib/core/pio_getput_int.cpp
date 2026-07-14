@@ -12,7 +12,9 @@
 #include "spio_io_summary.h"
 #include "spio_hash.h"
 #include "spio_hdf5_utils.hpp"
+#if PIO_USE_ASYNC_WR_THREAD
 #include "spio_async_hdf5_utils.hpp"
+#endif
 
 /**
  * Write a netCDF attribute of any type, converting to any type.

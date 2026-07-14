@@ -7,8 +7,13 @@
 #include "spio_async_tpool.hpp"
 
 /* Static variables */
+#if PIO_USE_ASYNC_WR_THREAD
 thread_local std::size_t SPIO_Util::TComm_info::tidx_ = -1;
 thread_local bool SPIO_Util::TComm_info::is_thread_init_ = false;
+#else
+std::size_t SPIO_Util::TComm_info::tidx_ = -1;
+bool SPIO_Util::TComm_info::is_thread_init_ = false;
+#endif
 
 SPIO_Util::TComm_info::TComm_info(MPI_Comm union_comm, int union_comm_rank, int union_comm_io_root, int union_comm_comp_root, MPI_Comm io_comm, int io_comm_rank, bool is_io_master, MPI_Comm comp_comm, int comp_comm_rank, bool is_comp_master, MPI_Comm intercomm, MPI_Comm my_comm, MPI_Comm node_comm): union_comm_rank_(union_comm_rank), union_comm_io_root_(union_comm_io_root), union_comm_comp_root_(union_comm_comp_root), io_comm_rank_(io_comm_rank), is_io_master_(is_io_master), comp_comm_rank_(comp_comm_rank), is_comp_master_(is_comp_master)
 {
@@ -112,8 +117,10 @@ MPI_Info *SPIO_Util::TComm_info::create_mpi_info(void )
 {
   int ret = MPI_SUCCESS;
   MPI_Info info;
+#if PIO_USE_ASYNC_WR_THREAD
   std::mutex mtx;
   std::lock_guard<std::mutex> lg(mtx);
+#endif
 
   ret = MPI_Info_create(&info); assert(ret == MPI_SUCCESS);
 
@@ -144,6 +151,7 @@ SPIO_Util::TComm_info::~TComm_info()
 
 void SPIO_Util::TComm_info::init_thread_info(void )
 {
+#if PIO_USE_ASYNC_WR_THREAD
   tidx_ = INVALID_IDX;
   /* Since we do this once per thread, and have a small number of threads a linear
    * search should be ok
@@ -161,6 +169,10 @@ void SPIO_Util::TComm_info::init_thread_info(void )
   }
 
   assert(tidx_ != INVALID_IDX);
+#else
+  tidx_ = 0;
+#endif
+
   is_thread_init_ = true;
 }
 

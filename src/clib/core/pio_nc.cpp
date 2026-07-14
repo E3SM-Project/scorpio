@@ -20,7 +20,9 @@
 #endif
 #include "spio_io_summary.h"
 #include "spio_hdf5_utils.hpp"
+#if PIO_USE_ASYNC_WR_THREAD
 #include "spio_async_hdf5_utils.hpp"
+#endif
 
 const char spio_nc_fillvalue_aname[] = "_FillValue";
 

@@ -16,7 +16,9 @@ extern "C" {
 #ifdef MPI_SERIAL
 }
 #endif
+#if PIO_USE_ASYNC_WR_THREAD
 #include "spio_async_tpool.hpp"
+#endif
 
 namespace SPIO_Util{
 
@@ -54,8 +56,13 @@ class TComm_info{
      * is reserved for the main thread
      * e.g. union_comms_[tidx_] is the union comm for current thread
     */
+#if PIO_USE_ASYNC_WR_THREAD
     static thread_local std::size_t tidx_;
     static thread_local bool is_thread_init_;
+#else
+    static std::size_t tidx_;
+    static bool is_thread_init_;
+#endif
 
     int union_comm_rank_;
     int union_comm_io_root_;

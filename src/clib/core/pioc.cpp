@@ -23,7 +23,9 @@
 #include "spio_decomp_logger.hpp"
 #include "spio_hdf5_utils.hpp"
 #include "spio_async_tcomm.hpp"
+#if PIO_USE_ASYNC_WR_THREAD
 #include "spio_async_hdf5_utils.hpp"
+#endif
 
 /* Include headers for HDF5 compression filters */
 #if PIO_USE_HDF5

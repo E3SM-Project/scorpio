@@ -4,9 +4,14 @@
 message(STATUS "===== Configuring SCORPIO C Core (progress engine)... =====")
 # SCORPIO C library - core
 set (spio_core_progress_engine_src
-  spio_async_utils.cpp
-  spio_async_tpool.cpp
   spio_async_tcomm.cpp)
+
+if(PIO_USE_ASYNC_WR_THREAD)
+  # Async tpool requires thread support
+  list (APPEND spio_core_progress_engine_src
+    spio_async_utils.cpp
+    spio_async_tpool.cpp)
+endif()
 
 add_library (spio_core_progress_engine OBJECT
   ${spio_core_progress_engine_src})

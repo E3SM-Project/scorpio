@@ -863,7 +863,11 @@ int spio_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
 {
   assert(ios && file && ios->ioproc);
 
+#if PIO_USE_ASYNC_WR_THREAD
   return pio_iosys_async_file_close_op_add(file);
+#else
+  assert(0);
+#endif
 }
 
 /**
