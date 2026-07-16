@@ -1,0 +1,32 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 7,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "linux-generic-debug-config",
+      "displayName": "Linux Generic Machine (Debug)",
+      "description": "Targeting a generic Linux machine/laptop (Debug mode)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_CXX_COMPILER": "mpicxx",
+        "CMAKE_C_COMPILER": "mpicc",
+        "CMAKE_Fortran_COMPILER": "mpif90"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "linux-generic-debug-build",
+      "displayName": "Linux Generic Machine (Debug Build)",
+      "description": "Build targeting a generic Linux machine/laptop (Debug mode)",
+      "configurePreset": "linux-generic-debug-config"
+    }
+  ]
+}
