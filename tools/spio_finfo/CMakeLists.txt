@@ -91,12 +91,12 @@ add_definitions(${PIO_DEFINITIONS})
 #include_directories(${PIO_INCLUDE_DIRS})
 #link_directories(${PIO_LIB_DIR})
 
-# Enable C++11 support
+# Enable C++14 support
 string (TOUPPER "${CMAKE_CXX_COMPILER_ID}" CMAKE_CXX_COMPILER_NAME)
 if (CMAKE_CXX_COMPILER_NAME STREQUAL "CRAY")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -h std=c++11")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -h std=c++14")
 else ()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 endif ()
 
 #include_directories(

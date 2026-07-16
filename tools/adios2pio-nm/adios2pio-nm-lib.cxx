@@ -5,6 +5,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <utility>
 #include <stdexcept>
 #include <regex>
 #include <unistd.h> // usleep
@@ -78,6 +79,39 @@ static int debug_out = 0;
     { \
         throw std::runtime_error(error_msg); \
     }
+
+namespace ADIOS2PIO_Util{
+  namespace GVars{
+    /* Available rearranger types */
+    const std::vector<std::pair<int, std::string> > SPIO_rearr_types = {
+      {PIO_REARR_BOX, "box"},
+      {PIO_REARR_SUBSET, "subset"},
+      {PIO_REARR_CONTIG, "contig"},
+      {PIO_REARR_ANY, "any"} };
+  } // namespace GVars
+
+  /* Convert a rearranger type to string */
+  static std::string rearr_type_to_string(int rearr)
+  {
+    for(std::vector<std::pair<int, std::string> >::const_iterator iter = GVars::SPIO_rearr_types.cbegin();
+        iter != GVars::SPIO_rearr_types.cend(); ++iter){
+      if(iter->first == rearr) { return iter->second; }
+    }
+    fprintf(stderr, "Invalid rearranger type (%d), resetting to box rearranger\n", rearr);
+    return rearr_type_to_string(PIO_REARR_BOX);
+  }
+
+  /* Convert a rearranger name/string to type */
+  static int rearr_string_to_type(const std::string &rearr)
+  {
+    for(std::vector<std::pair<int, std::string> >::const_iterator iter = GVars::SPIO_rearr_types.cbegin();
+        iter != GVars::SPIO_rearr_types.cend(); ++iter){
+      if(iter->second == rearr) { return iter->first; }
+    }
+    fprintf(stderr, "Invalid rearranger type string (%s), resetting to box rearranger\n", rearr.c_str());
+    return PIO_REARR_BOX;
+  }
+} // namespace ADIOS2PIO_Util
 
 nc_type PIOc_get_nctype_from_adios_type(const std::string &atype)
 {
@@ -2498,11 +2532,7 @@ int ConvertBPFile(const string &infilepath, const string &outfilename,
         /* Assign blocks to reader processes */
         std::vector<int> local_proc_blocks = FindProcessBlockGroupAssignments(block_procs, mpirank, nproc, comm);
 
-        int rearr_type = PIO_REARR_ANY;
-        if (rearr == "box")
-            rearr_type = PIO_REARR_BOX;
-        else if (rearr == "subset")
-            rearr_type = PIO_REARR_SUBSET;
+        int rearr_type = ADIOS2PIO_Util::rearr_string_to_type(rearr);
         iosysid = InitPIO(comm, mpirank, nproc, rearr_type);
         if (iosysid == BP2PIO_ERROR)
         {
@@ -2943,11 +2973,7 @@ extern "C" {
 int C_API_ConvertBPToNC(const char *infilepath, const char *outfilename,
                         const char *piotype, int rearr_type, MPI_Comm comm_in)
 {
-    std::string rearr;
-    if (rearr_type == PIO_REARR_BOX)
-        rearr = "box";
-    else
-        rearr = "subset";
+    std::string rearr = ADIOS2PIO_Util::rearr_type_to_string(rearr_type);
 
     /* FIXME: Currently we don't support regex deletes of BP input files */
     std::string rm_ifname_rgx;
