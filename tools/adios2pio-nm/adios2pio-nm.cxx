@@ -15,7 +15,7 @@ static void init_user_options(spio_tool_utils::ArgParser &ap)
     .add_opt("idir", "Directory containing the input files (in ADIOS BP format)")
     .add_opt("nc-file", "output file name after conversion (will be used as prefix when converting multiple files)")
     .add_opt("pio-format", "output SCORPIO I/O type. Supported parameters: \"pnetcdf\",  \"netcdf\",  \"netcdf4c\",  \"netcdf4p\", \"nczarr\"")
-    .add_opt("rearr", "SCORPIO rearranger. Supported parameters: \"subset\", \"box\", \"any\". Default \"any\".")
+    .add_opt("rearr", "SCORPIO rearranger. Supported parameters: \"subset\", \"box\", \"contig\", \"any\". Default \"any\".")
     .add_opt("verbose", "Turn on verbose info messages");
 }
 
