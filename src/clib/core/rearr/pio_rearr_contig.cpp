@@ -388,7 +388,7 @@ int SPIO::DataRearr::Contig_rearr::aggregate_data(const void *sbuf, std::size_t 
       for(std::size_t i = 0; i < agg_gs_info_.rtypes.size(); i++){
         MPI_Datatype agg_rtype = MPI_DATATYPE_NULL;
         if(agg_gs_info_.rtypes[i] != MPI_DATATYPE_NULL){
-          ret = MPI_Type_hvector(nvars, 1, stride_between_vars, agg_gs_info_.rtypes[i], &agg_rtype);
+          ret = MPI_Type_create_hvector(nvars, 1, stride_between_vars, agg_gs_info_.rtypes[i], &agg_rtype);
           if(ret == MPI_SUCCESS){
             ret = MPI_Type_commit(&agg_rtype);
           }
@@ -402,7 +402,7 @@ int SPIO::DataRearr::Contig_rearr::aggregate_data(const void *sbuf, std::size_t 
     }
     if(agg_gs_info_.stype != MPI_DATATYPE_NULL){
       MPI_Aint stride_between_vars = static_cast<MPI_Aint>(sbuf_sz / nvars);
-      ret = MPI_Type_hvector(nvars, 1, stride_between_vars, agg_gs_info_.stype, &agg_stype_nvars);
+      ret = MPI_Type_create_hvector(nvars, 1, stride_between_vars, agg_gs_info_.stype, &agg_stype_nvars);
       if(ret == MPI_SUCCESS){
         ret = MPI_Type_commit(&agg_stype_nvars);
       }
@@ -476,7 +476,7 @@ int SPIO::DataRearr::Contig_rearr::disperse_data(const void *abuf, std::size_t a
       for(std::size_t i = 0; i < agg_gs_info_.rtypes.size(); i++){
         MPI_Datatype dis_stype = MPI_DATATYPE_NULL;
         if(agg_gs_info_.rtypes[i] != MPI_DATATYPE_NULL){
-          ret = MPI_Type_hvector(nvars, 1, stride_between_vars, agg_gs_info_.rtypes[i], &dis_stype);
+          ret = MPI_Type_create_hvector(nvars, 1, stride_between_vars, agg_gs_info_.rtypes[i], &dis_stype);
           if(ret == MPI_SUCCESS){
             ret = MPI_Type_commit(&dis_stype);
           }
@@ -490,7 +490,7 @@ int SPIO::DataRearr::Contig_rearr::disperse_data(const void *abuf, std::size_t a
     }
     if(agg_gs_info_.stype != MPI_DATATYPE_NULL){
       MPI_Aint stride_between_vars = static_cast<MPI_Aint>(rbuf_sz / nvars);
-      ret = MPI_Type_hvector(nvars, 1, stride_between_vars, agg_gs_info_.stype, &dis_rtype_nvars);
+      ret = MPI_Type_create_hvector(nvars, 1, stride_between_vars, agg_gs_info_.stype, &dis_rtype_nvars);
       if(ret == MPI_SUCCESS){
         ret = MPI_Type_commit(&dis_rtype_nvars);
       }
@@ -1387,7 +1387,7 @@ int SPIO::DataRearr::Contig_rearr::rearrange_data(const void *sbuf, std::size_t 
       MPI_Datatype rearr_rtype = MPI_DATATYPE_NULL;
       /* Send type for block of vars */
       if((agg2rearr && (rearr_alltoall_info_.stypes[i] != MPI_DATATYPE_NULL)) || (!agg2rearr && (rearr_alltoall_info_.rtypes[i] != MPI_DATATYPE_NULL))){
-        ret = MPI_Type_hvector(nvars, 1, sstride_between_vars,
+        ret = MPI_Type_create_hvector(nvars, 1, sstride_between_vars,
                 (agg2rearr) ? rearr_alltoall_info_.stypes[i] : rearr_alltoall_info_.rtypes[i], &rearr_stype);
         if(ret == MPI_SUCCESS){
           ret = MPI_Type_commit(&rearr_stype);
@@ -1399,7 +1399,7 @@ int SPIO::DataRearr::Contig_rearr::rearrange_data(const void *sbuf, std::size_t 
       }
       /* Recv type for block of vars */
       if((agg2rearr && (rearr_alltoall_info_.rtypes[i] != MPI_DATATYPE_NULL)) || (!agg2rearr && (rearr_alltoall_info_.stypes[i] != MPI_DATATYPE_NULL))){
-        ret = MPI_Type_hvector(nvars, 1, rstride_between_vars,
+        ret = MPI_Type_create_hvector(nvars, 1, rstride_between_vars,
                 (agg2rearr) ? rearr_alltoall_info_.rtypes[i] : rearr_alltoall_info_.stypes[i], &rearr_rtype);
         if(ret == MPI_SUCCESS){
           ret = MPI_Type_commit(&rearr_rtype);
