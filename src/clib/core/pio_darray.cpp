@@ -169,7 +169,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
   }
 
   /* Get cached iodesc. */
-  std::shared_ptr<io_desc_t> sp_iodesc = spio_get_iodesc_ref_from_file(file, ioid);
+  std::shared_ptr<io_desc_t> sp_iodesc = spio_get_iodesc_ref_from_file(file, std::vector<int>(varids, varids+nvars), ioid);
   if(!sp_iodesc){
     return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
                     "Writing multiple variables to file (%s, ncid=%d) failed. Invalid arguments, invalid PIO decomposition id (%d) provided", pio_get_fname_from_file(file), ncid, ioid);
@@ -2402,7 +2402,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
   wmb->num_arrays++;
 
   /* Cache a ref to the iodesc in the file */
-  spio_add_iodesc_ref_to_file(file, ioid);
+  spio_add_iodesc_ref_to_file(file, varid, ioid);
 
   LOG((2, "wmb->num_arrays = %d iodesc->maxbytes / iodesc->mpitype_size = %d "
        "iodesc->ndof = %d iodesc->llen = %d", wmb->num_arrays,

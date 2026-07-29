@@ -478,36 +478,49 @@ int spio_wait_on_hard_close(iosystem_desc_t *ios, file_desc_t *file)
   return PIO_NOERR;
 }
 
-void spio_add_iodesc_ref_to_file(file_desc_t *file, int ioid)
+void spio_add_iodesc_ref_to_file(file_desc_t *file, int varid, int ioid)
 {
   assert(file && file->pmtx && file->io_desc_refs);
+  assert((varid >= 0) && (ioid >= 0));
 
   /* Get the lock before proceeding */
   std::lock_guard<std::mutex> lg(*(file->pmtx));
 
-  /* Don't add duplicates, just one ref to iodesc used by file.
-   * When cached iodesc is used, for writing data, its used for all
-   * cached variables at once. So we just need one ref to iodesc here
+  /* Don't add duplicates, just one ref per variable to iodesc used by file.
    */
   std::shared_ptr<io_desc_t> iodesc = pio_get_iodesc_sptr_from_id(ioid);
-  file->io_desc_refs->insert({ioid, iodesc});
+  std::pair<std::map<int, std::shared_ptr<io_desc_t> >::iterator, bool> res = file->io_desc_refs->insert({varid, iodesc});
+  if(!res.second){
+    /* If the variable already has an I/O decomposition associated with it, ensure that its the same */
+    assert(res.first->second->ioid == ioid);
+  }
 }
 
-std::shared_ptr<io_desc_t> spio_get_iodesc_ref_from_file(file_desc_t *file, int ioid)
+std::shared_ptr<io_desc_t> spio_get_iodesc_ref_from_file(file_desc_t *file, const std::vector<int> &varids, int ioid)
 {
   assert(file && file->pmtx && file->io_desc_refs);
+  assert((varids.size() > 0) && (ioid >= 0));
 
   /* Get the lock before proceeding */
   std::lock_guard<std::mutex> lg(*(file->pmtx));
 
-  /* Search through the cached I/O descs */
-  std::map<int, std::shared_ptr<io_desc_t> >::iterator iter = file->io_desc_refs->find(ioid);
+  /* Search through the cached I/O descs. All variables use the same I/O decomposition */
+  std::map<int, std::shared_ptr<io_desc_t> >::iterator iter = file->io_desc_refs->find(varids[0]);
 
   if(iter != file->io_desc_refs->end()){
+    assert(iter->second->ioid == ioid);
     /* The caller now has ownership of this iodesc */
     std::shared_ptr<io_desc_t> sp = iter->second;
     file->io_desc_refs->erase(iter);
     return sp;
+  }
+
+  /* When cached iodesc is used, for writing data, its used for all
+   * variables at once. So remove references to the I/O desc for all
+   * the remaining variables
+   */
+  for(std::vector<int>::const_iterator iter = varids.cbegin(); iter != varids.cend(); ++iter){
+    file->io_desc_refs->erase(*iter);
   }
 
   return nullptr;

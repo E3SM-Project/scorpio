@@ -144,8 +144,8 @@ extern "C" {
 
     /* Close the file ("hard close") */
     int spio_wait_on_hard_close(iosystem_desc_t *ios, file_desc_t *file);
-    void spio_add_iodesc_ref_to_file(file_desc_t *file, int ioid);
-    std::shared_ptr<io_desc_t> spio_get_iodesc_ref_from_file(file_desc_t *file, int ioid);
+    void spio_add_iodesc_ref_to_file(file_desc_t *file, int varid, int ioid);
+    std::shared_ptr<io_desc_t> spio_get_iodesc_ref_from_file(file_desc_t *file, const std::vector<int> &varids, int ioid);
     int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file, bool sync_with_ioprocs);
     int spio_soft_closefile(iosystem_desc_t *ios, file_desc_t *file);
 
