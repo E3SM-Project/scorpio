@@ -24,6 +24,7 @@
 #include "spio_decomp_logger.hpp"
 #include "spio_dt_converter.hpp"
 #include "spio_async_utils.hpp"
+#include "spio_iosys_utils.hpp"
 #include <string>
 #include <memory>
 #include <vector>
@@ -168,13 +169,21 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
                     "Writing multiple variables to file (%s, ncid=%d) failed. Trying to write to a read only file, try reopening the file in write mode (use the PIO_WRITE flag)", pio_get_fname_from_file(file), ncid);
   }
 
-  /* Get cached iodesc. */
-  std::shared_ptr<io_desc_t> sp_iodesc = spio_get_iodesc_ref_from_file(file, std::vector<int>(varids, varids+nvars), ioid);
+  std::shared_ptr<io_desc_t> sp_iodesc = nullptr;
+  if(!SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios)){
+    /* Get cached iodesc. */
+    sp_iodesc = spio_get_iodesc_ref_from_file(file, std::vector<int>(varids, varids+nvars), ioid);
+  }
+  else{
+    /* I/O desc is not cached for async I/O - since PIO_write_darray() is not offloaded */
+    sp_iodesc = pio_get_iodesc_sptr_from_id(ioid);
+  }
   if(!sp_iodesc){
     return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
                     "Writing multiple variables to file (%s, ncid=%d) failed. Invalid arguments, invalid PIO decomposition id (%d) provided", pio_get_fname_from_file(file), ncid, ioid);
   }
   iodesc = sp_iodesc.get();
+
   pioassert(iodesc->rearranger == PIO_REARR_BOX || iodesc->rearranger == PIO_REARR_SUBSET || iodesc->rearranger == PIO_REARR_CONTIG,
             "unknown rearranger", __FILE__, __LINE__);
 
