@@ -34,16 +34,18 @@ int alloc_region2(iosystem_desc_t *ios, int ndims, io_region **regionp)
                     "Internal error while allocating region. Out of memory allocating %lld bytes I/O region", (unsigned long long) sizeof(io_region));
   }
 
-  /* Allocate memory for the array of start indicies. */
-  if(!(region->start = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset)))){
-    return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                    "Internal error while allocating region. Out of memory allocating %lld bytes  for start array in the I/O region", (unsigned long long) (ndims * sizeof(PIO_Offset)));
-  }
+  if(ndims > 0){
+    /* Allocate memory for the array of start indicies. */
+    if(!(region->start = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset)))){
+      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Internal error while allocating region. Out of memory allocating %lld bytes  for start array in the I/O region", (unsigned long long) (ndims * sizeof(PIO_Offset)));
+    }
 
-  /* Allocate memory for the array of counts. */
-  if(!(region->count = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset)))){
-    return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                    "Internal error while allocating region. Out of memory allocating %lld bytes  for count array in the I/O region", (unsigned long long) (ndims * sizeof(PIO_Offset)));
+    /* Allocate memory for the array of counts. */
+    if(!(region->count = (PIO_Offset *) calloc(ndims, sizeof(PIO_Offset)))){
+      return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Internal error while allocating region. Out of memory allocating %lld bytes  for count array in the I/O region", (unsigned long long) (ndims * sizeof(PIO_Offset)));
+    }
   }
 
   /* Return pointer to new region to caller. */
