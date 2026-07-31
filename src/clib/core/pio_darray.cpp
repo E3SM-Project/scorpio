@@ -170,12 +170,14 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
   }
 
   std::shared_ptr<io_desc_t> sp_iodesc = nullptr;
-  if(!SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios)){
-    /* Get cached iodesc. */
-    sp_iodesc = spio_get_iodesc_ref_from_file(file, std::vector<int>(varids, varids+nvars), ioid);
-  }
-  else{
-    /* I/O desc is not cached for async I/O - since PIO_write_darray() is not offloaded */
+  /* First try to get cached iodesc. */
+  sp_iodesc = spio_get_iodesc_ref_from_file(file, std::vector<int>(varids, varids+nvars), ioid);
+  if(!sp_iodesc){
+    /* For some cases the I/O desc is not cached right now,
+     * 1) I/O desc is not cached for async I/O - since PIO_write_darray() is not offloaded
+     * 2) The unit tests that call this function directly (PIO_write_darray() is not called) also don't have the iodesc cached
+     * Try to get the iodesc from the global list
+     */
     sp_iodesc = pio_get_iodesc_sptr_from_id(ioid);
   }
   if(!sp_iodesc){
