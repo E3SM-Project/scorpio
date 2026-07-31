@@ -2881,7 +2881,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     file->pmtx = new std::mutex();
     assert(file->pmtx);
 
-    file->io_desc_refs = new std::map<int, std::shared_ptr<io_desc_t> >();
+    file->io_desc_refs = new std::map<int, std::map<int, std::shared_ptr<io_desc_t> > >();
     assert(file->io_desc_refs);
 
     file->io_fstats = (spio_io_fstats_summary_t *) calloc(sizeof(spio_io_fstats_summary_t), 1);
@@ -4604,7 +4604,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   file->pmtx = new std::mutex();
   assert(file->pmtx);
 
-  file->io_desc_refs = new std::map<int, std::shared_ptr<io_desc_t> >();
+  file->io_desc_refs = new std::map<int, std::map<int, std::shared_ptr<io_desc_t> > >();
   assert(file->io_desc_refs);
 
   file->io_fstats = (spio_io_fstats_summary_t *) calloc(sizeof(spio_io_fstats_summary_t), 1);
