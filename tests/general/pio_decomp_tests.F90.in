@@ -59,6 +59,217 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_write_1d_darray
   call PIO_freedecomp(pio_tf_iosystem_, iodesc)
 PIO_TF_AUTO_TEST_SUB_END nc_write_1d_darray
 
+! Test freeing I/O decomposition before closing (writing data to) file
+PIO_TF_AUTO_TEST_SUB_BEGIN free_before_close
+  implicit none
+
+  ! pio_file1 uses iodesc1, iodesc2
+  ! pio_file2 uses iodesc1, iodesc3
+  ! pio_file3 uses iodesc2
+  type(file_desc_t) :: pio_file1, pio_file2, pio_file3
+  character(len=PIO_TF_MAX_STR_LEN) :: filename1, filename2, filename3
+  type(io_desc_t) :: iodesc1, iodesc2, iodesc3
+  ! rd_iodesc is used by all files to read data
+  type(io_desc_t) :: rd_iodesc
+
+  integer, parameter :: VEC_LOCAL_SZ = 7
+  integer, dimension(VEC_LOCAL_SZ) :: compdof, compdof_rel_disps
+  integer, dimension(VEC_LOCAL_SZ) :: buf, rbuf
+  character(len=*), parameter :: PIO_VAR1_NAME = 'PIO_TF_test_var1'
+  character(len=*), parameter :: PIO_VAR2_NAME = 'PIO_TF_test_var2'
+
+  ! pio_file1 & pio_file2 have 2 vars, pio_file3 has a single var : All vars have the same size
+  type(var_desc_t)  :: pio_var1_file1, pio_var2_file1, pio_var1_file2, pio_var2_file2, pio_var1_file3
+  integer, dimension(1) :: dims
+  integer :: pio_dim1, pio_dim2, pio_dim3
+
+  ! iotypes = valid io types
+  integer, dimension(:), allocatable :: iotypes
+  character(len=PIO_TF_MAX_STR_LEN), dimension(:), allocatable :: iotype_descs
+  integer :: num_iotypes
+
+  integer :: i, ierr
+
+  do i=1,VEC_LOCAL_SZ
+    compdof_rel_disps(i) = i
+  end do
+  dims(1) = VEC_LOCAL_SZ * pio_tf_world_sz_
+  compdof = VEC_LOCAL_SZ * pio_tf_world_rank_ + compdof_rel_disps
+  buf = pio_tf_world_rank_;
+
+  filename1 = "test_pio_decomp_simple_tests_free_before_close_file1.testfile"
+  filename2 = "test_pio_decomp_simple_tests_free_before_close_file2.testfile"
+  filename3 = "test_pio_decomp_simple_tests_free_before_close_file3.testfile"
+
+  num_iotypes = 0
+  call PIO_TF_Get_nc_iotypes(iotypes, iotype_descs, num_iotypes)
+  do i=1,num_iotypes
+    PIO_TF_LOG(0,*) "Testing : PIO_TF_DATA_TYPE : ", iotype_descs(i)
+
+    ! Create the 3 files
+    ierr = PIO_createfile(pio_tf_iosystem_, pio_file1, iotypes(i), filename1, PIO_CLOBBER)
+    PIO_TF_CHECK_ERR(ierr, "Could not create (file 1) " // trim(filename1))
+
+    ierr = PIO_createfile(pio_tf_iosystem_, pio_file2, iotypes(i), filename2, PIO_CLOBBER)
+    PIO_TF_CHECK_ERR(ierr, "Could not create (file 2) " // trim(filename2))
+
+    ierr = PIO_createfile(pio_tf_iosystem_, pio_file3, iotypes(i), filename3, PIO_CLOBBER)
+    PIO_TF_CHECK_ERR(ierr, "Could not create (file 3) " // trim(filename3))
+
+    ierr = PIO_def_dim(pio_file1, 'PIO_TF_test_dim', dims(1), pio_dim1)
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a dim (file 1) : " // trim(filename1))
+
+    ierr = PIO_def_dim(pio_file2, 'PIO_TF_test_dim', dims(1), pio_dim2)
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a dim (file 2) : " // trim(filename2))
+
+    ierr = PIO_def_dim(pio_file3, 'PIO_TF_test_dim', dims(1), pio_dim3)
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a dim (file 3) : " // trim(filename3))
+
+    ierr = PIO_def_var(pio_file1, PIO_VAR1_NAME, PIO_INT, (/pio_dim1/), pio_var1_file1)
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a var (var 1 + file 1): " // trim(filename1))
+
+    ierr = PIO_def_var(pio_file1, PIO_VAR2_NAME, PIO_INT, (/pio_dim1/), pio_var2_file1)
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a var (var 2 + file 1): " // trim(filename1))
+
+    ierr = PIO_def_var(pio_file2, PIO_VAR1_NAME, PIO_INT, (/pio_dim2/), pio_var1_file2)
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a var (var 1 + file 2): " // trim(filename2))
+
+    ierr = PIO_def_var(pio_file2, PIO_VAR2_NAME, PIO_INT, (/pio_dim2/), pio_var2_file2)
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a var (var 2 + file 2): " // trim(filename2))
+
+    ierr = PIO_def_var(pio_file3, PIO_VAR1_NAME, PIO_INT, (/pio_dim3/), pio_var1_file3)
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a var (var 1 + file 3): " // trim(filename3))
+
+    ierr = PIO_enddef(pio_file1)
+    PIO_TF_CHECK_ERR(ierr, "Failed to end define mode (file 1): " // trim(filename1))
+
+    ierr = PIO_enddef(pio_file2)
+    PIO_TF_CHECK_ERR(ierr, "Failed to end define mode (file 2): " // trim(filename2))
+
+    ierr = PIO_enddef(pio_file3)
+    PIO_TF_CHECK_ERR(ierr, "Failed to end define mode (file 3): " // trim(filename3))
+
+    ! Create I/O decomps : Same decomposition for all variables in all files
+    call PIO_initdecomp(pio_tf_iosystem_, PIO_INT, dims, compdof, iodesc1)
+    call PIO_initdecomp(pio_tf_iosystem_, PIO_INT, dims, compdof, iodesc2)
+    call PIO_initdecomp(pio_tf_iosystem_, PIO_INT, dims, compdof, iodesc3)
+
+    ! Write the variable out into the three files
+    ! file 1 : writes using iodesc1 and iodesc2
+    ! file 2 : writes using iodesc1 and iodesc3
+    ! file 3 : writes using iodesc2
+
+    call PIO_write_darray(pio_file1, pio_var1_file1, iodesc1, buf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to write darray (file 1 + var 1 + iodesc 1): " // trim(filename1))
+
+    call PIO_write_darray(pio_file1, pio_var2_file1, iodesc2, buf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to write darray (file 1 + var 2 + iodesc 2): " // trim(filename1))
+
+    call PIO_write_darray(pio_file2, pio_var1_file2, iodesc1, buf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to write darray (file 2 + var 1 + iodesc 1): " // trim(filename2))
+
+    call PIO_write_darray(pio_file2, pio_var2_file2, iodesc3, buf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to write darray (file 2 + var 2 + iodesc 3): " // trim(filename2))
+
+    call PIO_write_darray(pio_file3, pio_var1_file3, iodesc2, buf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to write darray (file 3 + var 1 + iodesc 2): " // trim(filename3))
+
+    ! Free I/O decompisitions (write decomps) before sync (and before closing the files)
+    call PIO_freedecomp(pio_tf_iosystem_, iodesc1)
+    call PIO_freedecomp(pio_tf_iosystem_, iodesc2)
+    call PIO_freedecomp(pio_tf_iosystem_, iodesc3)
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+    call PIO_closefile(pio_file1)
+    call PIO_closefile(pio_file2)
+    call PIO_closefile(pio_file3)
+
+    ierr = PIO_openfile(pio_tf_iosystem_, pio_file1, iotypes(i), filename1, PIO_nowrite)
+    PIO_TF_CHECK_ERR(ierr, "Could not reopen file (file 1)" // trim(filename1))
+
+    ierr = PIO_openfile(pio_tf_iosystem_, pio_file2, iotypes(i), filename2, PIO_nowrite)
+    PIO_TF_CHECK_ERR(ierr, "Could not reopen file (file 2)" // trim(filename2))
+
+    ierr = PIO_openfile(pio_tf_iosystem_, pio_file3, iotypes(i), filename3, PIO_nowrite)
+    PIO_TF_CHECK_ERR(ierr, "Could not reopen file (file 3)" // trim(filename3))
+
+    ierr = PIO_inq_varid(pio_file1, PIO_VAR1_NAME, pio_var1_file1)
+    PIO_TF_CHECK_ERR(ierr, "Could not inq var (var 1 + file 1): " // trim(filename1))
+
+    ierr = PIO_inq_varid(pio_file1, PIO_VAR2_NAME, pio_var2_file1)
+    PIO_TF_CHECK_ERR(ierr, "Could not inq var (var 2 + file 1): " // trim(filename1))
+
+    ierr = PIO_inq_varid(pio_file2, PIO_VAR1_NAME, pio_var1_file2)
+    PIO_TF_CHECK_ERR(ierr, "Could not inq var (var 1 + file 2): " // trim(filename2))
+
+    ierr = PIO_inq_varid(pio_file2, PIO_VAR2_NAME, pio_var2_file2)
+    PIO_TF_CHECK_ERR(ierr, "Could not inq var (var 2 + file 2): " // trim(filename2))
+
+    ierr = PIO_inq_varid(pio_file3, PIO_VAR1_NAME, pio_var1_file3)
+    PIO_TF_CHECK_ERR(ierr, "Could not inq var (var 1 + file 3): " // trim(filename3))
+#else
+    call PIO_syncfile(pio_file1)
+    call PIO_syncfile(pio_file2)
+    call PIO_syncfile(pio_file3)
+#endif
+
+    ! Create read I/O decomp
+    call PIO_initdecomp(pio_tf_iosystem_, PIO_INT, dims, compdof, rd_iodesc)
+
+    ! Read and verify contents of the first file
+    rbuf = 0
+    call PIO_read_darray(pio_file1, pio_var1_file1, rd_iodesc, rbuf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to read darray (var 1 + file 1): " // trim(filename1))
+
+    PIO_TF_CHECK_VAL((rbuf, buf), "Got wrong val (var 1 + file 1)")
+
+    rbuf = 0
+    call PIO_read_darray(pio_file1, pio_var2_file1, rd_iodesc, rbuf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to read darray (var 2 + file 1): " // trim(filename1))
+
+    PIO_TF_CHECK_VAL((rbuf, buf), "Got wrong val (var 2 + file 1)")
+
+    ! Close/delete first file, the next two files will be closed/deleted together
+    call PIO_closefile(pio_file1)
+    call PIO_deletefile(pio_tf_iosystem_, filename1);
+
+    ! Verify the contents of the remaining files (interleaved reads)
+    ! Read from second file
+    rbuf = 0
+    call PIO_read_darray(pio_file2, pio_var1_file2, rd_iodesc, rbuf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to read darray (var 1 + file 2): " // trim(filename2))
+
+    PIO_TF_CHECK_VAL((rbuf, buf), "Got wrong val (var 1 + file 2)")
+
+    ! Read from third file
+    rbuf = 0
+    call PIO_read_darray(pio_file3, pio_var1_file3, rd_iodesc, rbuf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to read darray (var 1 + file 3): " // trim(filename3))
+
+    PIO_TF_CHECK_VAL((rbuf, buf), "Got wrong val (var 1 + file 3)")
+
+    ! Now read back from second file
+    rbuf = 0
+    call PIO_read_darray(pio_file2, pio_var2_file2, rd_iodesc, rbuf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to read darray (var 2 + file 2): " // trim(filename2))
+
+    PIO_TF_CHECK_VAL((rbuf, buf), "Got wrong val (var 2 + file 2)")
+
+    call PIO_closefile(pio_file2)
+    call PIO_closefile(pio_file3)
+    call PIO_deletefile(pio_tf_iosystem_, filename2);
+    call PIO_deletefile(pio_tf_iosystem_, filename3);
+
+    ! Test freeing (read) I/O decomp after the files are closed/deleted
+    call PIO_freedecomp(pio_tf_iosystem_, rd_iodesc)
+  end do
+  if(allocated(iotypes)) then
+    deallocate(iotypes)
+    deallocate(iotype_descs)
+  end if
+
+PIO_TF_AUTO_TEST_SUB_END free_before_close
+
 ! Write 1d array, although diff procs have different
 ! number of elements to write locally they all use
 ! the same buffer size (compdof size is different for

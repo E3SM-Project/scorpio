@@ -357,21 +357,6 @@ CONTAINS
     CALL t_startf("PIO:freedecomp")
 #endif
 
-    ! Since a I/O decomposition can be freed before all writes
-    ! to a file is synced (explicit sync or close) we need to
-    ! ensure that all writes to the file is synced
-    ! FIXME : This is unfortunate since all writes (even writes
-    ! with a different I/O decomposition) are synced here. This
-    ! is unnecessary and needs to be fixed (a performance bug)
-    cerr = PIOc_sync(file%fh)
-    IF(cerr /= PIO_NOERR) THEN
-      WRITE(log_msg, *) "File sync failed in PIO_freedecomp (PIO_freedecomp_file),",&
-                        " err = ", cerr, ", iosysid =", file%iosystem%iosysid,&
-                        ", ncid =", file%fh, ", ioid = ", iodesc%ioid
-      ret = pio_error(file%iosystem, INT(cerr), __FILE__, __LINE__, trim(log_msg))
-      RETURN
-    END IF
-
     cerr = PIOc_freedecomp(file%iosystem%iosysid, INT(iodesc%ioid, C_INT))
     IF(PRESENT(ierr)) THEN
       ierr = INT(cerr)
