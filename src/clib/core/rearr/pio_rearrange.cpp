@@ -1201,10 +1201,12 @@ int determine_fill(iosystem_desc_t *ios, io_desc_t *iodesc, const int *gdimlen,
     /* Determine how many values we have locally. */
     if (iodesc->rearranger == PIO_REARR_SUBSET)
         totalllen = iodesc->llen;
-    else
+    else{
+        pioassert((iodesc->ndof == 0) || compmap, "invalid input", __FILE__, __LINE__);
         for (int i = 0; i < iodesc->ndof; i++)
             if (compmap[i] > 0)
                 totalllen++;
+    }
 
     /* Add results accross communicator. */
     LOG((2, "determine_fill before allreduce totalllen = %d totalgridsize = %d",
@@ -1271,7 +1273,7 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
 
     GPTLstart("PIO:box_rearrange_create");
     /* Check inputs. */
-    pioassert(ios && maplen >= 0 && ((maplen == 0) || compmap) && gdimlen && ndims > 0 && iodesc,
+    pioassert(ios && maplen >= 0 && ((maplen == 0) || compmap) && ((ndims == 0) || gdimlen) && ndims >= 0 && iodesc,
               "invalid input", __FILE__, __LINE__);
     LOG((1, "box_rearrange_create maplen = %d ndims = %d ios->num_comptasks = %d "
          "ios->num_iotasks = %d", maplen, ndims, ios->num_comptasks, ios->num_iotasks));

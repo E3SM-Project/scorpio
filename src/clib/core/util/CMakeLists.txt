@@ -10,6 +10,7 @@ set (spio_core_util_src
   pio_lists.cpp
   spio_io_summary.cpp
   spio_file_mvcache.cpp
+  spio_iosys_utils.cpp
   pio_sdecomps_regex.cpp)
 
 add_library (spio_core_util OBJECT
