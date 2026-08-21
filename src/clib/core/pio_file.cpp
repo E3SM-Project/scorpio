@@ -16,6 +16,7 @@
 #include <functional>
 #include "spio_hdf5_utils.hpp"
 #include "spio_async_tcomm.hpp"
+#include "spio_dbg_utils.hpp"
 
 #ifdef _ADIOS2
 #include "../../tools/adios2pio-nm/adios2pio-nm-lib-c.h"
@@ -549,6 +550,7 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
 #endif
 
     assert(ios && file);
+    //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + file->fname);
 
     /* Get the lock before proceeding */
     std::lock_guard<std::mutex> lg(*(file->pmtx));
@@ -557,7 +559,11 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
 
     if(sync_with_ioprocs){
       //if(ios->ioproc) { while(file->npend_ops){} }
-      MPI_Barrier(ios->union_comm);
+      /* For I/O async threads the union comm is NULL comm */
+      MPI_Comm sync_comm = ios->tcomm_info->get_union_comm();
+      if(sync_comm != MPI_COMM_NULL){
+        MPI_Barrier(sync_comm);
+      }
     }
 
     if(file->is_hard_closed) { return PIO_NOERR; }
@@ -859,7 +865,12 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
         }
     }
 
+#if PIO_USE_ASYNC_WR_THREAD
+    /* FIXME: Use the iosystem/file error handlers once error handlers are multi-threaded */
+    ierr = spio_handle_err(NULL, file, PIO_RETURN_ERROR, ierr, __FILE__, __LINE__);
+#else
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
+#endif
     if(ierr != PIO_NOERR){
         LOG((1, "nc*_close failed, ierr = %d", ierr));
         return pio_err(NULL, file, ierr, __FILE__, __LINE__,
@@ -919,6 +930,7 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
 int spio_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
 {
   assert(ios && file && ios->ioproc);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + file->fname);
 
 #if PIO_USE_ASYNC_WR_THREAD
   return pio_iosys_async_file_close_op_add(file);
@@ -1035,24 +1047,9 @@ int PIOc_closefile_impl(int ncid)
       if(ios->ioproc){
         soft_close = true;
       }
-      else{
-        /* Wait on all hdf5 async ops before a "hard close" */
-        /*
+      /* To wait on all hdf5 async ops before a "hard close" (for debugging)
         ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
-        if(ierr != PIO_NOERR){
-          return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                          "Closing file (%s, ncid=%d) failed. Error sending async msg PIO_MSG_CLOSE_FILE", pio_get_fname_from_file(file), ncid);
-        }
-        */
-      }
-    }
-    else{
-      /* Wait on all hdf5 async ops before a "hard close" */
-      ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
-      if(ierr != PIO_NOERR){
-        return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                        "Closing file (%s, ncid=%d) failed. Error sending async msg PIO_MSG_CLOSE_FILE", pio_get_fname_from_file(file), ncid);
-      }
+      */
     }
 #endif
 
