@@ -171,8 +171,6 @@ int test_setup(MPI_Comm comm, int rank, int sz,
   ios->async_ios_msg_info.prev_msg = 0;
   ios->comp_idx = 0;
   /* We don't need the rearranger options set for this test */
-  ios->next = NULL;
-
 
   /* Initialize file structure with some dummy requests */
   file->iosystem = ios;

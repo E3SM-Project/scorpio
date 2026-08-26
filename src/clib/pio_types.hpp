@@ -521,9 +521,6 @@ typedef struct iosystem_desc_t
 
     /* List of pending async operations on this iosystem */
     std::deque<SPIO_Util::Async_op> async_pend_ops;
-
-    /** Pointer to the next iosystem_desc_t in the list. */
-    struct iosystem_desc_t *next;
 } iosystem_desc_t;
 
 /**
