@@ -12,6 +12,8 @@
 #include "spio_io_summary.h"
 #include "spio_hash.h"
 #include "spio_hdf5_utils.hpp"
+#include <vector>
+#include <algorithm>
 #if PIO_USE_ASYNC_WR_THREAD
 #include "spio_async_hdf5_utils.hpp"
 #endif
@@ -2331,6 +2333,39 @@ int spio_get_var_tc(int ncid, int varid, nc_type xtype, void *buf)
     return spio_get_vars_tc(ncid, varid, startp, countp, NULL, xtype, buf);
 }
 
+/* Returns true if a variable has unlimited dimensions, false otherwise (and on error) */
+static bool spio_var_has_unlimited_dims(file_desc_t *file, int varid, int &ret)
+{
+  ret = PIO_NOERR;
+  assert(file && (varid >= 0));
+
+  /* Get the unlimited dimension in the file
+   * Note: We assume that we have just one unlimited dimension (no longer valid for
+   * NetCDF4 files) in a file
+   */
+  int unlim_dimid = -1;
+  ret = PIOc_inq_unlimdim_impl(file->pio_ncid, &unlim_dimid);
+  if((ret != PIO_NOERR) || (unlim_dimid == -1)) { return false; }
+
+  /* Get the number of dimensions in the variable */
+  int ndims = -1;
+  ret = PIOc_inq_varndims_impl(file->pio_ncid, varid, &ndims);
+  if((ret != PIO_NOERR) || (ndims <= 0)) { return false; }
+
+  /* Get the variable dimensions */
+  std::vector<int> vdims(ndims);
+  ret = PIOc_inq_vardimid_impl(file->pio_ncid, varid, vdims.data());
+  if(ret != PIO_NOERR) { return false; }
+
+  /* Check if any variable dimension is an unlimited dimension */
+  std::vector<int>::const_iterator iter =
+    std::find_if(vdims.cbegin(), vdims.cend(),
+      [unlim_dimid](int vdim){ return vdim == unlim_dimid; });
+  if(iter != vdims.cend()) { return true; }
+
+  return false;
+}
+
 /**
  * Internal PIO function which provides a type-neutral interface to
  * nc_put_vars.
@@ -3309,6 +3344,26 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC &&
             file->iotype != PIO_IOTYPE_HDF5 && file->iotype != PIO_IOTYPE_HDF5C && file->do_io)
         {
+#ifdef _NETCDF4
+          /* If using NetCDF4 parallel I/O set the access mode to COLLECTIVE */
+          if((file->iotype == PIO_IOTYPE_NETCDF4P) || (file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR)){
+            /* FIXME: We might just need this for vars with unlimited dims
+             * i.e., spio_var_has_unlimited_dims(file, varid, ierr) == true
+             * However to be consistent with PIOc_def_var() setting it for all vars
+             */
+            ierr = nc_var_par_access(file->fh, varid, NC_COLLECTIVE);
+            if(ierr != PIO_NOERR){
+              GPTLstop("PIO:write_total");
+              spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+              spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+              spio_ltimer_stop(file->io_fstats->wr_timer_name);
+              spio_ltimer_stop(file->io_fstats->tot_timer_name);
+              return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                              "Writing variable (%s, varid=%d) to file (%s, ncid=%d, iotype=%s) failed. Setting collective access for variable failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
+            }
+          }
+#endif /* _NETCDF4 */
+
             LOG((2, "spio_put_vars_tc calling netcdf function file->iotype = %d",
                  file->iotype));
             ios->io_fstats->wb += num_elem * typelen;
