@@ -1701,13 +1701,17 @@ int PIOc_finalize_impl(int iosysid)
         }
     }
 
+    /* Close files that were not explicitly closed by the user */
+    bool wait_on_hard_close = false;
 #if PIO_USE_ASYNC_WR_THREAD
-    ierr = spio_close_all_files_and_delete_from_list(iosysid);
+    /* Wait on pending async ops on file before closing it */
+    wait_on_hard_close = true;
+#endif
+    ierr = spio_close_all_files_and_delete_from_list(iosysid, wait_on_hard_close);
     if(ierr != PIO_NOERR){
       return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                       "PIO Finalize failed on iosytem (%d). Error closing files on this I/O system", iosysid);
     }
-#endif
 
 #if PIO_SAVE_DECOMPS
     SPIO_Util::Decomp_Util::serialize_decomp_map_info_pool(ios);
