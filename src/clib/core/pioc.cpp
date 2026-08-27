@@ -1742,15 +1742,17 @@ int PIOc_finalize_impl(int iosysid)
                         "PIO Finalize failed on iosystem (%d). Unable to get the number of open I/O systems", iosysid);
     }
 
-#if PIO_USE_ASYNC_WR_THREAD
     if(niosysid == 1){
+      /* All data should be flushed by now, so I/O decomps are no longer needed. Delete all I/O decomps.
+       * Note: Some I/O decomps may not be freed/deleted on PIOc_freedecomp() due to pending rearrangement/writes
+       */
       ierr = pio_delete_all_iodescs(iosysid);
       if(ierr != PIO_NOERR){
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                         "PIO Finalize failed on iosytem (%d). Error deleting I/O decomps on this I/O system", iosysid);
       }
     }
-#endif
+
 #ifdef _NETCDF
     if(niosysid == 1){
       /* All data should already be flushed by now. Free any NetCDF internal structures/objects/memory */
