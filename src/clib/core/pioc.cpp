@@ -1747,6 +1747,33 @@ int PIOc_finalize_impl(int iosysid)
       }
     }
 #endif
+#ifdef _NETCDF
+    if(niosysid == 1){
+      /* All data should already be flushed by now. Free any NetCDF internal structures/objects/memory */
+      /* FIXME: Calling nc_finalize() corrupts output files (test_rearr fails) when its called multiple times
+       * (when the library is initialized/finalized multiple times)
+       *  - at least with NetCDF 4.8.0 C, 4.3.1 C++, 4.5.3 Fortran using Parallel I/O + HDF5 1.14.6
+       * So disabling the call for now - we might need to enable this call in future
+       */
+      /*
+      ierr = nc_finalize();
+      if(ierr != PIO_NOERR){
+        std::string warn_msg = std::string("Finalizing NetCDF library failed, ret =") + std::to_string(ierr);
+        PIOc_warn(iosysid, -1, __FILE__, __LINE__, warn_msg.c_str());
+      }
+      */
+    }
+#endif
+#ifdef _HDF5
+    if(niosysid == 1){
+      /* All data should already be flushed by now. Free any HDF5 internal structures/objects/memory */
+      herr_t herr = H5close();
+      if(herr < 0){
+        /* FIXME: We might want to print the error stack here */
+        PIOc_warn(iosysid, -1, __FILE__, __LINE__, "Finalizing HDF5 library failed");
+      }
+    }
+#endif
 
     LOG((2, "%d iosystems are still open.", niosysid));
     free(ios->io_fstats);
