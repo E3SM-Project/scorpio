@@ -1777,8 +1777,9 @@ int PIOc_inq_varid_impl(int ncid, const char *name, int *varidp)
 #endif /* _PNETCDF */
 
 #ifdef _NETCDF
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC && file->do_io)
-            ierr = nc_inq_varid(file->fh, name, varidp);
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC && file->do_io){
+          ierr = nc_inq_varid(file->fh, name, varidp);
+        }
 #endif /* _NETCDF */
     }
 

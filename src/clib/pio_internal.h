@@ -123,7 +123,7 @@ extern "C" {
 
     int pio_get_file(int ncid, file_desc_t **filep);
     int pio_delete_file_from_list(int ncid);
-    int spio_close_all_files_and_delete_from_list(int iosysid);
+    int spio_close_all_files_and_delete_from_list(int iosysid, bool wait_on_hard_close);
     int spio_close_soft_closed_file(const char *filename);
     int pio_add_to_file_list(file_desc_t *file, MPI_Comm comm);
 

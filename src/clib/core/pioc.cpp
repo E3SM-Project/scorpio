@@ -1701,13 +1701,17 @@ int PIOc_finalize_impl(int iosysid)
         }
     }
 
+    /* Close files that were not explicitly closed by the user */
+    bool wait_on_hard_close = false;
 #if PIO_USE_ASYNC_WR_THREAD
-    ierr = spio_close_all_files_and_delete_from_list(iosysid);
+    /* Wait on pending async ops on file before closing it */
+    wait_on_hard_close = true;
+#endif
+    ierr = spio_close_all_files_and_delete_from_list(iosysid, wait_on_hard_close);
     if(ierr != PIO_NOERR){
       return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                       "PIO Finalize failed on iosytem (%d). Error closing files on this I/O system", iosysid);
     }
-#endif
 
 #if PIO_SAVE_DECOMPS
     SPIO_Util::Decomp_Util::serialize_decomp_map_info_pool(ios);
@@ -1738,12 +1742,41 @@ int PIOc_finalize_impl(int iosysid)
                         "PIO Finalize failed on iosystem (%d). Unable to get the number of open I/O systems", iosysid);
     }
 
-#if PIO_USE_ASYNC_WR_THREAD
     if(niosysid == 1){
+      /* All data should be flushed by now, so I/O decomps are no longer needed. Delete all I/O decomps.
+       * Note: Some I/O decomps may not be freed/deleted on PIOc_freedecomp() due to pending rearrangement/writes
+       */
       ierr = pio_delete_all_iodescs(iosysid);
       if(ierr != PIO_NOERR){
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                         "PIO Finalize failed on iosytem (%d). Error deleting I/O decomps on this I/O system", iosysid);
+      }
+    }
+
+#ifdef _NETCDF
+    if(niosysid == 1){
+      /* All data should already be flushed by now. Free any NetCDF internal structures/objects/memory */
+      /* FIXME: Calling nc_finalize() corrupts output files (test_rearr fails) when its called multiple times
+       * (when the library is initialized/finalized multiple times)
+       *  - at least with NetCDF 4.8.0 C, 4.3.1 C++, 4.5.3 Fortran using Parallel I/O + HDF5 1.14.6
+       * So disabling the call for now - we might need to enable this call in future
+       */
+      /*
+      ierr = nc_finalize();
+      if(ierr != PIO_NOERR){
+        std::string warn_msg = std::string("Finalizing NetCDF library failed, ret =") + std::to_string(ierr);
+        PIOc_warn(iosysid, -1, __FILE__, __LINE__, warn_msg.c_str());
+      }
+      */
+    }
+#endif
+#ifdef _HDF5
+    if(niosysid == 1){
+      /* All data should already be flushed by now. Free any HDF5 internal structures/objects/memory */
+      herr_t herr = H5close();
+      if(herr < 0){
+        /* FIXME: We might want to print the error stack here */
+        PIOc_warn(iosysid, -1, __FILE__, __LINE__, "Finalizing HDF5 library failed");
       }
     }
 #endif

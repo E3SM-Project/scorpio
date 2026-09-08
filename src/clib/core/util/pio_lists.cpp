@@ -213,7 +213,7 @@ int pio_delete_file_from_list(int ncid)
   return pio_free_file(file);
 }
 
-int spio_close_all_files_and_delete_from_list(int iosysid)
+int spio_close_all_files_and_delete_from_list(int iosysid, bool wait_on_hard_close)
 {
   int ret = PIO_NOERR;
   std::vector<int> ncids_to_del_from_list;
@@ -222,11 +222,13 @@ int spio_close_all_files_and_delete_from_list(int iosysid)
     file_desc_t *file = iter->second;
     assert(file);
     if(file->iosystem->iosysid == iosysid){
-      //ret = spio_hard_closefile(file->iosystem, file, true);
-      ret = spio_wait_on_hard_close(file->iosystem, file);
-      if(ret != PIO_NOERR){
-        return pio_err(file->iosystem, file, PIO_EINTERNAL, __FILE__, __LINE__,
-                        "Error closing file (hard close failed)");
+      if(wait_on_hard_close){
+        //ret = spio_hard_closefile(file->iosystem, file, true);
+        ret = spio_wait_on_hard_close(file->iosystem, file);
+        if(ret != PIO_NOERR){
+          return pio_err(file->iosystem, file, PIO_EINTERNAL, __FILE__, __LINE__,
+                          "Error closing file (hard close failed)");
+        }
       }
       ncids_to_del_from_list.push_back(file->pio_ncid);
     }
