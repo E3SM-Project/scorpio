@@ -31,7 +31,7 @@ ${CMAKE_CURRENT_SOURCE_DIR}/../src/clib/pioc_sc.c" )
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
     ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
 
-  # Copy necessary files.
+  # Copy necessary files & build docs in build directory
   add_custom_target(docs
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/customdoxygen.css
     ${CMAKE_CURRENT_BINARY_DIR}
@@ -42,4 +42,10 @@ ${CMAKE_CURRENT_SOURCE_DIR}/../src/clib/pioc_sc.c" )
     COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Generating API documentation with Doxygen" VERBATIM)
+
+  # Update doc in the source directory
+  add_custom_target(update_docs
+    COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Updating documentation in-place (in <SOURCE_DIRECTORY>/docs/html)" VERBATIM)
 endif(DOXYGEN_FOUND)
