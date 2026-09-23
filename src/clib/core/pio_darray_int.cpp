@@ -21,6 +21,7 @@
 #include "spio_dbg_utils.hpp"
 #include "spio_dt_converter.hpp"
 #include "spio_hdf5_utils.hpp"
+#include "spio_iosys_utils.hpp"
 
 /* 10MB default limit. */
 extern PIO_Offset pio_buffer_size_limit;
@@ -200,7 +201,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
     void *iobuf = fill ? vdesc->fillbuf : spio_file_mvcache_get(file, iodesc->ioid);
 
     /* If this is an IO task write the data. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
         int rrcnt = 0; /* Number of subarray requests (pnetcdf only). */
         void *bufptr = NULL;
@@ -671,7 +672,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
         /* Free resources. */
         free(startlist);
         free(countlist);
-    } /* endif (ios->ioproc) */
+    } /* endif (ios->io_comm_info->is_sync_io_proc()) */
 
     /* Check the return code from the netCDF/pnetcdf call. */
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
@@ -790,16 +791,16 @@ int send_all_start_count(iosystem_desc_t *ios, io_desc_t *iodesc, PIO_Offset lle
     int ierr = PIO_NOERR;    /* Return code. */
 
     /* Check inputs. */
-    pioassert(ios && ios->ioproc && ios->io_rank > 0 && maxregions >= 0,
+    pioassert(ios && ios->io_comm_info->is_sync_io_proc() && ios->io_comm_info->get_sync_io_comm_rank() > 0 && maxregions >= 0,
               "invalid inputs", __FILE__, __LINE__);
 
     /* Do a handshake. */
-    if ((mpierr = MPI_Recv(&ierr, 1, MPI_INT, 0, 0, ios->io_comm, &status)))
+    if ((mpierr = MPI_Recv(&ierr, 1, MPI_INT, 0, 0, ios->io_comm_info->get_sync_io_comm(), &status)))
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
 
     /* Send local length of iobuffer for each field (all
      * fields are the same length). */
-    if ((mpierr = MPI_Send((void *)&llen, 1, MPI_OFFSET, 0, ios->io_rank, ios->io_comm)))
+    if ((mpierr = MPI_Send((void *)&llen, 1, MPI_OFFSET, 0, ios->io_comm_info->get_sync_io_comm_rank(), ios->io_comm_info->get_sync_io_comm())))
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
     LOG((3, "sent llen = %d", llen));
 
@@ -807,17 +808,17 @@ int send_all_start_count(iosystem_desc_t *ios, io_desc_t *iodesc, PIO_Offset lle
      * all regions, and the data buffer with all the data. */
     if (llen > 0)
     {
-        if ((mpierr = MPI_Send((void *)&maxregions, 1, MPI_INT, 0, ios->io_rank + ios->num_iotasks,
-                               ios->io_comm)))
+        if ((mpierr = MPI_Send((void *)&maxregions, 1, MPI_INT, 0, ios->io_comm_info->get_sync_io_comm_rank() + ios->io_comm_info->get_sync_io_comm_sz(),
+                               ios->io_comm_info->get_sync_io_comm())))
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Send(tmp_start, maxregions * fndims, MPI_OFFSET, 0,
-                               ios->io_rank + 2 * ios->num_iotasks, ios->io_comm)))
+                               ios->io_comm_info->get_sync_io_comm_rank() + 2 * ios->io_comm_info->get_sync_io_comm_sz(), ios->io_comm_info->get_sync_io_comm())))
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Send(tmp_count, maxregions * fndims, MPI_OFFSET, 0,
-                               ios->io_rank + 3 * ios->num_iotasks, ios->io_comm)))
+                               ios->io_comm_info->get_sync_io_comm_rank() + 3 * ios->io_comm_info->get_sync_io_comm_sz(), ios->io_comm_info->get_sync_io_comm())))
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
         if ((mpierr = MPI_Send(iobuf, nvars * llen, iodesc->mpitype, 0,
-                               ios->io_rank + 4 * ios->num_iotasks, ios->io_comm)))
+                               ios->io_comm_info->get_sync_io_comm_rank() + 4 * ios->io_comm_info->get_sync_io_comm_sz(), ios->io_comm_info->get_sync_io_comm())))
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
         LOG((3, "sent data for maxregions = %d", maxregions));
     }
@@ -886,19 +887,19 @@ int recv_and_write_data(file_desc_t *file, const int *varids, const int *frame,
 
     /* For each of the other tasks that are using this task
      * for IO. */
-    for (int rtask = 0; rtask < ios->num_iotasks; rtask++)
+    for (int rtask = 0; rtask < ios->io_comm_info->get_sync_io_comm_sz(); rtask++)
     {
         /* From the remote tasks, we send information about
          * the data regions. and also the data. */
         if (rtask)
         {
             /* handshake - tell the sending task I'm ready */
-            if ((mpierr = MPI_Send(&ierr, 1, MPI_INT, rtask, 0, ios->io_comm)))
+            if ((mpierr = MPI_Send(&ierr, 1, MPI_INT, rtask, 0, ios->io_comm_info->get_sync_io_comm())))
                 return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
 
             /* Get length of iobuffer for each field on this
              * task (all fields are the same length). */
-            if ((mpierr = MPI_Recv(&rlen, 1, MPI_OFFSET, rtask, rtask, ios->io_comm,
+            if ((mpierr = MPI_Recv(&rlen, 1, MPI_OFFSET, rtask, rtask, ios->io_comm_info->get_sync_io_comm(),
                                    &status)))
                 return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
             LOG((3, "received rlen = %d", rlen));
@@ -907,17 +908,17 @@ int recv_and_write_data(file_desc_t *file, const int *varids, const int *frame,
              * values for all regions, and the data buffer. */
             if (rlen > 0)
             {
-                if ((mpierr = MPI_Recv(&rregions, 1, MPI_INT, rtask, rtask + ios->num_iotasks,
-                                       ios->io_comm, &status)))
+                if ((mpierr = MPI_Recv(&rregions, 1, MPI_INT, rtask, rtask + ios->io_comm_info->get_sync_io_comm_sz(),
+                                       ios->io_comm_info->get_sync_io_comm(), &status)))
                     return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
                 if ((mpierr = MPI_Recv(tmp_start, rregions * fndims, MPI_OFFSET, rtask,
-                                       rtask + 2 * ios->num_iotasks, ios->io_comm, &status)))
+                                       rtask + 2 * ios->io_comm_info->get_sync_io_comm_sz(), ios->io_comm_info->get_sync_io_comm(), &status)))
                     return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
                 if ((mpierr = MPI_Recv(tmp_count, rregions * fndims, MPI_OFFSET, rtask,
-                                       rtask + 3 * ios->num_iotasks, ios->io_comm, &status)))
+                                       rtask + 3 * ios->io_comm_info->get_sync_io_comm_sz(), ios->io_comm_info->get_sync_io_comm(), &status)))
                     return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
                 if ((mpierr = MPI_Recv(iobuf, nvars * rlen, iodesc->mpitype, rtask,
-                                       rtask + 4 * ios->num_iotasks, ios->io_comm, &status)))
+                                       rtask + 4 * ios->io_comm_info->get_sync_io_comm_sz(), ios->io_comm_info->get_sync_io_comm(), &status)))
                     return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
                 LOG((3, "received data rregions = %d fndims = %d", rregions, fndims));
             }
@@ -1095,7 +1096,7 @@ int write_darray_multi_serial(file_desc_t *file, int nvars, int fndims, const in
     GPTLstart("PIO:write_darray_multi_serial");
 
     /* Only IO tasks participate in this code. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
         size_t tmp_start[fndims * num_regions]; /* A start array for each region. */
         size_t tmp_count[fndims * num_regions]; /* A count array for each region. */
@@ -1114,7 +1115,7 @@ int write_darray_multi_serial(file_desc_t *file, int nvars, int fndims, const in
         if (ierr == PIO_NOERR)
         {
             /* Tasks other than 0 will send their data to task 0. */
-            if (ios->io_rank > 0)
+            if (ios->io_comm_info->get_sync_io_comm_rank() > 0)
             {
                 /* Send the tmp_start and tmp_count arrays from this IO task
                  * to task 0. */
@@ -1135,9 +1136,9 @@ int write_darray_multi_serial(file_desc_t *file, int nvars, int fndims, const in
                     ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
                                     "Writing multiple variables (number of variables = %d) to file (%s, ncid=%d) using serial I/O failed. Internal error receiving start/count of I/O regions to write to file from non-root processes.", nvars, pio_get_fname_from_file(file), file->pio_ncid);
                 }
-            } /* if (ios->io_rank > 0) */
+            } /* if (ios->io_comm_info->get_sync_io_comm_rank() > 0) */
         } /* if (ierr == PIO_NOERR) */
-    } /* if (ios->ioproc) */
+    } /* if (ios->io_comm_info->is_sync_io_proc()) */
 
     ierr = check_netcdf(ios, file, ierr, __FILE__, __LINE__);
     if(ierr != PIO_NOERR){
@@ -1195,7 +1196,7 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
     ndims = iodesc->ndims;
 
     /* IO procs will actially read the data. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
         io_region *region;
         size_t start[fndims];
@@ -1450,7 +1451,7 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
     /* Get the number of dims in our decomposition. */
     ndims = iodesc->ndims;
 
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
         io_region *region;
         size_t start[fndims];
@@ -1540,9 +1541,9 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
 
         /* IO tasks other than 0 send their starts/counts and data to
          * IO task 0. */
-        if (ios->io_rank > 0)
+        if (ios->io_comm_info->get_sync_io_comm_rank() > 0)
         {
-            if ((mpierr = MPI_Send(&iodesc->llen, 1, MPI_OFFSET, 0, ios->io_rank, ios->io_comm)))
+            if ((mpierr = MPI_Send(&iodesc->llen, 1, MPI_OFFSET, 0, ios->io_comm_info->get_sync_io_comm_rank(), ios->io_comm_info->get_sync_io_comm())))
             {
                 GPTLstop("PIO:read_darray_nc_serial");
                 return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -1552,19 +1553,19 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
             if (iodesc->llen > 0)
             {
                 if ((mpierr = MPI_Send(&(iodesc->maxregions), 1, MPI_INT, 0,
-                                       ios->num_iotasks + ios->io_rank, ios->io_comm)))
+                                       ios->io_comm_info->get_sync_io_comm_sz() + ios->io_comm_info->get_sync_io_comm_rank(), ios->io_comm_info->get_sync_io_comm())))
                 {
                     GPTLstop("PIO:read_darray_nc_serial");
                     return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
                 }
                 if ((mpierr = MPI_Send(tmp_count, iodesc->maxregions * fndims, MPI_OFFSET, 0,
-                                       2 * ios->num_iotasks + ios->io_rank, ios->io_comm)))
+                                       2 * ios->io_comm_info->get_sync_io_comm_sz() + ios->io_comm_info->get_sync_io_comm_rank(), ios->io_comm_info->get_sync_io_comm())))
                 {
                     GPTLstop("PIO:read_darray_nc_serial");
                     return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
                 }
                 if ((mpierr = MPI_Send(tmp_start, iodesc->maxregions * fndims, MPI_OFFSET, 0,
-                                       3 * ios->num_iotasks + ios->io_rank, ios->io_comm)))
+                                       3 * ios->io_comm_info->get_sync_io_comm_sz() + ios->io_comm_info->get_sync_io_comm_rank(), ios->io_comm_info->get_sync_io_comm())))
                 {
                     GPTLstop("PIO:read_darray_nc_serial");
                     return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -1572,7 +1573,7 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
                 LOG((3, "sent iodesc->maxregions = %d tmp_count and tmp_start arrays", iodesc->maxregions));
 
                 if ((mpierr = MPI_Recv(iobuf, iodesc->llen, iodesc->mpitype, 0,
-                                       4 * ios->num_iotasks + ios->io_rank, ios->io_comm, &status)))
+                                       4 * ios->io_comm_info->get_sync_io_comm_sz() + ios->io_comm_info->get_sync_io_comm_rank(), ios->io_comm_info->get_sync_io_comm(), &status)))
                 {
                     GPTLstop("PIO:read_darray_nc_serial");
                     return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -1580,7 +1581,7 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
                 LOG((3, "received %d elements of data", iodesc->llen));
             }
         }
-        else if (ios->io_rank == 0)
+        else if (ios->io_comm_info->get_sync_io_comm_rank() == 0)
         {
             /* This is IO task 0. Get starts/counts and data from
              * other IO tasks. */
@@ -1589,11 +1590,11 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
             size_t this_start[fndims * iodesc->maxregions];
             size_t this_count[fndims * iodesc->maxregions];
 
-            for (int rtask = 1; rtask <= ios->num_iotasks; rtask++)
+            for (int rtask = 1; rtask <= ios->io_comm_info->get_sync_io_comm_sz(); rtask++)
             {
-                if (rtask < ios->num_iotasks)
+                if (rtask < ios->io_comm_info->get_sync_io_comm_sz())
                 {
-                    if ((mpierr = MPI_Recv(&tmp_bufsize, 1, MPI_OFFSET, rtask, rtask, ios->io_comm, &status)))
+                    if ((mpierr = MPI_Recv(&tmp_bufsize, 1, MPI_OFFSET, rtask, rtask, ios->io_comm_info->get_sync_io_comm(), &status)))
                     {
                         GPTLstop("PIO:read_darray_nc_serial");
                         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -1602,20 +1603,20 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
 
                     if (tmp_bufsize > 0)
                     {
-                        if ((mpierr = MPI_Recv(&maxregions, 1, MPI_INT, rtask, ios->num_iotasks + rtask,
-                                               ios->io_comm, &status)))
+                        if ((mpierr = MPI_Recv(&maxregions, 1, MPI_INT, rtask, ios->io_comm_info->get_sync_io_comm_sz() + rtask,
+                                               ios->io_comm_info->get_sync_io_comm(), &status)))
                         {
                             GPTLstop("PIO:read_darray_nc_serial");
                             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
                         }
                         if ((mpierr = MPI_Recv(this_count, maxregions * fndims, MPI_OFFSET, rtask,
-                                               2 * ios->num_iotasks + rtask, ios->io_comm, &status)))
+                                               2 * ios->io_comm_info->get_sync_io_comm_sz() + rtask, ios->io_comm_info->get_sync_io_comm(), &status)))
                         {
                             GPTLstop("PIO:read_darray_nc_serial");
                             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
                         }
                         if ((mpierr = MPI_Recv(this_start, maxregions * fndims, MPI_OFFSET, rtask,
-                                               3 * ios->num_iotasks + rtask, ios->io_comm, &status)))
+                                               3 * ios->io_comm_info->get_sync_io_comm_sz() + rtask, ios->io_comm_info->get_sync_io_comm(), &status)))
                         {
                             GPTLstop("PIO:read_darray_nc_serial");
                             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -1639,7 +1640,7 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
                     regionsize = 1;
 
                     /* ??? */
-                    if (rtask < ios->num_iotasks)
+                    if (rtask < ios->io_comm_info->get_sync_io_comm_sz())
                     {
                         for (int m = 0; m < fndims; m++)
                         {
@@ -1720,11 +1721,11 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
 
                 /* The decomposition may not use all of the active io
                  * tasks. rtask here is the io task rank and
-                 * ios->num_iotasks is the number of iotasks actually
+                 * ios->io_comm_info->get_sync_io_comm_sz() is the number of iotasks actually
                  * used in this decomposition. */
-                if (rtask < ios->num_iotasks && tmp_bufsize > 0)
+                if (rtask < ios->io_comm_info->get_sync_io_comm_sz() && tmp_bufsize > 0)
                     if ((mpierr = MPI_Send(iobuf, tmp_bufsize, iodesc->mpitype, rtask,
-                                           4 * ios->num_iotasks + rtask, ios->io_comm)))
+                                           4 * ios->io_comm_info->get_sync_io_comm_sz() + rtask, ios->io_comm_info->get_sync_io_comm())))
                     {
                         GPTLstop("PIO:read_darray_nc_serial");
                         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -1827,7 +1828,7 @@ int get_file_req_blocks(file_desc_t *file,
             preqs && nreqs && last_var_with_req &&
             preq_block_ranges && nreq_blocks);
     assert(file->iotype == PIO_IOTYPE_PNETCDF);
-    assert(file->iosystem && (file->iosystem->num_iotasks > 0));
+    assert(file->iosystem && (file->iosystem->io_comm_info->get_sync_io_comm_sz() > 0));
 
     *nreqs = 0;
     *nvars_with_reqs = 0;
@@ -1858,7 +1859,7 @@ int get_file_req_blocks(file_desc_t *file,
     /* Sanity check : All io ranks have the same number of reqs per file */
     int file_nreqs_root = file_nreqs;
     mpierr = MPI_Bcast(&file_nreqs_root, 1, MPI_INT,
-              file->iosystem->ioroot, file->iosystem->io_comm);
+              file->iosystem->io_comm_info->get_sync_io_root(), file->iosystem->io_comm_info->get_sync_io_comm());
     assert(mpierr == MPI_SUCCESS);
     assert(file_nreqs_root == file_nreqs);
 #endif
@@ -1914,7 +1915,7 @@ int get_file_req_blocks(file_desc_t *file,
     /* local file pending request sizes */
     int *file_lrequest = *preqs;
     PIO_Offset file_lrequest_sz[file_nreqs];
-    PIO_Offset file_grequest_sz[file_nreqs * file->iosystem->num_iotasks];
+    PIO_Offset file_grequest_sz[file_nreqs * file->iosystem->io_comm_info->get_sync_io_comm_sz()];
 
     for(int i = vdesc_with_reqs_start, j = 0;
           (i < vdesc_with_reqs_end) && (j < file_nreqs); i++){
@@ -1954,16 +1955,16 @@ int get_file_req_blocks(file_desc_t *file,
     /* Gather file pending request sizes from all I/O processes */
     mpierr = MPI_Gather(file_lrequest_sz, file_nreqs, MPI_OFFSET,
                         file_grequest_sz, file_nreqs, MPI_OFFSET,
-                        file->iosystem->ioroot, file->iosystem->io_comm);
+                        file->iosystem->io_comm_info->get_sync_io_root(), file->iosystem->io_comm_info->get_sync_io_comm());
     if(mpierr != MPI_SUCCESS){
       return check_mpi(file->iosystem, file, mpierr, __FILE__, __LINE__);
     }
 
     /* Find the request blocks in the root I/O process */
     bool is_ioroot =
-      (file->iosystem->io_rank == file->iosystem->ioroot) ? true : false;
+      (file->iosystem->io_comm_info->get_sync_io_comm_rank() == file->iosystem->io_comm_info->get_sync_io_root()) ? true : false;
     if(is_ioroot){
-      PIO_Offset file_cur_block_grequest_sz[file->iosystem->num_iotasks];
+      PIO_Offset file_cur_block_grequest_sz[file->iosystem->io_comm_info->get_sync_io_comm_sz()];
 
       /* file_grequest_sz[] = {
        * rank_0_req0_sz, rank_0_req1_sz, ..., rank_0_reqi_sz, ...
@@ -1978,14 +1979,14 @@ int get_file_req_blocks(file_desc_t *file,
        * Note:
        *  Number of pending requests on this file, file_nreqs > 1
        */
-      for(int j = 0; j < file->iosystem->num_iotasks; j++){
+      for(int j = 0; j < file->iosystem->io_comm_info->get_sync_io_comm_sz(); j++){
         PIO_Offset cur_idx = j * file_nreqs;
         file_cur_block_grequest_sz[j] = file_grequest_sz[cur_idx];
       }
       int k = 0;
       for(int i = 1; i < file_nreqs; i++){
         req_block_ends[k] = i;
-        for(int j = 0; j < file->iosystem->num_iotasks; j++){
+        for(int j = 0; j < file->iosystem->io_comm_info->get_sync_io_comm_sz(); j++){
           /* Get idx for reqi on rank j */
           PIO_Offset cur_idx = i + j * file_nreqs;
           file_cur_block_grequest_sz[j] += file_grequest_sz[cur_idx];
@@ -2010,7 +2011,7 @@ int get_file_req_blocks(file_desc_t *file,
             req_block_starts[k] = i;
             req_block_ends[k] = i;
             /* Reset the current size of block for all iotasks */
-            for(int l = 0; l < file->iosystem->num_iotasks; l++){
+            for(int l = 0; l < file->iosystem->io_comm_info->get_sync_io_comm_sz(); l++){
               /* Get idx for reqi on rank l */
               PIO_Offset idx = i + l * file_nreqs;
               file_cur_block_grequest_sz[l] = file_grequest_sz[idx];
@@ -2037,7 +2038,7 @@ int get_file_req_blocks(file_desc_t *file,
      */
     *preq_block_ranges_sz = *nreq_blocks;
     mpierr = MPI_Bcast(*preq_block_ranges, 2 * file_nreqs + 1, MPI_INT,
-              file->iosystem->ioroot, file->iosystem->io_comm);
+              file->iosystem->io_comm_info->get_sync_io_root(), file->iosystem->io_comm_info->get_sync_io_comm());
     if(mpierr != MPI_SUCCESS){
       return check_mpi(file->iosystem, file, mpierr, __FILE__, __LINE__);
     }
@@ -2083,11 +2084,11 @@ int flush_output_buffer(file_desc_t *file, bool force, PIO_Offset addsize)
 
     /* If we are not forcing a flush, spread the usage to all IO
      * tasks. */
-    if (!force && file->iosystem->io_comm != MPI_COMM_NULL)
+    if (!force && file->iosystem->io_comm_info->get_sync_io_comm() != MPI_COMM_NULL)
     {
         usage += addsize;
         if ((mpierr = MPI_Allreduce(MPI_IN_PLACE, &usage, 1,  MPI_OFFSET,  MPI_MAX,
-                                    file->iosystem->io_comm)))
+                                    file->iosystem->io_comm_info->get_sync_io_comm())))
         {
             GPTLstop("PIO:flush_output_buffer");
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -2532,7 +2533,7 @@ int compute_maxaggregate_bytes(iosystem_desc_t *ios, io_desc_t *iodesc)
          iodesc->maxiobuflen, iodesc->ndof));
 
     /* Determine the max bytes that can be held on IO task. */
-    if (ios->ioproc && iodesc->maxiobuflen > 0)
+    if (ios->io_comm_info->is_sync_io_proc() && iodesc->maxiobuflen > 0)
         maxbytesoniotask = pio_buffer_size_limit / iodesc->maxiobuflen;
 
     /* Determine the max bytes that can be held on computation task. */

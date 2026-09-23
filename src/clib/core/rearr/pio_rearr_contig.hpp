@@ -6,6 +6,7 @@
 #include "pio_internal.h"
 #include "pio_types.hpp"
 #include "spio_map_sorter.hpp"
+#include "spio_iosys_utils.hpp"
 
 #include <vector>
 #include <utility>
@@ -82,7 +83,7 @@ namespace SPIO{
         /* Get rearrange info */
         std::size_t get_rearrange_buf_sz(void ) const{
           assert(is_init_ && ios_);
-          if(!ios_->ioproc){
+          if(!ios_->io_comm_info->is_sync_io_proc()){
             return 0;
           }
 

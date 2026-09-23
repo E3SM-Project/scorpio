@@ -12,6 +12,7 @@
 #include "spio_io_summary.h"
 #include "spio_hash.h"
 #include "spio_hdf5_utils.hpp"
+#include "spio_iosys_utils.hpp"
 #include <vector>
 #include <algorithm>
 #if PIO_USE_ASYNC_WR_THREAD
@@ -122,7 +123,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 
     /* Run these on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         /* Get the length (in bytes) of the type in file. */
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -290,7 +291,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         file->adios_attrs[num_attrs].adios_type = adios_type;
         file->num_attrs++;
 
-        if (ios->iomaster == MPI_ROOT)
+        if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
         {
             ios->io_fstats->wb += len * atttype_len;
             file->io_fstats->wb += len * atttype_len;
@@ -389,12 +390,12 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 #endif /* _HDF5 */
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
-            if (ios->iomaster == MPI_ROOT)
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
             {
                 ios->io_fstats->wb += len * atttype_len;
                 file->io_fstats->wb += len * atttype_len;
@@ -453,7 +454,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 #ifdef _HDF5
     if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
-        if (ios->iomaster == MPI_ROOT)
+        if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
         {
             ios->io_fstats->wb += len * atttype_len;
             file->io_fstats->wb += len * atttype_len;
@@ -471,7 +472,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC &&
             file->iotype != PIO_IOTYPE_HDF5 && file->iotype != PIO_IOTYPE_HDF5C && file->do_io)
         {
-            if (ios->iomaster == MPI_ROOT)
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
             {
                 ios->io_fstats->wb += len * atttype_len;
                 file->io_fstats->wb += len * atttype_len;
@@ -612,7 +613,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 
     /* Run these on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         /* Get the type and length of the attribute. */
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -815,7 +816,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
         LOG((2, "calling pnetcdf/netcdf"));
 #ifdef _PNETCDF
@@ -940,7 +941,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 
     /* Broadcast results to all tasks. */
     LOG((2, "bcasting att values attlen = %d memtype_len = %d", attlen, memtype_len));
-    if ((mpierr = MPI_Bcast(ip, (int)attlen * memtype_len, MPI_BYTE, ios->ioroot,
+    if ((mpierr = MPI_Bcast(ip, (int)attlen * memtype_len, MPI_BYTE, ios->io_comm_info->get_sync_io_root(),
                             ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -1039,7 +1040,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
     /* Run these on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         /* Get the type of this var. */
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -1182,7 +1183,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     }
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
         LOG((2, "file->iotype = %d xtype = %d file->do_io = %d", file->iotype, xtype, file->do_io));
 #ifdef _PNETCDF
@@ -1203,7 +1204,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
             /* Only the IO master does the IO, so we are not really
              * getting parallel IO here. */
-            if (ios->iomaster == MPI_ROOT)
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
             {
                 switch(xtype)
                 {
@@ -1265,7 +1266,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             }
 #else
             PIO_Offset *cnt;
-            if (ios->iomaster == MPI_ROOT)
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
                 cnt = (PIO_Offset*)count;
             else
             {
@@ -1335,7 +1336,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Unsupported variable type (type=%x)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, xtype);
             }
 
-            if (ios->iomaster != MPI_ROOT)
+            if (ios->io_comm_info->get_sync_io_master() != MPI_ROOT)
                 free(cnt);
 #endif /* PIO_USE_INDEP_MODE */
         }
@@ -2185,8 +2186,8 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
     /* Send the data. */
     LOG((2, "spio_get_vars_tc bcasting data num_elem = %d typelen = %d ios->ioroot = %d", num_elem,
-         typelen, ios->ioroot));
-    if ((mpierr = MPI_Bcast(buf, num_elem * typelen, MPI_BYTE, ios->ioroot, ios->my_comm)))
+         typelen, ios->io_comm_info->get_sync_io_root()));
+    if ((mpierr = MPI_Bcast(buf, num_elem * typelen, MPI_BYTE, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -2484,7 +2485,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
     /* Run these on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         /* Get the type of this var. */
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -3082,7 +3083,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -3131,7 +3132,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
                 /* Only the IO master does the IO, so we are not really
                  * getting parallel IO here. */
-                if (ios->iomaster == MPI_ROOT)
+                if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
                 {
                     if (start)
                     {
@@ -3249,7 +3250,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     fake_stride = (PIO_Offset *)stride;
 
                 /* Only the IO master actually does the call. */
-                if (ios->iomaster == MPI_ROOT)
+                if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
                 {
                     ios->io_fstats->wb += num_elem * typelen;
                     file->io_fstats->wb += num_elem * typelen;
@@ -3326,7 +3327,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 #ifdef _HDF5
     if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
-        if (ios->iomaster == MPI_ROOT)
+        if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
         {
             ios->io_fstats->wb += num_elem * typelen;
             file->io_fstats->wb += num_elem * typelen;

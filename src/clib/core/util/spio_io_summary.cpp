@@ -17,6 +17,7 @@
 
 #include "spio_io_summary.hpp"
 #include "spio_serializer.hpp"
+#include "spio_iosys_utils.hpp"
 
 namespace PIO_Util{
   namespace IO_Summary_Util{
@@ -638,7 +639,7 @@ int spio_write_io_summary(iosystem_desc_t *ios)
   }
 
   /* For async I/O only collect statistics from the I/O processes */
-  if(ios->async && !(ios->ioproc)){
+  if(ios->async && !(ios->io_comm_info->is_sync_io_proc())){
     return PIO_NOERR;
   }
 
@@ -712,7 +713,7 @@ int spio_write_io_summary(iosystem_desc_t *ios)
   }
 
   /* Consolidate I/O performance statistics for the files, belonging to this I/O system, and the I/O system */
-  MPI_Comm comm = (ios->async) ? (ios->io_comm) : (ios->union_comm);
+  MPI_Comm comm = (ios->async) ? (ios->io_comm_info->get_sync_io_comm()) : (ios->union_comm);
   ierr = MPI_Reduce(tmp_sstats.data(), gio_sstats.data(), nelems_to_red, io_sstats2mpi.get_mpi_datatype(),
                       op, ROOT_PROC, comm);
   if(ierr != PIO_NOERR){

@@ -194,7 +194,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
 
   /* Run these on all tasks if async is not in use, but only on
    * non-IO tasks if async is in use. */
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     /* Get the number of dims for this var. */
     LOG((3, "about to call PIOc_inq_varndims varids[0] = %d", varids[0]));
     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -268,7 +268,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
    * and write. The buffer size on io task 0 must be as large as
    * the largest used to accommodate this serial io method (use
    * iodesc->maxiobuflen to calculate it). */
-  if((file->iotype == PIO_IOTYPE_NETCDF || file->iotype == PIO_IOTYPE_NETCDF4C) && ios->iomaster == MPI_ROOT){
+  if((file->iotype == PIO_IOTYPE_NETCDF || file->iotype == PIO_IOTYPE_NETCDF4C) && ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
     rlen = iodesc->maxiobuflen * nvars;
   }
   else{
@@ -324,7 +324,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
       }
     }
   }
-  else if(file->iotype == PIO_IOTYPE_PNETCDF && ios->ioproc){
+  else if(file->iotype == PIO_IOTYPE_PNETCDF && ios->io_comm_info->is_sync_io_proc()){
     /* this assures that iobuf is allocated on all iotasks thus
      assuring that the flush_output_buffer call above is called
      collectively (from all iotasks) */
@@ -487,7 +487,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     pioassert(!vdesc0->fillbuf, "buffer overwrite",__FILE__, __LINE__);
 
     /* Get a buffer. */
-    if(ios->io_rank == 0){
+    if(ios->io_comm_info->get_sync_io_comm_rank() == 0){
       vdesc0->fillbuf = bget(iodesc->maxholegridsize * iodesc->mpitype_size * nvars);
     }
     else if(iodesc->holegridsize > 0){
@@ -566,7 +566,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
    * needs an explicit flush/wait to make sure data is written
    * to disk (if the buffer is full)
    */
-  if(ios->ioproc && file->iotype == PIO_IOTYPE_PNETCDF){
+  if(ios->io_comm_info->is_sync_io_proc() && file->iotype == PIO_IOTYPE_PNETCDF){
     /* Flush data to disk for pnetcdf. */
     if((ierr = flush_output_buffer(file, flushtodisk, 0))){
       return pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -2082,7 +2082,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
 
   /* Run these on all tasks if async is not in use, but only on
    * non-IO tasks if async is in use. */
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->wr_timer_name);
@@ -2220,7 +2220,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
   }
   LOG((2, "needsflush = %d", needsflush));
 
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     if(file->varlist[varid].vrsize == 0){
       spio_ltimer_stop(ios->io_fstats->wr_timer_name);
       spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -3456,7 +3456,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 
   /* Run these on all tasks if async is not in use, but only on
    * non-IO tasks if async is in use. */
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -3522,7 +3522,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 
   /* Run these on all tasks if async is not in use, but only on
    * non-IO tasks if async is in use. */
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     /* Get the number of dims for this var. */
     LOG((3, "about to call PIOc_inq_varndims varid = %d", varid));
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -3546,7 +3546,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
    * buffer size on io task 0 must be as large as the largest
    * used to accommodate this serial io method (use iodesc->
    * maxiobuflen to set it). */
-  if((file->iotype == PIO_IOTYPE_NETCDF || file->iotype == PIO_IOTYPE_NETCDF4C) && ios->iomaster == MPI_ROOT){
+  if((file->iotype == PIO_IOTYPE_NETCDF || file->iotype == PIO_IOTYPE_NETCDF4C) && ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
     rlen = iodesc->maxiobuflen;
   }
   else{
@@ -3557,7 +3557,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
     rlen = 0;
   }
 
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     if(file->varlist[varid].vrsize == 0){
       spio_ltimer_stop(ios->io_fstats->rd_timer_name);
       spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -3578,7 +3578,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
   file->rb_pend += file->varlist[varid].vrsize;
 
   /* Allocate a buffer for one record. */
-  if(ios->ioproc && rlen > 0){
+  if(ios->io_comm_info->is_sync_io_proc() && rlen > 0){
     if(!(iobuf = bget(iodesc->mpitype_size * rlen))){
       return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Out of memory allocating space (%lld bytes) in I/O processes to read data from file (before rearrangement)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (iodesc->mpitype_size * rlen));
@@ -3616,7 +3616,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 #endif
 
   /* Call the correct darray read function based on iotype. */
-  if(!ios->async || ios->ioproc){
+  if(!ios->async || ios->io_comm_info->is_sync_io_proc()){
       switch (file->iotype){
         case PIO_IOTYPE_NETCDF:
         case PIO_IOTYPE_NETCDF4C:

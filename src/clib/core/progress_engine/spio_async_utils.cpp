@@ -30,6 +30,7 @@ extern "C"{
 #include "spio_dbg_utils.hpp"
 #include "spio_dt_converter.hpp"
 #include "spio_hdf5_utils.hpp"
+#include "spio_iosys_utils.hpp"
 
 /* Use this function for op kinds with no wait functions
  * We use it to indicate,
@@ -485,7 +486,7 @@ int pio_var_rearr_and_cache(file_desc_t *file, var_desc_t *vdesc,
    * no data to receive from other procs in a subset
    * of procs (SUBSET rearranger)
    */
-  if((ios->ioproc) && (iodesc->maxiobuflen > 0)){
+  if((ios->io_comm_info->is_sync_io_proc()) && (iodesc->maxiobuflen > 0)){
     /* viobuf cache list keeps track of iobuf that contains the
      * rearranged data
      */
@@ -565,7 +566,7 @@ int pio_var_rearr_and_cache(file_desc_t *file, var_desc_t *vdesc,
                     "Error while rearranging data from compute processes to I/O processes before writing it out to file (%s, ncid=%d). Internal error occured while rearranging data", pio_get_fname_from_file(file), file->pio_ncid);
   }
 
-  if((ios->ioproc) && (iodesc->maxiobuflen > 0)){
+  if((ios->io_comm_info->is_sync_io_proc()) && (iodesc->maxiobuflen > 0)){
     /* Add the new node to the end of the list */
     if(vdesc->viobuf_ltail){
       vdesc->viobuf_ltail->next = pnew;

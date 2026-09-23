@@ -11,6 +11,7 @@
 #include "pio_rearr_utils.hpp"
 #include "spio_dbg_utils.hpp"
 #include "spio_gptl_utils.hpp"
+#include "spio_iosys_utils.hpp"
 
 namespace SPIO_Util{
   template<typename CIter, typename Iter>
@@ -619,15 +620,15 @@ inline int SPIO::DataRearr::Contig_rearr::create_agg_comm(void )
 
   assert(ios_);
 
-  /* Divide union comm into (ios_->num_iotasks) groups */
-  int agg_range_sz = ios_->num_uniontasks/ios_->num_iotasks;
+  /* Divide union comm into (number of sync I/O tasks) groups */
+  int agg_range_sz = ios_->num_uniontasks/ios_->io_comm_info->get_sync_io_comm_sz();
   /* Ensure that each group/color gets an I/O process - which is also the aggregating process */
-  int color = (ios_->ioproc) ? ios_->io_rank : (ios_->union_rank/agg_range_sz);
+  int color = (ios_->io_comm_info->is_sync_io_proc()) ? ios_->io_comm_info->get_sync_io_comm_rank() : (ios_->union_rank/agg_range_sz);
   /* Put the extra set of procs, after evenly dividing procs among I/O procs, with the last I/O proc */
-  color = (color >= ios_->num_iotasks) ? (ios_->num_iotasks - 1) : color;
+  color = (color >= ios_->io_comm_info->get_sync_io_comm_sz()) ? (ios_->io_comm_info->get_sync_io_comm_sz() - 1) : color;
 
   /* Each I/O process is rank 0 in the new aggregator comm, and is also the aggregating proc */
-  int key = (ios_->ioproc) ? 0 : 1;
+  int key = (ios_->io_comm_info->is_sync_io_proc()) ? 0 : 1;
 
   ret = MPI_Comm_split(ios_->union_comm, color, key, &agg_comm_);
   if(ret == MPI_SUCCESS){
@@ -958,11 +959,11 @@ inline int SPIO::DataRearr::Contig_rearr::create_rearr_comm(void )
   assert(ios_);
   assert(gdecomp_sz_ > 0);
   
-  if(!ios_->ioproc){
+  if(!ios_->io_comm_info->is_sync_io_proc()){
     return ret;
   }
 
-  ret = MPI_Comm_dup(ios_->io_comm, &rearr_comm_);
+  ret = MPI_Comm_dup(ios_->io_comm_info->get_sync_io_comm(), &rearr_comm_);
   if(ret == MPI_SUCCESS){
     ret = MPI_Comm_size(rearr_comm_, &rearr_comm_sz_);
     if(ret == MPI_SUCCESS){
@@ -985,7 +986,7 @@ inline void SPIO::DataRearr::Contig_rearr::set_rearr_comm_iochunk_sz(int ndims, 
   assert(ios_);
   assert(gdecomp_sz_ > 0);
 
-  if(ios_->ioproc){
+  if(ios_->io_comm_info->is_sync_io_proc()){
     assert((rearr_comm_ != MPI_COMM_NULL) && (rearr_comm_sz_ > 0));
 
     rearr_comm_iochunk_sz_ = gdecomp_sz_ / rearr_comm_sz_;
@@ -1034,7 +1035,7 @@ int SPIO::DataRearr::Contig_rearr::get_rearr_toproc_map(const std::vector<PIO_Of
   int ret = PIO_NOERR;
   assert(ios_);
   
-  if(!ios_->ioproc){
+  if(!ios_->io_comm_info->is_sync_io_proc()){
     return ret;
   }
   assert(rearr_comm_sz_ > 0);
@@ -1068,7 +1069,7 @@ int SPIO::DataRearr::Contig_rearr::setup_data_rearr_info(std::vector<PIO_Offset>
   SPIO_Util::GPTL_Util::GPTL_timer ftimer("PIO:Contig_rearr::setup_data_rearr_info");
   assert(ios_);
 
-  if(!ios_->ioproc){
+  if(!ios_->io_comm_info->is_sync_io_proc()){
     return ret;
   }
   assert(rearr_comm_sz_ > 0);
@@ -1201,7 +1202,7 @@ int SPIO::DataRearr::Contig_rearr::init_rearr_send_types(
   int ret = PIO_NOERR;
   SPIO_Util::GPTL_Util::GPTL_timer ftimer("PIO:Contig_rearr::init_rearr_send_types");
 
-  assert(ios_ && ios_->ioproc);
+  assert(ios_ && ios_->io_comm_info->is_sync_io_proc());
   assert(rearr_comm_sz_ > 0);
   assert(static_cast<int>(nregion_infos_sent.size()) == rearr_comm_sz_);
 
@@ -1262,7 +1263,7 @@ int SPIO::DataRearr::Contig_rearr::init_rearr_recvd_types(
   int ret = PIO_NOERR;
   SPIO_Util::GPTL_Util::GPTL_timer ftimer("PIO:Contig_rearr::init_rearr_recvd_types");
 
-  assert(ios_ && ios_->ioproc);
+  assert(ios_ && ios_->io_comm_info->is_sync_io_proc());
   assert(rearr_comm_sz_ > 0);
   assert(static_cast<int>(nregion_infos_recvd.size()) == rearr_comm_sz_);
 
@@ -1334,7 +1335,7 @@ int SPIO::DataRearr::Contig_rearr::rearrange_data(const void *sbuf, std::size_t 
   assert(is_init_);
 
   assert(ios_);
-  if(!ios_->ioproc){
+  if(!ios_->io_comm_info->is_sync_io_proc()){
     return PIO_NOERR;
   }
 

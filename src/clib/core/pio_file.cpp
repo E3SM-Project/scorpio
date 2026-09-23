@@ -17,6 +17,7 @@
 #include "spio_hdf5_utils.hpp"
 #include "spio_async_tcomm.hpp"
 #include "spio_dbg_utils.hpp"
+#include "spio_iosys_utils.hpp"
 
 #ifdef _ADIOS2
 #include "../../tools/adios2pio-nm/adios2pio-nm-lib-c.h"
@@ -183,7 +184,7 @@ int PIOc_createfile_impl(int iosysid, int *ncidp, const int *iotype, const char 
      * non-IO tasks if async is in use. (Because otherwise, in async
      * mode, set_fill would be called twice by each IO task, since
      * PIOc_createfile() will already be called on each IO task.) */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         /* Set the fill mode to NOFILL. */
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -305,7 +306,7 @@ static int sync_file(int ncid)
 #endif
 
     /* Flush data buffers on computational tasks. */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         if (file->mode & PIO_WRITE)
         {
@@ -377,7 +378,7 @@ static int sync_file(int ncid)
      */
     if (file->mode & PIO_WRITE)
     {
-        if (ios->ioproc)
+        if (ios->io_comm_info->is_sync_io_proc())
         {
             switch (file->iotype)
             {
@@ -390,7 +391,7 @@ static int sync_file(int ncid)
 #endif
 #ifdef _NETCDF
             case PIO_IOTYPE_NETCDF:
-                if (ios->io_rank == 0)
+                if (ios->io_comm_info->get_sync_io_comm_rank() == 0)
                     ierr = nc_sync(file->fh);
                 break;
 #endif
@@ -558,7 +559,7 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
     int ncid = file->pio_ncid;
 
     if(sync_with_ioprocs){
-      //if(ios->ioproc) { while(file->npend_ops){} }
+      //if(ios->io_comm_info->is_sync_io_proc()) { while(file->npend_ops){} }
       /* For I/O async threads the union comm is NULL comm */
       MPI_Comm sync_comm = ios->tcomm_info->get_union_comm();
       if(sync_comm != MPI_COMM_NULL){
@@ -828,7 +829,7 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
     assert((file->iotype != PIO_IOTYPE_ADIOS) && (file->iotype != PIO_IOTYPE_ADIOSC));
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
         switch (file->iotype)
         {
@@ -841,7 +842,7 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank == 0)
+            if (ios->io_comm_info->get_sync_io_comm_rank() == 0)
                 ierr = nc_close(file->fh);
             break;
 #endif
@@ -929,7 +930,7 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
  */
 int spio_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
 {
-  assert(ios && file && ios->ioproc);
+  assert(ios && file && ios->io_comm_info->is_sync_io_proc());
   //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + file->fname);
 
 #if PIO_USE_ASYNC_WR_THREAD
@@ -979,7 +980,7 @@ int PIOc_closefile_impl(int ncid)
 
     /* Sync changes before closing on all tasks if async is not in
      * use, but only on non-IO tasks if async is in use. */
-    if(!ios->async || !ios->ioproc){
+    if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
       if(file->mode & PIO_WRITE){
         sync_file(ncid);
       }
@@ -1044,7 +1045,7 @@ int PIOc_closefile_impl(int ncid)
     bool soft_close = false;
 #if PIO_USE_ASYNC_WR_THREAD
     if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
-      if(ios->ioproc){
+      if(ios->io_comm_info->is_sync_io_proc()){
         soft_close = true;
       }
       /* To wait on all hdf5 async ops before a "hard close" (for debugging)
@@ -1152,9 +1153,9 @@ int PIOc_deletefile_impl(int iosysid, const char *filename)
      * on the file while it is being deleted. IOTYPE is not known, but
      * nc_delete() will delete any type of file. */
     mpierr = MPI_Barrier(ios->union_comm);
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
-        if (!mpierr && ios->io_rank == 0)
+        if (!mpierr && ios->io_comm_info->get_sync_io_comm_rank() == 0)
         {
             struct stat sd;
 #ifdef _ADIOS2
