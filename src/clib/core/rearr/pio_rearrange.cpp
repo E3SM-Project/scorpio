@@ -5,6 +5,7 @@
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
+#include "spio_iosys_utils.hpp"
 #include <pio_minmax.h>
 
 /**
