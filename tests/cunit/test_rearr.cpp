@@ -8,6 +8,7 @@
 #include <pio.h>
 #include <pio_tests.h>
 #include <pio_internal.h>
+#include "spio_iosys_utils.hpp"
 #if SIZEOF_PIO_OFFSET >= 8
 #include <stdint.h>
 #endif
@@ -551,12 +552,12 @@ int test_define_iodesc_datatypes()
     for (int r = 0; r < NUM_REARRANGERS; r++)
     {
         iosystem_desc_t ios;
+        ios.io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(MPI_COMM_NULL, 0, 4,
+            MPI_GROUP_NULL, std::vector<int>(), true, 0, 0, false);
         io_desc_t iodesc(&ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
 
         /* Set up test for IO task with BOX rearranger to create one type. */
-        ios.ioproc = 1; /* this is IO proc. */
         ios.compproc = 1; /* this is also compute proc. */
-        ios.num_iotasks = 4; /* The number of IO tasks. */
         iodesc.rtype = NULL; /* Array of MPI types will be created here. */
         iodesc.nrecvs = 1; /* Number of types created. */
         iodesc.mpitype = MPI_INT;
@@ -576,7 +577,7 @@ int test_define_iodesc_datatypes()
         iodesc.rearranger = rearranger[r];
 
         /* The two rearrangers create a different number of send types. */
-        int num_send_types = iodesc.rearranger == PIO_REARR_BOX ? ios.num_iotasks : 1;
+        int num_send_types = iodesc.rearranger == PIO_REARR_BOX ? ios.io_comm_info->get_sync_io_comm_sz() : 1;
 
         if (!(iodesc.sindex = (PIO_Offset *) malloc(num_send_types * sizeof(PIO_Offset))))
             return PIO_ENOMEM;
@@ -609,6 +610,7 @@ int test_define_iodesc_datatypes()
         free(iodesc.rcount); iodesc.rcount = NULL;
         free(iodesc.rfrom); iodesc.rfrom = NULL;
         free(iodesc.rindex); iodesc.rindex = NULL;
+        delete(ios.io_comm_info);
     }
 
     return 0;
@@ -626,16 +628,17 @@ int test_compute_counts(MPI_Comm test_comm, int my_rank)
     if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
         return PIO_ENOMEM;
 
-    ios->num_iotasks = TARGET_NTASKS;
     ios->num_comptasks = TARGET_NTASKS;
     ios->num_uniontasks = TARGET_NTASKS;
-    ios->ioproc = 1;
     ios->compproc = 1;
     ios->union_comm = test_comm;
-    if (!(ios->ioranks = (int *) malloc(TARGET_NTASKS * sizeof(int))))
-        return PIO_ENOMEM;
-    for (int t = 0; t < TARGET_NTASKS; t++)
-        ios->ioranks[t] = t;
+    {
+        std::vector<int> sync_io_ranks(TARGET_NTASKS);
+        for (int t = 0; t < TARGET_NTASKS; t++)
+            sync_io_ranks[t] = t;
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(MPI_COMM_NULL, 0,
+            TARGET_NTASKS, MPI_GROUP_NULL, sync_io_ranks, true, 0, 0, false);
+    }
     if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for comp ranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
@@ -655,7 +658,7 @@ int test_compute_counts(MPI_Comm test_comm, int my_rank)
         return ret;
 
     /* Check results. */
-    for (int i = 0; i < ios->num_iotasks; i++)
+    for (int i = 0; i < ios->io_comm_info->get_sync_io_comm_sz(); i++)
         if (iodesc->scount[i] != 1 || iodesc->sindex[i] != i)
             return ERR_WRONG;
 
@@ -672,7 +675,7 @@ int test_compute_counts(MPI_Comm test_comm, int my_rank)
     free(iodesc->rindex); iodesc->rindex = NULL;
 
     /* Free test resources. */
-    free(ios->ioranks);
+    delete(ios->io_comm_info);
     free(ios->compranks);
     delete(iodesc);
     free(ios);
@@ -728,21 +731,23 @@ int test_box_rearrange_create(MPI_Comm test_comm, int my_rank)
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
-    ios->io_comm = test_comm;
     iodesc->ndims = NDIM1;
     iodesc->rearranger = PIO_REARR_BOX;
 
     /* Set up the IO task info for the test. */
-    ios->ioproc = 1;
     ios->compproc = 1;
     ios->union_rank = my_rank;
-    ios->num_iotasks = 4;
     ios->num_comptasks = 4;
     ios->num_uniontasks = 4;
-    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
-    for (int i = 0; i < TARGET_NTASKS; i++)
-        ios->ioranks[i] = i;
+    {
+        const int nio = 4;
+        std::vector<int> sync_io_ranks(nio);
+        for (int i = 0; i < nio; i++)
+            sync_io_ranks[i] = i;
+        /* io_comm aliases test_comm (owned/freed by the caller) - owns_resources = false */
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(test_comm, 0, nio,
+            MPI_GROUP_NULL, sync_io_ranks, true, 0, 0, false);
+    }
     if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
@@ -808,7 +813,7 @@ int test_box_rearrange_create(MPI_Comm test_comm, int my_rank)
     free(ior1->start);
     free(ior1->count);
     free(ior1); iodesc->firstregion = NULL;
-    free(ios->ioranks);
+    delete(ios->io_comm_info);
     free(ios->compranks);
     delete(iodesc);
     free(ios);
@@ -843,7 +848,6 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
-    ios->io_comm = test_comm;
     iodesc->ndims = NDIM1;
     iodesc->rearranger = PIO_REARR_BOX;
 
@@ -851,16 +855,19 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
     iodesc->ndof = 2;
 
     /* Set up the IO task info for the test. */
-    ios->ioproc = 1;
     ios->compproc = 1;
     ios->union_rank = my_rank;
-    ios->num_iotasks = 4;
     ios->num_comptasks = 4;
     ios->num_uniontasks = 4;
-    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
-    for (int i = 0; i < TARGET_NTASKS; i++)
-        ios->ioranks[i] = i;
+    {
+        const int nio = 4;
+        std::vector<int> sync_io_ranks(nio);
+        for (int i = 0; i < nio; i++)
+            sync_io_ranks[i] = i;
+        /* io_comm aliases test_comm (owned/freed by the caller) - owns_resources = false */
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(test_comm, 0, nio,
+            MPI_GROUP_NULL, sync_io_ranks, true, 0, 0, false);
+    }
     if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
@@ -884,7 +891,7 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
         iodesc->llen != my_rank ? 0 : 8 || !iodesc->needsfill)
         return ERR_WRONG;
 
-    for (int i = 0; i < ios->num_iotasks; i++)
+    for (int i = 0; i < ios->io_comm_info->get_sync_io_comm_sz(); i++)
     {
         /* sindex is only allocated if scount[i] > 0. */
         if (iodesc->scount[i] != i ? 0 : 1 ||
@@ -923,7 +930,7 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
     free(ior1->start);
     free(ior1->count);
     free(ior1); iodesc->firstregion = NULL;
-    free(ios->ioranks);
+    delete(ios->io_comm_info);
     free(ios->compranks);
     delete(iodesc);
     free(ios);
@@ -959,7 +966,6 @@ int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
-    ios->io_comm = test_comm;
     iodesc->ndims = NDIM1;
     iodesc->rearranger = PIO_REARR_BOX;
 
@@ -967,16 +973,19 @@ int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
     iodesc->ndof = 1;
 
     /* Set up the IO task info for the test. */
-    ios->ioproc = 1;
     ios->compproc = 1;
     ios->union_rank = my_rank;
-    ios->num_iotasks = TARGET_NTASKS;
     ios->num_comptasks = TARGET_NTASKS;
     ios->num_uniontasks = TARGET_NTASKS;
-    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
-    for (int i = 0; i < ios->num_iotasks; i++)
-        ios->ioranks[i] = i;
+    {
+        const int nio = TARGET_NTASKS;
+        std::vector<int> sync_io_ranks(nio);
+        for (int i = 0; i < nio; i++)
+            sync_io_ranks[i] = i;
+        /* io_comm aliases test_comm (owned/freed by the caller) - owns_resources = false */
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(test_comm, 0, nio,
+            MPI_GROUP_NULL, sync_io_ranks, true, 0, 0, false);
+    }
     if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < ios->num_comptasks; i++)
@@ -1015,7 +1024,7 @@ int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
     free(ior1->start);
     free(ior1->count);
     free(ior1); iodesc->firstregion = NULL;
-    free(ios->ioranks);
+    delete(ios->io_comm_info);
     free(ios->compranks);
     delete(iodesc);
     free(ios);
@@ -1038,10 +1047,9 @@ int test_default_subset_partition(MPI_Comm test_comm, int my_rank)
     io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
     assert(iodesc);
 
-    ios->ioproc = 1;
-    ios->io_rank = my_rank;
+    ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(MPI_COMM_NULL, my_rank,
+        TARGET_NTASKS, MPI_GROUP_NULL, std::vector<int>(), true, 0, 0, false);
     ios->comp_rank = my_rank;
-    ios->num_iotasks = TARGET_NTASKS;
     ios->num_comptasks = TARGET_NTASKS;
     ios->comp_comm = test_comm;
     ios->union_comm = test_comm;
@@ -1055,6 +1063,7 @@ int test_default_subset_partition(MPI_Comm test_comm, int my_rank)
         MPIERR(mpierr);
 
     /* Free resources from test. */
+    delete(ios->io_comm_info);
     delete(iodesc);
     free(ios);
 
@@ -1095,12 +1104,17 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
     if (!(file = (file_desc_t *) calloc(1, sizeof(file_desc_t))))
         return PIO_ENOMEM;
 
-    ios->ioproc = 1;
     ios->compproc = 1;
-    ios->io_rank = my_rank;
     ios->union_comm = test_comm;
-    ios->num_iotasks = TARGET_NTASKS;
     ios->num_uniontasks = TARGET_NTASKS;
+    {
+        std::vector<int> sync_io_ranks(TARGET_NTASKS);
+        for (int i = 0; i < TARGET_NTASKS; i++)
+            sync_io_ranks[i] = i;
+        /* io_comm aliases test_comm (owned/freed by the caller) - owns_resources = false */
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(test_comm, my_rank,
+            TARGET_NTASKS, MPI_GROUP_NULL, sync_io_ranks, true, 0, 0, false);
+    }
     iodesc->rearranger = PIO_REARR_BOX;
     iodesc->mpitype = MPI_INT;
 
@@ -1114,7 +1128,7 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
     file->fh = -1;
 
     /* The two rearrangers create a different number of send types. */
-    int num_send_types = iodesc->rearranger == PIO_REARR_BOX ? ios->num_iotasks : 1;
+    int num_send_types = iodesc->rearranger == PIO_REARR_BOX ? ios->io_comm_info->get_sync_io_comm_sz() : 1;
 
     /* Default rearranger options. */
     iodesc->rearr_opts.comm_type = PIO_REARR_COMM_COLL;
@@ -1122,7 +1136,6 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
-    ios->io_comm = test_comm;
     iodesc->ndims = NDIM1;
     iodesc->rearranger = PIO_REARR_BOX;
 
@@ -1131,10 +1144,6 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
     /* Set up the IO task info for the test. */
     ios->union_rank = my_rank;
     ios->num_comptasks = 4;
-    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
-    for (int i = 0; i < TARGET_NTASKS; i++)
-        ios->ioranks[i] = i;
     if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
@@ -1184,7 +1193,7 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
     free(ior1->start);
     free(ior1->count);
     free(ior1); iodesc->firstregion = NULL;
-    free(ios->ioranks);
+    delete(ios->io_comm_info);
     free(ios->compranks);
     free(file);
     delete(iodesc);
@@ -1224,23 +1233,26 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
     assert(iodesc);
     iodesc->free_all_regions();
 
-    ios->ioproc = 1;
-    ios->io_rank = my_rank;
     ios->union_comm = test_comm;
-    ios->num_iotasks = TARGET_NTASKS;
+    {
+        std::vector<int> sync_io_ranks(TARGET_NTASKS);
+        for (int i = 0; i < TARGET_NTASKS; i++)
+            sync_io_ranks[i] = i;
+        /* io_comm aliases test_comm (owned/freed by the caller) - owns_resources = false */
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(test_comm, my_rank,
+            TARGET_NTASKS, MPI_GROUP_NULL, sync_io_ranks, true, 0, 0, false);
+    }
     iodesc->rearranger = PIO_REARR_BOX;
     iodesc->mpitype = MPI_INT;
 
     /* Set up test for IO task with BOX rearranger to create one type. */
-    ios->ioproc = 1; /* this is IO proc. */
-    ios->num_iotasks = 4; /* The number of IO tasks. */
     iodesc->rtype = NULL; /* Array of MPI types will be created here. */
     iodesc->nrecvs = 1; /* Number of types created. */
     iodesc->mpitype = MPI_INT;
     iodesc->stype = NULL; /* Array of MPI types will be created here. */
 
     /* The two rearrangers create a different number of send types. */
-    int num_send_types = iodesc->rearranger == PIO_REARR_BOX ? ios->num_iotasks : 1;
+    int num_send_types = iodesc->rearranger == PIO_REARR_BOX ? ios->io_comm_info->get_sync_io_comm_sz() : 1;
 
     /* Default rearranger options. */
     iodesc->rearr_opts.comm_type = PIO_REARR_COMM_COLL;
@@ -1248,23 +1260,16 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
-    ios->io_comm = test_comm;
     iodesc->ndims = NDIM1;
     iodesc->rearranger = PIO_REARR_BOX;
 
     iodesc->ndof = 4;
 
     /* Set up the IO task info for the test. */
-    ios->ioproc = 1;
     ios->compproc = 1;
     ios->union_rank = my_rank;
-    ios->num_iotasks = 4;
     ios->num_comptasks = 4;
     ios->num_uniontasks = 4;
-    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
-    for (int i = 0; i < TARGET_NTASKS; i++)
-        ios->ioranks[i] = i;
     if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
@@ -1314,7 +1319,7 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
     free(ior1->start);
     free(ior1->count);
     free(ior1); iodesc->firstregion = NULL;
-    free(ios->ioranks);
+    delete(ios->io_comm_info);
     free(ios->compranks);
     delete(iodesc);
     free(ios);

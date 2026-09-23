@@ -26,6 +26,7 @@
 #if PIO_USE_ASYNC_WR_THREAD
 #include "spio_async_hdf5_utils.hpp"
 #endif
+#include "spio_iosys_utils.hpp"
 
 /* Include headers for HDF5 compression filters */
 #if PIO_USE_HDF5
@@ -68,12 +69,12 @@ int PIOc_iosystem_is_active_impl(int iosysid, bool *active)
     /* Get the ios if there is one. */
     ios = pio_get_iosystem_from_id(iosysid);
 
-    if (active)
-    {
-        if (!ios || (ios->comp_comm == MPI_COMM_NULL && ios->io_comm == MPI_COMM_NULL))
-            *active = false;
-        else
-            *active = true;
+    if(active){
+      *active = ios && (ios->comp_comm != MPI_COMM_NULL) &&
+                (ios->io_comm_info->get_sync_io_comm() != MPI_COMM_NULL);
+#if PIO_USE_ASYNC_WR_THREAD
+      *active = *active && (ios->io_comm_info->get_async_io_comm() != MPI_COMM_NULL);
+#endif
     }
 
     return PIO_NOERR;
@@ -348,7 +349,7 @@ int PIOc_setframe_impl(int ncid, int varid, int frame)
 
 #ifdef _HDF5
     if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
-      if((frame >= 0) && (ios->ioproc)){
+      if((frame >= 0) && (ios->io_comm_info->is_sync_io_proc())){
 #if PIO_USE_ASYNC_WR_THREAD
         ret = spio_iosys_async_hdf5_set_frame_op_add(file, varid, frame);
 #else
@@ -387,7 +388,7 @@ int PIOc_get_numiotasks_impl(int iosysid, int *numiotasks)
     }
 
     if (numiotasks)
-        *numiotasks = ios->num_iotasks;
+        *numiotasks = ios->io_comm_info->get_sync_io_comm_sz();
 
     return PIO_NOERR;
 }
@@ -518,7 +519,7 @@ void pio_create_uniq_str(iosystem_desc_t *ios, io_desc_t *iodesc, std::string &s
     /* Add ios specific info into the str */
     str += std::to_string(ios->iosysid) + std::string("id");
     str += std::to_string(ios->num_comptasks) + std::string("tasks");
-    str += std::to_string(ios->num_iotasks) + std::string("io");
+    str += std::to_string(ios->io_comm_info->get_sync_io_comm_sz()) + std::string("io");
   }
   if(iodesc){
     /* Add iodesc specific info into the str */
@@ -539,7 +540,7 @@ static int subset_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const
   assert(ios && iodesc);
   assert(((iodesc->maplen == 0) || iodesc->map) && iodesc->dimlen);
 
-  iodesc->num_aiotasks = ios->num_iotasks;
+  iodesc->num_aiotasks = ios->io_comm_info->get_sync_io_comm_sz();
   LOG((2, "creating subset rearranger iodesc->num_aiotasks = %d", iodesc->num_aiotasks));
   if((ret = subset_rearrange_create(ios, iodesc->maplen, (PIO_Offset *)(iodesc->map),
                                       iodesc->dimlen, iodesc->ndims, iodesc))){
@@ -556,7 +557,7 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
   assert(ios && iodesc);
   assert(((iodesc->maplen == 0) || iodesc->map) && ((iodesc->ndims == 0) || iodesc->dimlen) && iodesc->firstregion);
 
-  if(ios->ioproc){
+  if(ios->io_comm_info->is_sync_io_proc()){
     /*  Unless the user specifies the start and count for each
      *  IO task compute it. */
     if(iostart && iocount){
@@ -565,13 +566,13 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
         iodesc->firstregion->start[i] = iostart[i];
         iodesc->firstregion->count[i] = iocount[i];
       }
-      iodesc->num_aiotasks = ios->num_iotasks;
+      iodesc->num_aiotasks = ios->io_comm_info->get_sync_io_comm_sz();
     }
     else{
       /* Compute start and count values for each io task. */
       LOG((2, "about to call CalcStartandCount piotype = %d ndims = %d", iodesc->piotype, iodesc->ndims));
-      if((ret = CalcStartandCount(iodesc->piotype, iodesc->ndims, iodesc->dimlen, ios->num_iotasks,
-                                   ios->io_rank, iodesc->firstregion->start,
+      if((ret = CalcStartandCount(iodesc->piotype, iodesc->ndims, iodesc->dimlen, ios->io_comm_info->get_sync_io_comm_sz(),
+                                   ios->io_comm_info->get_sync_io_comm_rank(), iodesc->firstregion->start,
                                    iodesc->firstregion->count, &iodesc->num_aiotasks))){
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Initializing the PIO decomposition failed. Internal error calculating start/count for the decomposition");
@@ -579,7 +580,7 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
     }
 
     /* Compute the max io buffer size needed for an iodesc. */
-    if((ret = compute_maxIObuffersize(ios->io_comm, iodesc))){
+    if((ret = compute_maxIObuffersize(ios->io_comm_info->get_sync_io_comm(), iodesc))){
       return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                       "Initializing the PIO decomposition failed. Internal error computing max io buffer size needed for the decomposition");
     }
@@ -588,7 +589,7 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
 
   /* Depending on array size and io-blocksize the actual number
    * of io tasks used may vary. */
-  if((ret = MPI_Bcast(&(iodesc->num_aiotasks), 1, MPI_INT, ios->ioroot, ios->my_comm))){
+  if((ret = MPI_Bcast(&(iodesc->num_aiotasks), 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm))){
     return check_mpi(ios, NULL, ret, __FILE__, __LINE__);
   }
   LOG((3, "iodesc->num_aiotasks = %d", iodesc->num_aiotasks));
@@ -607,8 +608,8 @@ static void init_iodesc_contig_rearr_fields(iosystem_desc_t *ios, io_desc_t *iod
   assert(ios && iodesc && iodesc->rearr && iodesc->rearr->is_init());
 
   iodesc->ndof = iodesc->rearr->get_decomp_map_lsz();
-  if(ios->ioproc){
-    iodesc->num_aiotasks = ios->num_iotasks;
+  if(ios->io_comm_info->is_sync_io_proc()){
+    iodesc->num_aiotasks = ios->io_comm_info->get_sync_io_comm_sz();
   }
 
   /* The first region is pre-allocated when iodesc is allocated */
@@ -620,7 +621,7 @@ static void init_iodesc_contig_rearr_fields(iosystem_desc_t *ios, io_desc_t *iod
   iodesc->llen = iodesc->rearr->get_rearrange_buf_sz();
   iodesc->maxiobuflen = iodesc->rearr->get_decomp_gsz();
 
-  if(ios->ioproc){
+  if(ios->io_comm_info->is_sync_io_proc()){
     assert(iodesc->firstregion && iodesc->firstregion->start && iodesc->firstregion->count);
     /* Get (start, count) pairs of contiguous decomp ranges for this I/O process */
     std::vector<std::pair<PIO_Offset, PIO_Offset> > off_ranges = iodesc->rearr->get_rearr_decomp_map_contig_ranges();
@@ -682,7 +683,7 @@ static inline void dbg_log_iodesc(iosystem_desc_t *ios, io_desc_t *iodesc)
        iodesc->ioid, iodesc->nrecvs, iodesc->ndof, iodesc->ndims, iodesc->num_aiotasks,
        iodesc->rearranger, iodesc->maxregions, iodesc->needsfill, iodesc->llen,
        iodesc->maxiobuflen));
-  if(ios->ioproc){
+  if(ios->io_comm_info->is_sync_io_proc()){
     if(iodesc->rearranger == PIO_REARR_SUBSET){
         for(int j = 0; j < iodesc->llen; j++){
           LOG((3, "rindex[%d] = %lld", j, iodesc->rindex[j]));
@@ -1098,14 +1099,14 @@ static int init_adios_comm(iosystem_desc_t *ios)
 
     /* Compute the io_group_size per node */
     int io_group_size;
-    if (ios->num_iotasks <= 0 || ios->num_iotasks > ios->num_comptasks)
+    if (ios->io_comm_info->get_sync_io_comm_sz() <= 0 || ios->io_comm_info->get_sync_io_comm_sz() > ios->num_comptasks)
     {
         io_group_size = nodeNProc;
     }
     else
     {
-        io_group_size = ios->num_comptasks / ios->num_iotasks;
-        if ((io_group_size * ios->num_iotasks) != ios->num_comptasks)
+        io_group_size = ios->num_comptasks / ios->io_comm_info->get_sync_io_comm_sz();
+        if ((io_group_size * ios->io_comm_info->get_sync_io_comm_sz()) != ios->num_comptasks)
         {
             io_group_size++;
         }
@@ -1273,12 +1274,12 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     }
 
     ios->sname[0] = '\0';
-    ios->io_comm = MPI_COMM_NULL;
+    //ios->io_comm = MPI_COMM_NULL;
     ios->intercomm = MPI_COMM_NULL;
     ios->node_comm = MPI_COMM_NULL;
     ios->error_handler = default_error_handler;
     ios->default_rearranger = rearr;
-    ios->num_iotasks = num_iotasks;
+    //ios->num_iotasks = num_iotasks;
     ios->num_comptasks = num_comptasks;
 
     /* For non-async, the IO tasks are a subset of the comptasks. */
@@ -1291,6 +1292,19 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     if ((mpierr = MPI_Comm_dup(comp_comm, &ios->union_comm)))
     {
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
+
+    /* Construct io_comm_info now: init_adios_comm() below (when _ADIOS2 is enabled)
+     * already needs ios->io_comm_info->get_sync_io_comm_sz(). */
+    {
+        MPI_Group union_group = MPI_GROUP_NULL;
+        if ((mpierr = MPI_Comm_group(ios->union_comm, &union_group)))
+        {
+            return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+        }
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(ios->union_comm,
+                                  union_group, base, stride, num_iotasks);
+        MPI_Group_free(&union_group);
     }
 
 #ifdef _ADIOS2
@@ -1451,61 +1465,14 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
         ios->compmaster = MPI_ROOT;
     LOG((2, "comp_rank = %d num_comptasks = %d", ios->comp_rank, ios->num_comptasks));
 
-    /* Create an array that holds the ranks of the tasks to be used
-     * for IO. */
-    if (!(ios->ioranks = (int *)calloc(ios->num_iotasks, sizeof(int))))
-    {
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "PIO Init failed. Out of memory allocating %lld bytes for array of I/O process ranks in the I/O descriptor", (unsigned long long) (ios->num_iotasks * sizeof(int)));
-    }
-    for (int i = 0; i < ios->num_iotasks; i++)
-    {
-        ios->ioranks[i] = (base + i * ustride) % ios->num_comptasks;
-        if (ios->ioranks[i] == ios->comp_rank)
-            ios->ioproc = true;
-        LOG((3, "ios->ioranks[%d] = %d", i, ios->ioranks[i]));
-    }
-    ios->ioroot = ios->ioranks[0];
-
     /* We are not providing an info object. */
     ios->info = MPI_INFO_NULL;
-
-    /* Identify the task that will be the root of the IO communicator. */
-    if (ios->comp_rank == ios->ioranks[0])
-        ios->iomaster = MPI_ROOT;
 
     /* Create a group for the computation tasks. */
     if ((mpierr = MPI_Comm_group(ios->comp_comm, &ios->compgroup)))
     {
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
     }
-
-    /* Create a group for the IO tasks. */
-    if ((mpierr = MPI_Group_incl(ios->compgroup, ios->num_iotasks, ios->ioranks,
-                                 &ios->iogroup)))
-    {
-        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
-    }
-
-    /* Create an MPI communicator for the IO tasks. */
-    if ((mpierr = MPI_Comm_create(ios->comp_comm, ios->iogroup, &ios->io_comm)))
-    {
-        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
-    }
-
-    /* For the tasks that are doing IO, get their rank within the IO
-     * communicator. If they are not doing IO, set their io_rank to
-     * -1. */
-    if (ios->ioproc)
-    {
-        if ((mpierr = MPI_Comm_rank(ios->io_comm, &ios->io_rank)))
-        {
-            return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
-        }
-    }
-    else
-        ios->io_rank = -1;
-    LOG((3, "ios->io_comm = %d ios->io_rank = %d", ios->io_comm, ios->io_rank));
 
     /* Create the node local comm - all procs in comp_comm that are local to
      * this compute node (share memory) */
@@ -1524,7 +1491,12 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
     ios->union_rank = ios->comp_rank;
 
     /* FIXME: Catch exceptions and return error */
-    ios->tcomm_info = new SPIO_Util::TComm_info(ios->union_comm, ios->union_rank, ios->ioroot, ios->comproot, ios->io_comm, ios->io_rank, (ios->iomaster) ? true : false, ios->comp_comm, ios->comp_rank, (ios->compmaster) ? true : false, ios->intercomm, ios->my_comm, ios->node_comm);
+    ios->tcomm_info = new SPIO_Util::TComm_info(ios->union_comm, ios->union_rank,
+        ios->io_comm_info->get_sync_io_root(), ios->comproot,
+        ios->io_comm_info->get_sync_io_comm(), ios->io_comm_info->get_sync_io_comm_rank(),
+        (ios->io_comm_info->get_sync_io_master()) ? true : false,
+        ios->comp_comm, ios->comp_rank, (ios->compmaster) ? true : false,
+        ios->intercomm, ios->my_comm, ios->node_comm);
 
     /* Async I/O service message info - not used here */
     ios->async_ios_msg_info.seq_num = PIO_MSG_START_SEQ_NUM;
@@ -1643,7 +1615,7 @@ int PIOc_set_hint_impl(int iosysid, const char *hint, const char *hintval)
         }
 
     /* Set the MPI hint. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
         if ((mpierr = MPI_Info_set(ios->info, hint, hintval)))
         {
             LOG((1, "ERROR: Setting PIO hints failed. Settnig MPI hints using info object failed (mpierr = %d)", mpierr));
@@ -1785,9 +1757,6 @@ int PIOc_finalize_impl(int iosysid)
     free(ios->io_fstats);
 
     /* Free this memory that was allocated in init_intracomm. */
-    if (ios->ioranks)
-        free(ios->ioranks);
-    LOG((3, "Freed ioranks."));
     if (ios->compranks)
         free(ios->compranks);
     LOG((3, "Freed compranks."));
@@ -1796,9 +1765,6 @@ int PIOc_finalize_impl(int iosysid)
     /* Free the MPI groups. */
     if (ios->compgroup != MPI_GROUP_NULL)
         MPI_Group_free(&ios->compgroup);
-
-    if (ios->iogroup != MPI_GROUP_NULL)
-        MPI_Group_free(&(ios->iogroup));
 
     /* Free the MPI communicators. my_comm is just a copy (but not an
      * MPI copy), so does not have to have an MPI_Comm_free()
@@ -1867,14 +1833,14 @@ int PIOc_finalize_impl(int iosysid)
 #ifdef TIMING
 #ifdef TIMING_INTERNAL
     if(spio_gptl_was_init_in_lib()){
-      if(ios->io_comm != MPI_COMM_NULL)
+      if(ios->io_comm_info->get_sync_io_comm() != MPI_COMM_NULL)
       {
-          snprintf(gptl_iolog_fname, PIO_MAX_NAME, "piorwgptlioinfo%010dwrank.dat", ios->ioroot);
-          GPTLpr_summary_file(ios->io_comm, gptl_iolog_fname);
+          snprintf(gptl_iolog_fname, PIO_MAX_NAME, "piorwgptlioinfo%010dwrank.dat", ios->io_comm_info->get_sync_io_root());
+          GPTLpr_summary_file(ios->io_comm_info->get_sync_io_comm(), gptl_iolog_fname);
           LOG((2, "Finished writing gptl io proc summary"));
       }
-      snprintf(gptl_log_fname, PIO_MAX_NAME, "piorwgptlinfo%010dwrank.dat", ios->ioroot);
-      if(ios->io_rank == 0)
+      snprintf(gptl_log_fname, PIO_MAX_NAME, "piorwgptlinfo%010dwrank.dat", ios->io_comm_info->get_sync_io_root());
+      if(ios->io_comm_info->get_sync_io_comm_rank() == 0)
       {
           GPTLpr_file(gptl_log_fname);
           LOG((2, "Finished writing gptl summary"));
@@ -1885,11 +1851,10 @@ int PIOc_finalize_impl(int iosysid)
 #endif
     if (ios->union_comm != MPI_COMM_NULL)
         MPI_Comm_free(&ios->union_comm);
-    if (ios->io_comm != MPI_COMM_NULL)
-        MPI_Comm_free(&ios->io_comm);
     if (ios->node_comm != MPI_COMM_NULL)
         MPI_Comm_free(&ios->node_comm);
     if(ios->tcomm_info) { delete(ios->tcomm_info); }
+    if(ios->io_comm_info) { delete(ios->io_comm_info); }
 
     /* Delete the iosystem_desc_t data associated with this id. */
     LOG((2, "About to delete iosysid %d.", iosysid));
@@ -1921,7 +1886,7 @@ int PIOc_iam_iotask_impl(int iosysid, bool *ioproc)
     }
 
     if (ioproc)
-        *ioproc = ios->ioproc;
+        *ioproc = ios->io_comm_info->is_sync_io_proc();
 
     return PIO_NOERR;
 }
@@ -1946,7 +1911,7 @@ int PIOc_iotask_rank_impl(int iosysid, int *iorank)
     }
 
     if (iorank)
-        *iorank = ios->io_rank;
+        *iorank = ios->io_comm_info->get_sync_io_comm_rank();
 
     return PIO_NOERR;
 }
@@ -2276,7 +2241,6 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         my_iosys = iosys[cmp];
 
         /* Initialize some values. */
-        my_iosys->io_comm = MPI_COMM_NULL;
         my_iosys->comp_comm = MPI_COMM_NULL;
         my_iosys->union_comm = MPI_COMM_NULL;
         my_iosys->intercomm = MPI_COMM_NULL;
@@ -2285,11 +2249,20 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         my_iosys->async = 1;
         my_iosys->error_handler = default_error_handler;
         my_iosys->num_comptasks = num_procs_per_comp[cmp];
-        my_iosys->num_iotasks = num_io_procs;
-        my_iosys->num_uniontasks = my_iosys->num_comptasks + my_iosys->num_iotasks;
+        my_iosys->num_uniontasks = my_iosys->num_comptasks + num_io_procs;
         my_iosys->compgroup = MPI_GROUP_NULL;
-        my_iosys->iogroup = MPI_GROUP_NULL;
         my_iosys->default_rearranger = rearranger;
+
+        /* Sync I/O comm info for this component - passed into the
+         * io_comm_info constructor below (the raw io_comm/iogroup/
+         * num_iotasks/io_rank/iomaster/ioroot/ioranks/ioproc fields that
+         * used to live on iosystem_desc_t have been removed). */
+        MPI_Comm my_io_comm = MPI_COMM_NULL;
+        MPI_Group my_iogroup = MPI_GROUP_NULL;
+        int my_io_rank = -1;
+        int my_iomaster = 0;
+        int my_ioroot = 0;
+        bool my_ioproc = false;
 
         /* Initialize the rearranger options. */
         init_rearr_opts(my_iosys);
@@ -2349,7 +2322,7 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
              union_group[cmp], nprocs_union));
 
         /* Remember whether this process is in the IO component. */
-        my_iosys->ioproc = in_io;
+        my_ioproc = in_io;
 
         /* With async, tasks are either in a computation component or
          * the IO component. */
@@ -2403,33 +2376,39 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         if (in_io)
         {
             LOG((3, "making a dup of io_comm = %d io_rank = %d", io_comm, io_rank));
-            if ((ret = MPI_Comm_dup(io_comm, &my_iosys->io_comm)))
+            if ((ret = MPI_Comm_dup(io_comm, &my_io_comm)))
             {
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
-            LOG((3, "dup of io_comm = %d io_rank = %d", my_iosys->io_comm, io_rank));
-            my_iosys->iomaster = iomaster;
-            my_iosys->io_rank = io_rank;
-            my_iosys->ioroot = 0;
+            LOG((3, "dup of io_comm = %d io_rank = %d", my_io_comm, io_rank));
+            my_iomaster = iomaster;
+            my_io_rank = io_rank;
             my_iosys->comp_idx = cmp;
         }
 
-        /* Create an array that holds the ranks of the tasks to be used
-         * for IO. */
-        if (!(my_iosys->ioranks = (int *) calloc(my_iosys->num_iotasks, sizeof(int))))
+        /* Ranks of the tasks to be used for IO - same values as
+         * my_io_proc_list, built directly into the io_comm_info below. */
+        my_ioroot = my_io_proc_list[0];
+
+        /* Construct io_comm_info directly from the sync I/O comm info
+         * already computed above (this function does not derive it from
+         * a union comm, unlike PIOc_Init_Intracomm_impl, so the
+         * direct-values constructor is used instead). owns_resources is
+         * true: io_comm_info now solely owns freeing my_io_comm/my_iogroup,
+         * via its destructor invoked from PIOc_finalize_impl. */
         {
-            return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "PIO Init (async) failed. Out of memory");
+            std::vector<int> sync_io_ranks(my_io_proc_list, my_io_proc_list + num_io_procs);
+            my_iosys->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(
+                my_io_comm, my_io_rank, num_io_procs,
+                my_iogroup, sync_io_ranks, my_ioproc,
+                my_iomaster, my_ioroot, true);
         }
-        for (int i = 0; i < my_iosys->num_iotasks; i++)
-            my_iosys->ioranks[i] = my_io_proc_list[i];
-        my_iosys->ioroot = my_iosys->ioranks[0];
 
         /* All the processes in this component, and the IO component,
          * are part of the union_comm. */
         if (in_io || in_cmp)
         {
-            LOG((3, "my_iosys->io_comm = %d group = %d", my_iosys->io_comm, union_group[cmp]));
+            LOG((3, "my_io_comm = %d group = %d", my_io_comm, union_group[cmp]));
             /* Create a group for the union of the IO component
              * and one of the computation components. */
             if ((ret = MPI_Comm_create(world, union_group[cmp], &my_iosys->union_comm)))
@@ -2449,11 +2428,11 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
 
             if (in_io)
             {
-                LOG((3, "my_iosys->io_comm = %d", my_iosys->io_comm));
+                LOG((3, "my_io_comm = %d", my_io_comm));
                 /* Create the intercomm from IO to computation component. */
                 LOG((3, "about to create intercomm for IO component to cmp = %d "
-                     "my_iosys->io_comm = %d", cmp, my_iosys->io_comm));
-                if ((ret = MPI_Intercomm_create(my_iosys->io_comm, 0, my_iosys->union_comm,
+                     "my_io_comm = %d", cmp, my_io_comm));
+                if ((ret = MPI_Intercomm_create(my_io_comm, 0, my_iosys->union_comm,
                                                 my_proc_list[cmp][0], 0, &my_iosys->intercomm)))
                 {
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
@@ -2487,7 +2466,7 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         }
 
         /* FIXME: Catch exceptions and return error */
-        my_iosys->tcomm_info = new SPIO_Util::TComm_info(my_iosys->union_comm, my_iosys->union_rank, my_iosys->ioroot, my_iosys->comproot, my_iosys->io_comm, my_iosys->io_rank, (my_iosys->iomaster) ? true : false, my_iosys->comp_comm, my_iosys->comp_rank, (my_iosys->compmaster) ? true : false, my_iosys->intercomm, my_iosys->my_comm, my_iosys->node_comm);
+        my_iosys->tcomm_info = new SPIO_Util::TComm_info(my_iosys->union_comm, my_iosys->union_rank, my_ioroot, my_iosys->comproot, my_io_comm, my_io_rank, (my_iomaster) ? true : false, my_iosys->comp_comm, my_iosys->comp_rank, (my_iosys->compmaster) ? true : false, my_iosys->intercomm, my_iosys->my_comm, my_iosys->node_comm);
 
         /* Async I/O service message info */
         my_iosys->async_ios_msg_info.seq_num = PIO_MSG_START_SEQ_NUM;
@@ -2698,16 +2677,13 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
         iosys[i]->iosysid = -1;
         iosys[i]->sname[0] = '\0';
         iosys[i]->union_comm = MPI_COMM_NULL;
-        iosys[i]->io_comm = MPI_COMM_NULL;
         iosys[i]->comp_comm = MPI_COMM_NULL;
         iosys[i]->intercomm = MPI_COMM_NULL;
         iosys[i]->my_comm = MPI_COMM_NULL;
         iosys[i]->node_comm = MPI_COMM_NULL;
 
         iosys[i]->compgroup = MPI_GROUP_NULL;
-        iosys[i]->iogroup = MPI_GROUP_NULL;
 
-        iosys[i]->iomaster = MPI_PROC_NULL;
         iosys[i]->compmaster = MPI_PROC_NULL;
 
         iosys[i]->error_handler = default_error_handler;
@@ -2746,6 +2722,18 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
         int comp_leader_grank = -1;
         LOG((3, "Async I/O Service : processing compute component %d", i));
 
+        /* Sync I/O comm info for this component - passed into the
+         * io_comm_info constructor below (the raw io_comm/iogroup/
+         * num_iotasks/io_rank/iomaster/ioroot/ioranks/ioproc fields that
+         * used to live on iosystem_desc_t have been removed). */
+        int my_num_iotasks = 0;
+        int my_io_rank = -1;
+        int my_iomaster = MPI_PROC_NULL;
+        int my_ioroot = 0;
+        bool my_ioproc = false;
+        MPI_Group my_iogroup = MPI_GROUP_NULL;
+        std::vector<int> my_ioranks;
+
         iosys[i]->async = true;
 
         /* Dup the io comm since its cached in the iosystem */
@@ -2771,7 +2759,6 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
          * Since peer_comm is the parent communicator for io_comm and comp_comm
          * it is used for all global communication across all comms
          * */
-        iosys[i]->io_comm = io_comm;
         iosys[i]->comp_comm = comp_comms[i];
         iosys[i]->comp_idx = i;
         /* Rank of io process and comp process in peer_comm */
@@ -2779,18 +2766,18 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
         if(io_comm != MPI_COMM_NULL)
         {
             /* I/O process */
-            iosys[i]->ioproc = true;
+            my_ioproc = true;
             iosys[i]->comp_rank = -1;
             iosys[i]->compproc = false;
             iosys[i]->num_comptasks = 0;
 
-            ret = MPI_Comm_rank(io_comm, &(iosys[i]->io_rank));
+            ret = MPI_Comm_rank(io_comm, &my_io_rank);
             if(ret != MPI_SUCCESS)
             {
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
-            ret = MPI_Comm_size(io_comm, &(iosys[i]->num_iotasks));
+            ret = MPI_Comm_size(io_comm, &my_num_iotasks);
             if(ret != MPI_SUCCESS)
             {
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
@@ -2806,14 +2793,14 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
             /* Find the io leader for intercomm */
-            if(iosys[i]->io_rank == IO_LEADER_LRANK)
+            if(my_io_rank == IO_LEADER_LRANK)
             {
                 io_leader_grank = io_grank;
-                iosys[i]->iomaster = MPI_ROOT;
+                my_iomaster = MPI_ROOT;
             }
             else
             {
-                iosys[i]->iomaster = MPI_PROC_NULL;
+                my_iomaster = MPI_PROC_NULL;
             }
             iosys[i]->compmaster = COMP_LEADER_LRANK;
 
@@ -2868,23 +2855,18 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
-            iosys[i]->num_comptasks = iosys[i]->num_uniontasks - iosys[i]->num_iotasks;
+            iosys[i]->num_comptasks = iosys[i]->num_uniontasks - my_num_iotasks;
             /* Since in the intercomm io procs are always in the "high group" the
              * ranks for the I/O processes start at iosys[i]->num_comptasks
              * The compute procs start at rank == 0 ("low group")
              */
             iosys[i]->comproot = COMP_ROOT_URANK;
-            iosys[i]->ioroot = iosys[i]->num_comptasks + IO_ROOT_URANK;
+            my_ioroot = iosys[i]->num_comptasks + IO_ROOT_URANK;
 
-            iosys[i]->ioranks = (int *)malloc(iosys[i]->num_iotasks * sizeof(int));
-            if(!(iosys[i]->ioranks))
+            my_ioranks.resize(my_num_iotasks);
+            for(int j=0; j<my_num_iotasks; j++)
             {
-                return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                "PIO Init (async) failed. Out of memory allocating %lld bytes to store ranks of I/O processes for component %d", (unsigned long long) (iosys[i]->num_iotasks * sizeof(int)), i);
-            }
-            for(int j=0; j<iosys[i]->num_iotasks; j++)
-            {
-                iosys[i]->ioranks[j] = iosys[i]->num_comptasks + j;
+                my_ioranks[j] = iosys[i]->num_comptasks + j;
             }
 
             iosys[i]->compranks = (int *)malloc(iosys[i]->num_comptasks * sizeof(int));
@@ -2913,7 +2895,7 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
             }
 
-            ret = MPI_Group_incl(union_comm_group, iosys[i]->num_iotasks, iosys[i]->ioranks, &(iosys[i]->iogroup));
+            ret = MPI_Group_incl(union_comm_group, my_num_iotasks, my_ioranks.data(), &my_iogroup);
             if(ret != MPI_SUCCESS)
             {
                 LOG((1, "PIO Init (async) failed. Unable to find procs in I/O group"));
@@ -2926,9 +2908,7 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
         {
             /* Compute process - belonging to any of comp_comms[i] */
             iosys[i]->comp_rank = -1;
-            iosys[i]->io_rank = -1;
             iosys[i]->num_comptasks = 0;
-            iosys[i]->ioproc = false;
             iosys[i]->compproc = false;
 
             io_grank = -1;
@@ -2966,7 +2946,7 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                 {
                     iosys[i]->compmaster = MPI_PROC_NULL;
                 }
-                iosys[i]->iomaster = IO_LEADER_LRANK;
+                my_iomaster = IO_LEADER_LRANK;
             }
             /* Find the io leader for intercomm */
             int tmp_io_leader_grank = io_leader_grank;
@@ -3021,23 +3001,18 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
 
-                iosys[i]->num_iotasks = iosys[i]->num_uniontasks - iosys[i]->num_comptasks;
+                my_num_iotasks = iosys[i]->num_uniontasks - iosys[i]->num_comptasks;
                 /* Since in the intercomm io procs are always in the "high group" the
                  * ranks for the I/O processes start at iosys[i]->num_comptasks
                  * The compute procs start at rank == 0 ("low group")
                  */
                 iosys[i]->comproot = COMP_ROOT_URANK;
-                iosys[i]->ioroot = iosys[i]->num_comptasks + IO_ROOT_URANK;
+                my_ioroot = iosys[i]->num_comptasks + IO_ROOT_URANK;
 
-                iosys[i]->ioranks = (int *)malloc(iosys[i]->num_iotasks * sizeof(int));
-                if(!(iosys[i]->ioranks))
+                my_ioranks.resize(my_num_iotasks);
+                for(int j=0; j<my_num_iotasks; j++)
                 {
-                    return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                    "PIO Init (async) failed. Out of memory allocating %lld bytes to store ranks of I/O processes for component %d", (unsigned long long) (iosys[i]->num_iotasks * sizeof(int)), i);
-                }
-                for(int j=0; j<iosys[i]->num_iotasks; j++)
-                {
-                    iosys[i]->ioranks[j] = iosys[i]->num_comptasks + j;
+                    my_ioranks[j] = iosys[i]->num_comptasks + j;
                 }
 
                 iosys[i]->compranks = (int *)malloc(iosys[i]->num_comptasks * sizeof(int));
@@ -3066,7 +3041,7 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
                     return check_mpi(NULL, NULL, ret, __FILE__, __LINE__);
                 }
 
-                ret = MPI_Group_incl(union_comm_group, iosys[i]->num_iotasks, iosys[i]->ioranks, &(iosys[i]->iogroup));
+                ret = MPI_Group_incl(union_comm_group, my_num_iotasks, my_ioranks.data(), &my_iogroup);
                 if(ret != MPI_SUCCESS)
                 {
                     LOG((1, "PIO Init (async) failed. Finding MPI processes in io group failed"));
@@ -3092,8 +3067,20 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
 
         iosys[i]->my_comm = iosys[i]->union_comm;
 
+        /* Construct io_comm_info directly from the sync I/O comm info
+         * already computed above in the io/compute branches (this
+         * function does not derive it from a union comm, unlike
+         * PIOc_Init_Intracomm_impl, so the direct-values constructor is
+         * used instead). owns_resources is true: io_comm_info now solely
+         * owns freeing io_comm/my_iogroup, via its destructor invoked
+         * from PIOc_finalize_impl. */
+        iosys[i]->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(
+            io_comm, my_io_rank, my_num_iotasks,
+            my_iogroup, my_ioranks, my_ioproc,
+            my_iomaster, my_ioroot, true);
+
         /* FIXME: Catch exceptions and return error */
-        iosys[i]->tcomm_info = new SPIO_Util::TComm_info(iosys[i]->union_comm, iosys[i]->union_rank, iosys[i]->ioroot, iosys[i]->comproot, iosys[i]->io_comm, iosys[i]->io_rank, (iosys[i]->iomaster) ? true : false, iosys[i]->comp_comm, iosys[i]->comp_rank, (iosys[i]->compmaster) ? true : false, iosys[i]->intercomm, iosys[i]->my_comm, iosys[i]->node_comm);
+        iosys[i]->tcomm_info = new SPIO_Util::TComm_info(iosys[i]->union_comm, iosys[i]->union_rank, my_ioroot, iosys[i]->comproot, io_comm, my_io_rank, (my_iomaster) ? true : false, iosys[i]->comp_comm, iosys[i]->comp_rank, (iosys[i]->compmaster) ? true : false, iosys[i]->intercomm, iosys[i]->my_comm, iosys[i]->node_comm);
 
         /* Async I/O service message info */
         iosys[i]->async_ios_msg_info.seq_num = PIO_MSG_START_SEQ_NUM;
@@ -3101,7 +3088,7 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
 
         /* Add this id to the list of PIO iosystem ids. */
         iosysidps[i] = pio_add_to_iosystem_list(iosys[i], peer_comm);
-        LOG((2, "PIOc_init_intercomm : iosys[%d]->ioid=%d, iosys[%d]->uniontasks = %d, iosys[%d]->union_rank=%d, %s", i, iosys[i]->iosysid, i, iosys[i]->num_uniontasks, i, iosys[i]->union_rank, ((iosys[i]->ioproc) ? ("IS IO PROC"):((iosys[i]->compproc) ? ("IS COMPUTE PROC") : ("NEITHER IO NOR COMPUTE PROC"))) ));
+        LOG((2, "PIOc_init_intercomm : iosys[%d]->ioid=%d, iosys[%d]->uniontasks = %d, iosys[%d]->union_rank=%d, %s", i, iosys[i]->iosysid, i, iosys[i]->num_uniontasks, i, iosys[i]->union_rank, ((my_ioproc) ? ("IS IO PROC"):((iosys[i]->compproc) ? ("IS COMPUTE PROC") : ("NEITHER IO NOR COMPUTE PROC"))) ));
         LOG((2, "New IOsystem added to iosystem_list iosysid = %d", iosysidps[i]));
 
         std::string sname;

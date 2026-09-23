@@ -13,6 +13,7 @@
 #include "pio_tests.h"
 #include "pio_rearr_contig.hpp"
 #include "spio_test_framework.hpp"
+#include "spio_iosys_utils.hpp"
 
 #ifdef SPIO_ENABLE_GPTL_TIMING
 #ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
@@ -68,26 +69,29 @@ iosystem_desc_t *get_iosystem(SPIO_TF::Test_framework &tf, MPI_Comm comm, int wr
   /* Assign first nio_procs procs as I/O processes */
   int color = (wrank/nio_procs == 0) ? 0 : 1;
 
-  ret = MPI_Comm_split(comm, color, 0, &(ios->io_comm));
+  MPI_Comm sync_io_comm = MPI_COMM_NULL;
+  ret = MPI_Comm_split(comm, color, 0, &sync_io_comm);
   if(ret != MPI_SUCCESS){
     tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO, "Unable to split comm for creating I/O system");
     free(ios);
     return NULL;
   }
 
-  ios->num_iotasks = nio_procs;
-  ios->ioproc = (color == 0) ? true : false;
-  if(ios->ioproc){
-    ret = MPI_Comm_rank(ios->io_comm, &(ios->io_rank));
+  bool is_io_proc = (color == 0) ? true : false;
+  int io_rank = -1;
+  if(is_io_proc){
+    ret = MPI_Comm_rank(sync_io_comm, &io_rank);
     if(ret != MPI_SUCCESS){
       tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO, "Unable to get rank of I/O process");
       free(ios);
       return NULL;
     }
   }
-  else{
-    ios->io_rank = -1;
-  }
+
+  /* sync_io_comm is genuinely owned (created via MPI_Comm_split above), so
+   * owns_resources = true: io_comm_info's destructor will MPI_Comm_free it. */
+  ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(sync_io_comm, io_rank,
+      nio_procs, MPI_GROUP_NULL, std::vector<int>(), is_io_proc, 0, 0, true);
 
   return ios;
 }
@@ -97,7 +101,7 @@ void free_iosystem(iosystem_desc_t *ios){
     return;
   }
 
-  MPI_Comm_free(&(ios->io_comm));
+  delete(ios->io_comm_info);
   free(ios);
 }
 
@@ -169,15 +173,15 @@ int test_c2i_block_data_rearr(SPIO_TF::Test_framework &tf)
 
     std::vector<double> rdata, exp_data;
 
-    if(ios->ioproc){
+    if(ios->io_comm_info->is_sync_io_proc()){
       std::size_t rearr_iochunk_sz = gdimlen/nio_procs;
-      std::size_t rdata_sz = (ios->io_rank != (nio_procs - 1)) ? rearr_iochunk_sz : (gdimlen - (ios->io_rank * rearr_iochunk_sz));
+      std::size_t rdata_sz = (ios->io_comm_info->get_sync_io_comm_rank() != (nio_procs - 1)) ? rearr_iochunk_sz : (gdimlen - (ios->io_comm_info->get_sync_io_comm_rank() * rearr_iochunk_sz));
     
       rdata.resize(rdata_sz);
       std::fill(rdata.begin(), rdata.end(), PIO_FILL_DOUBLE);
 
       exp_data.resize(rdata_sz);
-      std::iota(exp_data.begin(), exp_data.end(), ios->io_rank * rearr_iochunk_sz);
+      std::iota(exp_data.begin(), exp_data.end(), ios->io_comm_info->get_sync_io_comm_rank() * rearr_iochunk_sz);
     }
 
     std::iota(compmap.begin(), compmap.end(), wrank * LOCAL_COMPMAP_SZ);
@@ -239,15 +243,15 @@ int test_block_data_rearr(SPIO_TF::Test_framework &tf)
 
     std::vector<double> rdata, exp_data;
 
-    if(ios->ioproc){
+    if(ios->io_comm_info->is_sync_io_proc()){
       std::size_t rearr_iochunk_sz = gdimlen/nio_procs;
-      std::size_t rdata_sz = (ios->io_rank != (nio_procs - 1)) ? rearr_iochunk_sz : (gdimlen - (ios->io_rank * rearr_iochunk_sz));
+      std::size_t rdata_sz = (ios->io_comm_info->get_sync_io_comm_rank() != (nio_procs - 1)) ? rearr_iochunk_sz : (gdimlen - (ios->io_comm_info->get_sync_io_comm_rank() * rearr_iochunk_sz));
     
       rdata.resize(rdata_sz);
       std::fill(rdata.begin(), rdata.end(), PIO_FILL_DOUBLE);
 
       exp_data.resize(rdata_sz);
-      std::iota(exp_data.begin(), exp_data.end(), ios->io_rank * rearr_iochunk_sz);
+      std::iota(exp_data.begin(), exp_data.end(), ios->io_comm_info->get_sync_io_comm_rank() * rearr_iochunk_sz);
     }
 
     std::iota(compmap.begin(), compmap.end(), wrank * LOCAL_COMPMAP_SZ);
@@ -329,15 +333,15 @@ int test_rev_block_data_rearr(SPIO_TF::Test_framework &tf)
 
     std::vector<double> rdata, exp_data;
 
-    if(ios->ioproc){
+    if(ios->io_comm_info->is_sync_io_proc()){
       std::size_t rearr_iochunk_sz = gdimlen/nio_procs;
-      std::size_t rdata_sz = (ios->io_rank != (nio_procs - 1)) ? rearr_iochunk_sz : (gdimlen - (ios->io_rank * rearr_iochunk_sz));
+      std::size_t rdata_sz = (ios->io_comm_info->get_sync_io_comm_rank() != (nio_procs - 1)) ? rearr_iochunk_sz : (gdimlen - (ios->io_comm_info->get_sync_io_comm_rank() * rearr_iochunk_sz));
     
       rdata.resize(rdata_sz);
       std::fill(rdata.begin(), rdata.end(), PIO_FILL_DOUBLE);
 
       exp_data.resize(rdata_sz);
-      std::iota(exp_data.begin(), exp_data.end(), ios->io_rank * rearr_iochunk_sz);
+      std::iota(exp_data.begin(), exp_data.end(), ios->io_comm_info->get_sync_io_comm_rank() * rearr_iochunk_sz);
     }
 
     //std::iota(compmap.begin(), compmap.end(), wrank * LOCAL_COMPMAP_SZ);
@@ -423,15 +427,15 @@ int test_mrange_block_data_rearr(SPIO_TF::Test_framework &tf)
 
     std::vector<double> rdata, exp_data;
 
-    if(ios->ioproc){
+    if(ios->io_comm_info->is_sync_io_proc()){
       std::size_t rearr_iochunk_sz = gdimlen/nio_procs;
-      std::size_t rdata_sz = (ios->io_rank != (nio_procs - 1)) ? rearr_iochunk_sz : (gdimlen - (ios->io_rank * rearr_iochunk_sz));
+      std::size_t rdata_sz = (ios->io_comm_info->get_sync_io_comm_rank() != (nio_procs - 1)) ? rearr_iochunk_sz : (gdimlen - (ios->io_comm_info->get_sync_io_comm_rank() * rearr_iochunk_sz));
     
       rdata.resize(rdata_sz);
       std::fill(rdata.begin(), rdata.end(), PIO_FILL_DOUBLE);
 
       exp_data.resize(rdata_sz);
-      std::iota(exp_data.begin(), exp_data.end(), ios->io_rank * rearr_iochunk_sz);
+      std::iota(exp_data.begin(), exp_data.end(), ios->io_comm_info->get_sync_io_comm_rank() * rearr_iochunk_sz);
     }
 
     std::iota(compmap.begin(), compmap.begin() + FIRST_RANGE_SZ, wrank * FIRST_RANGE_SZ);
@@ -521,15 +525,15 @@ int test_mrange_oddz_data_rearr(SPIO_TF::Test_framework &tf)
 
     std::vector<double> rdata, exp_data;
 
-    if(ios->ioproc){
+    if(ios->io_comm_info->is_sync_io_proc()){
       std::size_t rearr_iochunk_sz = gdimlen/nio_procs;
-      std::size_t rdata_sz = (ios->io_rank != (nio_procs - 1)) ? rearr_iochunk_sz : (gdimlen - (ios->io_rank * rearr_iochunk_sz));
+      std::size_t rdata_sz = (ios->io_comm_info->get_sync_io_comm_rank() != (nio_procs - 1)) ? rearr_iochunk_sz : (gdimlen - (ios->io_comm_info->get_sync_io_comm_rank() * rearr_iochunk_sz));
     
       rdata.resize(rdata_sz);
       std::fill(rdata.begin(), rdata.end(), PIO_FILL_DOUBLE);
 
       exp_data.resize(rdata_sz);
-      std::iota(exp_data.begin(), exp_data.end(), ios->io_rank * rearr_iochunk_sz);
+      std::iota(exp_data.begin(), exp_data.end(), ios->io_comm_info->get_sync_io_comm_rank() * rearr_iochunk_sz);
     }
 
     if(!is_odd_proc){

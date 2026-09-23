@@ -32,6 +32,7 @@
 #include "spio_hdf5_utils.hpp"
 #if PIO_USE_ASYNC_WR_THREAD
 #include "spio_async_hdf5_utils.hpp"
+#include "spio_iosys_utils.hpp"
 #endif
 #include "spio_async_tcomm.hpp"
 #include <typeinfo>
@@ -1225,12 +1226,12 @@ int spio_handle_err(iosystem_desc_t *ios, file_desc_t *file, int eh,
 
     LOG((2, "spio_handle_err chose error handler = %d", eh));
     if(file){
-        ioroot = file->iosystem->ioroot;
+        ioroot = file->iosystem->io_comm_info->get_sync_io_root();
         comm = file->iosystem->my_comm;
     }
     else{
         assert(ios);
-        ioroot = ios->ioroot;
+        ioroot = ios->io_comm_info->get_sync_io_root();
         comm = ios->my_comm;
     }
 
@@ -1530,6 +1531,33 @@ void PIOc_warn(int iosysid, int ncid,
 
   bool print_warn_msg = (ios) ? (ios->tcomm_info->get_union_comm_rank() == ios->tcomm_info->get_union_comm_io_root()) : true;
   if(print_warn_msg){
+    fprintf(stderr, "PIO: WARNING: %s, (%s:%d)\n", uwarn_msg, (fname) ? fname : "\0", line);
+    fflush(stderr);
+  }
+}
+
+/**
+ * Print warning message (Can be used when there are no valid I/O systems to use)
+ * (Not a collective call)
+ *
+ * @param comm The MPI communicator for the group of processes
+ * @param fname The name of source code file where the warning occured.
+ * @param line The line number of source code where the warning occurred.
+ * @param uwarn_msg The user warning message
+ */
+void PIOc_warn(MPI_Comm comm,
+                const char *fname, int line,
+                const char *uwarn_msg)
+{
+  static const int ROOT_RANK = 0;
+  int rank = -1;
+  int ret;
+
+  if(comm != MPI_COMM_NULL){
+    ret = MPI_Comm_rank(comm, &rank); assert(ret == MPI_SUCCESS);
+  }
+
+  if((comm == MPI_COMM_NULL) || (rank == ROOT_RANK)){
     fprintf(stderr, "PIO: WARNING: %s, (%s:%d)\n", uwarn_msg, (fname) ? fname : "\0", line);
     fflush(stderr);
   }
@@ -2950,7 +2978,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
      * one task with netcdf serial files. */
     if (file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR ||
         file->iotype == PIO_IOTYPE_PNETCDF ||
-        ios->io_rank == 0)
+        ios->io_comm_info->get_sync_io_comm_rank() == 0)
         file->do_io = 1;
 
     LOG((2, "file->do_io = %d ios->async = %d", file->do_io, ios->async));
@@ -2976,12 +3004,12 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     /* Append ".bp" to output filename for the corresponding ADIOS BP filename */
     static const char adios_bp_filename_extn[] = ".bp";
     size_t adios_bp_filename_len = strlen(filename) + sizeof(adios_bp_filename_extn) + 1;
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
         if (!(file->mode & PIO_NOCLOBBER))
         {
             /* If PIO_NOCLOBBER is not set, i.e., CLOBBER mode, delete any ADIOS BP files with the same name */
-            if (ios->io_rank == 0)
+            if (ios->io_comm_info->get_sync_io_comm_rank() == 0)
             {
                 char *adios_bp_filename = (char *) calloc(adios_bp_filename_len, sizeof(char));
                 if (adios_bp_filename == NULL)
@@ -3033,7 +3061,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
 #ifdef SPIO_NO_CXX_REGEX
-        if (ios->io_rank == 0)
+        if (ios->io_comm_info->get_sync_io_comm_rank() == 0)
         {
             printf("PIO: WARNING: C++11 regex support is not available; skipping override of ADIOS with PnetCDF for creating file %s\n", filename);
         }
@@ -3042,7 +3070,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
         if (std::regex_match(filename, rgx))
         {
 #ifdef _PNETCDF
-            if (ios->io_rank == 0)
+            if (ios->io_comm_info->get_sync_io_comm_rank() == 0)
             {
                 printf("PIO: WARNING: Creating file %s with PnetCDF (CDF-5 format) instead of ADIOS (matched regex: %s)\n",
                        filename, SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX);
@@ -3054,7 +3082,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
             file->mode &= ~(NC_CLASSIC_MODEL | NC_64BIT_OFFSET | NC_NETCDF4);
             file->mode |= NC_64BIT_DATA;
 #else
-            if (ios->io_rank == 0)
+            if (ios->io_comm_info->get_sync_io_comm_rank() == 0)
             {
                 printf("PIO: WARNING: PnetCDF is not available; skipping override of ADIOS with PnetCDF for creating file %s (matched regex: %s)\n",
                        filename, SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX);
@@ -3320,7 +3348,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
 
     /* If this task is in the IO component, do the IO. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _NETCDF4
         /* All NetCDF4 files use the CDF5 file format by default,
@@ -3360,21 +3388,21 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
             file->mode |= NC_NODIMSCALE_ATTACH;
 #endif
             LOG((2, "Calling nc_create_par io_comm = %d mode = %d fh = %d",
-                 ios->io_comm, file->mode, file->fh));
-            ierr = nc_create_par(filename, file->mode, ios->io_comm, ios->info, &file->fh);
+                 ios->io_comm_info->get_sync_io_comm(), file->mode, file->fh));
+            ierr = nc_create_par(filename, file->mode, ios->io_comm_info->get_sync_io_comm(), ios->info, &file->fh);
             LOG((2, "nc_create_par returned %d file->fh = %d", ierr, file->fh));
             break;
         case PIO_IOTYPE_NETCDF4P_NCZARR:
             file->mode = file->mode |  NC_NETCDF4;
             LOG((2, "Calling nc_create_par (nczarr) io_comm = %d mode = %d fh = %d",
-                 ios->io_comm, file->mode, file->fh));
+                 ios->io_comm_info->get_sync_io_comm(), file->mode, file->fh));
             ierr = PIO_ENOTBUILT;
 #if PIO_USE_NETCDF4_NCZARR
             {
               std::string filename_nczarr = spio_get_nczarr_fname(filename);
               if(!filename_nczarr.empty()){
                 ierr = nc_create_par(filename_nczarr.c_str(), file->mode,
-                                      ios->io_comm, ios->info, &file->fh);
+                                      ios->io_comm_info->get_sync_io_comm(), ios->info, &file->fh);
               }
             }
             LOG((2, "nc_create_par returned %d file->fh = %d", ierr, file->fh));
@@ -3387,7 +3415,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (!ios->io_rank)
+            if (!ios->io_comm_info->get_sync_io_comm_rank())
             {
                 LOG((2, "Calling nc_create mode = %d", file->mode));
                 ierr = nc_create(filename, file->mode, &file->fh);
@@ -3474,7 +3502,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
             MPI_Info_get(ios->info, "striping_factor", PIO_MAX_NAME, info_striping_factor, &flag_striping_factor);
             if (!flag_striping_factor)
             {
-                int striping_factor_size = (ios->num_iotasks < PIO_MAX_LUSTRE_OSTS)? ios->num_iotasks : PIO_MAX_LUSTRE_OSTS;
+                int striping_factor_size = (ios->io_comm_info->get_sync_io_comm_sz() < PIO_MAX_LUSTRE_OSTS)? ios->io_comm_info->get_sync_io_comm_sz() : PIO_MAX_LUSTRE_OSTS;
                 char striping_factor_str[PIO_MAX_NAME];
                 snprintf(striping_factor_str, PIO_MAX_NAME, "%d", striping_factor_size);
 
@@ -3554,7 +3582,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
              */
             MPI_Info_set(ios->info, "nc_ibuf_size", "67108864");
 
-            ierr = ncmpi_create(ios->io_comm, filename, file->mode, ios->info, &file->fh);
+            ierr = ncmpi_create(ios->io_comm_info->get_sync_io_comm(), filename, file->mode, ios->info, &file->fh);
             if (!ierr)
             {
                 /* When using buffered put APIs in PnetCDF, we must explicitly specify the size of the internal buffer.
@@ -3584,7 +3612,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     }
 
     /* Broadcast mode to all tasks. */
-    if ((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->ioroot, ios->union_comm)))
+    if ((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->union_comm)))
     {
 #ifdef _ADIOS2
         if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
@@ -4832,7 +4860,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
    * for one task with netcdf serial files. */
   if(file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR ||
       file->iotype == PIO_IOTYPE_PNETCDF ||
-      ios->io_rank == 0) { file->do_io = 1; }
+      ios->io_comm_info->get_sync_io_comm_rank() == 0) { file->do_io = 1; }
 
   /* If async is in use, bcast the parameters from compute to I/O procs. */
   if(ios->async){
@@ -5086,7 +5114,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #endif
 
   /* If this is an IO task, then call the netCDF function. */
-  if(ios->ioproc){
+  if(ios->io_comm_info->is_sync_io_proc()){
     switch(file->iotype){
 #ifdef _NETCDF4
 
@@ -5095,7 +5123,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
       ierr = nc_open(filename, file->mode, &file->fh);
 #else
       imode = file->mode |  NC_MPIIO;
-      if ((ierr = nc_open_par(filename, imode, ios->io_comm, ios->info, &file->fh))) { break; }
+      if ((ierr = nc_open_par(filename, imode, ios->io_comm_info->get_sync_io_comm(), ios->info, &file->fh))) { break; }
       file->mode = imode;
 
       /* Check the vars for valid use of unlim dims. */
@@ -5108,7 +5136,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   case PIO_IOTYPE_NETCDF4P_NCZARR:
       file->mode = file->mode |  NC_NETCDF4;
       LOG((2, "Calling nc_open_par (nczarr) io_comm = %d mode = %d fh = %d",
-           ios->io_comm, file->mode, file->fh));
+           ios->io_comm_info->get_sync_io_comm(), file->mode, file->fh));
       ierr = PIO_ENOTBUILT;
 #ifndef _MPISERIAL
 #if PIO_USE_NETCDF4_NCZARR
@@ -5116,11 +5144,11 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
         std::string filename_nczarr = spio_get_nczarr_fname(filename);
         if(!filename_nczarr.empty()){
           ierr = nc_open_par(filename_nczarr.c_str(), file->mode,
-                                ios->io_comm, ios->info, &file->fh);
+                                ios->io_comm_info->get_sync_io_comm(), ios->info, &file->fh);
           if(ierr != NC_NOERR){
             /* The file being opened may not be NCZarr, for now retry with NetCDF4 */
             file->iotype = PIO_IOTYPE_NETCDF4P;
-            ierr = nc_open_par(filename, file->mode, ios->io_comm, ios->info, &file->fh);
+            ierr = nc_open_par(filename, file->mode, ios->io_comm_info->get_sync_io_comm(), ios->info, &file->fh);
           }
         }
       }
@@ -5131,7 +5159,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #endif
       break;
   case PIO_IOTYPE_NETCDF4C:
-      if(ios->io_rank == 0){
+      if(ios->io_comm_info->get_sync_io_comm_rank() == 0){
         imode = file->mode | NC_NETCDF4;
         if((ierr = nc_open(filename, imode, &file->fh))) { break; }
         file->mode = imode;
@@ -5143,7 +5171,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 
 #ifdef _NETCDF
   case PIO_IOTYPE_NETCDF:
-      if(ios->io_rank == 0){
+      if(ios->io_comm_info->get_sync_io_comm_rank() == 0){
           ierr = nc_open(filename, file->mode, &file->fh);
       }
       break;
@@ -5151,11 +5179,11 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 
 #ifdef _PNETCDF
   case PIO_IOTYPE_PNETCDF:
-      ierr = ncmpi_open(ios->io_comm, filename, file->mode, ios->info, &file->fh);
+      ierr = ncmpi_open(ios->io_comm_info->get_sync_io_comm(), filename, file->mode, ios->info, &file->fh);
 
       // This should only be done with a file opened to append
       if(ierr == PIO_NOERR && (file->mode & PIO_WRITE)){
-        if(ios->iomaster == MPI_ROOT) { LOG((2, "%d Setting IO buffer %ld", __LINE__, pio_buffer_size_limit)); }
+        if(ios->io_comm_info->get_sync_io_master() == MPI_ROOT) { LOG((2, "%d Setting IO buffer %ld", __LINE__, pio_buffer_size_limit)); }
 
         /* Please refer to a previous related comment for why we ensure a minimum buffer size (16 MiB) for
            buffered put APIs in PnetCDF.
@@ -5196,9 +5224,9 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
        with just plain old basic NetCDF. */
     if(retry){
 #ifdef _NETCDF
-      LOG((2, "retry error code ierr = %d io_rank %d", ierr, ios->io_rank));
+      LOG((2, "retry error code ierr = %d io_rank %d", ierr, ios->io_comm_info->get_sync_io_comm_rank()));
       /* Bcast error code from io rank 0 to all io procs */
-      mpierr = MPI_Bcast(&ierr, 1, MPI_INT, 0, ios->io_comm);
+      mpierr = MPI_Bcast(&ierr, 1, MPI_INT, 0, ios->io_comm_info->get_sync_io_comm());
       if(mpierr != MPI_SUCCESS){
           spio_ltimer_stop(ios->io_fstats->rd_timer_name);
           spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -5226,7 +5254,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
         /* *iotype = PIO_IOTYPE_NETCDF; */
 
         /* open netcdf file serially on main task */
-        if(ios->io_rank == 0){
+        if(ios->io_comm_info->get_sync_io_comm_rank() == 0){
           char errmsg[PIO_MAX_NAME];
 
           ierr2 = PIOc_strerror_impl(ierr, errmsg, PIO_MAX_NAME);
@@ -5248,10 +5276,10 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
            filename, file->fh, file->iotype, file->do_io, ierr));
 #endif /* _NETCDF */
     } // if(retry)
-  } // if(ios->ioproc)
+  } // if(ios->io_comm_info->is_sync_io_proc())
 
   /* Broadcast open mode to all tasks. */
-  if((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->ioroot, ios->my_comm))){
+  if((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm))){
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -5265,7 +5293,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 
   if(retry){
     /* Broadcast IO type (might be switched on IO tasks) to all tasks. */
-    if((mpierr = MPI_Bcast(&file->iotype, 1, MPI_INT, ios->ioroot, ios->my_comm))){
+    if((mpierr = MPI_Bcast(&file->iotype, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm))){
       spio_ltimer_stop(ios->io_fstats->rd_timer_name);
       spio_ltimer_stop(ios->io_fstats->tot_timer_name);
       spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -5337,7 +5365,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   spio_ltimer_stop(file->io_fstats->tot_timer_name);
 
   /* Check if the file has unlimited dimensions */
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     ierr = PIOc_inq_unlimdims_impl(*ncidp, &(file->num_unlim_dimids), NULL);
     if(ierr != PIO_NOERR){
       ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -5840,7 +5868,7 @@ int calc_var_rec_sz(int ncid, int varid)
         }
     }
     mpierr = MPI_Bcast(&(file->varlist[varid].vrsize), 1, MPI_OFFSET,
-                        ios->ioroot, ios->my_comm);
+                        ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     if(mpierr != MPI_SUCCESS)
     {
         LOG((1, "Unable to bcast vrsize"));

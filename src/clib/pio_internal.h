@@ -713,5 +713,11 @@ int spio_find_start_count(int ndims, const int *dimlen, int fndims, var_desc_t *
 }
 #endif
 
+#if defined(__cplusplus)
+/* C++-only overload (not part of the C API, not bound from Fortran):
+ * cannot be declared inside the extern "C" block above since C linkage
+ * does not support overloading. */
+void PIOc_warn(MPI_Comm comm, const char *fname, int line, const char *uwarn_msg);
+#endif
 
 #endif /* __PIO_INTERNAL__ */

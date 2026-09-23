@@ -30,6 +30,7 @@ extern "C"{
 #include "spio_dt_converter.hpp"
 #include "spio_hdf5_utils.hpp"
 #include "spio_async_tcomm.hpp"
+#include "spio_iosys_utils.hpp"
 
 struct Hdf5_create_info{
   file_desc_t *file;
@@ -190,7 +191,7 @@ int spio_iosys_async_hdf5_create_op_add(file_desc_t *file, const char *filename)
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->ioproc){
+  if(!ios->io_comm_info->is_sync_io_proc()){
     return PIO_NOERR;
   }
 
@@ -254,7 +255,7 @@ int spio_iosys_async_hdf5_def_var_op_add(file_desc_t *file, const char *name,
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->ioproc){
+  if(!ios->io_comm_info->is_sync_io_proc()){
     return PIO_NOERR;
   }
 
@@ -324,7 +325,7 @@ int spio_iosys_async_hdf5_put_att_op_add(file_desc_t *file, int varid,
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->ioproc){
+  if(!ios->io_comm_info->is_sync_io_proc()){
     return PIO_NOERR;
   }
 
@@ -393,7 +394,7 @@ int spio_iosys_async_hdf5_enddef_op_add(file_desc_t *file)
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->ioproc){
+  if(!ios->io_comm_info->is_sync_io_proc()){
     return PIO_NOERR;
   }
 
@@ -464,7 +465,7 @@ int spio_iosys_async_hdf5_put_var_op_add(file_desc_t *file, int varid,
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->ioproc){
+  if(!ios->io_comm_info->is_sync_io_proc()){
     return PIO_NOERR;
   }
 
@@ -552,7 +553,7 @@ int spio_iosys_async_hdf5_set_frame_op_add(file_desc_t *file, int varid, int fra
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->ioproc){
+  if(!ios->io_comm_info->is_sync_io_proc()){
     return PIO_NOERR;
   }
 
@@ -623,7 +624,7 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
   iosystem_desc_t *ios = file->iosystem;
   var_desc_t *v1desc = file->varlist + wcache->varids[0];
 
-  assert(ios && v1desc && ios->ioproc);
+  assert(ios && v1desc && ios->io_comm_info->is_sync_io_proc());
 
   bool wr_fillbuf = wcache->wr_fillbuf;
 
@@ -855,7 +856,7 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
   iosystem_desc_t *ios = file->iosystem;
   assert(ios);
 
-  if(!ios->ioproc){
+  if(!ios->io_comm_info->is_sync_io_proc()){
     return PIO_NOERR;
   }
 

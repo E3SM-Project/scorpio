@@ -23,6 +23,7 @@
 #if PIO_USE_ASYNC_WR_THREAD
 #include "spio_async_hdf5_utils.hpp"
 #endif
+#include "spio_iosys_utils.hpp"
 
 const char spio_nc_fillvalue_aname[] = "_FillValue";
 
@@ -190,7 +191,7 @@ int PIOc_inq_impl(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdi
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -238,7 +239,7 @@ int PIOc_inq_impl(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdi
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -252,7 +253,7 @@ int PIOc_inq_impl(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdi
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (ndimsp)
-        if ((mpierr = MPI_Bcast(ndimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(ndimsp, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -260,7 +261,7 @@ int PIOc_inq_impl(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdi
         }
 
     if (nvarsp)
-        if ((mpierr = MPI_Bcast(nvarsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(nvarsp, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -268,7 +269,7 @@ int PIOc_inq_impl(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdi
         }
 
     if (ngattsp)
-        if ((mpierr = MPI_Bcast(ngattsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(ngattsp, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -276,7 +277,7 @@ int PIOc_inq_impl(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdi
         }
 
     if (unlimdimidp)
-        if ((mpierr = MPI_Bcast(unlimdimidp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(unlimdimidp, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -397,7 +398,7 @@ int PIOc_inq_unlimdims_impl(int ncid, int *nunlimdimsp, int *unlimdimidsp)
 
     LOG((2, "file->iotype = %d", file->iotype));
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
         if (file->iotype == PIO_IOTYPE_NETCDF && file->do_io)
         {
@@ -469,7 +470,7 @@ int PIOc_inq_unlimdims_impl(int ncid, int *nunlimdimsp, int *unlimdimidsp)
 #endif
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -484,7 +485,7 @@ int PIOc_inq_unlimdims_impl(int ncid, int *nunlimdimsp, int *unlimdimidsp)
     }
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
-    if ((mpierr = MPI_Bcast(&tmp_nunlimdims, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+    if ((mpierr = MPI_Bcast(&tmp_nunlimdims, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -492,7 +493,7 @@ int PIOc_inq_unlimdims_impl(int ncid, int *nunlimdimsp, int *unlimdimidsp)
     }
     
     if (nunlimdimsp)
-        if ((mpierr = MPI_Bcast(nunlimdimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(nunlimdimsp, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -500,7 +501,7 @@ int PIOc_inq_unlimdims_impl(int ncid, int *nunlimdimsp, int *unlimdimidsp)
         }
 
     if (unlimdimidsp)
-        if ((mpierr = MPI_Bcast(unlimdimidsp, tmp_nunlimdims, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(unlimdimidsp, tmp_nunlimdims, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -614,7 +615,7 @@ int PIOc_inq_type_impl(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -641,16 +642,16 @@ int PIOc_inq_type_impl(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
     if (name)
     {
         int slen;
-        if (ios->iomaster == MPI_ROOT)
+        if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
             slen = strlen(name);
-        if ((mpierr = MPI_Bcast(&slen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(&slen, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
         if (!mpierr)
-            if ((mpierr = MPI_Bcast((void *)name, slen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
+            if ((mpierr = MPI_Bcast((void *)name, slen + 1, MPI_CHAR, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
             {
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -658,7 +659,7 @@ int PIOc_inq_type_impl(int ncid, nc_type xtype, char *name, PIO_Offset *sizep)
             }
     }
     if (sizep)
-        if ((mpierr = MPI_Bcast(sizep , 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(sizep , 1, MPI_OFFSET, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -727,7 +728,7 @@ int PIOc_inq_format_impl(int ncid, int *formatp)
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -752,7 +753,7 @@ int PIOc_inq_format_impl(int ncid, int *formatp)
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (formatp)
-        if ((mpierr = MPI_Bcast(formatp , 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(formatp , 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -897,7 +898,7 @@ int PIOc_inq_dim_impl(int ncid, int dimid, char *name, PIO_Offset *lenp)
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -918,7 +919,7 @@ int PIOc_inq_dim_impl(int ncid, int dimid, char *name, PIO_Offset *lenp)
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -937,15 +938,15 @@ int PIOc_inq_dim_impl(int ncid, int dimid, char *name, PIO_Offset *lenp)
     {
         int slen;
         LOG((2, "bcasting results my_comm = %d", ios->my_comm));
-        if (ios->iomaster == MPI_ROOT)
+        if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
             slen = strlen(name);
-        if ((mpierr = MPI_Bcast(&slen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(&slen, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
-        if ((mpierr = MPI_Bcast((void *)name, slen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast((void *)name, slen + 1, MPI_CHAR, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -954,7 +955,7 @@ int PIOc_inq_dim_impl(int ncid, int dimid, char *name, PIO_Offset *lenp)
     }
 
     if (lenp)
-        if ((mpierr = MPI_Bcast(lenp , 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(lenp , 1, MPI_OFFSET, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1134,7 +1135,7 @@ int PIOc_inq_dimid_impl(int ncid, const char *name, int *idp)
 #endif
  
     /* IO tasks call the netCDF functions. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -1149,7 +1150,7 @@ int PIOc_inq_dimid_impl(int ncid, const char *name, int *idp)
     LOG((3, "nc_inq_dimid call complete ierr = %d", ierr));
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1165,7 +1166,7 @@ int PIOc_inq_dimid_impl(int ncid, const char *name, int *idp)
 
     /* Broadcast results. */
     if (idp)
-        if ((mpierr = MPI_Bcast(idp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(idp, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1318,7 +1319,7 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
 #endif
 
     /* Call the netCDF layer. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
         LOG((2, "Calling the netCDF layer"));
 #ifdef _PNETCDF
@@ -1423,7 +1424,7 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1438,15 +1439,15 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
     }
 
     /* Broadcast the results for non-null pointers. */
-    if (ios->iomaster == MPI_ROOT)
+    if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
         slen = strlen(my_name);
-    if ((mpierr = MPI_Bcast(&slen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+    if ((mpierr = MPI_Bcast(&slen, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
     }
-    if ((mpierr = MPI_Bcast((void *)my_name, slen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
+    if ((mpierr = MPI_Bcast((void *)my_name, slen + 1, MPI_CHAR, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1464,7 +1465,7 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
       * - Assuming that we don't reuse varids 
       * - Also assuming that a timer is needed if we query about a var
       * */
-    snprintf(timer_log_fname, PIO_MAX_NAME, "piorwinfo%010dwrank.dat", ios->ioroot);
+    snprintf(timer_log_fname, PIO_MAX_NAME, "piorwinfo%010dwrank.dat", ios->io_comm_info->get_sync_io_root());
     if(!mtimer_is_valid(file->varlist[varid].rd_mtimer))
     {
         std::string tmp_timer_name;
@@ -1509,7 +1510,7 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
     }
 #endif
 
-    if ((mpierr = MPI_Bcast(&(file->varlist[varid].rec_var), 1, MPI_INT, ios->ioroot, ios->my_comm)))
+    if ((mpierr = MPI_Bcast(&(file->varlist[varid].rec_var), 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1517,7 +1518,7 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
     }
 
     if (xtypep)
-        if ((mpierr = MPI_Bcast(xtypep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(xtypep, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1531,9 +1532,9 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
             *ndimsp = file->varlist[varid].ndims;
         }
         else{
-            LOG((2, "PIOc_inq_var about to Bcast ndims = %d ios->ioroot = %d ios->my_comm = %d",
-                 *ndimsp, ios->ioroot, ios->my_comm));
-            if ((mpierr = MPI_Bcast(ndimsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+            LOG((2, "PIOc_inq_var about to Bcast ndims = %d ios->io_comm_info->get_sync_io_root() = %d ios->my_comm = %d",
+                 *ndimsp, ios->io_comm_info->get_sync_io_root(), ios->my_comm));
+            if ((mpierr = MPI_Bcast(ndimsp, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
             {
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1545,13 +1546,13 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
     }
     if (dimidsp)
     {
-        if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
-        if ((mpierr = MPI_Bcast(dimidsp, ndims, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(dimidsp, ndims, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1559,7 +1560,7 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
         }
     }
     if (nattsp)
-        if ((mpierr = MPI_Bcast(nattsp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(nattsp, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1769,7 +1770,7 @@ int PIOc_inq_varid_impl(int ncid, const char *name, int *varidp)
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -1784,7 +1785,7 @@ int PIOc_inq_varid_impl(int ncid, const char *name, int *varidp)
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1800,7 +1801,7 @@ int PIOc_inq_varid_impl(int ncid, const char *name, int *varidp)
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (varidp)
-        if ((mpierr = MPI_Bcast(varidp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(varidp, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -1813,7 +1814,7 @@ int PIOc_inq_varid_impl(int ncid, const char *name, int *varidp)
       * - Assuming that we don't reuse varids
       * - Also assuming that a timer is needed if we query about a var
       * */
-    snprintf(timer_log_fname, PIO_MAX_NAME, "piorwinfo%010dwrank.dat", ios->ioroot);
+    snprintf(timer_log_fname, PIO_MAX_NAME, "piorwinfo%010dwrank.dat", ios->io_comm_info->get_sync_io_root());
     if(!mtimer_is_valid(file->varlist[*varidp].rd_mtimer))
     {
         char tmp_timer_name[PIO_MAX_NAME];
@@ -2005,7 +2006,7 @@ int PIOc_inq_att_impl(int ncid, int varid, const char *name, nc_type *xtypep,
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -2020,7 +2021,7 @@ int PIOc_inq_att_impl(int ncid, int varid, const char *name, nc_type *xtypep,
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2036,14 +2037,14 @@ int PIOc_inq_att_impl(int ncid, int varid, const char *name, nc_type *xtypep,
 
     /* Broadcast results. */
     if (xtypep)
-        if ((mpierr = MPI_Bcast(xtypep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(xtypep, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (lenp)
-        if ((mpierr = MPI_Bcast(lenp, 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(lenp, 1, MPI_OFFSET, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2212,7 +2213,7 @@ int PIOc_inq_attname_impl(int ncid, int varid, int attnum, char *name)
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -2239,14 +2240,14 @@ int PIOc_inq_attname_impl(int ncid, int varid, int attnum, char *name)
     if (name)
     {
         int namelen = strlen(name);
-        if ((mpierr = MPI_Bcast(&namelen, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(&namelen, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
         /* Casting to void to avoid warnings on some compilers. */
-        if ((mpierr = MPI_Bcast((void *)name, namelen + 1, MPI_CHAR, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast((void *)name, namelen + 1, MPI_CHAR, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2387,7 +2388,7 @@ int PIOc_inq_attid_impl(int ncid, int varid, const char *name, int *idp)
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -2402,7 +2403,7 @@ int PIOc_inq_attid_impl(int ncid, int varid, const char *name, int *idp)
     }
 
     /* A failure to inquire is not fatal */
-    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->ioroot, ios->my_comm);
+    mpierr = MPI_Bcast(&ierr, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     if(mpierr != MPI_SUCCESS){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2418,7 +2419,7 @@ int PIOc_inq_attid_impl(int ncid, int varid, const char *name, int *idp)
 
     /* Broadcast results. */
     if (idp)
-        if ((mpierr = MPI_Bcast(idp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(idp, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -2502,7 +2503,7 @@ int PIOc_rename_dim_impl(int ncid, int dimid, const char *name)
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -2602,7 +2603,7 @@ int PIOc_rename_var_impl(int ncid, int varid, const char *name)
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -2712,7 +2713,7 @@ int PIOc_rename_att_impl(int ncid, int varid, const char *name,
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -2813,7 +2814,7 @@ int PIOc_del_att_impl(int ncid, int varid, const char *name)
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -2917,7 +2918,7 @@ int PIOc_set_fill_impl(int ncid, int fillmode, int *old_modep)
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -2947,7 +2948,7 @@ int PIOc_set_fill_impl(int ncid, int fillmode, int *old_modep)
     if (old_modep)
     {
         LOG((2, "old_mode = %d", *old_modep));
-        if ((mpierr = MPI_Bcast(old_modep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(old_modep, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -3022,8 +3023,8 @@ int PIOc_enddef_impl(int ncid)
 #endif
 
   /* If this is an IO task, then call the netCDF function. */
-  LOG((3, "PIOc_enddef_impl ios->ioproc = %d", ios->ioproc));
-  if(ios->ioproc){
+  LOG((3, "PIOc_enddef_impl ios->io_comm_info->is_sync_io_proc() = %d", ios->io_comm_info->is_sync_io_proc()));
+  if(ios->io_comm_info->is_sync_io_proc()){
     LOG((3, "PIOc_enddef_impl calling netcdf function file->fh = %d file->do_io = %d iotype = %d",
          file->fh, file->do_io, file->iotype));
 
@@ -3238,8 +3239,8 @@ int PIOc_redef_impl(int ncid)
 #endif
 
   /* If this is an IO task, then call the netCDF function. */
-  LOG((3, "PIOc_redef_impl ios->ioproc = %d", ios->ioproc));
-  if(ios->ioproc){
+  LOG((3, "PIOc_redef_impl ios->io_comm_info->is_sync_io_proc() = %d", ios->io_comm_info->is_sync_io_proc()));
+  if(ios->io_comm_info->is_sync_io_proc()){
     LOG((3, "PIOc_redef calling netcdf function file->fh = %d file->do_io = %d iotype = %d",
          file->fh, file->do_io, file->iotype));
     switch(file->iotype){
@@ -3469,7 +3470,7 @@ int PIOc_def_dim_impl(int ncid, const char *name, PIO_Offset len, int *idp)
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -3494,7 +3495,7 @@ int PIOc_def_dim_impl(int ncid, const char *name, PIO_Offset len, int *idp)
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (idp)
-        if ((mpierr = MPI_Bcast(idp , 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(idp , 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -3583,7 +3584,7 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
     /* Run this on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. Learn whether each dimension
      * is unlimited. */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         for (int d = 1; d < ndims; d++)
         {
@@ -3878,7 +3879,7 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
 #endif
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -3970,7 +3971,7 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
     /* Broadcast results. */
     /* FIXME: varidp should be valid, no need to check it here */
     if (varidp)
-        if ((mpierr = MPI_Bcast(varidp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(varidp, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -4000,7 +4001,7 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
       * - Assuming that we don't reuse varids 
       * - Also assuming that a timer is needed if we query about a var
       * */
-    snprintf(timer_log_fname, PIO_MAX_NAME, "piorwinfo%010dwrank.dat", ios->ioroot);
+    snprintf(timer_log_fname, PIO_MAX_NAME, "piorwinfo%010dwrank.dat", ios->io_comm_info->get_sync_io_root());
     if(!mtimer_is_valid(file->varlist[*varidp].rd_mtimer))
     {
         char tmp_timer_name[PIO_MAX_NAME];
@@ -4117,7 +4118,7 @@ int PIOc_def_var_fill_impl(int ncid, int varid, int fill_mode, const void *fill_
     /* Run this on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. Get the size of this vars
      * type. */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -4178,7 +4179,7 @@ int PIOc_def_var_fill_impl(int ncid, int varid, int fill_mode, const void *fill_
         }
     }
 
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
@@ -4272,7 +4273,7 @@ int PIOc_inq_var_fill_impl(int ncid, int varid, int *no_fill, void *fill_valuep)
     /* Run this on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. Get the size of this vars
      * type. */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -4324,7 +4325,7 @@ int PIOc_inq_var_fill_impl(int ncid, int varid, int *no_fill, void *fill_valuep)
     }
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
         LOG((2, "calling inq_var_fill file->iotype = %d file->fh = %d varid = %d",
              file->iotype, file->fh, varid));
@@ -4419,14 +4420,14 @@ int PIOc_inq_var_fill_impl(int ncid, int varid, int *no_fill, void *fill_valuep)
 
     /* Broadcast results to all tasks. Ignore NULL parameters. */
     if (no_fill)
-        if ((mpierr = MPI_Bcast(no_fill, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(no_fill, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (fill_valuep)
-        if ((mpierr = MPI_Bcast(fill_valuep, type_size, MPI_CHAR, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(fill_valuep, type_size, MPI_CHAR, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -5098,7 +5099,7 @@ int PIOc_copy_att_impl(int incid, int ivarid, const char *name,
   switch(ifile->iotype){
 #ifdef _PNETCDF
     case PIO_IOTYPE_PNETCDF:
-          if(ios->ioproc){
+          if(ios->io_comm_info->is_sync_io_proc()){
             ierr = ncmpi_copy_att(ifile->fh, ivarid, name,
                     ofile->fh, ovarid);
           }
@@ -5110,7 +5111,7 @@ int PIOc_copy_att_impl(int incid, int ivarid, const char *name,
     case PIO_IOTYPE_NETCDF4C:
     case PIO_IOTYPE_NETCDF4P:
     case PIO_IOTYPE_NETCDF4P_NCZARR:
-          if(ios->ioproc && ifile->do_io){
+          if(ios->io_comm_info->is_sync_io_proc() && ifile->do_io){
             ierr = nc_copy_att(ifile->fh, ivarid, name,
                     ofile->fh, ovarid);
           }
@@ -5120,7 +5121,7 @@ int PIOc_copy_att_impl(int incid, int ivarid, const char *name,
 #ifdef _HDF5
     case PIO_IOTYPE_HDF5:
     case PIO_IOTYPE_HDF5C:
-          if(ios->ioproc){
+          if(ios->io_comm_info->is_sync_io_proc()){
             ierr = spio_hdf5_copy_att(ifile->iosystem, ifile, ivarid, name, ofile, ovarid);
           }
           ierr = check_netcdf(ios, ifile, ierr, __FILE__, __LINE__);

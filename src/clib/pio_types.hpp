@@ -70,6 +70,9 @@ struct var_desc_t;
 /* Fwd declaration of thread-specific comm class used in iosystem_desc_t */
 namespace SPIO_Util{
   class TComm_info;
+  namespace Iosys_Util{
+    class IO_comm_info;
+  }
 }
 
 const int SPIO_INVALID_ID = -1;
@@ -386,9 +389,8 @@ typedef struct iosystem_desc_t
      * both the IO and the computation communicators. */
     MPI_Comm union_comm;
 
-    /** This is an MPI intra communicator that includes all the tasks
-     * involved in IO. */
-    MPI_Comm io_comm;
+    /** I/O Communicator info : comm, ranks, root */
+    SPIO_Util::Iosys_Util::IO_comm_info *io_comm_info;
 
     /** This is an MPI intra communicator that includes all the tasks
      * involved in computation. */
@@ -410,12 +412,6 @@ typedef struct iosystem_desc_t
      * computation. */
     MPI_Group compgroup;
 
-    /** This MPI group contains the processors involved in I/O. */
-    MPI_Group iogroup;
-
-    /** The number of tasks in the IO communicator. */
-    int num_iotasks;
-
     /** The number of tasks in the computation communicator. */
     int num_comptasks;
 
@@ -431,21 +427,9 @@ typedef struct iosystem_desc_t
      * if this process is not part of the computation communicator. */
     int comp_rank;
 
-    /** The rank of this process in the IO communicator, or -1 if this
-     * process is not part of the IO communicator. */
-    int io_rank;
-
-    /** Set to MPI_ROOT if this task is the master of IO communicator, 0
-     * otherwise. */
-    int iomaster;
-
     /** Set to MPI_ROOT if this task is the master of comp communicator, 0
      * otherwise. */
     int compmaster;
-
-    /** Rank of IO root task (which is rank 0 in io_comm) in the union
-     * communicator. Will always be 0 for async situations. */
-    int ioroot;
 
     /** Rank of computation root task (which is rank 0 in
      * comm_comms[cmp]) in the union communicator. Will always = number
@@ -453,10 +437,6 @@ typedef struct iosystem_desc_t
     int comproot;
 
     SPIO_Util::TComm_info *tcomm_info;
-
-    /** An array of the ranks of all IO tasks within the union
-     * communicator. */
-    int *ioranks;
 
     /** An array of the ranks of all computation tasks within the
      * union communicator. */
@@ -471,9 +451,6 @@ typedef struct iosystem_desc_t
 
     /** True if asynchronous interface is in use. */
     bool async;
-
-    /** True if this task is a member of the IO communicator. */
-    bool ioproc;
 
     /** True if this task is a member of a computation
      * communicator. */

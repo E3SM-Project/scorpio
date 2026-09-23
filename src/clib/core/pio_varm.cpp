@@ -2,6 +2,7 @@
 #include <pio.h>
 #include <pio_internal.h>
 #include "spio_io_summary.h"
+#include "spio_iosys_utils.hpp"
 
 ///
 /// PIO interface to nc_put_varm
@@ -37,7 +38,7 @@ int PIOc_put_varm_impl(int ncid, int varid, const PIO_Offset start[], const PIO_
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -49,7 +50,7 @@ int PIOc_put_varm_impl(int ncid, int varid, const PIO_Offset start[], const PIO_
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = nc_put_varm(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,   buf);;
             }
             break;
@@ -64,7 +65,7 @@ int PIOc_put_varm_impl(int ncid, int varid, const PIO_Offset start[], const PIO_
             }
             request = vdesc->request+vdesc->nreqs;
 
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = ncmpi_bput_varm(file->fh, varid, start, count, stride, imap, buf, bufcount, buftype, request);;
             }else{
                 *request = PIO_REQ_NULL;
@@ -122,7 +123,7 @@ int PIOc_put_varm_uchar_impl(int ncid, int varid, const PIO_Offset start[], cons
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -134,7 +135,7 @@ int PIOc_put_varm_uchar_impl(int ncid, int varid, const PIO_Offset start[], cons
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = nc_put_varm_uchar(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             }
             break;
@@ -149,7 +150,7 @@ int PIOc_put_varm_uchar_impl(int ncid, int varid, const PIO_Offset start[], cons
             }
             request = vdesc->request+vdesc->nreqs;
 
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = ncmpi_bput_varm_uchar(file->fh, varid, start, count, stride, imap, op, request);;
             }else{
                 *request = PIO_REQ_NULL;
@@ -203,7 +204,7 @@ int PIOc_put_varm_short_impl(int ncid, int varid, const PIO_Offset start[], cons
 
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -215,7 +216,7 @@ int PIOc_put_varm_short_impl(int ncid, int varid, const PIO_Offset start[], cons
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = nc_put_varm_short(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             }
             break;
@@ -230,7 +231,7 @@ int PIOc_put_varm_short_impl(int ncid, int varid, const PIO_Offset start[], cons
             }
             request = vdesc->request+vdesc->nreqs;
 
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = ncmpi_bput_varm_short(file->fh, varid, start, count, stride, imap, op, request);;
             }else{
                 *request = PIO_REQ_NULL;
@@ -285,7 +286,7 @@ int PIOc_put_varm_text_impl(int ncid, int varid, const PIO_Offset start[], const
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -297,7 +298,7 @@ int PIOc_put_varm_text_impl(int ncid, int varid, const PIO_Offset start[], const
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = nc_put_varm_text(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             }
             break;
@@ -312,7 +313,7 @@ int PIOc_put_varm_text_impl(int ncid, int varid, const PIO_Offset start[], const
             }
             request = vdesc->request+vdesc->nreqs;
 
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = ncmpi_bput_varm_text(file->fh, varid, start, count, stride, imap, op, request);;
             }else{
                 *request = PIO_REQ_NULL;
@@ -368,7 +369,7 @@ int PIOc_put_varm_ushort_impl(int ncid, int varid, const PIO_Offset start[], con
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -380,7 +381,7 @@ int PIOc_put_varm_ushort_impl(int ncid, int varid, const PIO_Offset start[], con
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = nc_put_varm_ushort(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             }
             break;
@@ -395,7 +396,7 @@ int PIOc_put_varm_ushort_impl(int ncid, int varid, const PIO_Offset start[], con
             }
             request = vdesc->request+vdesc->nreqs;
 
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = ncmpi_bput_varm_ushort(file->fh, varid, start, count, stride, imap, op, request);;
             }else{
                 *request = PIO_REQ_NULL;
@@ -451,7 +452,7 @@ int PIOc_put_varm_ulonglong_impl(int ncid, int varid, const PIO_Offset start[], 
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -463,7 +464,7 @@ int PIOc_put_varm_ulonglong_impl(int ncid, int varid, const PIO_Offset start[], 
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = nc_put_varm_ulonglong(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             }
             break;
@@ -478,7 +479,7 @@ int PIOc_put_varm_ulonglong_impl(int ncid, int varid, const PIO_Offset start[], 
             }
             request = vdesc->request+vdesc->nreqs;
 
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = ncmpi_bput_varm_ulonglong(file->fh, varid, start, count, stride, imap, op, request);;
             }else{
                 *request = PIO_REQ_NULL;
@@ -533,7 +534,7 @@ int PIOc_put_varm_int_impl(int ncid, int varid, const PIO_Offset start[], const 
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -545,7 +546,7 @@ int PIOc_put_varm_int_impl(int ncid, int varid, const PIO_Offset start[], const 
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = nc_put_varm_int(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             }
             break;
@@ -560,7 +561,7 @@ int PIOc_put_varm_int_impl(int ncid, int varid, const PIO_Offset start[], const 
             }
             request = vdesc->request+vdesc->nreqs;
 
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = ncmpi_bput_varm_int(file->fh, varid, start, count, stride, imap, op, request);;
             }else{
                 *request = PIO_REQ_NULL;
@@ -616,7 +617,7 @@ int PIOc_put_varm_float_impl(int ncid, int varid, const PIO_Offset start[], cons
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -628,7 +629,7 @@ int PIOc_put_varm_float_impl(int ncid, int varid, const PIO_Offset start[], cons
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = nc_put_varm_float(file->fh, varid,(size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             }
             break;
@@ -643,7 +644,7 @@ int PIOc_put_varm_float_impl(int ncid, int varid, const PIO_Offset start[], cons
             }
             request = vdesc->request+vdesc->nreqs;
 
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = ncmpi_bput_varm_float(file->fh, varid, start, count, stride, imap, op, request);;
             }else{
                 *request = PIO_REQ_NULL;
@@ -698,7 +699,7 @@ int PIOc_put_varm_long_impl(int ncid, int varid, const PIO_Offset start[], const
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -710,7 +711,7 @@ int PIOc_put_varm_long_impl(int ncid, int varid, const PIO_Offset start[], const
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = nc_put_varm_long(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             }
             break;
@@ -725,7 +726,7 @@ int PIOc_put_varm_long_impl(int ncid, int varid, const PIO_Offset start[], const
             }
             request = vdesc->request+vdesc->nreqs;
 
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = ncmpi_bput_varm_long(file->fh, varid, start, count, stride, imap, op, request);;
             }else{
                 *request = PIO_REQ_NULL;
@@ -782,7 +783,7 @@ int PIOc_put_varm_uint_impl(int ncid, int varid, const PIO_Offset start[], const
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -794,7 +795,7 @@ int PIOc_put_varm_uint_impl(int ncid, int varid, const PIO_Offset start[], const
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = nc_put_varm_uint(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             }
             break;
@@ -809,7 +810,7 @@ int PIOc_put_varm_uint_impl(int ncid, int varid, const PIO_Offset start[], const
             }
             request = vdesc->request+vdesc->nreqs;
 
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = ncmpi_bput_varm_uint(file->fh, varid, start, count, stride, imap, op, request);;
             }else{
                 *request = PIO_REQ_NULL;
@@ -865,7 +866,7 @@ int PIOc_put_varm_double_impl(int ncid, int varid, const PIO_Offset start[], con
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -877,7 +878,7 @@ int PIOc_put_varm_double_impl(int ncid, int varid, const PIO_Offset start[], con
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = nc_put_varm_double(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             }
             break;
@@ -892,7 +893,7 @@ int PIOc_put_varm_double_impl(int ncid, int varid, const PIO_Offset start[], con
             }
             request = vdesc->request+vdesc->nreqs;
 
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = ncmpi_bput_varm_double(file->fh, varid, start, count, stride, imap, op, request);;
             }else{
                 *request = PIO_REQ_NULL;
@@ -947,7 +948,7 @@ int PIOc_put_varm_schar_impl(int ncid, int varid, const PIO_Offset start[], cons
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -959,7 +960,7 @@ int PIOc_put_varm_schar_impl(int ncid, int varid, const PIO_Offset start[], cons
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = nc_put_varm_schar(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             }
             break;
@@ -974,7 +975,7 @@ int PIOc_put_varm_schar_impl(int ncid, int varid, const PIO_Offset start[], cons
             }
             request = vdesc->request+vdesc->nreqs;
 
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = ncmpi_bput_varm_schar(file->fh, varid, start, count, stride, imap, op, request);;
             }else{
                 *request = PIO_REQ_NULL;
@@ -1029,7 +1030,7 @@ int PIOc_put_varm_longlong_impl(int ncid, int varid, const PIO_Offset start[], c
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -1041,7 +1042,7 @@ int PIOc_put_varm_longlong_impl(int ncid, int varid, const PIO_Offset start[], c
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = nc_put_varm_longlong(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap, op);;
             }
             break;
@@ -1056,7 +1057,7 @@ int PIOc_put_varm_longlong_impl(int ncid, int varid, const PIO_Offset start[], c
             }
             request = vdesc->request+vdesc->nreqs;
 
-            if (ios->io_rank==0){
+            if (ios->io_comm_info->get_sync_io_comm_rank()==0){
                 ierr = ncmpi_bput_varm_longlong(file->fh, varid, start, count, stride, imap, op, request);;
             }else{
                 *request = PIO_REQ_NULL;
@@ -1111,7 +1112,7 @@ int PIOc_get_varm_uchar_impl(int ncid, int varid, const PIO_Offset start[], cons
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -1123,7 +1124,7 @@ int PIOc_get_varm_uchar_impl(int ncid, int varid, const PIO_Offset start[], cons
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
             bcast = true;
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = nc_get_varm_uchar(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             }
             break;
@@ -1132,7 +1133,7 @@ int PIOc_get_varm_uchar_impl(int ncid, int varid, const PIO_Offset start[], cons
         case PIO_IOTYPE_PNETCDF:
 #if defined(PNET_READ_AND_BCAST) && (PIO_USE_INDEP_MODE)
             ncmpi_begin_indep_data(file->fh);
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = ncmpi_get_varm_uchar(file->fh, varid, start, count, stride, imap,  buf);
             }
             ncmpi_end_indep_data(file->fh);
@@ -1152,8 +1153,8 @@ int PIOc_get_varm_uchar_impl(int ncid, int varid, const PIO_Offset start[], cons
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
 
     if (ios->async || bcast ||
-        (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        (ios->io_comm_info->get_sync_io_comm_sz() < ios->num_comptasks)){
+        MPI_Bcast(buf, ibufcnt, ibuftype, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1190,7 +1191,7 @@ int PIOc_get_varm_schar_impl(int ncid, int varid, const PIO_Offset start[], cons
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -1202,7 +1203,7 @@ int PIOc_get_varm_schar_impl(int ncid, int varid, const PIO_Offset start[], cons
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
             bcast = true;
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = nc_get_varm_schar(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             }
             break;
@@ -1211,7 +1212,7 @@ int PIOc_get_varm_schar_impl(int ncid, int varid, const PIO_Offset start[], cons
         case PIO_IOTYPE_PNETCDF:
 #if defined(PNET_READ_AND_BCAST) && (PIO_USE_INDEP_MODE)
             ncmpi_begin_indep_data(file->fh);
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = ncmpi_get_varm_schar(file->fh, varid, start, count, stride, imap,  buf);
             }
             ncmpi_end_indep_data(file->fh);
@@ -1231,8 +1232,8 @@ int PIOc_get_varm_schar_impl(int ncid, int varid, const PIO_Offset start[], cons
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
 
     if (ios->async || bcast ||
-        (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        (ios->io_comm_info->get_sync_io_comm_sz() < ios->num_comptasks)){
+        MPI_Bcast(buf, ibufcnt, ibuftype, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1269,7 +1270,7 @@ int PIOc_get_varm_double_impl(int ncid, int varid, const PIO_Offset start[], con
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -1281,7 +1282,7 @@ int PIOc_get_varm_double_impl(int ncid, int varid, const PIO_Offset start[], con
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
             bcast = true;
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = nc_get_varm_double(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             }
             break;
@@ -1290,7 +1291,7 @@ int PIOc_get_varm_double_impl(int ncid, int varid, const PIO_Offset start[], con
         case PIO_IOTYPE_PNETCDF:
 #if defined(PNET_READ_AND_BCAST) && (PIO_USE_INDEP_MODE)
             ncmpi_begin_indep_data(file->fh);
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = ncmpi_get_varm_double(file->fh, varid, start, count, stride, imap,  buf);
             }
             ncmpi_end_indep_data(file->fh);
@@ -1310,8 +1311,8 @@ int PIOc_get_varm_double_impl(int ncid, int varid, const PIO_Offset start[], con
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
 
     if (ios->async || bcast ||
-        (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        (ios->io_comm_info->get_sync_io_comm_sz() < ios->num_comptasks)){
+        MPI_Bcast(buf, ibufcnt, ibuftype, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1348,7 +1349,7 @@ int PIOc_get_varm_text_impl(int ncid, int varid, const PIO_Offset start[], const
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -1360,7 +1361,7 @@ int PIOc_get_varm_text_impl(int ncid, int varid, const PIO_Offset start[], const
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
             bcast = true;
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = nc_get_varm_text(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             }
             break;
@@ -1369,7 +1370,7 @@ int PIOc_get_varm_text_impl(int ncid, int varid, const PIO_Offset start[], const
         case PIO_IOTYPE_PNETCDF:
 #if defined(PNET_READ_AND_BCAST) && (PIO_USE_INDEP_MODE)
             ncmpi_begin_indep_data(file->fh);
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = ncmpi_get_varm_text(file->fh, varid, start, count, stride, imap,  buf);
             }
             ncmpi_end_indep_data(file->fh);
@@ -1389,8 +1390,8 @@ int PIOc_get_varm_text_impl(int ncid, int varid, const PIO_Offset start[], const
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
 
     if (ios->async || bcast ||
-        (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        (ios->io_comm_info->get_sync_io_comm_sz() < ios->num_comptasks)){
+        MPI_Bcast(buf, ibufcnt, ibuftype, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1427,7 +1428,7 @@ int PIOc_get_varm_int_impl(int ncid, int varid, const PIO_Offset start[], const 
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -1439,7 +1440,7 @@ int PIOc_get_varm_int_impl(int ncid, int varid, const PIO_Offset start[], const 
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
             bcast = true;
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = nc_get_varm_int(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             }
             break;
@@ -1448,7 +1449,7 @@ int PIOc_get_varm_int_impl(int ncid, int varid, const PIO_Offset start[], const 
         case PIO_IOTYPE_PNETCDF:
 #if defined(PNET_READ_AND_BCAST) && (PIO_USE_INDEP_MODE)
             ncmpi_begin_indep_data(file->fh);
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = ncmpi_get_varm_int(file->fh, varid, start, count, stride, imap,  buf);
             }
             ncmpi_end_indep_data(file->fh);
@@ -1468,8 +1469,8 @@ int PIOc_get_varm_int_impl(int ncid, int varid, const PIO_Offset start[], const 
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
 
     if (ios->async || bcast ||
-        (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        (ios->io_comm_info->get_sync_io_comm_sz() < ios->num_comptasks)){
+        MPI_Bcast(buf, ibufcnt, ibuftype, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1506,7 +1507,7 @@ int PIOc_get_varm_uint_impl(int ncid, int varid, const PIO_Offset start[], const
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -1518,7 +1519,7 @@ int PIOc_get_varm_uint_impl(int ncid, int varid, const PIO_Offset start[], const
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
             bcast = true;
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = nc_get_varm_uint(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             }
             break;
@@ -1527,7 +1528,7 @@ int PIOc_get_varm_uint_impl(int ncid, int varid, const PIO_Offset start[], const
         case PIO_IOTYPE_PNETCDF:
 #if defined(PNET_READ_AND_BCAST) && (PIO_USE_INDEP_MODE)
             ncmpi_begin_indep_data(file->fh);
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = ncmpi_get_varm_uint(file->fh, varid, start, count, stride, imap,  buf);
             }
             ncmpi_end_indep_data(file->fh);
@@ -1547,8 +1548,8 @@ int PIOc_get_varm_uint_impl(int ncid, int varid, const PIO_Offset start[], const
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
 
     if (ios->async || bcast ||
-        (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        (ios->io_comm_info->get_sync_io_comm_sz() < ios->num_comptasks)){
+        MPI_Bcast(buf, ibufcnt, ibuftype, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1580,7 +1581,7 @@ int PIOc_get_varm_impl(int ncid, int varid, const PIO_Offset start[], const PIO_
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -1592,7 +1593,7 @@ int PIOc_get_varm_impl(int ncid, int varid, const PIO_Offset start[], const PIO_
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
             bcast = true;
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = nc_get_varm(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,   buf);;
             }
             break;
@@ -1601,7 +1602,7 @@ int PIOc_get_varm_impl(int ncid, int varid, const PIO_Offset start[], const PIO_
         case PIO_IOTYPE_PNETCDF:
 #if defined(PNET_READ_AND_BCAST) && (PIO_USE_INDEP_MODE)
             ncmpi_begin_indep_data(file->fh);
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = ncmpi_get_varm(file->fh, varid, start, count, stride, imap, buf, bufcount, buftype);
             }
             ncmpi_end_indep_data(file->fh);
@@ -1621,8 +1622,8 @@ int PIOc_get_varm_impl(int ncid, int varid, const PIO_Offset start[], const PIO_
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
 
     if (ios->async || bcast ||
-        (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        (ios->io_comm_info->get_sync_io_comm_sz() < ios->num_comptasks)){
+        MPI_Bcast(buf, ibufcnt, ibuftype, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1659,7 +1660,7 @@ int PIOc_get_varm_float_impl(int ncid, int varid, const PIO_Offset start[], cons
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -1671,7 +1672,7 @@ int PIOc_get_varm_float_impl(int ncid, int varid, const PIO_Offset start[], cons
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
             bcast = true;
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = nc_get_varm_float(file->fh, varid,(size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             }
             break;
@@ -1680,7 +1681,7 @@ int PIOc_get_varm_float_impl(int ncid, int varid, const PIO_Offset start[], cons
         case PIO_IOTYPE_PNETCDF:
 #if defined(PNET_READ_AND_BCAST) && (PIO_USE_INDEP_MODE)
             ncmpi_begin_indep_data(file->fh);
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = ncmpi_get_varm_float(file->fh, varid, start, count, stride, imap,  buf);
             }
             ncmpi_end_indep_data(file->fh);
@@ -1700,8 +1701,8 @@ int PIOc_get_varm_float_impl(int ncid, int varid, const PIO_Offset start[], cons
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
 
     if (ios->async || bcast ||
-        (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        (ios->io_comm_info->get_sync_io_comm_sz() < ios->num_comptasks)){
+        MPI_Bcast(buf, ibufcnt, ibuftype, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1738,7 +1739,7 @@ int PIOc_get_varm_long_impl(int ncid, int varid, const PIO_Offset start[], const
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -1750,7 +1751,7 @@ int PIOc_get_varm_long_impl(int ncid, int varid, const PIO_Offset start[], const
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
             bcast = true;
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = nc_get_varm_long(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             }
             break;
@@ -1759,7 +1760,7 @@ int PIOc_get_varm_long_impl(int ncid, int varid, const PIO_Offset start[], const
         case PIO_IOTYPE_PNETCDF:
 #if defined(PNET_READ_AND_BCAST) && (PIO_USE_INDEP_MODE)
             ncmpi_begin_indep_data(file->fh);
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = ncmpi_get_varm_long(file->fh, varid, start, count, stride, imap,  buf);
             }
             ncmpi_end_indep_data(file->fh);
@@ -1779,8 +1780,8 @@ int PIOc_get_varm_long_impl(int ncid, int varid, const PIO_Offset start[], const
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
 
     if (ios->async || bcast ||
-        (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        (ios->io_comm_info->get_sync_io_comm_sz() < ios->num_comptasks)){
+        MPI_Bcast(buf, ibufcnt, ibuftype, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1817,7 +1818,7 @@ int PIOc_get_varm_ushort_impl(int ncid, int varid, const PIO_Offset start[], con
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -1829,7 +1830,7 @@ int PIOc_get_varm_ushort_impl(int ncid, int varid, const PIO_Offset start[], con
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
             bcast = true;
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = nc_get_varm_ushort(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             }
             break;
@@ -1838,7 +1839,7 @@ int PIOc_get_varm_ushort_impl(int ncid, int varid, const PIO_Offset start[], con
         case PIO_IOTYPE_PNETCDF:
 #if defined(PNET_READ_AND_BCAST) && (PIO_USE_INDEP_MODE)
             ncmpi_begin_indep_data(file->fh);
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = ncmpi_get_varm_ushort(file->fh, varid, start, count, stride, imap,  buf);
             }
             ncmpi_end_indep_data(file->fh);
@@ -1858,8 +1859,8 @@ int PIOc_get_varm_ushort_impl(int ncid, int varid, const PIO_Offset start[], con
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
 
     if (ios->async || bcast ||
-        (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        (ios->io_comm_info->get_sync_io_comm_sz() < ios->num_comptasks)){
+        MPI_Bcast(buf, ibufcnt, ibuftype, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1896,7 +1897,7 @@ int PIOc_get_varm_longlong_impl(int ncid, int varid, const PIO_Offset start[], c
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -1908,7 +1909,7 @@ int PIOc_get_varm_longlong_impl(int ncid, int varid, const PIO_Offset start[], c
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
             bcast = true;
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = nc_get_varm_longlong(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             }
             break;
@@ -1917,7 +1918,7 @@ int PIOc_get_varm_longlong_impl(int ncid, int varid, const PIO_Offset start[], c
         case PIO_IOTYPE_PNETCDF:
 #if defined(PNET_READ_AND_BCAST) && (PIO_USE_INDEP_MODE)
             ncmpi_begin_indep_data(file->fh);
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = ncmpi_get_varm_longlong(file->fh, varid, start, count, stride, imap,  buf);
             }
             ncmpi_end_indep_data(file->fh);
@@ -1937,8 +1938,8 @@ int PIOc_get_varm_longlong_impl(int ncid, int varid, const PIO_Offset start[], c
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
 
     if (ios->async || bcast ||
-        (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        (ios->io_comm_info->get_sync_io_comm_sz() < ios->num_comptasks)){
+        MPI_Bcast(buf, ibufcnt, ibuftype, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1975,7 +1976,7 @@ int PIOc_get_varm_short_impl(int ncid, int varid, const PIO_Offset start[], cons
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -1987,7 +1988,7 @@ int PIOc_get_varm_short_impl(int ncid, int varid, const PIO_Offset start[], cons
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
             bcast = true;
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = nc_get_varm_short(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             }
             break;
@@ -1996,7 +1997,7 @@ int PIOc_get_varm_short_impl(int ncid, int varid, const PIO_Offset start[], cons
         case PIO_IOTYPE_PNETCDF:
 #if defined(PNET_READ_AND_BCAST) && (PIO_USE_INDEP_MODE)
             ncmpi_begin_indep_data(file->fh);
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = ncmpi_get_varm_short(file->fh, varid, start, count, stride, imap,  buf);
             }
             ncmpi_end_indep_data(file->fh);
@@ -2016,8 +2017,8 @@ int PIOc_get_varm_short_impl(int ncid, int varid, const PIO_Offset start[], cons
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
 
     if (ios->async || bcast ||
-        (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        (ios->io_comm_info->get_sync_io_comm_sz() < ios->num_comptasks)){
+        MPI_Bcast(buf, ibufcnt, ibuftype, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -2054,7 +2055,7 @@ int PIOc_get_varm_ulonglong_impl(int ncid, int varid, const PIO_Offset start[], 
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
-    if (ios->ioproc){
+    if (ios->io_comm_info->is_sync_io_proc()){
         switch(file->iotype){
 #ifdef _NETCDF4
         case PIO_IOTYPE_NETCDF4P:
@@ -2066,7 +2067,7 @@ int PIOc_get_varm_ulonglong_impl(int ncid, int varid, const PIO_Offset start[], 
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
             bcast = true;
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = nc_get_varm_ulonglong(file->fh, varid, (size_t *) start, (size_t *) count, (ptrdiff_t *) stride, (ptrdiff_t *) imap,  buf);;
             }
             break;
@@ -2075,7 +2076,7 @@ int PIOc_get_varm_ulonglong_impl(int ncid, int varid, const PIO_Offset start[], 
         case PIO_IOTYPE_PNETCDF:
 #if defined(PNET_READ_AND_BCAST) && (PIO_USE_INDEP_MODE)
             ncmpi_begin_indep_data(file->fh);
-            if (ios->iomaster == MPI_ROOT){
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
                 ierr = ncmpi_get_varm_ulonglong(file->fh, varid, start, count, stride, imap,  buf);
             }
             ncmpi_end_indep_data(file->fh);
@@ -2095,8 +2096,8 @@ int PIOc_get_varm_ulonglong_impl(int ncid, int varid, const PIO_Offset start[], 
     ierr = check_netcdf(NULL, file, ierr, __FILE__,__LINE__);
 
     if (ios->async || bcast ||
-        (ios->num_iotasks < ios->num_comptasks)){
-        MPI_Bcast(buf, ibufcnt, ibuftype, ios->ioroot, ios->my_comm);
+        (ios->io_comm_info->get_sync_io_comm_sz() < ios->num_comptasks)){
+        MPI_Bcast(buf, ibufcnt, ibuftype, ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     }
 
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
