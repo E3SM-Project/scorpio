@@ -17,6 +17,7 @@
 #include "spio_tracer_mdata.hpp"
 #include "spio_tracer_decomp.hpp"
 #include "spio_logger.hpp"
+#include "spio_iosys_utils.hpp"
 
 namespace SPIO_Util{
   namespace Tracer{
