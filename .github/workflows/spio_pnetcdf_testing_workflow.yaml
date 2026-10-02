@@ -14,8 +14,13 @@ on:  # yamllint disable-line rule:truthy
     inputs:
       branch_name:
         description: 'Branch to run the SCORPIO + PnetCDF tests'
-        required: true
         type: string
+        required: true
+      checkout_repo:
+        description: 'Flag to signal if a checkout is required (default: true)'
+        type: boolean
+        required: false
+        default: true
 
 jobs:
   build_and_test:
@@ -23,6 +28,7 @@ jobs:
 
     steps:
       - name: Checkout repository
+        if: ${{ inputs.checkout_repo }} # Check out repo iff checkout_repo == true
         uses: actions/checkout@v4
 
       - name: Setup Miniconda
