@@ -29,6 +29,10 @@ on:  # yamllint disable-line rule:truthy
       - 'copilot/**'
 
 jobs:
+  call_spio_actionlint_testing_workflow:
+    uses: ./.github/workflows/spio_lint_workflow.yaml
+    with:
+      branch_name: ${{ github.ref_name }}
   call_spio_pnetcdf_testing_workflow:
     uses: ./.github/workflows/spio_pnetcdf_testing_workflow.yaml
     with:
