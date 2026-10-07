@@ -17,16 +17,20 @@ on:  # yamllint disable-line rule:truthy
         required: true
 
 jobs:
-  build_and_test:
+  actionlint:
+    name: 'Checkout and run actionlint'
     runs-on: ubuntu-latest  # Or other suitable runner
 
     steps:
+      # Actionlint requires newer Node.js (the default one throws errors)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Or '18', '22'
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Run actionlint
-        uses: raven-actions/actionlint@v1
+        uses: raven-actions/actionlint@v2
         with:
-          # Optional configurations:
-          shellcheck: true # Lints inline bash scripts
-          pyflakes: true   # Lints inline python scripts
+          fail-on-error: true
