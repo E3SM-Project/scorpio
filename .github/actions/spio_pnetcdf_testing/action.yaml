@@ -40,7 +40,7 @@ runs:
       with:
         python-version: 3.9  # Specify your desired Python version
         channels: conda-forge,defaults  # Specify your desired channels
-        auto-activate-base: false  # Prevent auto-activation of base env
+        auto-activate: false  # Prevent auto-activation of base env
 
     - name: Create and activate Conda environment
       if: ${{ inputs.install_sw == 'true' }} # Setup conda + dependencies iff install_sw == true

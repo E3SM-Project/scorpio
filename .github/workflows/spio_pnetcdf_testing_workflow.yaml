@@ -36,7 +36,7 @@ jobs:
         with:
           python-version: 3.9  # Specify your desired Python version
           channels: conda-forge,defaults  # Specify your desired channels
-          auto-activate-base: false  # Prevent auto-activation of base env
+          auto-activate: false  # Prevent auto-activation of base env
 
       - name: Create and activate Conda environment
         shell: bash -l {0}  # Use bash -l to ensure conda commands are available
