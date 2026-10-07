@@ -230,9 +230,6 @@ struct iosystem_desc_t;
  *
  * Contains all information for data rearrangement when reading or
  * writing data.
- * This struct is currently unused.
- * It is a copy of most of the members in io_desc_t and will
- * replace these members in future.
  */
 struct io_desc_info_t
 {
@@ -383,135 +380,17 @@ struct io_desc_t
     /** The ID of this io_desc_t. */
     int ioid;
 
-    /** The length of the decomposition map. */
-    int maplen;
+    /* I/O decomposition info for synchronous reads/writes */
+    io_desc_info_t sync_io_desc_info;
 
-    /** A 1-D array with iodesc->maplen elements, which are the
-     * 1-based mappings to the global array for that task. */
-    PIO_Offset *map;
-
-    /** Number of tasks involved in the communication between comp and
-     * io tasks. */
-    int nrecvs;
-
-    /** Local size of the decomposition array on the compute node. */
-    int ndof;
-
-    /** All vars included in this io_desc_t have the same number of
-     * dimensions. */
-    int ndims;
-
-    /** An array of size ndims with the length of each dimension. */
-    int *dimlen;
-
-    /** The actual number of IO tasks participating. */
-    int num_aiotasks;
-
-    /** The rearranger in use for this variable. */
-    int rearranger;
-
-    /** Maximum number of regions in the decomposition. */
-    int maxregions;
-
-    /** Does this decomp leave holes in the field (true) or write
-     * everywhere (false) */
-    bool needsfill;
-
-    /** The maximum number of bytes of this iodesc before flushing. */
-    int maxbytes;
-
-    /** The PIO type of the data. */
-    int piotype;
-
-    /** The size of one element of the piotype. */
-    int piotype_size;
-
-    /** The MPI type of the data. */
-    MPI_Datatype mpitype;
-
-    /** The size in bytes of a datum of MPI type mpitype. */
-    int mpitype_size;
-
-    /** Length of the iobuffer on this task for a single field on the
-     * IO node. The arrays from compute nodes gathered and rearranged
-     * to the io-nodes (which are sometimes collocated with compute
-     * nodes), each io task contains data from the compmap of one or
-     * more compute tasks in the iomap array. */
-    PIO_Offset llen;
-
-    /** Maximum llen participating. */
-    PIO_Offset maxiobuflen;
-
-    /** Array (length nrecvs) of computation tasks received from. */
-    int *rfrom;
-
-    /** Array (length nrecvs) of counts of data to be received from
-     * each computation task by the IO tasks. */
-    int *rcount;
-
-    /** Array (length numiotasks) of data counts to send to each task
-     * in the communication in pio_swapm(). */
-    int *scount;
-
-    /** Array (length ndof) for the BOX rearranger with the index
-     * for computation taks (send side during writes). */
-    PIO_Offset *sindex;
-
-    /** Index for the IO tasks (receive side during writes). */
-    PIO_Offset *rindex;
-
-    /** Array (of length nrecvs) of receive MPI types in pio_swapm() call. */
-    MPI_Datatype *rtype;
-
-    /** Array of send MPI types in pio_swapm() call. */
-    MPI_Datatype *stype;
-
-    /** Number of send MPI types in pio_swapm() call. */
-    int num_stypes;
-
-    /** Used when writing fill data. */
-    int holegridsize;
-
-    /** max holegridsize across all io tasks, needed for netcdf and netcdf4c serial */
-    int maxholegridsize;
-
-    /** Used when writing fill data. */
-    int maxfillregions;
-
-    /** Linked list of regions. */
-    io_region *firstregion;
-
-    /** Used when writing fill data. */
-    io_region *fillregion;
-
-    /** Rearranger flow control options
-     *  (handshake, non-blocking sends, pending requests)
-     */
-    rearr_opt_t rearr_opts;
-
-    /** In the subset communicator each io task is associated with a
-     * unique group of comp tasks this is the communicator for that
-     * group. */
-    MPI_Comm subset_comm;
-
-    /* Indicates whether this iodesc has been saved to disk (the
-     * decomposition is dumped to disk)
-     */
-    bool is_saved;
-
-    /* FIXME: Once we have classes for subset/box this ptr should be to a base rearr class */
-    SPIO::DataRearr::Contig_rearr *rearr;
+    /* I/O decomposition info for asynchronous writes. Currently not implemented (NULL) */
+    io_desc_info_t *async_io_desc_info;
 
     /* Number of pending async ops using this I/O desc */
     std::atomic_int nasync_pend_ops;
 
     io_desc_t(iosystem_desc_t *ios, int piotype, int ndims, const int *gdimlen,
               int maplen, const PIO_Offset *compmap, int rearranger, bool map_zero_based);
-    void init_map(int maplen, const PIO_Offset *compmap, int rearranger, bool map_zero_based);
-    void free_region_list(io_region *phead);
-    void free_all_regions(void );
-    void free_mpi_types(MPI_Datatype *ptypes, int ntypes);
-    void free_all_mpi_types(void );
     ~io_desc_t();
 };
 
