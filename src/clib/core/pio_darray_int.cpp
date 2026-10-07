@@ -181,9 +181,9 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
     pioassert(file && file->iosystem && varids && varids[0] >= 0 && varids[0] <= PIO_MAX_VARS &&
               iodesc, "invalid input", __FILE__, __LINE__);
 
-    LOG((1, "write_darray_multi_par nvars = %d iodesc->ndims = %d iodesc->mpitype = %d "
-         "iodesc->maxregions = %d iodesc->llen = %d", nvars, iodesc->ndims,
-         iodesc->mpitype, iodesc->maxregions, iodesc->llen));
+    LOG((1, "write_darray_multi_par nvars = %d iodesc->sync_io_desc_info.ndims = %d iodesc->sync_io_desc_info.mpitype = %d "
+         "iodesc->sync_io_desc_info.maxregions = %d iodesc->sync_io_desc_info.llen = %d", nvars, iodesc->sync_io_desc_info.ndims,
+         iodesc->sync_io_desc_info.mpitype, iodesc->sync_io_desc_info.maxregions, iodesc->sync_io_desc_info.llen));
 
     /* Start timing this function. */
     GPTLstart("PIO:write_darray_multi_par");
@@ -195,9 +195,9 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
     vdesc = file->varlist + varids[0];
 
     /* Set these differently for data and fill writing. */
-    int num_regions = fill ? iodesc->maxfillregions: iodesc->maxregions;
-    io_region *region = fill ? iodesc->fillregion : iodesc->firstregion;
-    PIO_Offset llen = fill ? iodesc->holegridsize : iodesc->llen;
+    int num_regions = fill ? iodesc->sync_io_desc_info.maxfillregions: iodesc->sync_io_desc_info.maxregions;
+    io_region *region = fill ? iodesc->sync_io_desc_info.fillregion : iodesc->sync_io_desc_info.firstregion;
+    PIO_Offset llen = fill ? iodesc->sync_io_desc_info.holegridsize : iodesc->sync_io_desc_info.llen;
     void *iobuf = fill ? vdesc->fillbuf : spio_file_mvcache_get(file, iodesc->ioid);
 
     /* If this is an IO task write the data. */
@@ -234,7 +234,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
         for (int regioncnt = 0; regioncnt < num_regions; regioncnt++)
         {
             /* Fill the start/count arrays. */
-            if ((ierr = spio_find_start_count(iodesc->ndims, iodesc->dimlen, fndims, vdesc, region, start, count)))
+            if ((ierr = spio_find_start_count(iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen, fndims, vdesc, region, start, count)))
             {
                 ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
                                 "Writing variables (number of variables = %d) to file (%s, ncid=%d) failed. Internal error, finding start/count for the I/O regions written out from the I/O process failed", nvars, pio_get_fname_from_file(file), file->pio_ncid);
@@ -256,7 +256,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
 
                     /* If there is data for this region, get a pointer to it. */
                     if (region)
-                        bufptr = (void *)((char *)iobuf + iodesc->mpitype_size * (nv * llen + region->loffset));
+                        bufptr = (void *)((char *)iobuf + iodesc->sync_io_desc_info.mpitype_size * (nv * llen + region->loffset));
 
                     /* Ensure collective access. */
                     ierr = nc_var_par_access(file->fh, varids[nv], NC_COLLECTIVE);
@@ -267,7 +267,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                         break;
                     }
 
-                    switch (iodesc->piotype)
+                    switch (iodesc->sync_io_desc_info.piotype)
                     {
                     case PIO_BYTE:
                         ierr = nc_put_vara_schar(file->fh, varids[nv], start, count, (signed char*)bufptr);
@@ -307,7 +307,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                         break;
                     default:
                         ierr = pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
-                                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using %s iotype failed. Unsupported variable data type (type=%d)", nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype), iodesc->piotype);
+                                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using %s iotype failed. Unsupported variable data type (type=%d)", nvars, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype), iodesc->sync_io_desc_info.piotype);
                         break;
                     }
                     if(ierr != NC_NOERR)
@@ -374,7 +374,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                                 startlist[rc][0] = frame[nv];
 
                         /* Get a pointer to the data. */
-                        bufptr = (void *)((char *)iobuf + nv * iodesc->mpitype_size * llen);
+                        bufptr = (void *)((char *)iobuf + nv * iodesc->sync_io_desc_info.mpitype_size * llen);
 
                         if (vdesc->nreqs % PIO_REQUEST_ALLOC_CHUNK == 0)
                         {
@@ -409,7 +409,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                         LOG((3, "about to call ncmpi_iput_varn() varids[%d] = %d rrcnt = %d, llen = %d",
                              nv, varids[nv], rrcnt, llen));
                         ierr = ncmpi_iput_varn(file->fh, varids[nv], rrcnt, startlist, countlist,
-                                               bufptr, llen, iodesc->mpitype, vdesc->request + vdesc->nreqs);
+                                               bufptr, llen, iodesc->sync_io_desc_info.mpitype, vdesc->request + vdesc->nreqs);
                         if (ierr != PIO_NOERR)
                         {
                             LOG((3, "ERROR: ncmpi_iput_varn() FAILED: iodesc = %s", SPIO_Util::Dbg_Util::get_iodesc_info(iodesc).c_str()));
@@ -421,7 +421,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                         /* PIO_REQ_NULL == NC_REQ_NULL */
                         if (vdesc->request[vdesc->nreqs] != PIO_REQ_NULL)
                         {
-                            vdesc->request_sz[vdesc->nreqs] = llen * iodesc->mpitype_size;
+                            vdesc->request_sz[vdesc->nreqs] = llen * iodesc->sync_io_desc_info.mpitype_size;
                         }
 
                         /* Ensure that we increment the number of requests
@@ -542,7 +542,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                             }
 
                             /* Get a pointer to the data. */
-                            bufptr = (void *)((char *)iobuf + nv * iodesc->mpitype_size * llen);
+                            bufptr = (void *)((char *)iobuf + nv * iodesc->sync_io_desc_info.mpitype_size * llen);
                         }
                         else
                         {
@@ -568,13 +568,13 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                         }
 
                         /* Collective write */
-                        hid_t mem_type_id = spio_nc_type_to_hdf5_type(iodesc->piotype);
+                        hid_t mem_type_id = spio_nc_type_to_hdf5_type(iodesc->sync_io_desc_info.piotype);
                         if (mem_type_id == H5I_INVALID_HID)
                         {
                             return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                                            "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                                            "Unsupported memory type (type=%x) for variable (%s, varid=%d)",
-                                           nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
+                                           nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->sync_io_desc_info.piotype, pio_get_vname_from_file(file, varids[nv]), varids[nv]);
                         }
 
                         hid_t file_var_type_id = H5Dget_type(file->hdf5_vars[varids[nv]].hdf5_dataset_id);
@@ -596,13 +596,13 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                         void *wbuf = bufptr;
                         if((dsize_all > 0) && !H5Tequal(mem_type_id, file_var_ntype_id)){
                           assert(file->dt_converter);
-                          wbuf = static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->convert(iodesc->ioid, bufptr, iodesc->mpitype_size * dsize_all,
-                                  iodesc->piotype, spio_hdf5_type_to_pio_type(file_var_ntype_id));
+                          wbuf = static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->convert(iodesc->ioid, bufptr, iodesc->sync_io_desc_info.mpitype_size * dsize_all,
+                                  iodesc->sync_io_desc_info.piotype, spio_hdf5_type_to_pio_type(file_var_ntype_id));
                           if(wbuf == NULL){
                             return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                                            "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                                            "Unable to convert the type (from %d to %d) of variable (%s, varid=%d)",
-                                           nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype,
+                                           nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->sync_io_desc_info.piotype,
                                            spio_hdf5_type_to_pio_type(file_var_ntype_id), pio_get_vname_from_file(file, varids[nv]), varids[nv]);
                           }
                         }
@@ -817,7 +817,7 @@ int send_all_start_count(iosystem_desc_t *ios, io_desc_t *iodesc, PIO_Offset lle
         if ((mpierr = MPI_Send(tmp_count, maxregions * fndims, MPI_OFFSET, 0,
                                ios->io_comm_info->get_sync_io_comm_rank() + 3 * ios->io_comm_info->get_sync_io_comm_sz(), ios->io_comm_info->get_sync_io_comm())))
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
-        if ((mpierr = MPI_Send(iobuf, nvars * llen, iodesc->mpitype, 0,
+        if ((mpierr = MPI_Send(iobuf, nvars * llen, iodesc->sync_io_desc_info.mpitype, 0,
                                ios->io_comm_info->get_sync_io_comm_rank() + 4 * ios->io_comm_info->get_sync_io_comm_sz(), ios->io_comm_info->get_sync_io_comm())))
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
         LOG((3, "sent data for maxregions = %d", maxregions));
@@ -917,7 +917,7 @@ int recv_and_write_data(file_desc_t *file, const int *varids, const int *frame,
                 if ((mpierr = MPI_Recv(tmp_count, rregions * fndims, MPI_OFFSET, rtask,
                                        rtask + 3 * ios->io_comm_info->get_sync_io_comm_sz(), ios->io_comm_info->get_sync_io_comm(), &status)))
                     return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
-                if ((mpierr = MPI_Recv(iobuf, nvars * rlen, iodesc->mpitype, rtask,
+                if ((mpierr = MPI_Recv(iobuf, nvars * rlen, iodesc->sync_io_desc_info.mpitype, rtask,
                                        rtask + 4 * ios->io_comm_info->get_sync_io_comm_sz(), ios->io_comm_info->get_sync_io_comm(), &status)))
                     return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
                 LOG((3, "received data rregions = %d fndims = %d", rregions, fndims));
@@ -954,7 +954,7 @@ int recv_and_write_data(file_desc_t *file, const int *varids, const int *frame,
                     vdesc = file->varlist + varids[nv];
 
                     /* Get a pointer to the correct part of the buffer. */
-                    bufptr = (void *)((char *)iobuf + iodesc->mpitype_size * (nv * rlen + loffset));
+                    bufptr = (void *)((char *)iobuf + iodesc->sync_io_desc_info.mpitype_size * (nv * rlen + loffset));
 
                     /* If this var has a record dim, set
                      * the start on that dim to the frame
@@ -973,7 +973,7 @@ int recv_and_write_data(file_desc_t *file, const int *varids, const int *frame,
                     if ((ierr = nc_put_vara(file->fh, varids[nv], start, count, bufptr)))
                         return check_netcdf(ios, NULL, ierr, __FILE__, __LINE__);
                     */
-                    switch (iodesc->piotype)
+                    switch (iodesc->sync_io_desc_info.piotype)
                     {
 #ifdef _NETCDF
                     case PIO_BYTE:
@@ -1018,7 +1018,7 @@ int recv_and_write_data(file_desc_t *file, const int *varids, const int *frame,
                     default:
                         ierr = pio_err(ios, file, PIO_EBADTYPE,
                                         __FILE__, __LINE__,
-                                        "Writing multiple variables (number of variables = %d) to file (%s, ncid=%d) using serial I/O failed. Unsupported variable type (type = %d)", nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype);
+                                        "Writing multiple variables (number of variables = %d) to file (%s, ncid=%d) using serial I/O failed. Unsupported variable type (type = %d)", nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->sync_io_desc_info.piotype);
                         break;
                     }
                     if(ierr != PIO_NOERR){
@@ -1074,8 +1074,8 @@ int write_darray_multi_serial(file_desc_t *file, int nvars, int fndims, const in
     pioassert(file && file->iosystem && varids && varids[0] >= 0 &&
               varids[0] <= PIO_MAX_VARS && iodesc, "invalid input", __FILE__, __LINE__);
 
-    LOG((1, "write_darray_multi_serial nvars = %d fndims = %d iodesc->ndims = %d "
-         "iodesc->mpitype = %d", nvars, iodesc->ndims, fndims, iodesc->mpitype));
+    LOG((1, "write_darray_multi_serial nvars = %d fndims = %d iodesc->sync_io_desc_info.ndims = %d "
+         "iodesc->sync_io_desc_info.mpitype = %d", nvars, iodesc->sync_io_desc_info.ndims, fndims, iodesc->sync_io_desc_info.mpitype));
 
     /* Get the iosystem info. */
     ios = file->iosystem;
@@ -1087,9 +1087,9 @@ int write_darray_multi_serial(file_desc_t *file, int nvars, int fndims, const in
 
     /* Set these differently for data and fill writing. iobuf may be
      * null if array size < number of nodes. */
-    int num_regions = fill ? iodesc->maxfillregions: iodesc->maxregions;
-    io_region *region = fill ? iodesc->fillregion : iodesc->firstregion;
-    PIO_Offset llen = fill ? iodesc->holegridsize : iodesc->llen;
+    int num_regions = fill ? iodesc->sync_io_desc_info.maxfillregions: iodesc->sync_io_desc_info.maxregions;
+    io_region *region = fill ? iodesc->sync_io_desc_info.fillregion : iodesc->sync_io_desc_info.firstregion;
+    PIO_Offset llen = fill ? iodesc->sync_io_desc_info.holegridsize : iodesc->sync_io_desc_info.llen;
     void *iobuf = fill ? vdesc->fillbuf : spio_file_mvcache_get(file, iodesc->ioid);
 
     /* Start timing this function. */
@@ -1105,7 +1105,7 @@ int write_darray_multi_serial(file_desc_t *file, int nvars, int fndims, const in
 
         /* Fill the tmp_start and tmp_count arrays, which contain the
          * start and count arrays for all regions. */
-        if ((ierr = find_all_start_count(region, num_regions, fndims, iodesc->ndims, iodesc->dimlen, vdesc,
+        if ((ierr = find_all_start_count(region, num_regions, fndims, iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen, vdesc,
                                          tmp_start, tmp_count)))
         {
             ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -1193,7 +1193,7 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
     vdesc = file->varlist + vid;
 
     /* Get the number of dimensions in the decomposition. */
-    ndims = iodesc->ndims;
+    ndims = iodesc->sync_io_desc_info.ndims;
 
     /* IO procs will actially read the data. */
     if (ios->io_comm_info->is_sync_io_proc())
@@ -1204,13 +1204,13 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
         size_t tmp_bufsize = 1;
         void *bufptr;
         int rrlen = 0;
-        PIO_Offset *startlist[iodesc->maxregions];
-        PIO_Offset *countlist[iodesc->maxregions];
+        PIO_Offset *startlist[iodesc->sync_io_desc_info.maxregions];
+        PIO_Offset *countlist[iodesc->sync_io_desc_info.maxregions];
 
         /* buffer is incremented by byte and loffset is in terms of
            the iodessc->mpitype so we need to multiply by the size of
            the mpitype. */
-        region = iodesc->firstregion;
+        region = iodesc->sync_io_desc_info.firstregion;
 
         /* This is a record (or quasi-record) var. If the record
            number has not been set yet, set it to 0 by default */
@@ -1221,10 +1221,10 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
         }
 
         /* For each regions, read the data. */
-        for (int regioncnt = 0; regioncnt < iodesc->maxregions; regioncnt++)
+        for (int regioncnt = 0; regioncnt < iodesc->sync_io_desc_info.maxregions; regioncnt++)
         {
             tmp_bufsize = 1;
-            if (region == NULL || iodesc->llen == 0)
+            if (region == NULL || iodesc->sync_io_desc_info.llen == 0)
             {
                 /* No data for this region. */
                 for (int i = 0; i < fndims; i++)
@@ -1240,9 +1240,9 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
                 if (regioncnt == 0 || region == NULL)
                     bufptr = iobuf;
                 else
-                    bufptr=(void *)((char *)iobuf + iodesc->mpitype_size * region->loffset);
+                    bufptr=(void *)((char *)iobuf + iodesc->sync_io_desc_info.mpitype_size * region->loffset);
 
-                LOG((2, "%d %d %d", iodesc->llen - region->loffset, iodesc->llen, region->loffset));
+                LOG((2, "%d %d %d", iodesc->sync_io_desc_info.llen - region->loffset, iodesc->sync_io_desc_info.llen, region->loffset));
 
                 /* Allow extra outermost dimensions in the decomposition */
                 int num_extra_dims = (vdesc->record >= 0 && fndims > 1)? (ndims - (fndims - 1)) : (ndims - fndims);
@@ -1250,7 +1250,7 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
                 if (num_extra_dims > 0)
                 {
                     for (int d = 0; d < num_extra_dims; d++)
-                        pioassert(iodesc->dimlen[d] == 1, "Extra outermost dimensions must have lengths of 1",
+                        pioassert(iodesc->sync_io_desc_info.dimlen[d] == 1, "Extra outermost dimensions must have lengths of 1",
                                   __FILE__, __LINE__);
                 }
 
@@ -1289,7 +1289,7 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
             case PIO_IOTYPE_NETCDF4P:
             case PIO_IOTYPE_NETCDF4P_NCZARR:
                 /* ierr = nc_get_vara(file->fh, vid, start, count, bufptr); */
-                switch (iodesc->piotype)
+                switch (iodesc->sync_io_desc_info.piotype)
                 {
                 case PIO_BYTE:
                     ierr = nc_get_vara_schar(file->fh, vid, start, count, (signed char*)bufptr);
@@ -1355,15 +1355,15 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
                 }
 
                 /* Is this is the last region to process? */
-                if (regioncnt == iodesc->maxregions - 1)
+                if (regioncnt == iodesc->sync_io_desc_info.maxregions - 1)
                 {
                     /* Read a list of subarrays. */
                     ierr = ncmpi_get_varn_all(file->fh, vid, rrlen, startlist,
-                                              countlist, iobuf, iodesc->llen, iodesc->mpitype);
+                                              countlist, iobuf, iodesc->sync_io_desc_info.llen, iodesc->sync_io_desc_info.mpitype);
                     if(ierr != PIO_NOERR)
                     {
                         ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
-                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with PIO_IOTYPE_PNETCDF iotype. The low level (PnetCDF) I/O library call failed to read the variable (Number of regions = %d, iodesc id = %d, Bytes to read on this process = %llu)", pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid, rrlen, iodesc->ioid, (unsigned long long int) iodesc->llen);
+                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with PIO_IOTYPE_PNETCDF iotype. The low level (PnetCDF) I/O library call failed to read the variable (Number of regions = %d, iodesc id = %d, Bytes to read on this process = %llu)", pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid, rrlen, iodesc->ioid, (unsigned long long int) iodesc->sync_io_desc_info.llen);
                         break;
                     }
 
@@ -1449,22 +1449,22 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
     vdesc = file->varlist + vid;
 
     /* Get the number of dims in our decomposition. */
-    ndims = iodesc->ndims;
+    ndims = iodesc->sync_io_desc_info.ndims;
 
     if (ios->io_comm_info->is_sync_io_proc())
     {
         io_region *region;
         size_t start[fndims];
         size_t count[fndims];
-        size_t tmp_start[fndims * iodesc->maxregions];
-        size_t tmp_count[fndims * iodesc->maxregions];
+        size_t tmp_start[fndims * iodesc->sync_io_desc_info.maxregions];
+        size_t tmp_count[fndims * iodesc->sync_io_desc_info.maxregions];
         size_t tmp_bufsize;
         void *bufptr;
 
         /* buffer is incremented by byte and loffset is in terms of
            the iodessc->mpitype so we need to multiply by the size of
            the mpitype. */
-        region = iodesc->firstregion;
+        region = iodesc->sync_io_desc_info.firstregion;
 
         /* This is a record (or quasi-record) var. If the record
            number has not been set yet, set it to 0 by default */
@@ -1475,9 +1475,9 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
         }
 
         /* Put together start/count arrays for all regions. */
-        for (int regioncnt = 0; regioncnt < iodesc->maxregions; regioncnt++)
+        for (int regioncnt = 0; regioncnt < iodesc->sync_io_desc_info.maxregions; regioncnt++)
         {
-            if (!region || iodesc->llen == 0)
+            if (!region || iodesc->sync_io_desc_info.llen == 0)
             {
                 /* Nothing to write for this region. */
                 for (int i = 0; i < fndims; i++)
@@ -1495,7 +1495,7 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
                 if (num_extra_dims > 0)
                 {
                     for (int d = 0; d < num_extra_dims; d++)
-                        pioassert(iodesc->dimlen[d] == 1, "Extra outermost dimensions must have lengths of 1",
+                        pioassert(iodesc->sync_io_desc_info.dimlen[d] == 1, "Extra outermost dimensions must have lengths of 1",
                                   __FILE__, __LINE__);
                 }
 
@@ -1543,42 +1543,42 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
          * IO task 0. */
         if (ios->io_comm_info->get_sync_io_comm_rank() > 0)
         {
-            if ((mpierr = MPI_Send(&iodesc->llen, 1, MPI_OFFSET, 0, ios->io_comm_info->get_sync_io_comm_rank(), ios->io_comm_info->get_sync_io_comm())))
+            if ((mpierr = MPI_Send(&iodesc->sync_io_desc_info.llen, 1, MPI_OFFSET, 0, ios->io_comm_info->get_sync_io_comm_rank(), ios->io_comm_info->get_sync_io_comm())))
             {
                 GPTLstop("PIO:read_darray_nc_serial");
                 return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
             }
-            LOG((3, "sent iodesc->llen = %d", iodesc->llen));
+            LOG((3, "sent iodesc->sync_io_desc_info.llen = %d", iodesc->sync_io_desc_info.llen));
 
-            if (iodesc->llen > 0)
+            if (iodesc->sync_io_desc_info.llen > 0)
             {
-                if ((mpierr = MPI_Send(&(iodesc->maxregions), 1, MPI_INT, 0,
+                if ((mpierr = MPI_Send(&(iodesc->sync_io_desc_info.maxregions), 1, MPI_INT, 0,
                                        ios->io_comm_info->get_sync_io_comm_sz() + ios->io_comm_info->get_sync_io_comm_rank(), ios->io_comm_info->get_sync_io_comm())))
                 {
                     GPTLstop("PIO:read_darray_nc_serial");
                     return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
                 }
-                if ((mpierr = MPI_Send(tmp_count, iodesc->maxregions * fndims, MPI_OFFSET, 0,
+                if ((mpierr = MPI_Send(tmp_count, iodesc->sync_io_desc_info.maxregions * fndims, MPI_OFFSET, 0,
                                        2 * ios->io_comm_info->get_sync_io_comm_sz() + ios->io_comm_info->get_sync_io_comm_rank(), ios->io_comm_info->get_sync_io_comm())))
                 {
                     GPTLstop("PIO:read_darray_nc_serial");
                     return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
                 }
-                if ((mpierr = MPI_Send(tmp_start, iodesc->maxregions * fndims, MPI_OFFSET, 0,
+                if ((mpierr = MPI_Send(tmp_start, iodesc->sync_io_desc_info.maxregions * fndims, MPI_OFFSET, 0,
                                        3 * ios->io_comm_info->get_sync_io_comm_sz() + ios->io_comm_info->get_sync_io_comm_rank(), ios->io_comm_info->get_sync_io_comm())))
                 {
                     GPTLstop("PIO:read_darray_nc_serial");
                     return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
                 }
-                LOG((3, "sent iodesc->maxregions = %d tmp_count and tmp_start arrays", iodesc->maxregions));
+                LOG((3, "sent iodesc->sync_io_desc_info.maxregions = %d tmp_count and tmp_start arrays", iodesc->sync_io_desc_info.maxregions));
 
-                if ((mpierr = MPI_Recv(iobuf, iodesc->llen, iodesc->mpitype, 0,
+                if ((mpierr = MPI_Recv(iobuf, iodesc->sync_io_desc_info.llen, iodesc->sync_io_desc_info.mpitype, 0,
                                        4 * ios->io_comm_info->get_sync_io_comm_sz() + ios->io_comm_info->get_sync_io_comm_rank(), ios->io_comm_info->get_sync_io_comm(), &status)))
                 {
                     GPTLstop("PIO:read_darray_nc_serial");
                     return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
                 }
-                LOG((3, "received %d elements of data", iodesc->llen));
+                LOG((3, "received %d elements of data", iodesc->sync_io_desc_info.llen));
             }
         }
         else if (ios->io_comm_info->get_sync_io_comm_rank() == 0)
@@ -1587,8 +1587,8 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
              * other IO tasks. */
             int maxregions = 0;
             size_t loffset, regionsize;
-            size_t this_start[fndims * iodesc->maxregions];
-            size_t this_count[fndims * iodesc->maxregions];
+            size_t this_start[fndims * iodesc->sync_io_desc_info.maxregions];
+            size_t this_count[fndims * iodesc->sync_io_desc_info.maxregions];
 
             for (int rtask = 1; rtask <= ios->io_comm_info->get_sync_io_comm_sz(); rtask++)
             {
@@ -1626,8 +1626,8 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
                 }
                 else
                 {
-                    maxregions = iodesc->maxregions;
-                    tmp_bufsize = iodesc->llen;
+                    maxregions = iodesc->sync_io_desc_info.maxregions;
+                    tmp_bufsize = iodesc->sync_io_desc_info.llen;
                 }
                 LOG((3, "maxregions = %d tmp_bufsize = %d", maxregions, tmp_bufsize));
 
@@ -1636,7 +1636,7 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
                 for (int regioncnt = 0; regioncnt < maxregions; regioncnt++)
                 {
                     /* Get pointer where data should go. */
-                    bufptr = (void *)((char *)iobuf + iodesc->mpitype_size * loffset);
+                    bufptr = (void *)((char *)iobuf + iodesc->sync_io_desc_info.mpitype_size * loffset);
                     regionsize = 1;
 
                     /* ??? */
@@ -1662,7 +1662,7 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
 
                     /* Read the data. */
                     /* ierr = nc_get_vara(file->fh, vid, start, count, bufptr); */
-                    switch (iodesc->piotype)
+                    switch (iodesc->sync_io_desc_info.piotype)
                     {
 #ifdef _NETCDF
                     case PIO_BYTE:
@@ -1706,7 +1706,7 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
 #endif /* _NETCDF4 */
                     default:
                         ierr = pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
-                                        "Reading variable (%s, varid=%d) from file (%s, ncid=%d) with serial I/O failed. Unsupported variable type (iotype=%d)", pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype);
+                                        "Reading variable (%s, varid=%d) from file (%s, ncid=%d) with serial I/O failed. Unsupported variable type (iotype=%d)", pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid, iodesc->sync_io_desc_info.piotype);
                         break;
                     }
 
@@ -1724,7 +1724,7 @@ int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, 
                  * ios->io_comm_info->get_sync_io_comm_sz() is the number of iotasks actually
                  * used in this decomposition. */
                 if (rtask < ios->io_comm_info->get_sync_io_comm_sz() && tmp_bufsize > 0)
-                    if ((mpierr = MPI_Send(iobuf, tmp_bufsize, iodesc->mpitype, rtask,
+                    if ((mpierr = MPI_Send(iobuf, tmp_bufsize, iodesc->sync_io_desc_info.mpitype, rtask,
                                            4 * ios->io_comm_info->get_sync_io_comm_sz() + rtask, ios->io_comm_info->get_sync_io_comm())))
                     {
                         GPTLstop("PIO:read_darray_nc_serial");
@@ -2529,16 +2529,16 @@ int compute_maxaggregate_bytes(iosystem_desc_t *ios, io_desc_t *iodesc)
     /* Check inputs. */
     pioassert(iodesc, "invalid input", __FILE__, __LINE__);
 
-    LOG((2, "compute_maxaggregate_bytes iodesc->maxiobuflen = %d iodesc->ndof = %d",
-         iodesc->maxiobuflen, iodesc->ndof));
+    LOG((2, "compute_maxaggregate_bytes iodesc->sync_io_desc_info.maxiobuflen = %d iodesc->sync_io_desc_info.ndof = %d",
+         iodesc->sync_io_desc_info.maxiobuflen, iodesc->sync_io_desc_info.ndof));
 
     /* Determine the max bytes that can be held on IO task. */
-    if (ios->io_comm_info->is_sync_io_proc() && iodesc->maxiobuflen > 0)
-        maxbytesoniotask = pio_buffer_size_limit / iodesc->maxiobuflen;
+    if (ios->io_comm_info->is_sync_io_proc() && iodesc->sync_io_desc_info.maxiobuflen > 0)
+        maxbytesoniotask = pio_buffer_size_limit / iodesc->sync_io_desc_info.maxiobuflen;
 
     /* Determine the max bytes that can be held on computation task. */
-    if (ios->comp_rank >= 0 && iodesc->ndof > 0)
-        maxbytesoncomputetask = pio_cnbuffer_limit / iodesc->ndof;
+    if (ios->comp_rank >= 0 && iodesc->sync_io_desc_info.ndof > 0)
+        maxbytesoncomputetask = pio_cnbuffer_limit / iodesc->sync_io_desc_info.ndof;
 
     /* Take the min of the max IO and max comp bytes. */
     maxbytes = std::min(maxbytesoniotask, maxbytesoncomputetask);
@@ -2553,7 +2553,7 @@ int compute_maxaggregate_bytes(iosystem_desc_t *ios, io_desc_t *iodesc)
     LOG((3, "after allreaduce maxbytes = %d", maxbytes));
 
     /* Remember the result. */
-    iodesc->maxbytes = maxbytes;
+    iodesc->sync_io_desc_info.maxbytes = maxbytes;
 
     return PIO_NOERR;
 }

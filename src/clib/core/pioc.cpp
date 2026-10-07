@@ -409,7 +409,7 @@ int PIOc_get_local_array_size_impl(int ioid)
     if (!(iodesc = pio_get_iodesc_from_id(ioid)))
         piodie(__FILE__, __LINE__, "Getting local array size failed. Invalid iodesc id provided. Could not get iodesc corresponding to ioid = %d", ioid);
 
-    return iodesc->ndof;
+    return iodesc->sync_io_desc_info.ndof;
 }
 
 /**
@@ -523,7 +523,7 @@ void pio_create_uniq_str(iosystem_desc_t *ios, io_desc_t *iodesc, std::string &s
   }
   if(iodesc){
     /* Add iodesc specific info into the str */
-    str += std::to_string(iodesc->ndims) + std::string("dims");
+    str += std::to_string(iodesc->sync_io_desc_info.ndims) + std::string("dims");
   }
 
   /* Add counter - to make the str unique */
@@ -538,12 +538,12 @@ static int subset_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const
   int ret = PIO_NOERR;
 
   assert(ios && iodesc);
-  assert(((iodesc->maplen == 0) || iodesc->map) && iodesc->dimlen);
+  assert(((iodesc->sync_io_desc_info.maplen == 0) || iodesc->sync_io_desc_info.map) && iodesc->sync_io_desc_info.dimlen);
 
-  iodesc->num_aiotasks = ios->io_comm_info->get_sync_io_comm_sz();
-  LOG((2, "creating subset rearranger iodesc->num_aiotasks = %d", iodesc->num_aiotasks));
-  if((ret = subset_rearrange_create(ios, iodesc->maplen, (PIO_Offset *)(iodesc->map),
-                                      iodesc->dimlen, iodesc->ndims, iodesc))){
+  iodesc->sync_io_desc_info.num_aiotasks = ios->io_comm_info->get_sync_io_comm_sz();
+  LOG((2, "creating subset rearranger iodesc->sync_io_desc_info.num_aiotasks = %d", iodesc->sync_io_desc_info.num_aiotasks));
+  if((ret = subset_rearrange_create(ios, iodesc->sync_io_desc_info.maplen, (PIO_Offset *)(iodesc->sync_io_desc_info.map),
+                                      iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.ndims, iodesc))){
     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                     "Initializing the PIO decomposition failed. Error creating the SUBSET rearranger");
   }
@@ -555,25 +555,25 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
 {
   int ret = PIO_NOERR;
   assert(ios && iodesc);
-  assert(((iodesc->maplen == 0) || iodesc->map) && ((iodesc->ndims == 0) || iodesc->dimlen) && iodesc->firstregion);
+  assert(((iodesc->sync_io_desc_info.maplen == 0) || iodesc->sync_io_desc_info.map) && ((iodesc->sync_io_desc_info.ndims == 0) || iodesc->sync_io_desc_info.dimlen) && iodesc->sync_io_desc_info.firstregion);
 
   if(ios->io_comm_info->is_sync_io_proc()){
     /*  Unless the user specifies the start and count for each
      *  IO task compute it. */
     if(iostart && iocount){
       LOG((3, "iostart and iocount provided"));
-      for(int i = 0; i < iodesc->ndims; i++){
-        iodesc->firstregion->start[i] = iostart[i];
-        iodesc->firstregion->count[i] = iocount[i];
+      for(int i = 0; i < iodesc->sync_io_desc_info.ndims; i++){
+        iodesc->sync_io_desc_info.firstregion->start[i] = iostart[i];
+        iodesc->sync_io_desc_info.firstregion->count[i] = iocount[i];
       }
-      iodesc->num_aiotasks = ios->io_comm_info->get_sync_io_comm_sz();
+      iodesc->sync_io_desc_info.num_aiotasks = ios->io_comm_info->get_sync_io_comm_sz();
     }
     else{
       /* Compute start and count values for each io task. */
-      LOG((2, "about to call CalcStartandCount piotype = %d ndims = %d", iodesc->piotype, iodesc->ndims));
-      if((ret = CalcStartandCount(iodesc->piotype, iodesc->ndims, iodesc->dimlen, ios->io_comm_info->get_sync_io_comm_sz(),
-                                   ios->io_comm_info->get_sync_io_comm_rank(), iodesc->firstregion->start,
-                                   iodesc->firstregion->count, &iodesc->num_aiotasks))){
+      LOG((2, "about to call CalcStartandCount piotype = %d ndims = %d", iodesc->sync_io_desc_info.piotype, iodesc->sync_io_desc_info.ndims));
+      if((ret = CalcStartandCount(iodesc->sync_io_desc_info.piotype, iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen, ios->io_comm_info->get_sync_io_comm_sz(),
+                                   ios->io_comm_info->get_sync_io_comm_rank(), iodesc->sync_io_desc_info.firstregion->start,
+                                   iodesc->sync_io_desc_info.firstregion->count, &iodesc->sync_io_desc_info.num_aiotasks))){
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Initializing the PIO decomposition failed. Internal error calculating start/count for the decomposition");
       }
@@ -584,18 +584,18 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
       return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                       "Initializing the PIO decomposition failed. Internal error computing max io buffer size needed for the decomposition");
     }
-    LOG((3, "compute_maxIObuffersize called iodesc->maxiobuflen = %d", iodesc->maxiobuflen));
+    LOG((3, "compute_maxIObuffersize called iodesc->sync_io_desc_info.maxiobuflen = %d", iodesc->sync_io_desc_info.maxiobuflen));
   }
 
   /* Depending on array size and io-blocksize the actual number
    * of io tasks used may vary. */
-  if((ret = MPI_Bcast(&(iodesc->num_aiotasks), 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm))){
+  if((ret = MPI_Bcast(&(iodesc->sync_io_desc_info.num_aiotasks), 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm))){
     return check_mpi(ios, NULL, ret, __FILE__, __LINE__);
   }
-  LOG((3, "iodesc->num_aiotasks = %d", iodesc->num_aiotasks));
+  LOG((3, "iodesc->sync_io_desc_info.num_aiotasks = %d", iodesc->sync_io_desc_info.num_aiotasks));
 
   /* Compute the communications pattern for this decomposition. */
-  if((ret = box_rearrange_create(ios, iodesc->maplen, iodesc->map, iodesc->dimlen, iodesc->ndims, iodesc))){
+  if((ret = box_rearrange_create(ios, iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map, iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.ndims, iodesc))){
     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                     "Error initializing the PIO decomposition. Error creating the BOX rearranger");
   }
@@ -605,48 +605,48 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
 
 static void init_iodesc_contig_rearr_fields(iosystem_desc_t *ios, io_desc_t *iodesc)
 {
-  assert(ios && iodesc && iodesc->rearr && iodesc->rearr->is_init());
+  assert(ios && iodesc && iodesc->sync_io_desc_info.rearr && iodesc->sync_io_desc_info.rearr->is_init());
 
-  iodesc->ndof = iodesc->rearr->get_decomp_map_lsz();
+  iodesc->sync_io_desc_info.ndof = iodesc->sync_io_desc_info.rearr->get_decomp_map_lsz();
   if(ios->io_comm_info->is_sync_io_proc()){
-    iodesc->num_aiotasks = ios->io_comm_info->get_sync_io_comm_sz();
+    iodesc->sync_io_desc_info.num_aiotasks = ios->io_comm_info->get_sync_io_comm_sz();
   }
 
   /* The first region is pre-allocated when iodesc is allocated */
-  iodesc->maxregions = 0;
+  iodesc->sync_io_desc_info.maxregions = 0;
   /* FIXME: We only need fillvalues when the total decomp map size is less than var size */
-  iodesc->needsfill = true;
+  iodesc->sync_io_desc_info.needsfill = true;
   /* FIXME: Remove the field since we no longer use maxbytes */
-  iodesc->maxbytes = 0;
-  iodesc->llen = iodesc->rearr->get_rearrange_buf_sz();
-  iodesc->maxiobuflen = iodesc->rearr->get_decomp_gsz();
+  iodesc->sync_io_desc_info.maxbytes = 0;
+  iodesc->sync_io_desc_info.llen = iodesc->sync_io_desc_info.rearr->get_rearrange_buf_sz();
+  iodesc->sync_io_desc_info.maxiobuflen = iodesc->sync_io_desc_info.rearr->get_decomp_gsz();
 
   if(ios->io_comm_info->is_sync_io_proc()){
-    assert(iodesc->firstregion && iodesc->firstregion->start && iodesc->firstregion->count);
+    assert(iodesc->sync_io_desc_info.firstregion && iodesc->sync_io_desc_info.firstregion->start && iodesc->sync_io_desc_info.firstregion->count);
     /* Get (start, count) pairs of contiguous decomp ranges for this I/O process */
-    std::vector<std::pair<PIO_Offset, PIO_Offset> > off_ranges = iodesc->rearr->get_rearr_decomp_map_contig_ranges();
-    io_region *cur_region = iodesc->firstregion;
+    std::vector<std::pair<PIO_Offset, PIO_Offset> > off_ranges = iodesc->sync_io_desc_info.rearr->get_rearr_decomp_map_contig_ranges();
+    io_region *cur_region = iodesc->sync_io_desc_info.firstregion;
     io_region *prev_region = cur_region;
     int loff = 0;
 
-    LOG((1, "Contig rearranger : iodesc {ioid=%d, llen=%lld, maxiobuflen=%lld, ndims=%d, dimlen=%s, maxregions=%lld", iodesc->ioid, static_cast<long long int>(iodesc->llen), static_cast<long long int>(iodesc->maxiobuflen), iodesc->ndims, SPIO_Util::Dbg_Util::vec1d_to_string(iodesc->dimlen, iodesc->dimlen + iodesc->ndims).c_str(), static_cast<long long int>(off_ranges.size())));
+    LOG((1, "Contig rearranger : iodesc {ioid=%d, llen=%lld, maxiobuflen=%lld, ndims=%d, dimlen=%s, maxregions=%lld", iodesc->ioid, static_cast<long long int>(iodesc->sync_io_desc_info.llen), static_cast<long long int>(iodesc->sync_io_desc_info.maxiobuflen), iodesc->sync_io_desc_info.ndims, SPIO_Util::Dbg_Util::vec1d_to_string(iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.dimlen + iodesc->sync_io_desc_info.ndims).c_str(), static_cast<long long int>(off_ranges.size())));
     // FIXME : Move to C++ lists for region list
     for(std::size_t i = 0; i < off_ranges.size(); i++){
       if(cur_region == NULL){
-        alloc_region2(ios, iodesc->ndims, &cur_region);
+        alloc_region2(ios, iodesc->sync_io_desc_info.ndims, &cur_region);
         prev_region->next = cur_region;
       }
       cur_region->loffset = loff;
       loff += static_cast<int>(off_ranges[i].second);
       /* Convert the range (start, count) offsets to dim indices & store in the region info */
-      iodesc->rearr->off_range_to_dim_range(off_ranges[i].first, off_ranges[i].second,
+      iodesc->sync_io_desc_info.rearr->off_range_to_dim_range(off_ranges[i].first, off_ranges[i].second,
                                             cur_region->start, cur_region->count);
 
-      LOG((1, "Contig range = [%lld, %lld), start=%s, count=%s", static_cast<long long int>(off_ranges[i].first), static_cast<long long int>(off_ranges[i].second), SPIO_Util::Dbg_Util::vec1d_to_string(cur_region->start, cur_region->start + iodesc->ndims).c_str(), SPIO_Util::Dbg_Util::vec1d_to_string(cur_region->count, cur_region->count + iodesc->ndims).c_str()));
+      LOG((1, "Contig range = [%lld, %lld), start=%s, count=%s", static_cast<long long int>(off_ranges[i].first), static_cast<long long int>(off_ranges[i].second), SPIO_Util::Dbg_Util::vec1d_to_string(cur_region->start, cur_region->start + iodesc->sync_io_desc_info.ndims).c_str(), SPIO_Util::Dbg_Util::vec1d_to_string(cur_region->count, cur_region->count + iodesc->sync_io_desc_info.ndims).c_str()));
       prev_region = cur_region;
       cur_region = cur_region->next;
     }
-    iodesc->maxregions = iodesc->rearr->get_rearr_decomp_map_contig_max_nranges();
+    iodesc->sync_io_desc_info.maxregions = iodesc->sync_io_desc_info.rearr->get_rearr_decomp_map_contig_max_nranges();
   }
 }
 
@@ -655,14 +655,14 @@ static int contig_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const
   int ret = PIO_NOERR;
 
   assert(ios && iodesc);
-  assert(((iodesc->maplen == 0) || iodesc->map) && ((iodesc->ndims == 0) || iodesc->dimlen));
+  assert(((iodesc->sync_io_desc_info.maplen == 0) || iodesc->sync_io_desc_info.map) && ((iodesc->sync_io_desc_info.ndims == 0) || iodesc->sync_io_desc_info.dimlen));
 
   if(iostart && iocount){
     /* FIXME: We should at least convert iostart/iocount arrays to decomp maps */
   }
 
-  iodesc->rearr = new SPIO::DataRearr::Contig_rearr(ios);
-  ret = iodesc->rearr->init(iodesc->piotype, iodesc->map, iodesc->maplen, iodesc->dimlen, iodesc->ndims, iodesc);
+  iodesc->sync_io_desc_info.rearr = new SPIO::DataRearr::Contig_rearr(ios);
+  ret = iodesc->sync_io_desc_info.rearr->init(iodesc->sync_io_desc_info.piotype, iodesc->sync_io_desc_info.map, iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.ndims, iodesc);
   if(ret != PIO_NOERR){
     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                     "Error initializing the I/O decomposition. Error initializing PIO_REARR_CONTIG rearranger");
@@ -680,23 +680,23 @@ static inline void dbg_log_iodesc(iosystem_desc_t *ios, io_desc_t *iodesc)
   /* Log results. */
   LOG((2, "iodesc ioid = %d nrecvs = %d ndof = %d ndims = %d num_aiotasks = %d "
        "rearranger = %d maxregions = %d needsfill = %d llen = %d maxiobuflen  = %d",
-       iodesc->ioid, iodesc->nrecvs, iodesc->ndof, iodesc->ndims, iodesc->num_aiotasks,
-       iodesc->rearranger, iodesc->maxregions, iodesc->needsfill, iodesc->llen,
-       iodesc->maxiobuflen));
+       iodesc->ioid, iodesc->sync_io_desc_info.nrecvs, iodesc->sync_io_desc_info.ndof, iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.num_aiotasks,
+       iodesc->sync_io_desc_info.rearranger, iodesc->sync_io_desc_info.maxregions, iodesc->sync_io_desc_info.needsfill, iodesc->sync_io_desc_info.llen,
+       iodesc->sync_io_desc_info.maxiobuflen));
   if(ios->io_comm_info->is_sync_io_proc()){
-    if(iodesc->rearranger == PIO_REARR_SUBSET){
-        for(int j = 0; j < iodesc->llen; j++){
-          LOG((3, "rindex[%d] = %lld", j, iodesc->rindex[j]));
+    if(iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET){
+        for(int j = 0; j < iodesc->sync_io_desc_info.llen; j++){
+          LOG((3, "rindex[%d] = %lld", j, iodesc->sync_io_desc_info.rindex[j]));
         }
     }
     else{
       int totalrecv = 0;
-      for(int j = 0; j < iodesc->nrecvs; j++){
-        totalrecv += iodesc->rcount[j];
+      for(int j = 0; j < iodesc->sync_io_desc_info.nrecvs; j++){
+        totalrecv += iodesc->sync_io_desc_info.rcount[j];
       }
 
       for(int j = 0; j < totalrecv; j++){
-        LOG((3, "rindex[%d] = %lld", j, iodesc->rindex[j]));
+        LOG((3, "rindex[%d] = %lld", j, iodesc->sync_io_desc_info.rindex[j]));
       }
     }
   }
@@ -837,23 +837,23 @@ static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, 
     ndims, gdimlen, maplen, compmap, rearr, map_zero_based);
 
   /* Initialize the rearranger */
-  if(iodesc->rearranger == PIO_REARR_SUBSET){
+  if(iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET){
     ierr = subset_rearranger_init(ios, iodesc.get(), iostart, iocount);
   }
-  else if(iodesc->rearranger == PIO_REARR_BOX){
+  else if(iodesc->sync_io_desc_info.rearranger == PIO_REARR_BOX){
     ierr = box_rearranger_init(ios, iodesc.get(), iostart, iocount);
   }
-  else if(iodesc->rearranger == PIO_REARR_CONTIG){
+  else if(iodesc->sync_io_desc_info.rearranger == PIO_REARR_CONTIG){
     ierr = contig_rearranger_init(ios, iodesc.get(), iostart, iocount);
   }
   else{
     return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                    "Initializing the PIO decomposition failed. Error initializing rearranger, invalid rearranger (ndims = %d, maplen = %d, rearranger=%d)", ndims, maplen, iodesc->rearranger);
+                    "Initializing the PIO decomposition failed. Error initializing rearranger, invalid rearranger (ndims = %d, maplen = %d, rearranger=%d)", ndims, maplen, iodesc->sync_io_desc_info.rearranger);
   }
 
   if(ierr != PIO_NOERR){
     return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                    "Initializing the PIO decomposition failed. Error initializing rearranger (ndims = %d, maplen = %d, rearranger=%d)", ndims, maplen, iodesc->rearranger);
+                    "Initializing the PIO decomposition failed. Error initializing rearranger (ndims = %d, maplen = %d, rearranger=%d)", ndims, maplen, iodesc->sync_io_desc_info.rearranger);
   }
 
   /* Add this IO description to the list. */
@@ -884,7 +884,7 @@ static int initdecomp(int iosysid, int pio_type, int ndims, const int *gdimlen, 
     (*logger).write_only().open().put(iodesc.get()).close();
     delete logger;
 
-    iodesc->is_saved = true;
+    iodesc->sync_io_desc_info.is_saved = true;
 
     SPIO_Util::Decomp_Util::gdpool_mgr.get_decomp_map_info_pool()->add_decomp_map_info(*ioidp, filename.c_str());
   }

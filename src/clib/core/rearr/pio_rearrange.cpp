@@ -249,12 +249,12 @@ int compute_maxIObuffersize(MPI_Comm io_comm, io_desc_t *iodesc)
 
     /*  compute the max io buffer size, for conveneance it is the
      *  combined size of all regions */
-    for (io_region *region = iodesc->firstregion; region; region = region->next)
+    for (io_region *region = iodesc->sync_io_desc_info.firstregion; region; region = region->next)
     {
         if (region->count[0] > 0)
         {
             PIO_Offset iosize = 1;
-            for (int i = 0; i < iodesc->ndims; i++)
+            for (int i = 0; i < iodesc->sync_io_desc_info.ndims; i++)
                 iosize *= region->count[i];
             totiosize += iosize;
         }
@@ -268,7 +268,7 @@ int compute_maxIObuffersize(MPI_Comm io_comm, io_desc_t *iodesc)
     LOG((2, "after allreduce compute_maxIObuffersize got totiosize = %lld", totiosize));
 
     /* Remember the result. */
-    iodesc->maxiobuflen = totiosize;
+    iodesc->sync_io_desc_info.maxiobuflen = totiosize;
 
     return PIO_NOERR;
 }
@@ -286,7 +286,7 @@ int compute_maxIObuffersize(MPI_Comm io_comm, io_desc_t *iodesc)
  * @param mfrom A pointer to the previous structure in the read/write
  * list. This is always NULL for the BOX rearranger.
  * @param mtype pointer to an array (length msgcnt) which gets the
- * created datatypes. Will be NULL when iodesc->nrecvs == 0.
+ * created datatypes. Will be NULL when iodesc->sync_io_desc_info.nrecvs == 0.
  * @returns 0 on success, error code otherwise.
  */
 int create_mpi_datatypes(MPI_Datatype mpitype, int msgcnt,
@@ -422,7 +422,7 @@ int create_mpi_datatypes(MPI_Datatype mpitype, int msgcnt,
  * If needed, create the derived MPI datatypes used for comp2io and
  * io2comp transfers.
  *
- * If iodesc->stype and iodesc->rtype arrays already exist, this
+ * If iodesc->sync_io_desc_info.stype and iodesc->sync_io_desc_info.rtype arrays already exist, this
  * function does nothing. This function is called from
  * rearrange_io2comp() and rearrange_comp2io().
  *
@@ -443,37 +443,37 @@ int define_iodesc_datatypes(iosystem_desc_t *ios, io_desc_t *iodesc)
     int ret; /* Return value. */
 
     pioassert(ios && iodesc, "invalid input", __FILE__, __LINE__);
-    LOG((1, "define_iodesc_datatypes ios->io_comm_info->is_sync_io_proc() = %d iodesc->rtype is %sNULL, iodesc->nrecvs",
-         ios->io_comm_info->is_sync_io_proc(), iodesc->rtype ? "not " : "", iodesc->nrecvs));
+    LOG((1, "define_iodesc_datatypes ios->io_comm_info->is_sync_io_proc() = %d iodesc->sync_io_desc_info.rtype is %sNULL, iodesc->sync_io_desc_info.nrecvs",
+         ios->io_comm_info->is_sync_io_proc(), iodesc->sync_io_desc_info.rtype ? "not " : "", iodesc->sync_io_desc_info.nrecvs));
 
     /* Set up the to transfer data to and from the IO tasks. */
     if (ios->io_comm_info->is_sync_io_proc())
     {
         /* If the types for the IO tasks have not been created, then
          * create them. */
-        if (!iodesc->rtype)
+        if (!iodesc->sync_io_desc_info.rtype)
         {
-            if (iodesc->nrecvs > 0)
+            if (iodesc->sync_io_desc_info.nrecvs > 0)
             {
                 /* Allocate memory for array of MPI types for the IO tasks. */
-                if (!(iodesc->rtype = (MPI_Datatype *) malloc(iodesc->nrecvs * sizeof(MPI_Datatype))))
+                if (!(iodesc->sync_io_desc_info.rtype = (MPI_Datatype *) malloc(iodesc->sync_io_desc_info.nrecvs * sizeof(MPI_Datatype))))
                 {
                     return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                    "Defining MPI datatypes for I/O decomposition failed. Out of memory allocating %lld bytes for storing MPI datatypes for data received from each compute process", (unsigned long long) (iodesc->nrecvs * sizeof(MPI_Datatype)));
+                                    "Defining MPI datatypes for I/O decomposition failed. Out of memory allocating %lld bytes for storing MPI datatypes for data received from each compute process", (unsigned long long) (iodesc->sync_io_desc_info.nrecvs * sizeof(MPI_Datatype)));
                 }
-                LOG((2, "allocated memory for IO task MPI types iodesc->nrecvs = %d "
-                     "iodesc->rearranger = %d", iodesc->nrecvs, iodesc->rearranger));
+                LOG((2, "allocated memory for IO task MPI types iodesc->sync_io_desc_info.nrecvs = %d "
+                     "iodesc->sync_io_desc_info.rearranger = %d", iodesc->sync_io_desc_info.nrecvs, iodesc->sync_io_desc_info.rearranger));
 
                 /* Initialize data types to NULL. */
-                for (int i = 0; i < iodesc->nrecvs; i++)
-                    iodesc->rtype[i] = MPI_DATATYPE_NULL;
+                for (int i = 0; i < iodesc->sync_io_desc_info.nrecvs; i++)
+                    iodesc->sync_io_desc_info.rtype[i] = MPI_DATATYPE_NULL;
 
                 /* The different rearrangers get different values for mfrom. */
-                int *mfrom = iodesc->rearranger == PIO_REARR_SUBSET ? iodesc->rfrom : NULL;
+                int *mfrom = iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET ? iodesc->sync_io_desc_info.rfrom : NULL;
 
                 /* Create the MPI datatypes. */
-                if ((ret = create_mpi_datatypes(iodesc->mpitype, iodesc->nrecvs, iodesc->rindex,
-                                                iodesc->rcount, mfrom, iodesc->rtype)))
+                if ((ret = create_mpi_datatypes(iodesc->sync_io_desc_info.mpitype, iodesc->sync_io_desc_info.nrecvs, iodesc->sync_io_desc_info.rindex,
+                                                iodesc->sync_io_desc_info.rcount, mfrom, iodesc->sync_io_desc_info.rtype)))
                 {
                     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                                     "Defining MPI datatypes for I/O decomposition failed. Unable to create MPI datatypes for receiving data from compute processes.");
@@ -487,16 +487,16 @@ int define_iodesc_datatypes(iosystem_desc_t *ios, io_desc_t *iodesc)
      * operation.) */
     if (ios->compproc)
     {
-        if (!iodesc->stype)
+        if (!iodesc->sync_io_desc_info.stype)
         {
             int ntypes;
             
             /* Subset rearranger gets one type; box rearranger gets one
              * type per IO task. */
-            ntypes = iodesc->rearranger == PIO_REARR_SUBSET ? 1 : ios->io_comm_info->get_sync_io_comm_sz();
+            ntypes = iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET ? 1 : ios->io_comm_info->get_sync_io_comm_sz();
             
             /* Allocate memory for array of MPI types for the computation tasks. */
-            if (!(iodesc->stype = (MPI_Datatype *) malloc(ntypes * sizeof(MPI_Datatype))))
+            if (!(iodesc->sync_io_desc_info.stype = (MPI_Datatype *) malloc(ntypes * sizeof(MPI_Datatype))))
             {
                 return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                                 "Defining MPI datatypes for I/O decomposition failed. Out of memory allocating %lld bytes for storing MPI datatypes for data sent from each compute process", (unsigned long long) (ntypes * sizeof(MPI_Datatype)));
@@ -505,15 +505,15 @@ int define_iodesc_datatypes(iosystem_desc_t *ios, io_desc_t *iodesc)
             
             /* Initialize send types to NULL. */
             for (int i = 0; i < ntypes; i++)
-                iodesc->stype[i] = MPI_DATATYPE_NULL;
+                iodesc->sync_io_desc_info.stype[i] = MPI_DATATYPE_NULL;
             
             /* Remember how many types we created for the send side. */
-            iodesc->num_stypes = ntypes;
+            iodesc->sync_io_desc_info.num_stypes = ntypes;
             
             /* Create the MPI data types. */
             LOG((3, "about to call create_mpi_datatypes for computation MPI types"));
-            if ((ret = create_mpi_datatypes(iodesc->mpitype, ntypes, iodesc->sindex,
-                                            iodesc->scount, NULL, iodesc->stype)))
+            if ((ret = create_mpi_datatypes(iodesc->sync_io_desc_info.mpitype, ntypes, iodesc->sync_io_desc_info.sindex,
+                                            iodesc->sync_io_desc_info.scount, NULL, iodesc->sync_io_desc_info.stype)))
             {
                 return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                                 "Defining MPI datatypes for I/O decomposition failed. Unable to create MPI datatypes for data sent from each compute process");
@@ -532,18 +532,18 @@ int define_iodesc_datatypes(iosystem_desc_t *ios, io_desc_t *iodesc)
  *
  * This function:
  * <ul>
- * <li>Allocates and inits iodesc->scount, an array (length
+ * <li>Allocates and inits iodesc->sync_io_desc_info.scount, an array (length
  * the number of sync I/O tasks) containing number of data elements sent to each
  * IO task from current compute task.
- * <li>Uses pio_swapm() to send iodesc->scount array from each
+ * <li>Uses pio_swapm() to send iodesc->sync_io_desc_info.scount array from each
  * computation task to all IO tasks.
- * <li>On IO tasks, allocates and inits iodesc->rcount and
- * iodesc->rfrom arrays (length max(1, nrecvs)) which holds the amount
+ * <li>On IO tasks, allocates and inits iodesc->sync_io_desc_info.rcount and
+ * iodesc->sync_io_desc_info.rfrom arrays (length max(1, nrecvs)) which holds the amount
  * of data to expect from each compute task and the rank of that
  * task. .
- * <li>Allocates and inits iodesc->sindex arrays (length iodesc->ndof)
+ * <li>Allocates and inits iodesc->sync_io_desc_info.sindex arrays (length iodesc->sync_io_desc_info.ndof)
  * which holds indecies for computation tasks.
- * <li>On IO tasks, allocates and inits iodesc->rindex (length
+ * <li>On IO tasks, allocates and inits iodesc->sync_io_desc_info.rindex (length
  * totalrecv) with indices of the data to be sent/received from this
  * io task to each compute task.
  * <li>Uses pio_swapm() to send list of indicies on each compute task
@@ -563,10 +563,10 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
     int nrecvs = 0;
     int ierr;
 
-    /* Check inputs. If iodesc->ndof is 0, dest_ioproc and dest_ioindex can be NULL */
+    /* Check inputs. If iodesc->sync_io_desc_info.ndof is 0, dest_ioproc and dest_ioindex can be NULL */
     pioassert(ios && iodesc &&
-              (iodesc->ndof == 0 || (iodesc->ndof > 0 && dest_ioproc && dest_ioindex)) &&
-              iodesc->rearranger == PIO_REARR_BOX && ios->num_uniontasks > 0,
+              (iodesc->sync_io_desc_info.ndof == 0 || (iodesc->sync_io_desc_info.ndof > 0 && dest_ioproc && dest_ioindex)) &&
+              iodesc->sync_io_desc_info.rearranger == PIO_REARR_BOX && ios->num_uniontasks > 0,
               "invalid input", __FILE__, __LINE__);
     LOG((1, "compute_counts ios->num_uniontasks = %d", ios->num_uniontasks));
 
@@ -579,29 +579,29 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
 
     /* The list of indeces on each compute task */
     PIO_Offset *s2rindex = NULL;
-    if (iodesc->ndof > 0)
+    if (iodesc->sync_io_desc_info.ndof > 0)
     {
-        if (!(s2rindex = (PIO_Offset *) malloc(iodesc->ndof * sizeof(PIO_Offset))))
+        if (!(s2rindex = (PIO_Offset *) malloc(iodesc->sync_io_desc_info.ndof * sizeof(PIO_Offset))))
         {
           return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                          "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory allocating %lld bytes to store index mapping between compute and I/O processes", (unsigned long long) (iodesc->ndof * sizeof(PIO_Offset)));
+                          "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory allocating %lld bytes to store index mapping between compute and I/O processes", (unsigned long long) (iodesc->sync_io_desc_info.ndof * sizeof(PIO_Offset)));
         }
     }
 
     /* Allocate memory for the array of counts and init to zero. */
-    if (!(iodesc->scount = (int *) calloc(ios->io_comm_info->get_sync_io_comm_sz(), sizeof(int))))
+    if (!(iodesc->sync_io_desc_info.scount = (int *) calloc(ios->io_comm_info->get_sync_io_comm_sz(), sizeof(int))))
     {
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                           "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory allocating %lld bytes to store amount of data sent between compute and I/O processes", (unsigned long long) (ios->io_comm_info->get_sync_io_comm_sz() * sizeof(int)));
     }
 
-    /* iodesc->scount is the number of data elements sent to each IO
+    /* iodesc->sync_io_desc_info.scount is the number of data elements sent to each IO
      * task from the current compute task. dest_ioindex[i] may be
      * -1. */
     if (ios->compproc)
-        for (int i = 0; i < iodesc->ndof; i++)
+        for (int i = 0; i < iodesc->sync_io_desc_info.ndof; i++)
             if (dest_ioindex[i] >= 0)
-                (iodesc->scount[dest_ioproc[i]])++;
+                (iodesc->sync_io_desc_info.scount[dest_ioproc[i]])++;
 
     /* Initialize arrays used in swapm call. */
     for (int i = 0; i < ios->num_uniontasks; i++)
@@ -613,13 +613,13 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
         sr_types[i] = MPI_INT;
     }
 
-    /* Setup for the swapm call. iodesc->scount is the amount of data
+    /* Setup for the swapm call. iodesc->sync_io_desc_info.scount is the amount of data
      * this compute task will transfer to/from each iotask. For the
      * box rearranger there can be more than one IO task per compute
      * task. This provides enough information to know the size of data
      * on the iotask, so at line 557 we allocate arrays to hold the
-     * map on the iotasks. iodesc->rcount is an array of the amount of
-     * data to expect from each compute task and iodesc->rfrom is the
+     * map on the iotasks. iodesc->sync_io_desc_info.rcount is an array of the amount of
+     * data to expect from each compute task and iodesc->sync_io_desc_info.rfrom is the
      * rank of that task. */
     if (ios->compproc)
     {
@@ -655,11 +655,11 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
     }
 
     LOG((2, "about to share scount from each compute task to all IO tasks."));
-    /* Share the iodesc->scount from each compute task to all IO
+    /* Share the iodesc->sync_io_desc_info.scount from each compute task to all IO
      * tasks. The scounts will end up in array recv_buf. */
-    if ((ierr = pio_swapm(iodesc->scount, send_counts, send_displs, sr_types,
+    if ((ierr = pio_swapm(iodesc->sync_io_desc_info.scount, send_counts, send_displs, sr_types,
                           recv_buf, recv_counts, recv_displs, sr_types, ios->union_comm,
-                          &iodesc->rearr_opts.comp2io)))
+                          &iodesc->sync_io_desc_info.rearr_opts.comp2io)))
     {
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                         "Calculating the amount/offset of data transferred between compute and I/O processes failed. pio_swapm() call failed to transfer the amount of data transferred between compute and I/O processes");
@@ -678,14 +678,14 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
         }
 
         /* Get memory to hold the count of data receives. */
-        if (!(iodesc->rcount = (int *) calloc(max(1, nrecvs), sizeof(int))))
+        if (!(iodesc->sync_io_desc_info.rcount = (int *) calloc(max(1, nrecvs), sizeof(int))))
         {
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory in I/O process allocating %lld bytes to store amount of data received from compute processes", (unsigned long long) (max(1, nrecvs) * sizeof(int)));
         }
 
         /* Get memory to hold the list of task data was from. */
-        if (!(iodesc->rfrom = (int *) calloc(max(1, nrecvs), sizeof(int))))
+        if (!(iodesc->sync_io_desc_info.rfrom = (int *) calloc(max(1, nrecvs), sizeof(int))))
         {
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory in I/O process allocating %lld bytes to store rank of compute processes that send data", (unsigned long long) (max(1, nrecvs) * sizeof(int)));
@@ -697,8 +697,8 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
         {
             if (recv_buf[i] != 0)
             {
-                iodesc->rcount[nrecvs] = recv_buf[i];
-                iodesc->rfrom[nrecvs] = ios->compranks[i];
+                iodesc->sync_io_desc_info.rcount[nrecvs] = recv_buf[i];
+                iodesc->sync_io_desc_info.rfrom[nrecvs] = ios->compranks[i];
                 nrecvs++;
             }
         }
@@ -706,18 +706,18 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
     }
 
     /* ??? */
-    iodesc->nrecvs = nrecvs;
-    LOG((3, "iodesc->nrecvs = %d", iodesc->nrecvs));
+    iodesc->sync_io_desc_info.nrecvs = nrecvs;
+    LOG((3, "iodesc->sync_io_desc_info.nrecvs = %d", iodesc->sync_io_desc_info.nrecvs));
 
     /* Allocate an array for indicies on the computation tasks (the
      * send side when writing). */
-    if (iodesc->sindex == NULL && iodesc->ndof > 0)
-        if (!(iodesc->sindex = (PIO_Offset *) malloc(iodesc->ndof * sizeof(PIO_Offset))))
+    if (iodesc->sync_io_desc_info.sindex == NULL && iodesc->sync_io_desc_info.ndof > 0)
+        if (!(iodesc->sync_io_desc_info.sindex = (PIO_Offset *) malloc(iodesc->sync_io_desc_info.ndof * sizeof(PIO_Offset))))
         {
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory allocating %lld bytes to store offset/index of data", (unsigned long long) (iodesc->ndof * sizeof(PIO_Offset)));
+                            "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory allocating %lld bytes to store offset/index of data", (unsigned long long) (iodesc->sync_io_desc_info.ndof * sizeof(PIO_Offset)));
         }
-    LOG((2, "iodesc->ndof = %d ios->io_comm_info->get_sync_io_comm_sz() = %d", iodesc->ndof, ios->io_comm_info->get_sync_io_comm_sz()));
+    LOG((2, "iodesc->sync_io_desc_info.ndof = %d ios->io_comm_info->get_sync_io_comm_sz() = %d", iodesc->sync_io_desc_info.ndof, ios->io_comm_info->get_sync_io_comm_sz()));
 
     int tempcount[ios->io_comm_info->get_sync_io_comm_sz()];
     int spos[ios->io_comm_info->get_sync_io_comm_sz()];
@@ -727,13 +727,13 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
     tempcount[0] = 0;
     for (int i = 1; i < ios->io_comm_info->get_sync_io_comm_sz(); i++)
     {
-        spos[i] = spos[i - 1] + iodesc->scount[i - 1];
+        spos[i] = spos[i - 1] + iodesc->sync_io_desc_info.scount[i - 1];
         tempcount[i] = 0;
         LOG((3, "spos[%d] = %d tempcount[%d] = %d", i, spos[i], i, tempcount[i]));
     }
 
     /* ??? */
-    for (int i = 0; i < iodesc->ndof; i++)
+    for (int i = 0; i < iodesc->sync_io_desc_info.ndof; i++)
     {
         int iorank;
         int ioindex;
@@ -745,7 +745,7 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
         if (iorank > -1)
         {
             /* this should be moved to create_box */
-            iodesc->sindex[spos[iorank] + tempcount[iorank]] = i;
+            iodesc->sync_io_desc_info.sindex[spos[iorank] + tempcount[iorank]] = i;
 
             s2rindex[spos[iorank] + tempcount[iorank]] = ioindex;
             (tempcount[iorank])++;
@@ -769,11 +769,11 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
     {
         /* Subset rearranger needs one type, box rearranger needs one for
          * each IO task. */
-        send_counts[ios_ioranks[i]] = iodesc->scount[i];
+        send_counts[ios_ioranks[i]] = iodesc->sync_io_desc_info.scount[i];
         if (send_counts[ios_ioranks[i]] > 0)
             send_displs[ios_ioranks[i]] = spos[i] * SIZEOF_MPI_OFFSET;
-        LOG((3, "ios_ioranks[i] = %d iodesc->scount[%d] = %d spos[%d] = %d",
-             ios_ioranks[i], i, iodesc->scount[i], i, spos[i]));
+        LOG((3, "ios_ioranks[i] = %d iodesc->sync_io_desc_info.scount[%d] = %d spos[%d] = %d",
+             ios_ioranks[i], i, iodesc->sync_io_desc_info.scount[i], i, spos[i]));
     }
 
     /* Only do this on IO tasks. */
@@ -782,17 +782,17 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
         int totalrecv = 0;
         for (int i = 0; i < nrecvs; i++)
         {
-            recv_counts[iodesc->rfrom[i]] = iodesc->rcount[i];
-            totalrecv += iodesc->rcount[i];
+            recv_counts[iodesc->sync_io_desc_info.rfrom[i]] = iodesc->sync_io_desc_info.rcount[i];
+            totalrecv += iodesc->sync_io_desc_info.rcount[i];
         }
 
         recv_displs[0] = 0;
         for (int i = 1; i < nrecvs; i++)
         {
-            recv_displs[iodesc->rfrom[i]] = recv_displs[iodesc->rfrom[i - 1]] +
-                iodesc->rcount[i - 1] * SIZEOF_MPI_OFFSET;
-            LOG((3, "iodesc->rfrom[%d] = %d recv_displs[iodesc->rfrom[i]] = %d", i,
-                 iodesc->rfrom[i], recv_displs[iodesc->rfrom[i]]));
+            recv_displs[iodesc->sync_io_desc_info.rfrom[i]] = recv_displs[iodesc->sync_io_desc_info.rfrom[i - 1]] +
+                iodesc->sync_io_desc_info.rcount[i - 1] * SIZEOF_MPI_OFFSET;
+            LOG((3, "iodesc->sync_io_desc_info.rfrom[%d] = %d recv_displs[iodesc->sync_io_desc_info.rfrom[i]] = %d", i,
+                 iodesc->sync_io_desc_info.rfrom[i], recv_displs[iodesc->sync_io_desc_info.rfrom[i]]));
         }
 
         /* rindex is an array of the indices of the data to be sent from
@@ -800,7 +800,7 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
         LOG((3, "totalrecv = %d", totalrecv));
         if (totalrecv > 0)
         {
-            if (!(iodesc->rindex = (PIO_Offset *) calloc(totalrecv, sizeof(PIO_Offset))))
+            if (!(iodesc->sync_io_desc_info.rindex = (PIO_Offset *) calloc(totalrecv, sizeof(PIO_Offset))))
             {
                 return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                             "Calculating the amount/offset of data transferred between compute and I/O processes failed. Out of memory allocating %lld bytes to store receive index/offset of data", (unsigned long long) (totalrecv * sizeof(PIO_Offset)));
@@ -817,9 +817,9 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc,
      * task to the index on the io task. */
     /* s2rindex is the list of indeces on each compute task */
     LOG((3, "sending mapping"));
-    if ((ierr = pio_swapm(s2rindex, send_counts, send_displs, sr_types, iodesc->rindex,
+    if ((ierr = pio_swapm(s2rindex, send_counts, send_displs, sr_types, iodesc->sync_io_desc_info.rindex,
                           recv_counts, recv_displs, sr_types, ios->union_comm,
-                          &iodesc->rearr_opts.comp2io)))
+                          &iodesc->sync_io_desc_info.rearr_opts.comp2io)))
     {
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
                         "Calculating the amount/offset of data transferred between compute and I/O processes failed. pio_swapm() call failed to exchange offset/index of data transferred.");
@@ -856,18 +856,18 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
     /* Caller must provide these. */
     pioassert(ios && iodesc && nvars > 0, "invalid input", __FILE__, __LINE__);
 
-    LOG((1, "rearrange_comp2io nvars = %d iodesc->rearranger = %d", nvars,
-         iodesc->rearranger));
+    LOG((1, "rearrange_comp2io nvars = %d iodesc->sync_io_desc_info.rearranger = %d", nvars,
+         iodesc->sync_io_desc_info.rearranger));
 
     /* Different rearraangers use different communicators. */
-    if (iodesc->rearranger == PIO_REARR_BOX)
+    if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_BOX)
     {
         mycomm = ios->union_comm;
         niotasks = ios->io_comm_info->get_sync_io_comm_sz();
     }
     else
     {
-        mycomm = iodesc->subset_comm;
+        mycomm = iodesc->sync_io_desc_info.subset_comm;
         niotasks = 1;
     }
 
@@ -897,8 +897,8 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
         recvtypes[i] = MPI_DATATYPE_NULL;
         sendtypes[i] = MPI_DATATYPE_NULL;
     }
-    LOG((3, "ntasks = %d iodesc->mpitype_size = %d niotasks = %d", ntasks,
-         iodesc->mpitype_size, niotasks));
+    LOG((3, "ntasks = %d iodesc->sync_io_desc_info.mpitype_size = %d niotasks = %d", ntasks,
+         iodesc->sync_io_desc_info.mpitype_size, niotasks));
 
     /* If it has not already been done, define the MPI data types that
      * will be used for this io_desc_t. */
@@ -911,16 +911,16 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
 
     /* If this io proc, we need to exchange data with compute
      * tasks. Create a MPI DataType for that exchange. */
-    LOG((2, "ios->io_comm_info->is_sync_io_proc() %d iodesc->nrecvs = %d", ios->io_comm_info->is_sync_io_proc(), iodesc->nrecvs));
-    if (ios->io_comm_info->is_sync_io_proc() && iodesc->nrecvs > 0)
+    LOG((2, "ios->io_comm_info->is_sync_io_proc() %d iodesc->sync_io_desc_info.nrecvs = %d", ios->io_comm_info->is_sync_io_proc(), iodesc->sync_io_desc_info.nrecvs));
+    if (ios->io_comm_info->is_sync_io_proc() && iodesc->sync_io_desc_info.nrecvs > 0)
     {
-        for (int i = 0; i < iodesc->nrecvs; i++)
+        for (int i = 0; i < iodesc->sync_io_desc_info.nrecvs; i++)
         {
-            if (iodesc->rtype[i] != MPI_DATATYPE_NULL)
+            if (iodesc->sync_io_desc_info.rtype[i] != MPI_DATATYPE_NULL)
             {
-                LOG((3, "iodesc->rtype[%d] = %d iodesc->rearranger = %d", i, iodesc->rtype[i],
-                        iodesc->rearranger));
-                if (iodesc->rearranger == PIO_REARR_SUBSET)
+                LOG((3, "iodesc->sync_io_desc_info.rtype[%d] = %d iodesc->sync_io_desc_info.rearranger = %d", i, iodesc->sync_io_desc_info.rtype[i],
+                        iodesc->sync_io_desc_info.rearranger));
+                if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET)
                 {
                     LOG((3, "exchanging data for subset rearranger"));
                     recvcounts[i] = 1;
@@ -929,8 +929,8 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
                      *  spaced blocks of the same size. The block size
                      *  is 1, the stride here is the length of the
                      *  collected array (llen). */
-                    if ((mpierr = MPI_Type_create_hvector(nvars, 1, (MPI_Aint)iodesc->llen * iodesc->mpitype_size,
-                                                          iodesc->rtype[i], &recvtypes[i])))
+                    if ((mpierr = MPI_Type_create_hvector(nvars, 1, (MPI_Aint)iodesc->sync_io_desc_info.llen * iodesc->sync_io_desc_info.mpitype_size,
+                                                          iodesc->sync_io_desc_info.rtype[i], &recvtypes[i])))
                     {
                         GPTLstop("PIO:rearrange_comp2io");
                         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
@@ -945,27 +945,27 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
                 }
                 else
                 {
-                    recvcounts[iodesc->rfrom[i]] = 1;
-                    LOG((3, "exchanging data for box rearranger i = %d iodesc->rfrom[i] = %d "
-                         "recvcounts[iodesc->rfrom[i]] = %d", i, iodesc->rfrom[i],
-                         recvcounts[iodesc->rfrom[i]]));
+                    recvcounts[iodesc->sync_io_desc_info.rfrom[i]] = 1;
+                    LOG((3, "exchanging data for box rearranger i = %d iodesc->sync_io_desc_info.rfrom[i] = %d "
+                         "recvcounts[iodesc->sync_io_desc_info.rfrom[i]] = %d", i, iodesc->sync_io_desc_info.rfrom[i],
+                         recvcounts[iodesc->sync_io_desc_info.rfrom[i]]));
 
-                    if ((mpierr = MPI_Type_create_hvector(nvars, 1, (MPI_Aint)iodesc->llen * iodesc->mpitype_size,
-                                                          iodesc->rtype[i], &recvtypes[iodesc->rfrom[i]])))
+                    if ((mpierr = MPI_Type_create_hvector(nvars, 1, (MPI_Aint)iodesc->sync_io_desc_info.llen * iodesc->sync_io_desc_info.mpitype_size,
+                                                          iodesc->sync_io_desc_info.rtype[i], &recvtypes[iodesc->sync_io_desc_info.rfrom[i]])))
                     {
                         GPTLstop("PIO:rearrange_comp2io");
                         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
                     }
-                    pioassert(recvtypes[iodesc->rfrom[i]] != MPI_DATATYPE_NULL,  "bad mpi type",
+                    pioassert(recvtypes[iodesc->sync_io_desc_info.rfrom[i]] != MPI_DATATYPE_NULL,  "bad mpi type",
                               __FILE__, __LINE__);
 
-                    if ((mpierr = MPI_Type_commit(&recvtypes[iodesc->rfrom[i]])))
+                    if ((mpierr = MPI_Type_commit(&recvtypes[iodesc->sync_io_desc_info.rfrom[i]])))
                     {
                         GPTLstop("PIO:rearrange_comp2io");
                         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
                     }
 
-                    rdispls[iodesc->rfrom[i]] = 0;
+                    rdispls[iodesc->sync_io_desc_info.rfrom[i]] = 0;
                 }
             }
         }
@@ -980,16 +980,16 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
         {
             int io_comprank = ios_ioranks[i];
             LOG((3, "ios_ioranks[%d] = %d", i, ios_ioranks[i]));
-            if (iodesc->rearranger == PIO_REARR_SUBSET)
+            if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET)
                 io_comprank = 0;
 
-            LOG((3, "i = %d iodesc->scount[i] = %d", i, iodesc->scount[i]));
-            if (iodesc->scount[i] > 0 && sbuf)
+            LOG((3, "i = %d iodesc->sync_io_desc_info.scount[i] = %d", i, iodesc->sync_io_desc_info.scount[i]));
+            if (iodesc->sync_io_desc_info.scount[i] > 0 && sbuf)
             {
                 LOG((3, "io task %d creating sendtypes[%d]", i, io_comprank));
                 sendcounts[io_comprank] = 1;
-                if ((mpierr = MPI_Type_create_hvector(nvars, 1, (MPI_Aint)iodesc->ndof * iodesc->mpitype_size,
-                                                      iodesc->stype[i], &sendtypes[io_comprank])))
+                if ((mpierr = MPI_Type_create_hvector(nvars, 1, (MPI_Aint)iodesc->sync_io_desc_info.ndof * iodesc->sync_io_desc_info.mpitype_size,
+                                                      iodesc->sync_io_desc_info.stype[i], &sendtypes[io_comprank])))
                 {
                     GPTLstop("PIO:rearrange_comp2io");
                     return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
@@ -1013,7 +1013,7 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
     LOG((2, "about to call pio_swapm for sbuf"));
     if ((ret = pio_swapm(sbuf, sendcounts, sdispls, sendtypes,
                          rbuf, recvcounts, rdispls, recvtypes, mycomm,
-                         &iodesc->rearr_opts.comp2io)))
+                         &iodesc->sync_io_desc_info.rearr_opts.comp2io)))
     {
         GPTLstop("PIO:rearrange_comp2io");
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
@@ -1070,14 +1070,14 @@ int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
 
     /* Different rearrangers use different communicators and number of
      * IO tasks. */
-    if (iodesc->rearranger == PIO_REARR_BOX)
+    if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_BOX)
     {
         mycomm = ios->union_comm;
         niotasks = ios->io_comm_info->get_sync_io_comm_sz();
     }
     else
     {
-        mycomm = iodesc->subset_comm;
+        mycomm = iodesc->sync_io_desc_info.subset_comm;
         niotasks = 1;
     }
     LOG((3, "niotasks = %d", niotasks));
@@ -1121,22 +1121,22 @@ int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
      * below. */
     if (ios->io_comm_info->is_sync_io_proc())
     {
-        for (int i = 0; i < iodesc->nrecvs; i++)
+        for (int i = 0; i < iodesc->sync_io_desc_info.nrecvs; i++)
         {
-            if (iodesc->rtype[i] != MPI_DATATYPE_NULL)
+            if (iodesc->sync_io_desc_info.rtype[i] != MPI_DATATYPE_NULL)
             {
-                if (iodesc->rearranger == PIO_REARR_SUBSET)
+                if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET)
                 {
                     if (sbuf)
                     {
                         sendcounts[i] = 1;
-                        sendtypes[i] = iodesc->rtype[i];
+                        sendtypes[i] = iodesc->sync_io_desc_info.rtype[i];
                     }
                 }
                 else
                 {
-                    sendcounts[iodesc->rfrom[i]] = 1;
-                    sendtypes[iodesc->rfrom[i]] = iodesc->rtype[i];
+                    sendcounts[iodesc->sync_io_desc_info.rfrom[i]] = 1;
+                    sendtypes[iodesc->sync_io_desc_info.rfrom[i]] = iodesc->sync_io_desc_info.rtype[i];
                 }
             }
         }
@@ -1151,19 +1151,19 @@ int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
     {
         int io_comprank = ios_ioranks[i];
 
-        if (iodesc->rearranger == PIO_REARR_SUBSET)
+        if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET)
             io_comprank = 0;
 
-        if (iodesc->scount[i] > 0 && iodesc->stype[i] != MPI_DATATYPE_NULL)
+        if (iodesc->sync_io_desc_info.scount[i] > 0 && iodesc->sync_io_desc_info.stype[i] != MPI_DATATYPE_NULL)
         {
             recvcounts[io_comprank] = 1;
-            recvtypes[io_comprank] = iodesc->stype[i];
+            recvtypes[io_comprank] = iodesc->sync_io_desc_info.stype[i];
         }
     }
 
     /* Data in sbuf on the ionodes is sent to rbuf on the compute nodes */
     if ((ret = pio_swapm(sbuf, sendcounts, sdispls, sendtypes, rbuf, recvcounts,
-                         rdispls, recvtypes, mycomm, &iodesc->rearr_opts.io2comp)))
+                         rdispls, recvtypes, mycomm, &iodesc->sync_io_desc_info.rearr_opts.io2comp)))
     {
         GPTLstop("PIO:rearrange_io2comp");
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
@@ -1183,7 +1183,7 @@ int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
  *
  * @param ios pointer to the iosystem_desc_t struct.
  * @param iodesc a pointer to the io_desc_t struct.
- * @param gdimlen pointer to an array length iodesc->ndims with the
+ * @param gdimlen pointer to an array length iodesc->sync_io_desc_info.ndims with the
  * global array sizes for one record (for record vars) or for the
  * entire var (for non-record vars).
  * @param compmap only used for the box communicator.
@@ -1197,19 +1197,19 @@ int determine_fill(iosystem_desc_t *ios, io_desc_t *iodesc, const int *gdimlen,
     int mpierr; /* Return code from MPI calls. */
 
     /* Check inputs. */
-    pioassert(ios && iodesc && gdimlen && ((iodesc->ndof == 0) || compmap), "invalid input",
+    pioassert(ios && iodesc && gdimlen && ((iodesc->sync_io_desc_info.ndof == 0) || compmap), "invalid input",
               __FILE__, __LINE__);
 
     /* Determine size of data space. */
-    for (int i = 0; i < iodesc->ndims; i++)
+    for (int i = 0; i < iodesc->sync_io_desc_info.ndims; i++)
         totalgridsize *= gdimlen[i];
 
     /* Determine how many values we have locally. */
-    if (iodesc->rearranger == PIO_REARR_SUBSET)
-        totalllen = iodesc->llen;
+    if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET)
+        totalllen = iodesc->sync_io_desc_info.llen;
     else{
-        pioassert((iodesc->ndof == 0) || compmap, "invalid input", __FILE__, __LINE__);
-        for (int i = 0; i < iodesc->ndof; i++)
+        pioassert((iodesc->sync_io_desc_info.ndof == 0) || compmap, "invalid input", __FILE__, __LINE__);
+        for (int i = 0; i < iodesc->sync_io_desc_info.ndof; i++)
             if (compmap[i] > 0)
                 totalllen++;
     }
@@ -1224,10 +1224,10 @@ int determine_fill(iosystem_desc_t *ios, io_desc_t *iodesc, const int *gdimlen,
 
     /* If the total size of the data provided to be written is < the
      * total data size then we need fill values. */
-    iodesc->needsfill = totalllen < totalgridsize;
+    iodesc->sync_io_desc_info.needsfill = totalllen < totalgridsize;
 
     /*  TURN OFF FILL for timing test
-        iodesc->needsfill=false; */
+        iodesc->sync_io_desc_info.needsfill=false; */
 
     return PIO_NOERR;
 }
@@ -1303,10 +1303,10 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
     PIO_Offset sc_info_msg_recv[ios->io_comm_info->get_sync_io_comm_sz() * sc_info_msg_sz];
 
     /* This is the box rearranger. */
-    iodesc->rearranger = PIO_REARR_BOX;
+    iodesc->sync_io_desc_info.rearranger = PIO_REARR_BOX;
 
     /* Number of elements of data on compute node. */
-    iodesc->ndof = maplen;
+    iodesc->sync_io_desc_info.ndof = maplen;
 
     if (maplen > 0)
     {
@@ -1381,20 +1381,20 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
      * complete list of llens for each IO task. */
     LOG((3, "ios->io_comm_info->is_sync_io_proc() = %d ios->num_uniontasks = %d", ios->io_comm_info->is_sync_io_proc(),
          ios->num_uniontasks));
-    pioassert(iodesc->llen == 0, "error", __FILE__, __LINE__);
+    pioassert(iodesc->sync_io_desc_info.llen == 0, "error", __FILE__, __LINE__);
     if (ios->io_comm_info->is_sync_io_proc())
     {
         /* Determine llen, the lenght of the data array on this IO
          * node, by multipliying the counts in the
-         * iodesc->firstregion. */
-        iodesc->llen = 1;
+         * iodesc->sync_io_desc_info.firstregion. */
+        iodesc->sync_io_desc_info.llen = 1;
         for (int i = 0; i < ndims; i++)
         {
-            iodesc->llen *= iodesc->firstregion->count[i];
-            LOG((3, "iodesc->firstregion->start[%d] = %d iodesc->firstregion->count[%d] = %d",
-                 i, iodesc->firstregion->start[i], i, iodesc->firstregion->count[i]));
+            iodesc->sync_io_desc_info.llen *= iodesc->sync_io_desc_info.firstregion->count[i];
+            LOG((3, "iodesc->sync_io_desc_info.firstregion->start[%d] = %d iodesc->sync_io_desc_info.firstregion->count[%d] = %d",
+                 i, iodesc->sync_io_desc_info.firstregion->start[i], i, iodesc->sync_io_desc_info.firstregion->count[i]));
         }
-        LOG((2, "iodesc->llen = %d", iodesc->llen));
+        LOG((2, "iodesc->sync_io_desc_info.llen = %d", iodesc->sync_io_desc_info.llen));
     }
 
     /* Determine whether fill values will be needed. */
@@ -1404,18 +1404,18 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Creating BOX rearranger failed for I/O decomposition (iodi=%d) on iosystem (iosysid=%d). Unable to determine fillvalue to use", iodesc->ioid, ios->iosysid);
     }
-    LOG((2, "iodesc->needsfill = %d ios->io_comm_info->get_sync_io_comm_sz() = %d", iodesc->needsfill,
+    LOG((2, "iodesc->sync_io_desc_info.needsfill = %d ios->io_comm_info->get_sync_io_comm_sz() = %d", iodesc->sync_io_desc_info.needsfill,
          ios->io_comm_info->get_sync_io_comm_sz()));
 
     /* Set the iomaplen in the sc_info msg */
-    sc_info_msg_send[0] = iodesc->llen;
+    sc_info_msg_send[0] = iodesc->sync_io_desc_info.llen;
 
     /* start/count array to be sent: 1st half for start, 2nd half for count */
     for (int j = 0; j < ndims; j++)
     {
         /* The first data in sc_info_msg_send[] is the iomaplen */
-        sc_info_msg_send[j + 1] = iodesc->firstregion->start[j];
-        sc_info_msg_send[ndims + j + 1] = iodesc->firstregion->count[j];
+        sc_info_msg_send[j + 1] = iodesc->sync_io_desc_info.firstregion->start[j];
+        sc_info_msg_send[ndims + j + 1] = iodesc->sync_io_desc_info.firstregion->count[j];
     }
 
     /* Set the recvcounts/recv displs for the sc_info msg from each io task */
@@ -1459,7 +1459,7 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
          ndims));
     if ((ret = pio_swapm(sc_info_msg_send, sendcounts, sdispls, dtypes, sc_info_msg_recv,
                          recvcounts, rdispls, dtypes, ios->union_comm,
-                         &iodesc->rearr_opts.io2comp)))
+                         &iodesc->sync_io_desc_info.rearr_opts.io2comp)))
     {
         GPTLstop("PIO:box_rearrange_create");
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
@@ -1585,7 +1585,7 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
             return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                             "Creating BOX rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Unable to compute hte maximum I/O buffer size required for caching data", iodesc->ioid, ios->iosysid);
         }
-        LOG((3, "iodesc->maxiobuflen = %d", iodesc->maxiobuflen));
+        LOG((3, "iodesc->sync_io_desc_info.maxiobuflen = %d", iodesc->sync_io_desc_info.maxiobuflen));
     }
 
     /* Using maxiobuflen compute the maximum number of bytes that the
@@ -1596,7 +1596,7 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Creating BOX rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Unable to calculate the max aggregate bytes across all processes", iodesc->ioid, ios->iosysid);
     }
-    LOG((3, "iodesc->maxbytes = %d", iodesc->maxbytes));
+    LOG((3, "iodesc->sync_io_desc_info.maxbytes = %d", iodesc->sync_io_desc_info.maxbytes));
 
     GPTLstop("PIO:box_rearrange_create");
     return PIO_NOERR;
@@ -1629,10 +1629,10 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
     PIO_Offset iomaplen[ios->io_comm_info->get_sync_io_comm_sz()];   /* Gets the llen of all IO tasks. */
 
     /* This is the box rearranger. */
-    iodesc->rearranger = PIO_REARR_BOX;
+    iodesc->sync_io_desc_info.rearranger = PIO_REARR_BOX;
 
     /* Number of elements of data on compute node. */
-    iodesc->ndof = maplen;
+    iodesc->sync_io_desc_info.ndof = maplen;
 
     if (maplen > 0)
     {
@@ -1691,7 +1691,7 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
      * complete list of llens for each IO task. */
     LOG((3, "ios->io_comm_info->is_sync_io_proc() = %d ios->num_uniontasks = %d", ios->io_comm_info->is_sync_io_proc(),
          ios->num_uniontasks));
-    pioassert(iodesc->llen == 0, "error", __FILE__, __LINE__);
+    pioassert(iodesc->sync_io_desc_info.llen == 0, "error", __FILE__, __LINE__);
     const std::vector<int> ios_ioranks = ios->io_comm_info->get_sync_io_ranks();
     if (ios->io_comm_info->is_sync_io_proc())
     {
@@ -1704,15 +1704,15 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
 
         /* Determine llen, the lenght of the data array on this IO
          * node, by multipliying the counts in the
-         * iodesc->firstregion. */
-        iodesc->llen = 1;
+         * iodesc->sync_io_desc_info.firstregion. */
+        iodesc->sync_io_desc_info.llen = 1;
         for (int i = 0; i < ndims; i++)
         {
-            iodesc->llen *= iodesc->firstregion->count[i];
-            LOG((3, "iodesc->firstregion->start[%d] = %d iodesc->firstregion->count[%d] = %d",
-                 i, iodesc->firstregion->start[i], i, iodesc->firstregion->count[i]));
+            iodesc->sync_io_desc_info.llen *= iodesc->sync_io_desc_info.firstregion->count[i];
+            LOG((3, "iodesc->sync_io_desc_info.firstregion->start[%d] = %d iodesc->sync_io_desc_info.firstregion->count[%d] = %d",
+                 i, iodesc->sync_io_desc_info.firstregion->start[i], i, iodesc->sync_io_desc_info.firstregion->count[i]));
         }
-        LOG((2, "iodesc->llen = %d", iodesc->llen));
+        LOG((2, "iodesc->sync_io_desc_info.llen = %d", iodesc->sync_io_desc_info.llen));
     }
 
     /* Determine whether fill values will be needed. */
@@ -1722,7 +1722,7 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Creating BOX rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Unable to determine fillvalue to use", iodesc->ioid, ios->iosysid);
     }
-    LOG((2, "iodesc->needsfill = %d ios->io_comm_info->get_sync_io_comm_sz() = %d", iodesc->needsfill,
+    LOG((2, "iodesc->sync_io_desc_info.needsfill = %d ios->io_comm_info->get_sync_io_comm_sz() = %d", iodesc->sync_io_desc_info.needsfill,
          ios->io_comm_info->get_sync_io_comm_sz()));
 
     /* Set up receive counts and displacements to for an AllToAll
@@ -1739,14 +1739,14 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
     /* All-gather the llen to all tasks into array iomaplen. */
     LOG((3, "calling pio_swapm to allgather llen into array iomaplen, ndims = %d dtypes[0] = %d",
          ndims, dtypes));
-    if ((ret = pio_swapm(&iodesc->llen, sendcounts, sdispls, dtypes, iomaplen, recvcounts,
-                         rdispls, dtypes, ios->union_comm, &iodesc->rearr_opts.io2comp)))
+    if ((ret = pio_swapm(&iodesc->sync_io_desc_info.llen, sendcounts, sdispls, dtypes, iomaplen, recvcounts,
+                         rdispls, dtypes, ios->union_comm, &iodesc->sync_io_desc_info.rearr_opts.io2comp)))
     {
         GPTLstop("PIO:box_rearrange_create_with_holes");
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Creating BOX rearranger failed for I/O decomposition (ioid=%d) on iosytem (iosysid=%d). pio_swapm() failed to exchange the I/O decomposition map length across processes", iodesc->ioid, ios->iosysid);
     }
-    LOG((3, "iodesc->llen = %d", iodesc->llen));
+    LOG((3, "iodesc->sync_io_desc_info.llen = %d", iodesc->sync_io_desc_info.llen));
 #if PIO_ENABLE_LOGGING
     for (int i = 0; i < ios->io_comm_info->get_sync_io_comm_sz(); i++)
         LOG((3, "iomaplen[%d] = %d", i, iomaplen[i]));
@@ -1781,8 +1781,8 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
             /* start/count array to be sent: 1st half for start, 2nd half for count */
             for (int j = 0; j < ndims; j++)
             {
-                start_count_send[j] = iodesc->firstregion->start[j];
-                start_count_send[ndims + j] = iodesc->firstregion->count[j];
+                start_count_send[j] = iodesc->sync_io_desc_info.firstregion->start[j];
+                start_count_send[ndims + j] = iodesc->sync_io_desc_info.firstregion->count[j];
             }
 
             /* Set up send/recv parameters for all to all gather of
@@ -1803,7 +1803,7 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
                  i, ndims));
             if ((ret = pio_swapm(start_count_send, sendcounts, sdispls, dtypes, start_count_recv,
                                  recvcounts, rdispls, dtypes, ios->union_comm,
-                                 &iodesc->rearr_opts.io2comp)))
+                                 &iodesc->sync_io_desc_info.rearr_opts.io2comp)))
             {
                 GPTLstop("PIO:box_rearrange_create_with_holes");
                 return pio_err(ios, NULL, ret, __FILE__, __LINE__,
@@ -1902,7 +1902,7 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
             return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                             "Creating BOX rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Unable to compute hte maximum I/O buffer size required for caching data", iodesc->ioid, ios->iosysid);
         }
-        LOG((3, "iodesc->maxiobuflen = %d", iodesc->maxiobuflen));
+        LOG((3, "iodesc->sync_io_desc_info.maxiobuflen = %d", iodesc->sync_io_desc_info.maxiobuflen));
     }
 
     /* Using maxiobuflen compute the maximum number of bytes that the
@@ -1913,7 +1913,7 @@ int box_rearrange_create_with_holes(iosystem_desc_t *ios, int maplen, const PIO_
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Creating BOX rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Unable to calculate the max aggregate bytes across all processes", iodesc->ioid, ios->iosysid);
     }
-    LOG((3, "iodesc->maxbytes = %d", iodesc->maxbytes));
+    LOG((3, "iodesc->sync_io_desc_info.maxbytes = %d", iodesc->sync_io_desc_info.maxbytes));
 
     GPTLstop("PIO:box_rearrange_create_with_holes");
     return PIO_NOERR;
@@ -2111,7 +2111,7 @@ int default_subset_partition(iosystem_desc_t *ios, io_desc_t *iodesc)
     {
         union_comm = ios->comp_comm;
     }
-    if ((mpierr = MPI_Comm_split(union_comm, color, key, &(iodesc->subset_comm))))
+    if ((mpierr = MPI_Comm_split(union_comm, color, key, &(iodesc->sync_io_desc_info.subset_comm))))
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
 
     LOG((2, "Finished Splitting comm = %x, key = %d, color = %d", union_comm, key, color));
@@ -2131,24 +2131,24 @@ int default_subset_partition(iosystem_desc_t *ios, io_desc_t *iodesc)
  * This function:
  * <ul>
  * <li>Calls default_subset_partition() to create subset_comm.
- * <li>For IO tasks, allocates iodesc->rcount array (length ntasks).
- * <li>Allocates iodesc->scount array (length 1)
- * <li>Determins value of iodesc->scount[0], the number of data
+ * <li>For IO tasks, allocates iodesc->sync_io_desc_info.rcount array (length ntasks).
+ * <li>Allocates iodesc->sync_io_desc_info.scount array (length 1)
+ * <li>Determins value of iodesc->sync_io_desc_info.scount[0], the number of data
  * elements on this compute task which are read/written.
- * <li>Allocated and inits iodesc->sindex (length iodesc->scount[0]),
+ * <li>Allocated and inits iodesc->sync_io_desc_info.sindex (length iodesc->sync_io_desc_info.scount[0]),
  * init it to contain indicies to data.
  * <li>Pass the reduced maplen (without holes) from each compute task
  * to its associated IO task.
  * <li>On IO tasks, determine llen.
  * <li>Determine whether fill values will be needed.
- * <li>Pass iodesc->sindex from each compute task to its associated IO
+ * <li>Pass iodesc->sync_io_desc_info.sindex from each compute task to its associated IO
  * task.
  * <li>Create shrtmap, which is compmap without the holes.
  * <li>Gather shrtmaps from each task into iomap.
  * <li>On IO tasks, sort the mapping, this will transpose the data
  * into IO order.
- * <li>On IO tasks, allocate and init iodesc->rindex and iodesc->rfrom
- * (length iodesc->llen).
+ * <li>On IO tasks, allocate and init iodesc->sync_io_desc_info.rindex and iodesc->sync_io_desc_info.rfrom
+ * (length iodesc->sync_io_desc_info.llen).
  * <li>On IO tasks, handle fill values, if needed.
  * <li>On IO tasks, scatter values of srcindex to subset communicator.
  * <li>On IO tasks, call get_regions() and distribute the max
@@ -2199,21 +2199,21 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Unable to create the default subset partition for the I/O decomposition", iodesc->ioid, ios->iosysid);
     }
-    iodesc->rearranger = PIO_REARR_SUBSET;
+    iodesc->sync_io_desc_info.rearranger = PIO_REARR_SUBSET;
 
     /* Get size of this subset communicator and rank of this task in it. */
-    if ((mpierr = MPI_Comm_rank(iodesc->subset_comm, &rank)))
+    if ((mpierr = MPI_Comm_rank(iodesc->sync_io_desc_info.subset_comm, &rank)))
     {
         GPTLstop("PIO:subset_rearrange_create");
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
     }
-    if ((mpierr = MPI_Comm_size(iodesc->subset_comm, &ntasks)))
+    if ((mpierr = MPI_Comm_size(iodesc->sync_io_desc_info.subset_comm, &ntasks)))
     {
         GPTLstop("PIO:subset_rearrange_create");
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
     }
 
-    LOG((2, "subset_comm = %x, MPI_COMM_NULL = %x, rank = %d, ntasks = %d", iodesc->subset_comm, MPI_COMM_NULL, rank, ntasks));
+    LOG((2, "subset_comm = %x, MPI_COMM_NULL = %x, rank = %d, ntasks = %d", iodesc->sync_io_desc_info.subset_comm, MPI_COMM_NULL, rank, ntasks));
     /* Check rank for correctness. */
     if (ios->io_comm_info->is_sync_io_proc())
         pioassert(rank == 0, "Bad io rank in subset create", __FILE__, __LINE__);
@@ -2222,12 +2222,12 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
                   __FILE__, __LINE__);
 
     /* Remember the maplen for this computation task. */
-    iodesc->ndof = maplen;
+    iodesc->sync_io_desc_info.ndof = maplen;
 
     if (ios->io_comm_info->is_sync_io_proc())
     {
         /* Allocate space to hold count of data to be received in pio_swapm(). */
-        if (!(iodesc->rcount = (int *) malloc(ntasks * sizeof(int))))
+        if (!(iodesc->sync_io_desc_info.rcount = (int *) malloc(ntasks * sizeof(int))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -2238,14 +2238,14 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
     }
 
     /* Allocate space to hold count of data to be sent in pio_swapm(). */
-    if (!(iodesc->scount = (int *) malloc(sizeof(int))))
+    if (!(iodesc->sync_io_desc_info.scount = (int *) malloc(sizeof(int))))
     {
         GPTLstop("PIO:subset_rearrange_create");
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
                         "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing send count while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) sizeof(int));
     }
 
-    iodesc->scount[0] = 0;
+    iodesc->sync_io_desc_info.scount[0] = 0;
 
     /* Find the total size of the global data array. */
     totalgridsize = 1;
@@ -2261,34 +2261,34 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
             pioassert(compmap[i]>=0 && compmap[i]<=totalgridsize, "Compmap value out of bounds",
             __FILE__,__LINE__); */
         if (compmap[i] > 0)
-            (iodesc->scount[0])++;
+            (iodesc->sync_io_desc_info.scount[0])++;
     }
 
     /* Allocate an array for indicies on the computation tasks (the
      * send side when writing). */
-    if (iodesc->scount[0] > 0)
-        if (!(iodesc->sindex = (PIO_Offset *) calloc(iodesc->scount[0], sizeof(PIO_Offset))))
+    if (iodesc->sync_io_desc_info.scount[0] > 0)
+        if (!(iodesc->sync_io_desc_info.sindex = (PIO_Offset *) calloc(iodesc->sync_io_desc_info.scount[0], sizeof(PIO_Offset))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing send indices while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->scount[0] * sizeof(PIO_Offset)));
+                            "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing send indices while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->sync_io_desc_info.scount[0] * sizeof(PIO_Offset)));
         }
 
     j = 0;
     for (i = 0; i < maplen; i++)
         if (compmap[i] > 0)
-            iodesc->sindex[j++] = i;
+            iodesc->sync_io_desc_info.sindex[j++] = i;
 
     /* Pass the reduced maplen (without holes) from each compute task
      * to its associated IO task. */
-    if ((mpierr = MPI_Gather(iodesc->scount, 1, MPI_INT, iodesc->rcount, rcnt,
-                             MPI_INT, 0, iodesc->subset_comm)))
+    if ((mpierr = MPI_Gather(iodesc->sync_io_desc_info.scount, 1, MPI_INT, iodesc->sync_io_desc_info.rcount, rcnt,
+                             MPI_INT, 0, iodesc->sync_io_desc_info.subset_comm)))
     {
         GPTLstop("PIO:subset_rearrange_create");
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
     }
 
-    iodesc->llen = 0;
+    iodesc->sync_io_desc_info.llen = 0;
 
     int rdispls[ntasks];
     int recvcounts[ntasks];
@@ -2298,23 +2298,23 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
     {
         for (i = 0; i < ntasks; i++)
         {
-            iodesc->llen += iodesc->rcount[i];
+            iodesc->sync_io_desc_info.llen += iodesc->sync_io_desc_info.rcount[i];
             rdispls[i] = 0;
-            recvcounts[i] = iodesc->rcount[i];
+            recvcounts[i] = iodesc->sync_io_desc_info.rcount[i];
             if (i > 0)
-                rdispls[i] = rdispls[i - 1] + iodesc->rcount[i - 1];
+                rdispls[i] = rdispls[i - 1] + iodesc->sync_io_desc_info.rcount[i - 1];
         }
 
-        if (iodesc->llen > 0)
+        if (iodesc->sync_io_desc_info.llen > 0)
         {
-            if (!(srcindex = (PIO_Offset *) calloc(iodesc->llen, sizeof(PIO_Offset))))
+            if (!(srcindex = (PIO_Offset *) calloc(iodesc->sync_io_desc_info.llen, sizeof(PIO_Offset))))
             {
                 GPTLstop("PIO:subset_rearrange_create");
                 return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing source indices while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->llen * sizeof(PIO_Offset)));
+                                "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing source indices while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->sync_io_desc_info.llen * sizeof(PIO_Offset)));
             }
 
-            for (i = 0; i < iodesc->llen; i++)
+            for (i = 0; i < iodesc->sync_io_desc_info.llen; i++)
                 srcindex[i] = 0;
         }
     }
@@ -2336,9 +2336,9 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
     }
 
     /* Pass the sindex from each compute task to its associated IO task. */
-    if ((mpierr = MPI_Gatherv(iodesc->sindex, iodesc->scount[0], PIO_OFFSET,
+    if ((mpierr = MPI_Gatherv(iodesc->sync_io_desc_info.sindex, iodesc->sync_io_desc_info.scount[0], PIO_OFFSET,
                               srcindex, recvcounts, rdispls, PIO_OFFSET, 0,
-                              iodesc->subset_comm)))
+                              iodesc->sync_io_desc_info.subset_comm)))
     {
         GPTLstop("PIO:subset_rearrange_create");
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
@@ -2346,32 +2346,32 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
 
     /* On IO tasks which need it, allocate memory for the map and the
      * iomap. */
-    if (ios->io_comm_info->is_sync_io_proc() && iodesc->llen > 0)
+    if (ios->io_comm_info->is_sync_io_proc() && iodesc->sync_io_desc_info.llen > 0)
     {
-        if (!(map = (mapsort *) calloc(iodesc->llen, sizeof(mapsort))))
+        if (!(map = (mapsort *) calloc(iodesc->sync_io_desc_info.llen, sizeof(mapsort))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing internal map while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->llen * sizeof(mapsort)));
+                            "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing internal map while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->sync_io_desc_info.llen * sizeof(mapsort)));
         }
 
-        if (!(iomap = (PIO_Offset *) calloc(iodesc->llen, sizeof(PIO_Offset))))
+        if (!(iomap = (PIO_Offset *) calloc(iodesc->sync_io_desc_info.llen, sizeof(PIO_Offset))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing internal I/O map while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->llen * sizeof(PIO_Offset)));
+                            "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing internal I/O map while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->sync_io_desc_info.llen * sizeof(PIO_Offset)));
         }
     }
 
     /* Now pass the compmap, skipping the holes. */
     PIO_Offset *shrtmap;
-    if (maplen > iodesc->scount[0] && iodesc->scount[0] > 0)
+    if (maplen > iodesc->sync_io_desc_info.scount[0] && iodesc->sync_io_desc_info.scount[0] > 0)
     {
-        if (!(shrtmap = (PIO_Offset *) calloc(iodesc->scount[0], sizeof(PIO_Offset))))
+        if (!(shrtmap = (PIO_Offset *) calloc(iodesc->sync_io_desc_info.scount[0], sizeof(PIO_Offset))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing internal comp map while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->scount[0] * sizeof(PIO_Offset)));
+                            "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing internal comp map while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->sync_io_desc_info.scount[0] * sizeof(PIO_Offset)));
         }
 
         j = 0;
@@ -2386,8 +2386,8 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
 
     /* Gather shrtmap from each task in the subset communicator, and
      * put gathered results into iomap. */
-    if ((mpierr = MPI_Gatherv(shrtmap, iodesc->scount[0], PIO_OFFSET, iomap, recvcounts,
-                              rdispls, PIO_OFFSET, 0, iodesc->subset_comm)))
+    if ((mpierr = MPI_Gatherv(shrtmap, iodesc->sync_io_desc_info.scount[0], PIO_OFFSET, iomap, recvcounts,
+                              rdispls, PIO_OFFSET, 0, iodesc->sync_io_desc_info.subset_comm)))
     {
         GPTLstop("PIO:subset_rearrange_create");
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
@@ -2397,14 +2397,14 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
         free(shrtmap);
 
     /* On IO tasks that have data in the local array ??? */
-    if (ios->io_comm_info->is_sync_io_proc() && iodesc->llen > 0)
+    if (ios->io_comm_info->is_sync_io_proc() && iodesc->sync_io_desc_info.llen > 0)
     {
         int pos = 0;
         int k = 0;
         mapsort *mptr;
         for (i = 0; i < ntasks; i++)
         {
-            for (j = 0; j < iodesc->rcount[i]; j++)
+            for (j = 0; j < iodesc->sync_io_desc_info.rcount[i]; j++)
             {
                 mptr = &map[k];
                 mptr->rfrom = i;
@@ -2412,24 +2412,24 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
                 mptr->iomap = iomap[pos + j];
                 k++;
             }
-            pos += iodesc->rcount[i];
+            pos += iodesc->sync_io_desc_info.rcount[i];
         }
 
         /* sort the mapping, this will transpose the data into IO order */
-        qsort(map, iodesc->llen, sizeof(mapsort), compare_offsets);
+        qsort(map, iodesc->sync_io_desc_info.llen, sizeof(mapsort), compare_offsets);
 
-        if (!(iodesc->rindex = (PIO_Offset *) calloc(1, iodesc->llen * sizeof(PIO_Offset))))
+        if (!(iodesc->sync_io_desc_info.rindex = (PIO_Offset *) calloc(1, iodesc->sync_io_desc_info.llen * sizeof(PIO_Offset))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing receive indices while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->llen * sizeof(PIO_Offset)));
+                            "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing receive indices while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->sync_io_desc_info.llen * sizeof(PIO_Offset)));
         }
 
-        if (!(iodesc->rfrom = (int *) calloc(1, iodesc->llen * sizeof(int))))
+        if (!(iodesc->sync_io_desc_info.rfrom = (int *) calloc(1, iodesc->sync_io_desc_info.llen * sizeof(int))))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing ranks to receive data from while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->llen * sizeof(int)));
+                            "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing ranks to receive data from while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->sync_io_desc_info.llen * sizeof(int)));
         }
     }
 
@@ -2441,17 +2441,17 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
 
     /* For IO tasks init rfrom and rindex arrays (compute tasks have
      * llen of 0). */
-    for (i = 0; i < iodesc->llen; i++)
+    for (i = 0; i < iodesc->sync_io_desc_info.llen; i++)
     {
         mapsort *mptr = &map[i];
-        iodesc->rfrom[i] = mptr->rfrom;
-        iodesc->rindex[i] = i;
+        iodesc->sync_io_desc_info.rfrom[i] = mptr->rfrom;
+        iodesc->sync_io_desc_info.rindex[i] = i;
         iomap[i] = mptr->iomap;
-        srcindex[(cnt[iodesc->rfrom[i]])++] = mptr->soffset;
+        srcindex[(cnt[iodesc->sync_io_desc_info.rfrom[i]])++] = mptr->soffset;
     }
 
     /* Handle fill values if needed. */
-    if (ios->io_comm_info->is_sync_io_proc() && iodesc->needsfill)
+    if (ios->io_comm_info->is_sync_io_proc() && iodesc->sync_io_desc_info.needsfill)
     {
         /* we need the list of offsets which are not in the union of iomap */
         PIO_Offset thisgridsize[ios->io_comm_info->get_sync_io_comm_sz()];
@@ -2478,7 +2478,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
                 thisgridmin[nio] = thisgridmax[nio - 1] + 1;
                 thisgridmax[nio]= thisgridmin[nio] + thisgridsize[nio] - 1;
             }
-            for (int i = 0; i < iodesc->llen; i++)
+            for (int i = 0; i < iodesc->sync_io_desc_info.llen; i++)
             {
                 if (iomap[i] >= thisgridmin[nio] && iomap[i] <= thisgridmax[nio])
                 {
@@ -2552,20 +2552,20 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
         if (myusegrid)
             free(myusegrid);
 
-        iodesc->holegridsize = thisgridsize[ios->io_comm_info->get_sync_io_comm_rank()] - cnt;
-        if (iodesc->holegridsize > 0)
+        iodesc->sync_io_desc_info.holegridsize = thisgridsize[ios->io_comm_info->get_sync_io_comm_rank()] - cnt;
+        if (iodesc->sync_io_desc_info.holegridsize > 0)
         {
             /* Allocate space for the fillgrid. */
-            if (!(myfillgrid = (PIO_Offset *) malloc(iodesc->holegridsize * sizeof(PIO_Offset))))
+            if (!(myfillgrid = (PIO_Offset *) malloc(iodesc->sync_io_desc_info.holegridsize * sizeof(PIO_Offset))))
             {
                 GPTLstop("PIO:subset_rearrange_create");
                 return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing fill grid to handle fillvalues while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->holegridsize * sizeof(PIO_Offset)));
+                                "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for storing fill grid to handle fillvalues while setting up the rearranger", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->sync_io_desc_info.holegridsize * sizeof(PIO_Offset)));
             }
         }
 
         /* Initialize the fillgrid. */
-        for (i = 0; i < iodesc->holegridsize; i++)
+        for (i = 0; i < iodesc->sync_io_desc_info.holegridsize; i++)
             myfillgrid[i] = -1;
 
         j = 0;
@@ -2586,25 +2586,25 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
         free(grid);
         grid = NULL;
         maxregions = 0;
-        iodesc->maxfillregions = 0;
+        iodesc->sync_io_desc_info.maxfillregions = 0;
         if (myfillgrid)
         {
             /* Allocate a data region to hold fill values. */
-            if ((ret = alloc_region2(ios, iodesc->ndims, &iodesc->fillregion)))
+            if ((ret = alloc_region2(ios, iodesc->sync_io_desc_info.ndims, &iodesc->sync_io_desc_info.fillregion)))
             {
                 GPTLstop("PIO:subset_rearrange_create");
                 return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                                 "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Allocating a data region to hold fillvalues failed", iodesc->ioid, ios->iosysid);
             }
-            if ((ret = get_regions(iodesc->ndims, gdimlen, iodesc->holegridsize, myfillgrid,
-                                   &iodesc->maxfillregions, iodesc->fillregion)))
+            if ((ret = get_regions(iodesc->sync_io_desc_info.ndims, gdimlen, iodesc->sync_io_desc_info.holegridsize, myfillgrid,
+                                   &iodesc->sync_io_desc_info.maxfillregions, iodesc->sync_io_desc_info.fillregion)))
             {
                 GPTLstop("PIO:subset_rearrange_create");
                 return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                                 "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Getting data regions with fillvalues failed", iodesc->ioid, ios->iosysid);
             }
             free(myfillgrid);
-            maxregions = iodesc->maxfillregions;
+            maxregions = iodesc->sync_io_desc_info.maxfillregions;
         }
 
         /* Get the max maxregions, and distribute it to all tasks in
@@ -2615,12 +2615,12 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
             GPTLstop("PIO:subset_rearrange_create");
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
         }
-        iodesc->maxfillregions = maxregions;
+        iodesc->sync_io_desc_info.maxfillregions = maxregions;
 
         /* Get the max maxholegridsize, and distribute it to all tasks
          * in the IO communicator. */
-	iodesc->maxholegridsize = iodesc->holegridsize;
-        if ((mpierr = MPI_Allreduce(MPI_IN_PLACE, &(iodesc->maxholegridsize), 1, MPI_INT,
+	iodesc->sync_io_desc_info.maxholegridsize = iodesc->sync_io_desc_info.holegridsize;
+        if ((mpierr = MPI_Allreduce(MPI_IN_PLACE, &(iodesc->sync_io_desc_info.maxholegridsize), 1, MPI_INT,
                                     MPI_MAX, ios->io_comm_info->get_sync_io_comm())))
         {
             GPTLstop("PIO:subset_rearrange_create");
@@ -2630,8 +2630,8 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
 
     /* Scatter values of srcindex to subset communicator. ??? */
     if ((mpierr = MPI_Scatterv((void *)srcindex, recvcounts, rdispls, PIO_OFFSET,
-                               (void *)iodesc->sindex, iodesc->scount[0],  PIO_OFFSET,
-                               0, iodesc->subset_comm)))
+                               (void *)iodesc->sync_io_desc_info.sindex, iodesc->sync_io_desc_info.scount[0],  PIO_OFFSET,
+                               0, iodesc->sync_io_desc_info.subset_comm)))
     {
         GPTLstop("PIO:subset_rearrange_create");
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
@@ -2639,15 +2639,15 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
 
     if (ios->io_comm_info->is_sync_io_proc())
     {
-        iodesc->maxregions = 0;
-        if ((ret = get_regions(iodesc->ndims, gdimlen, iodesc->llen, iomap,
-                               &iodesc->maxregions, iodesc->firstregion)))
+        iodesc->sync_io_desc_info.maxregions = 0;
+        if ((ret = get_regions(iodesc->sync_io_desc_info.ndims, gdimlen, iodesc->sync_io_desc_info.llen, iomap,
+                               &iodesc->sync_io_desc_info.maxregions, iodesc->sync_io_desc_info.firstregion)))
         {
             GPTLstop("PIO:subset_rearrange_create");
             return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                             "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Getting data regions with fillvalues failed", iodesc->ioid, ios->iosysid);
         }
-        maxregions = iodesc->maxregions;
+        maxregions = iodesc->sync_io_desc_info.maxregions;
 
         /* Get the max maxregions, and distribute it to all tasks in
          * the IO communicator. */
@@ -2656,7 +2656,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
             GPTLstop("PIO:subset_rearrange_create");
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
         }
-        iodesc->maxregions = maxregions;
+        iodesc->sync_io_desc_info.maxregions = maxregions;
 
         /* Free resources. */
         if (iomap)
@@ -2676,7 +2676,7 @@ int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compma
                             "Creating SUBSET rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Calculating maximum I/O buffer size for the I/O decomposition failed", iodesc->ioid, ios->iosysid);
         }
 
-        iodesc->nrecvs = ntasks;
+        iodesc->sync_io_desc_info.nrecvs = ntasks;
     }
 
     /* Using maxiobuflen compute the maximum number of vars of this type that the io
@@ -2711,28 +2711,28 @@ void performance_tune_rearranger(iosystem_desc_t *ios, io_desc_t *iodesc)
 
     assert(iodesc);
 
-    if ((mpierr = MPI_Type_size(iodesc->mpitype, &tsize)))
+    if ((mpierr = MPI_Type_size(iodesc->sync_io_desc_info.mpitype, &tsize)))
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
     cbuf = NULL;
     ibuf = NULL;
-    if (iodesc->ndof > 0)
-        if (!(cbuf = bget(iodesc->ndof * tsize)))
+    if (iodesc->sync_io_desc_info.ndof > 0)
+        if (!(cbuf = bget(iodesc->sync_io_desc_info.ndof * tsize)))
         {
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Performance tuning of the rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for buffer on compute processes", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->ndof * tsize));
+                            "Performance tuning of the rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for buffer on compute processes", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->sync_io_desc_info.ndof * tsize));
         }
 
-    if (iodesc->llen > 0)
-        if (!(ibuf = bget(iodesc->llen * tsize)))
+    if (iodesc->sync_io_desc_info.llen > 0)
+        if (!(ibuf = bget(iodesc->sync_io_desc_info.llen * tsize)))
         {
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Performance tuning of the rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for buffer on I/O processes", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->llen * tsize));
+                            "Performance tuning of the rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Out of memory allocating %lld bytes for buffer on I/O processes", iodesc->ioid, ios->iosysid, (unsigned long long) (iodesc->sync_io_desc_info.llen * tsize));
         }
 
-    if (iodesc->rearranger == PIO_REARR_BOX)
+    if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_BOX)
         mycomm = ios->union_comm;
     else
-        mycomm = iodesc->subset_comm;
+        mycomm = iodesc->sync_io_desc_info.subset_comm;
 
     if ((mpierr = MPI_Comm_size(mycomm, &nprocs)))
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
@@ -2758,16 +2758,16 @@ void performance_tune_rearranger(iosystem_desc_t *ios, io_desc_t *iodesc)
     if ((mpierr = MPI_Allreduce(MPI_IN_PLACE, &mintime, 1, MPI_DOUBLE, MPI_MAX, mycomm)))
         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
 
-    handshake = iodesc->rearr_opts.comp2io.hs;
+    handshake = iodesc->sync_io_desc_info.rearr_opts.comp2io.hs;
     isend = iodesc->isend;
     maxreqs = iodesc->max_requests;
 
     for (int i = 0; i < 2; i++)
     {
         if (i == 0)
-            iodesc->rearr_opts.comp2io.hs = false;
+            iodesc->sync_io_desc_info.rearr_opts.comp2io.hs = false;
         else
-            iodesc->rearr_opts.comp2io.hs = true;
+            iodesc->sync_io_desc_info.rearr_opts.comp2io.hs = true;
 
         for (int j = 0; j < 2; j++)
         {
@@ -2794,7 +2794,7 @@ void performance_tune_rearranger(iosystem_desc_t *ios, io_desc_t *iodesc)
 
                 if (wall[1] < mintime * 0.95)
                 {
-                    handshake = iodesc->rearr_opts.comp2io.hs;
+                    handshake = iodesc->sync_io_desc_info.rearr_opts.comp2io.hs;
                     isend = iodesc->isend;
                     maxreqs = nreqs;
                     mintime = wall[1];
@@ -2807,7 +2807,7 @@ void performance_tune_rearranger(iosystem_desc_t *ios, io_desc_t *iodesc)
         }
     }
 
-    iodesc->rearr_opts.comp2io.hs = handshake;
+    iodesc->sync_io_desc_info.rearr_opts.comp2io.hs = handshake;
     iodesc->isend = isend;
     iodesc->max_requests = maxreqs;
 

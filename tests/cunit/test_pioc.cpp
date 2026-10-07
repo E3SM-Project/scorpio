@@ -1645,17 +1645,17 @@ int test_malloc_iodesc2(int iosysid, int my_rank)
           1, gdimlen,
           1, compmap, PIO_REARR_BOX, false);
 
-        if (iodesc->mpitype != mpi_type[t])
+        if (iodesc->sync_io_desc_info.mpitype != mpi_type[t])
             return ERR_WRONG;
-        if (iodesc->ndims != 1)
+        if (iodesc->sync_io_desc_info.ndims != 1)
             return ERR_WRONG;
         ioid = pio_add_to_iodesc_list(iodesc, MPI_COMM_NULL);
-        if(iodesc->firstregion){
-          iodesc->free_region_list(iodesc->firstregion);
-          iodesc->firstregion = NULL;
+        if(iodesc->sync_io_desc_info.firstregion){
+          iodesc->sync_io_desc_info.free_region_list(iodesc->sync_io_desc_info.firstregion);
+          iodesc->sync_io_desc_info.firstregion = NULL;
         }
-        free(iodesc->map); iodesc->map = NULL;
-        free(iodesc->dimlen); iodesc->dimlen = NULL;
+        free(iodesc->sync_io_desc_info.map); iodesc->sync_io_desc_info.map = NULL;
+        free(iodesc->sync_io_desc_info.dimlen); iodesc->sync_io_desc_info.dimlen = NULL;
         if ((ret = pio_delete_iodesc_from_list(ioid)))
             return ret;
     }

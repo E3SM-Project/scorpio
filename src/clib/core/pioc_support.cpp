@@ -1940,12 +1940,12 @@ int PIOc_write_nc_decomp_impl(int iosysid, const char *filename, int cmode, int 
 
     /* Gather maplens from all computation tasks and fill the
      * task_maplen array on all tasks. */
-    if ((mpierr = MPI_Allgather(&iodesc->maplen, 1, MPI_INT, task_maplen, 1, MPI_INT,
+    if ((mpierr = MPI_Allgather(&iodesc->sync_io_desc_info.maplen, 1, MPI_INT, task_maplen, 1, MPI_INT,
                                 ios->comp_comm)))
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
 
     /* Find the max maxplen. */
-    if ((mpierr = MPI_Allreduce(&iodesc->maplen, &max_maplen, 1, MPI_INT, MPI_MAX,
+    if ((mpierr = MPI_Allreduce(&iodesc->sync_io_desc_info.maplen, &max_maplen, 1, MPI_INT, MPI_MAX,
                                 ios->comp_comm)))
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
     LOG((3, "max_maplen = %d", max_maplen));
@@ -1956,11 +1956,11 @@ int PIOc_write_nc_decomp_impl(int iosysid, const char *filename, int cmode, int 
 
     /* Fill local array with my map. Use the fill value for unused */
     /* elements at the end if max_maplen is longer than maplen. Also
-     * subtract 1 because the iodesc->map is 1-based. */
+     * subtract 1 because the iodesc->sync_io_desc_info.map is 1-based. */
     int my_map[max_maplen];
     for (int e = 0; e < max_maplen; e++)
     {
-        my_map[e] = e < iodesc->maplen ? iodesc->map[e] - 1 : NC_FILL_INT;
+        my_map[e] = e < iodesc->sync_io_desc_info.maplen ? iodesc->sync_io_desc_info.map[e] - 1 : NC_FILL_INT;
         LOG((3, "my_map[%d] = %d", e, my_map[e]));
     }
     
@@ -1974,7 +1974,7 @@ int PIOc_write_nc_decomp_impl(int iosysid, const char *filename, int cmode, int 
             LOG((3, "full_map[%d][%d] = %d", p, e, full_map[p][e]));
 
     /* Write the netCDF decomp file. */
-    if ((ret = spio_write_nc_decomp_int(ios, filename, cmode, iodesc->ndims, iodesc->dimlen,
+    if ((ret = spio_write_nc_decomp_int(ios, filename, cmode, iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen,
                                         ios->num_comptasks, task_maplen, (int *)full_map, title,
                                         history, fortran_order)))
     {
@@ -2641,7 +2641,7 @@ int PIOc_write_decomp_impl(const char *file, int iosysid, int ioid, MPI_Comm com
                         "Write I/O decomposition to file (%s) failed. Invalid io descriptor id (%d) provided (iosysid=%d)", (file) ? file : "UNKNOWN", ioid, iosysid);
     }
 
-    return PIOc_writemap_impl(file, iodesc->ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map,
+    return PIOc_writemap_impl(file, iodesc->ioid, iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map,
                          comm);
 }
 
