@@ -536,6 +536,75 @@ std::shared_ptr<io_desc_t> spio_get_iodesc_ref_from_file(file_desc_t *file, cons
   return nullptr;
 }
 
+/* Wait ("drain") for all asynchronous operations pending on a file to complete
+ *
+ * file->npend_ops is incremented when an asynchronous op (e.g. an HDF5 darray
+ * write dispatched to the async write thread pool) is queued for this file and
+ * decremented when that op completes. Anything that needs to observe the
+ * effects of those ops - closing the file's low level (HDF5) handles, syncing
+ * the file to disk, reading data back from the file - has to wait for the
+ * count to reach zero first.
+ *
+ * Implementation note: this is deliberately a yielding, bounded poll rather
+ * than a condition variable. npend_ops is a std::atomic<int> that the async
+ * worker threads decrement without holding any lock, and the only lock
+ * associated with a file (file->pmtx) is held by spio_hard_closefile() across
+ * its whole body - signalling a condition variable under that lock from the
+ * worker would risk deadlocking against the close path. It is also *not* a
+ * pure busy spin (the original, disabled, `while(file->npend_ops){}`): a tight
+ * spin can starve the async worker thread of CPU on an oversubscribed node.
+ * See also the equivalent polling waits spio_wait_async_iodesc_ops()
+ * (pio_lists.cpp) and spio_wait_all_hdf5_async_ops()
+ * (spio_async_hdf5_utils.cpp).
+ *
+ * Note: Must only be called from a thread that is not itself an async thread
+ * pool worker - a worker waiting here for an op that it is itself supposed to
+ * run would deadlock. The bounded timeout below keeps that from hanging
+ * forever if it ever happens.
+ *
+ * @param file: Pointer to the file_desc for the file
+ * @returns PIO_NOERR once no async ops are pending, PIO_EINTERNAL if the wait
+ * timed out (the caller is expected to warn and continue - aborting a close
+ * or a sync is worse than proceeding)
+ */
+static int spio_wait_file_async_pend_ops(file_desc_t *file)
+{
+  const int SLEEP_TIME_IN_MILLISECONDS = 1;
+  const int WARN_TIME_IN_MILLISECONDS = 5000;
+  /* Same (configurable) bound that spio_wait_on_hard_close() uses for waiting
+   * on async ops, so a stuck/failed async op cannot hang the application */
+  const int TIMEOUT_IN_MILLISECONDS = SPIO_ASYNC_OP_WAIT_TIMEOUT;
+
+  assert(file);
+
+  /* Fast path: nothing pending, no sleeping/yielding at all */
+  if(file->npend_ops <= 0) { return PIO_NOERR; }
+
+  int wait_time = 0;
+  while(file->npend_ops > 0){
+    /* Give the async worker thread(s) a chance to run before sleeping */
+    std::this_thread::yield();
+    std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME_IN_MILLISECONDS));
+    wait_time += SLEEP_TIME_IN_MILLISECONDS;
+
+    if((file->npend_ops > 0) && (wait_time % WARN_TIME_IN_MILLISECONDS == 0)){
+      std::string warn_msg = std::string("Continuing to wait for pending asynchronous operations (") +
+        std::to_string(static_cast<int>(file->npend_ops)) + std::string(" ops pending) on file (") +
+        std::string(pio_get_fname_from_file(file)) + std::string(", ncid=") +
+        std::to_string(file->pio_ncid) + std::string(")... (Elapsed time = ") +
+        std::to_string(wait_time) + std::string(" ms)");
+      PIOc_warn((file->iosystem) ? file->iosystem->iosysid : PIO_DEFAULT, file->pio_ncid,
+        __FILE__, __LINE__, warn_msg.c_str());
+    }
+
+    if(wait_time >= TIMEOUT_IN_MILLISECONDS){
+      return PIO_EINTERNAL;
+    }
+  }
+
+  return PIO_NOERR;
+}
+
 /* Close the file ("hard close")
  * @param ios: Pointer to the iosystem_desc
  * @param file: Pointer to the file_desc for the file
@@ -553,21 +622,36 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
     assert(ios && file);
     //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + file->fname);
 
+    /* Drain any async ops still pending on this file before its low level
+     * (e.g. HDF5) handles are closed below. This has to happen before the
+     * file->pmtx lock is taken: the lock is held for the rest of this
+     * function, and holding it while waiting on another thread is an
+     * unnecessary deadlock hazard.
+     *
+     * Only the sync I/O procs queue/own async write ops for a file (see
+     * pio_iosys_async_hdf5_write_op_add()'s I/O proc gate), so the wait is
+     * restricted to them - on every other proc npend_ops is always 0 and this
+     * is a no-op anyway.
+     *
+     * Note that this is usually already satisfied when we get here: the
+     * "soft close" path (PIOc_closefile_impl() -> spio_soft_closefile() ->
+     * pio_iosys_async_file_close_op_wait()) requeues the close op until
+     * npend_ops reaches 0 and only then calls this function. This drain
+     * covers the direct ("hard close") callers of this function. */
+    if(ios->io_comm_info && ios->io_comm_info->is_sync_io_proc()){
+      if(spio_wait_file_async_pend_ops(file) != PIO_NOERR){
+        PIOc_warn(ios->iosysid, file->pio_ncid, __FILE__, __LINE__,
+          "Timed out waiting for pending asynchronous operations on this file to complete before closing it. "
+          "Continuing with the close - data written by those operations may be lost or the close may fail");
+      }
+    }
+
     /* Get the lock before proceeding */
     std::lock_guard<std::mutex> lg(*(file->pmtx));
 
     int ncid = file->pio_ncid;
 
     if(sync_with_ioprocs){
-      /* FIXME: This drain-wait has been disabled since the async-HDF5-write
-       * feature's original introduction, so nothing currently guarantees a
-       * file's pending async write ops (file->npend_ops) complete before
-       * its HDF5 handles are closed below - a plausible contributor to
-       * use-after-free/ASAN crashes when async ops are still in flight at
-       * close time (see tests/cunit/test_darray_hdf5_contig.cpp's CONTIG
-       * sub-test, which crashes deterministically under
-       * PIO_USE_ASYNC_WR_THREAD=ON during this exact close path). */
-      //if(ios->io_comm_info->is_sync_io_proc()) { while(file->npend_ops){} }
       /* For I/O async threads the union comm is NULL comm */
       MPI_Comm sync_comm = ios->tcomm_info->get_union_comm();
       if(sync_comm != MPI_COMM_NULL){
@@ -1242,6 +1326,23 @@ int PIOc_sync_impl(int ncid)
                         "Syncing file (ncid=%d) failed. Invalid file id. Unable to find internal structure associated with the file id", ncid);
     }
     assert(file);
+
+    /* Drain any async write ops still pending on this file before syncing it
+     * to disk. Without this a PIOc_write_darray() dispatched to the async
+     * write thread pool can still be in flight here, so a subsequent
+     * PIOc_read_darray() (or any other reader) on the same file could observe
+     * stale/not-yet-written data. Only the sync I/O procs ever have pending
+     * async ops on a file, so this is a no-op everywhere else. */
+    if (file->iosystem && file->iosystem->io_comm_info &&
+        file->iosystem->io_comm_info->is_sync_io_proc())
+    {
+        if (spio_wait_file_async_pend_ops(file) != PIO_NOERR)
+        {
+            PIOc_warn(file->iosystem->iosysid, ncid, __FILE__, __LINE__,
+              "Timed out waiting for pending asynchronous operations on this file to complete before syncing it. "
+              "Continuing with the sync - data written by those operations may not be included");
+        }
+    }
 
     if (file->mode & PIO_WRITE)
     {

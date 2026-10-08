@@ -618,7 +618,15 @@ int spio_wait_all_hdf5_async_ops(int iosysid)
   return PIO_NOERR;
 }
 
-int pio_iosys_async_op_hdf5_write(void *pdata)
+/* The body of pio_iosys_async_op_hdf5_write(), separated out so that the
+ * pending-op counters (iodesc->nasync_pend_ops, file->npend_ops and
+ * SPIO_Util::GVars::npend_hdf5_async_ops) can be decremented on *every* exit
+ * path, including the error returns below. Leaking a pending-op count on an
+ * error used to be harmless because nothing ever waited on those counters;
+ * now that close/sync actually drain file->npend_ops (see
+ * spio_wait_file_async_pend_ops() in pio_file.cpp) a leaked count would stall
+ * the application until the async-op timeout expires. */
+static int pio_iosys_async_op_hdf5_write_impl(void *pdata)
 {
 #ifdef _HDF5
   /* FIXME: Add futures */
@@ -840,20 +848,45 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
   }
 
   /* FIXME: Is this barrier needed ? TComm_info caches a single io_comm with
-   * no sync/async role distinction, but an async-dispatched write (CONTIG +
-   * HDF5/HDF5C + PIO_USE_ASYNC_WR_THREAD) can run on a disjoint async-I/O
-   * rank set (see IO_comm_info's disjoint-procs branch). If get_io_comm()
-   * was built from sync-only ranks, this barrier may be called by the wrong
-   * rank set here - a deadlock risk for the async-dispatched case
-   * specifically. Confirmed real, not fixed here (needs a TComm_info
-   * audit). */
+   * no sync/async role distinction - it is built from the *sync* I/O comm
+   * (see TComm_info's construction from io_comm_info->get_sync_io_comm()), so
+   * it is MPI_COMM_NULL on async-only I/O ranks. An async-dispatched write
+   * (CONTIG + HDF5/HDF5C + PIO_USE_ASYNC_WR_THREAD) would therefore barrier
+   * on the wrong rank set here if it ever ran on async I/O ranks disjoint
+   * from the sync ones. That configuration is currently prevented upstream by
+   * io_desc_t::select_io_desc_info(), which falls a CONTIG decomp back to
+   * sync_io_desc_info unless the sync and async I/O roles are performed by
+   * the same set of processes
+   * (IO_comm_info::sync_and_async_io_share_procs()), so this barrier is
+   * always reached by the full sync-I/O rank set today. It still needs a
+   * TComm_info audit (a sync/async role-aware io_comm) before HDF5
+   * file/dataset creation is extended to span the async comm. */
   MPI_Barrier(ios->tcomm_info->get_io_comm());
 
-  iodesc->nasync_pend_ops--;
-  file->npend_ops--;
+  return PIO_NOERR;
+#else // _HDF5
+  assert(0);
+  return PIO_EINTERNAL;
+#endif // _HDF5
+}
+
+int pio_iosys_async_op_hdf5_write(void *pdata)
+{
+#ifdef _HDF5
+  Hdf5_wcache *wcache = static_cast<struct Hdf5_wcache *>(pdata);
+  assert(wcache);
+
+  int ret = pio_iosys_async_op_hdf5_write_impl(pdata);
+
+  /* One less pending op using this iodesc & file - decremented here, rather
+   * than at the end of the body above, so that it also happens when the body
+   * returns early with an error (see the comment on
+   * pio_iosys_async_op_hdf5_write_impl()) */
+  wcache->iodesc->nasync_pend_ops--;
+  wcache->file->npend_ops--;
   SPIO_Util::GVars::npend_hdf5_async_ops--;
 
-  return PIO_NOERR;
+  return ret;
 #else // _HDF5
   assert(0);
   return PIO_EINTERNAL;
@@ -885,7 +918,13 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
   iosystem_desc_t *ios = file->iosystem;
   assert(ios);
 
-  io_desc_info_t &sel_desc = iodesc->select_io_desc_info(file->iotype);
+  /* Select the io_desc_info_t (sync or async) that this write targets, and
+   * gate on the role-correct membership check: an async-dispatched write
+   * (CONTIG rearranger, PIO_USE_ASYNC_WR_THREAD on) is only queued/executed
+   * on async I/O procs, everything else (including the flag compiled off,
+   * where select_io_desc_info() always returns sync_io_desc_info) keeps the
+   * original sync I/O proc gate. */
+  io_desc_info_t &sel_desc = iodesc->select_io_desc_info(file->iotype, ios);
   bool is_async_write = (&sel_desc == iodesc->async_io_desc_info);
 
   if(!(is_async_write ? ios->io_comm_info->is_async_io_proc() : ios->io_comm_info->is_sync_io_proc())){

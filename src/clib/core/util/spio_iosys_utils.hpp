@@ -155,6 +155,28 @@ namespace SPIO_Util{
 
         bool is_sync_or_async_io_proc(void ) const { return is_sync_io_proc() || is_async_io_proc(); }
 
+        /* True if the sync and async I/O roles are performed by the same set of
+         * processes (i.e. no dedicated/disjoint async I/O procs were available at
+         * construction time, so the async I/O comm is just a dup of the sync I/O
+         * comm with identical rank membership).
+         *
+         * This is the signal callers need before routing an HDF5/HDF5C write
+         * through the async-rank-targeted path
+         * (pio_iosys_async_hdf5_write_op_add()/pio_iosys_async_op_hdf5_write()):
+         * the HDF5 file and all its datasets are created *only* on sync I/O ranks
+         * (TComm_info's io_comm is built from get_sync_io_comm(), and the
+         * HDF5 create/def_var/enddef async ops are restricted to sync I/O procs),
+         * so when the two rank sets are disjoint the async I/O ranks would call
+         * H5Dget_space()/H5Dwrite() on a dataset/file they never created (failing
+         * with "invalid dataset identifier") and would then hit an MPI_Barrier on
+         * an MPI_COMM_NULL io_comm. When this returns true the async-dispatched
+         * write runs on the very same ranks that created the file/dataset and is
+         * safe (it still runs on a background thread, just without extra ranks).
+         *
+         * Note: this is currently the same condition as "sync ops need to be
+         * synchronized with pending async ops", hence the shared member below. */
+        bool sync_and_async_io_share_procs(void ) const { return needs_sync_btw_sync_and_async_ops_; }
+
       private:
         Comm_info sync_comm_info_;
         /* Async comm info is only valid if async is enabled */

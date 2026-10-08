@@ -42,8 +42,12 @@ PIO_Util::PIO_async_tpool::PIO_async_tpool(int nthreads)
   /* FIXME: SCORPIO never calls MPI_Init_thread/requests MPI_THREAD_MULTIPLE
    * anywhere in the codebase, yet these background threads make direct MPI
    * calls (e.g. MPI_Barrier in pio_iosys_async_op_hdf5_write) - undefined
-   * behavior per the MPI standard, and a plausible root cause (or
-   * contributor) for crashes in async-write code paths. */
+   * behavior per the MPI standard. This is a real, separate, pre-existing
+   * gap. Note that it is *not* the cause of the "H5Dget_space(): invalid
+   * dataset identifier" crash seen with async CONTIG HDF5 writes: that was
+   * caused by dispatching those writes to async I/O ranks disjoint from the
+   * sync I/O ranks that created the HDF5 file/datasets, and is mitigated by
+   * the fallback in io_desc_t::select_io_desc_info(). */
   for(int i=0; i<nthreads; i++){
     pool_threads_.push_back(std::thread(PIO_async_tpool::dequeue_and_process, this));
   }

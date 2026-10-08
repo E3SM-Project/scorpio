@@ -220,6 +220,10 @@ SPIO_Util::Iosys_Util::IO_comm_info::IO_comm_info(MPI_Comm sync_io_comm, int syn
   bool owns_resources):
     is_sync_io_proc_(is_sync_io_proc), sync_io_master_(sync_io_master), sync_io_root_(sync_io_root),
     is_async_io_proc_(false), async_io_master_(MPI_PROC_NULL), async_io_root_(-1),
+    /* No async I/O comm at all in this mock (is_async_io_proc_ == false), so the
+     * sync and async I/O roles cannot share procs - false is the correct value
+     * here, and it makes sync_and_async_io_share_procs() correctly steer any
+     * async-eligible write back onto the sync path for this mock. */
     needs_sync_btw_sync_and_async_ops_(false)
 {
   sync_comm_info_.set(sync_io_comm, sync_io_comm_rank, sync_io_comm_sz, sync_io_group,
@@ -232,6 +236,12 @@ SPIO_Util::Iosys_Util::IO_comm_info::IO_comm_info(MPI_Comm sync_io_comm, int syn
   MPI_Group async_io_comm_group, std::vector<int> async_io_ranks):
     is_sync_io_proc_(true), sync_io_master_(0), sync_io_root_(0),
     is_async_io_proc_(true), async_io_master_(0), async_io_root_(0),
+    /* The caller provides two explicitly separate comms/groups here, so the
+     * conservative (and, for the intended use of this mock, accurate) answer
+     * for sync_and_async_io_share_procs() is false. No current test reads that
+     * accessor through this mock; if a test ever needs to mock the
+     * "same procs for both roles" shape, add an explicit ctor parameter for it
+     * rather than inferring it from the comms. */
     needs_sync_btw_sync_and_async_ops_(false)
 {
   sync_comm_info_.set(sync_io_comm, sync_io_comm_rank, sync_io_comm_sz, sync_io_comm_group,
