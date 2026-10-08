@@ -3662,6 +3662,10 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
         case PIO_IOTYPE_PNETCDF:
         case PIO_IOTYPE_NETCDF4P:
         case PIO_IOTYPE_NETCDF4P_NCZARR:
+#ifdef _HDF5
+        case PIO_IOTYPE_HDF5:
+        case PIO_IOTYPE_HDF5C:
+#endif
             if((ierr = pio_read_darray_nc(file, fndims, iodesc, varid, iobuf))){
               return pio_err(ios, file, ierr, __FILE__, __LINE__,
                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Reading variable in parallel (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
