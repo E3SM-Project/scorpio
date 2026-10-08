@@ -131,7 +131,8 @@ if(PIO_USE_ASYNC_WR_THREAD)
   add_spio_executable (test_mtq TRUE "" test_async_mtq.cpp OBJ_LIBS test_common_obj)
   add_spio_executable (test_mtq_signal TRUE "" test_async_mtq_signal.cpp OBJ_LIBS test_common_obj)
   add_spio_executable (test_mtq_pool TRUE "" test_async_tpool.cpp OBJ_LIBS test_common_obj)
-  add_dependencies(tests test_mtq test_mtq_signal test_mtq_pool)
+  add_spio_executable (test_spio_rearr_contig_async TRUE "" test_spio_rearr_contig_async.cpp OBJ_LIBS test_common_obj)
+  add_dependencies(tests test_mtq test_mtq_signal test_mtq_pool test_spio_rearr_contig_async)
 endif()
 
 set (SPIO_TEST_MAX_NPROCS 4)
@@ -209,6 +210,16 @@ else ()
       NUMPROCS ${nproc}
       TIMEOUT ${DEFAULT_TEST_TIMEOUT})
   endforeach()
+  if(PIO_USE_ASYNC_WR_THREAD)
+    # Needs at least 2 procs so the sync and async I/O comms used in this test can
+    # genuinely have different sizes (see test_spio_rearr_contig_async.cpp)
+    foreach(nproc RANGE 2 ${SPIO_TEST_MAX_NPROCS})
+      add_mpi_test(test_spio_rearr_contig_async${nproc}
+        EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_contig_async
+        NUMPROCS ${nproc}
+        TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+    endforeach()
+  endif()
   foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
     add_mpi_test(test_spio_rearr_contig_nvars${nproc}
       EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_contig_nvars

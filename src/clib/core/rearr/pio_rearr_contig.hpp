@@ -58,11 +58,7 @@ namespace SPIO{
      */
     class Contig_rearr{
       public:
-        Contig_rearr(iosystem_desc_t *ios):is_init_(false), ios_(ios), iodesc_(NULL),
-          lcompmap_sz_(0), elem_pio_type_(PIO_NAT), elem_mpi_type_(MPI_DATATYPE_NULL),
-          elem_mpi_type_sz_(0), agg_comm_(MPI_COMM_NULL), is_agg_root_(false),
-          agg_comm_sz_(0), agg_iochunk_sz_(0), rearr_comm_(MPI_COMM_NULL), rearr_comm_sz_(0),
-          rearr_comm_iochunk_sz_(0){}
+        Contig_rearr(iosystem_desc_t *ios, bool targets_async_comm = false);
         /* Initialize the rearranger */
         int init(int pio_type, const PIO_Offset *compmap, std::size_t compmap_sz,
                   const int *gdimlen, int ndims, io_desc_t *iodesc);
@@ -83,7 +79,7 @@ namespace SPIO{
         /* Get rearrange info */
         std::size_t get_rearrange_buf_sz(void ) const{
           assert(is_init_ && ios_);
-          if(!ios_->io_comm_info->is_sync_io_proc()){
+          if(!role_is_io_proc()){
             return 0;
           }
 
@@ -127,6 +123,9 @@ namespace SPIO{
       private:
         bool is_init_;
         iosystem_desc_t *ios_;
+        /* If true, this rearranger targets the async I/O comm (ios_->io_comm_info's
+         * async_* accessors) instead of the sync I/O comm (the default) */
+        bool targets_async_comm_;
         io_desc_t *iodesc_;
 
         /* The size of the compmap local to this process */
@@ -252,6 +251,14 @@ namespace SPIO{
         void get_contig_ranges_from_off_range(std::vector<std::pair<PIO_Offset, PIO_Offset> > &contig_map_ranges,
                                               PIO_Offset start_off, PIO_Offset count);
         std::size_t get_ncontig_ranges_from_off_range(PIO_Offset start_off, PIO_Offset count) const;
+
+        /* Dispatch helpers: pick the sync or async I/O comm accessor on ios_->io_comm_info,
+         * depending on targets_async_comm_ */
+        MPI_Comm role_io_comm(void ) const;
+        bool role_is_io_proc(void ) const;
+        int role_io_comm_sz(void ) const;
+        int role_io_comm_rank(void ) const;
+
         int create_agg_comm(void );
         static void get_non_fval_lcompmap_counts_displs(const PIO_Offset *lcompmap,
               std::size_t lcompmap_sz,
