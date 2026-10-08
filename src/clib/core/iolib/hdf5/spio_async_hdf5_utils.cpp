@@ -839,7 +839,14 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
     }
   }
 
-  /* FIXME: Is this barrier needed ? */
+  /* FIXME: Is this barrier needed ? TComm_info caches a single io_comm with
+   * no sync/async role distinction, but an async-dispatched write (CONTIG +
+   * HDF5/HDF5C + PIO_USE_ASYNC_WR_THREAD) can run on a disjoint async-I/O
+   * rank set (see IO_comm_info's disjoint-procs branch). If get_io_comm()
+   * was built from sync-only ranks, this barrier may be called by the wrong
+   * rank set here - a deadlock risk for the async-dispatched case
+   * specifically. Confirmed real, not fixed here (needs a TComm_info
+   * audit). */
   MPI_Barrier(ios->tcomm_info->get_io_comm());
 
   iodesc->nasync_pend_ops--;

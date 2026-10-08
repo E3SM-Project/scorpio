@@ -559,6 +559,14 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
     int ncid = file->pio_ncid;
 
     if(sync_with_ioprocs){
+      /* FIXME: This drain-wait has been disabled since the async-HDF5-write
+       * feature's original introduction, so nothing currently guarantees a
+       * file's pending async write ops (file->npend_ops) complete before
+       * its HDF5 handles are closed below - a plausible contributor to
+       * use-after-free/ASAN crashes when async ops are still in flight at
+       * close time (see tests/cunit/test_darray_hdf5_contig.cpp's CONTIG
+       * sub-test, which crashes deterministically under
+       * PIO_USE_ASYNC_WR_THREAD=ON during this exact close path). */
       //if(ios->io_comm_info->is_sync_io_proc()) { while(file->npend_ops){} }
       /* For I/O async threads the union comm is NULL comm */
       MPI_Comm sync_comm = ios->tcomm_info->get_union_comm();

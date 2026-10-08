@@ -39,6 +39,11 @@ std::vector<std::size_t> PIO_Util::PIO_async_tpool::get_thread_ids(void ) const
 PIO_Util::PIO_async_tpool::PIO_async_tpool(int nthreads)
 {
   LOG((2, "PIO_async_tpool:PIO_async_tpool: Creating %d threads", nthreads));
+  /* FIXME: SCORPIO never calls MPI_Init_thread/requests MPI_THREAD_MULTIPLE
+   * anywhere in the codebase, yet these background threads make direct MPI
+   * calls (e.g. MPI_Barrier in pio_iosys_async_op_hdf5_write) - undefined
+   * behavior per the MPI standard, and a plausible root cause (or
+   * contributor) for crashes in async-write code paths. */
   for(int i=0; i<nthreads; i++){
     pool_threads_.push_back(std::thread(PIO_async_tpool::dequeue_and_process, this));
   }
