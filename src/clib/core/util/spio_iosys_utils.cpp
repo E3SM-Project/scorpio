@@ -226,6 +226,20 @@ SPIO_Util::Iosys_Util::IO_comm_info::IO_comm_info(MPI_Comm sync_io_comm, int syn
     std::move(sync_io_ranks), owns_resources);
 }
 
+SPIO_Util::Iosys_Util::IO_comm_info::IO_comm_info(MPI_Comm sync_io_comm, int sync_io_comm_rank, int sync_io_comm_sz,
+  MPI_Group sync_io_comm_group, std::vector<int> sync_io_ranks,
+  MPI_Comm async_io_comm, int async_io_comm_rank, int async_io_comm_sz,
+  MPI_Group async_io_comm_group, std::vector<int> async_io_ranks):
+    is_sync_io_proc_(true), sync_io_master_(0), sync_io_root_(0),
+    is_async_io_proc_(true), async_io_master_(0), async_io_root_(0),
+    needs_sync_btw_sync_and_async_ops_(false)
+{
+  sync_comm_info_.set(sync_io_comm, sync_io_comm_rank, sync_io_comm_sz, sync_io_comm_group,
+    std::move(sync_io_ranks));
+  async_comm_info_.set(async_io_comm, async_io_comm_rank, async_io_comm_sz, async_io_comm_group,
+    std::move(async_io_ranks));
+}
+
 bool SPIO_Util::Iosys_Util::iosys_uses_async_io_service(iosystem_desc_t *iosys)
 {
   assert(iosys);

@@ -81,6 +81,14 @@ namespace SPIO_Util{
           bool is_sync_io_proc, int sync_io_master, int sync_io_root,
           bool owns_resources = false);
 
+        /* Construct directly from specified sync and async I/O comm info, without deriving
+         * it from union_comm - used by unit tests
+         */
+        IO_comm_info(MPI_Comm sync_io_comm, int sync_io_comm_rank, int sync_io_comm_sz,
+          MPI_Group sync_io_comm_group, std::vector<int> sync_io_ranks,
+          MPI_Comm async_io_comm, int async_io_comm_rank, int async_io_comm_sz,
+          MPI_Group async_io_comm_group, std::vector<int> async_io_ranks);
+
         /* Not copyable: Comm_info members own MPI resources whose
          * destructor would double-free on a shallow copy. */
         IO_comm_info(const IO_comm_info &) = delete;

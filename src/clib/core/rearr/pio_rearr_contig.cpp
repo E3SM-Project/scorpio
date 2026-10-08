@@ -50,6 +50,39 @@ namespace SPIO_Util{
   }
 } // namespace SPIO_Util
 
+SPIO::DataRearr::Contig_rearr::Contig_rearr(iosystem_desc_t *ios, bool targets_async_comm):
+  is_init_(false), ios_(ios), targets_async_comm_(targets_async_comm), iodesc_(NULL),
+  lcompmap_sz_(0), elem_pio_type_(PIO_NAT), elem_mpi_type_(MPI_DATATYPE_NULL),
+  elem_mpi_type_sz_(0), agg_comm_(MPI_COMM_NULL), is_agg_root_(false),
+  agg_comm_sz_(0), agg_iochunk_sz_(0), rearr_comm_(MPI_COMM_NULL), rearr_comm_sz_(0),
+  rearr_comm_iochunk_sz_(0)
+{
+}
+
+MPI_Comm SPIO::DataRearr::Contig_rearr::role_io_comm(void ) const
+{
+  return targets_async_comm_ ? ios_->io_comm_info->get_async_io_comm()
+                              : ios_->io_comm_info->get_sync_io_comm();
+}
+
+bool SPIO::DataRearr::Contig_rearr::role_is_io_proc(void ) const
+{
+  return targets_async_comm_ ? ios_->io_comm_info->is_async_io_proc()
+                              : ios_->io_comm_info->is_sync_io_proc();
+}
+
+int SPIO::DataRearr::Contig_rearr::role_io_comm_sz(void ) const
+{
+  return targets_async_comm_ ? ios_->io_comm_info->get_async_io_comm_sz()
+                              : ios_->io_comm_info->get_sync_io_comm_sz();
+}
+
+int SPIO::DataRearr::Contig_rearr::role_io_comm_rank(void ) const
+{
+  return targets_async_comm_ ? ios_->io_comm_info->get_async_io_comm_rank()
+                              : ios_->io_comm_info->get_sync_io_comm_rank();
+}
+
 int SPIO::DataRearr::Contig_rearr::init(int pio_type,
       const PIO_Offset *compmap, std::size_t compmap_sz,
       const int *gdimlen, int ndims, io_desc_t *iodesc)
@@ -620,15 +653,16 @@ inline int SPIO::DataRearr::Contig_rearr::create_agg_comm(void )
 
   assert(ios_);
 
-  /* Divide union comm into (number of sync I/O tasks) groups */
-  int agg_range_sz = ios_->num_uniontasks/ios_->io_comm_info->get_sync_io_comm_sz();
+  /* Divide union comm into (number of sync/async I/O tasks, depending on targets_async_comm_)
+   * groups */
+  int agg_range_sz = ios_->num_uniontasks/role_io_comm_sz();
   /* Ensure that each group/color gets an I/O process - which is also the aggregating process */
-  int color = (ios_->io_comm_info->is_sync_io_proc()) ? ios_->io_comm_info->get_sync_io_comm_rank() : (ios_->union_rank/agg_range_sz);
+  int color = (role_is_io_proc()) ? role_io_comm_rank() : (ios_->union_rank/agg_range_sz);
   /* Put the extra set of procs, after evenly dividing procs among I/O procs, with the last I/O proc */
-  color = (color >= ios_->io_comm_info->get_sync_io_comm_sz()) ? (ios_->io_comm_info->get_sync_io_comm_sz() - 1) : color;
+  color = (color >= role_io_comm_sz()) ? (role_io_comm_sz() - 1) : color;
 
   /* Each I/O process is rank 0 in the new aggregator comm, and is also the aggregating proc */
-  int key = (ios_->io_comm_info->is_sync_io_proc()) ? 0 : 1;
+  int key = (role_is_io_proc()) ? 0 : 1;
 
   ret = MPI_Comm_split(ios_->union_comm, color, key, &agg_comm_);
   if(ret == MPI_SUCCESS){
@@ -959,11 +993,11 @@ inline int SPIO::DataRearr::Contig_rearr::create_rearr_comm(void )
   assert(ios_);
   assert(gdecomp_sz_ > 0);
   
-  if(!ios_->io_comm_info->is_sync_io_proc()){
+  if(!role_is_io_proc()){
     return ret;
   }
 
-  ret = MPI_Comm_dup(ios_->io_comm_info->get_sync_io_comm(), &rearr_comm_);
+  ret = MPI_Comm_dup(role_io_comm(), &rearr_comm_);
   if(ret == MPI_SUCCESS){
     ret = MPI_Comm_size(rearr_comm_, &rearr_comm_sz_);
     if(ret == MPI_SUCCESS){
@@ -986,7 +1020,7 @@ inline void SPIO::DataRearr::Contig_rearr::set_rearr_comm_iochunk_sz(int ndims, 
   assert(ios_);
   assert(gdecomp_sz_ > 0);
 
-  if(ios_->io_comm_info->is_sync_io_proc()){
+  if(role_is_io_proc()){
     assert((rearr_comm_ != MPI_COMM_NULL) && (rearr_comm_sz_ > 0));
 
     rearr_comm_iochunk_sz_ = gdecomp_sz_ / rearr_comm_sz_;
@@ -1035,7 +1069,7 @@ int SPIO::DataRearr::Contig_rearr::get_rearr_toproc_map(const std::vector<PIO_Of
   int ret = PIO_NOERR;
   assert(ios_);
   
-  if(!ios_->io_comm_info->is_sync_io_proc()){
+  if(!role_is_io_proc()){
     return ret;
   }
   assert(rearr_comm_sz_ > 0);
@@ -1069,7 +1103,7 @@ int SPIO::DataRearr::Contig_rearr::setup_data_rearr_info(std::vector<PIO_Offset>
   SPIO_Util::GPTL_Util::GPTL_timer ftimer("PIO:Contig_rearr::setup_data_rearr_info");
   assert(ios_);
 
-  if(!ios_->io_comm_info->is_sync_io_proc()){
+  if(!role_is_io_proc()){
     return ret;
   }
   assert(rearr_comm_sz_ > 0);
@@ -1202,7 +1236,7 @@ int SPIO::DataRearr::Contig_rearr::init_rearr_send_types(
   int ret = PIO_NOERR;
   SPIO_Util::GPTL_Util::GPTL_timer ftimer("PIO:Contig_rearr::init_rearr_send_types");
 
-  assert(ios_ && ios_->io_comm_info->is_sync_io_proc());
+  assert(ios_ && role_is_io_proc());
   assert(rearr_comm_sz_ > 0);
   assert(static_cast<int>(nregion_infos_sent.size()) == rearr_comm_sz_);
 
@@ -1263,7 +1297,7 @@ int SPIO::DataRearr::Contig_rearr::init_rearr_recvd_types(
   int ret = PIO_NOERR;
   SPIO_Util::GPTL_Util::GPTL_timer ftimer("PIO:Contig_rearr::init_rearr_recvd_types");
 
-  assert(ios_ && ios_->io_comm_info->is_sync_io_proc());
+  assert(ios_ && role_is_io_proc());
   assert(rearr_comm_sz_ > 0);
   assert(static_cast<int>(nregion_infos_recvd.size()) == rearr_comm_sz_);
 
@@ -1335,7 +1369,7 @@ int SPIO::DataRearr::Contig_rearr::rearrange_data(const void *sbuf, std::size_t 
   assert(is_init_);
 
   assert(ios_);
-  if(!ios_->io_comm_info->is_sync_io_proc()){
+  if(!role_is_io_proc()){
     return PIO_NOERR;
   }
 
