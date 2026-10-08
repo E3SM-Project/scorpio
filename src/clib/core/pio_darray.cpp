@@ -262,6 +262,11 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
 
   pioassert(!spio_file_mvcache_get(file, ioid), "buffer overwrite",__FILE__, __LINE__);
 
+  /* Use async io_desc_info_t for writing with PIO_REARR_CONTIG + HDF5[C] +
+   * PIO_ASYNC_WR_THREAD. Use sync io_desc_info_t otherwise
+   */
+  io_desc_info_t &write_desc_info = iodesc->select_io_desc_info(file->iotype, ios);
+
   /* Determine total size of aggregated data (all vars/records).
    * For netcdf serial writes we collect the data on io nodes and
    * then move that data one node at a time to the io master node
@@ -269,10 +274,10 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
    * the largest used to accommodate this serial io method (use
    * iodesc->sync_io_desc_info.maxiobuflen to calculate it). */
   if((file->iotype == PIO_IOTYPE_NETCDF || file->iotype == PIO_IOTYPE_NETCDF4C) && ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
-    rlen = iodesc->sync_io_desc_info.maxiobuflen * nvars;
+    rlen = write_desc_info.maxiobuflen * nvars;
   }
   else{
-    rlen = iodesc->sync_io_desc_info.llen * nvars;
+    rlen = write_desc_info.llen * nvars;
   }
 
 #ifdef PIO_MICRO_TIMING
@@ -304,22 +309,22 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
   void *mv_iobuf = NULL;
   if(rlen > 0){
     /* Allocate memory for the buffer for all vars/records. */
-    mv_iobuf = spio_file_mvcache_alloc(file, ioid, iodesc->sync_io_desc_info.mpitype_size * rlen);
+    mv_iobuf = spio_file_mvcache_alloc(file, ioid, write_desc_info.mpitype_size * rlen);
     if(!mv_iobuf){
       return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Writing multiple variables to file (%s, ncid=%d) failed. Out of memory (Trying to allocate %lld bytes for rearranged data for multiple variables with the same decomposition)", pio_get_fname_from_file(file), ncid, (unsigned long long)(iodesc->sync_io_desc_info.mpitype_size * rlen));
+                      "Writing multiple variables to file (%s, ncid=%d) failed. Out of memory (Trying to allocate %lld bytes for rearranged data for multiple variables with the same decomposition)", pio_get_fname_from_file(file), ncid, (unsigned long long)(write_desc_info.mpitype_size * rlen));
     }
-    LOG((3, "allocated %lld bytes for variable buffer", rlen * iodesc->sync_io_desc_info.mpitype_size));
+    LOG((3, "allocated %lld bytes for variable buffer", rlen * write_desc_info.mpitype_size));
 
     /* If fill values are desired, and we're using the BOX
      * rearranger, insert fill values. */
-    if(iodesc->sync_io_desc_info.needsfill && ((iodesc->sync_io_desc_info.rearranger == PIO_REARR_BOX) || (iodesc->sync_io_desc_info.rearranger == PIO_REARR_CONTIG))){
+    if(write_desc_info.needsfill && ((write_desc_info.rearranger == PIO_REARR_BOX) || (write_desc_info.rearranger == PIO_REARR_CONTIG))){
       PIO_Offset localiobuflen = rlen / nvars;
-      LOG((3, "inserting fill values iodesc->sync_io_desc_info.maxiobuflen = %lld, localiobuflen = %lld", iodesc->sync_io_desc_info.maxiobuflen, localiobuflen));
+      LOG((3, "inserting fill values write_desc_info.maxiobuflen = %lld, localiobuflen = %lld", write_desc_info.maxiobuflen, localiobuflen));
       for(int nv = 0; nv < nvars; nv++){
         for(PIO_Offset i = 0; i < localiobuflen; i++){
-          memcpy(&((char *)mv_iobuf)[iodesc->sync_io_desc_info.mpitype_size * (i + nv * localiobuflen)],
-                 &((char *)fillvalue)[nv * iodesc->sync_io_desc_info.mpitype_size], iodesc->sync_io_desc_info.mpitype_size);
+          memcpy(&((char *)mv_iobuf)[write_desc_info.mpitype_size * (i + nv * localiobuflen)],
+                 &((char *)fillvalue)[nv * write_desc_info.mpitype_size], write_desc_info.mpitype_size);
         }
       }
     }
@@ -336,9 +341,12 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     LOG((3, "allocated token for variable buffer"));
   }
 
-  /* Move data from compute to IO tasks. */
-  if(iodesc->sync_io_desc_info.rearranger == PIO_REARR_CONTIG){
-    ierr = iodesc->sync_io_desc_info.rearr->rearrange_comp2io(array, arraylen * nvars * iodesc->sync_io_desc_info.mpitype_size, mv_iobuf, rlen * iodesc->sync_io_desc_info.mpitype_size, nvars);
+  /* Move data from compute to IO tasks.
+   * For PIO_REARR_CONTIG + PIO_USE_ASYNC_WR_THREAD + HDF5[C] :
+   *  write_desc_info is set to use the async io_desc_info_t so that the data is rearranged to the async I/O procs.
+   */
+  if(write_desc_info.rearranger == PIO_REARR_CONTIG){
+    ierr = write_desc_info.rearr->rearrange_comp2io(array, arraylen * nvars * write_desc_info.mpitype_size, mv_iobuf, rlen * write_desc_info.mpitype_size, nvars);
   }
   else{
     ierr = rearrange_comp2io(ios, iodesc, file, array, mv_iobuf, nvars);
@@ -346,7 +354,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
   if(ierr != PIO_NOERR){
     return pio_err(ios, file, ierr, __FILE__, __LINE__,
                     "Writing multiple variables to file (%s, ncid=%d) failed. Error rearranging and moving data from compute tasks to I/O tasks(rearranger = %d)",
-                    pio_get_fname_from_file(file), ncid, iodesc->sync_io_desc_info.rearranger);
+                    pio_get_fname_from_file(file), ncid, write_desc_info.rearranger);
   }
 
 #ifdef PIO_MICRO_TIMING
@@ -426,6 +434,13 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
         break;
     case PIO_IOTYPE_HDF5:
     case PIO_IOTYPE_HDF5C:
+        /* Every HDF5/HDF5C write is queued on the async write thread pool
+         * when PIO_USE_ASYNC_WR_THREAD is compiled in, for *all* rearrangers.
+         * pio_iosys_async_hdf5_write_op_add() makes the sync-vs-async
+         * io_desc_info_t selection (via iodesc->select_io_desc_info()) and
+         * gates on the role-correct I/O proc set itself, so BOX/SUBSET
+         * decomps keep targeting the sync I/O ranks exactly as before while a
+         * CONTIG decomp can additionally target the async I/O ranks. */
 #if PIO_USE_ASYNC_WR_THREAD
         ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, sp_iodesc,
                                                   DARRAY_DATA, frame);
@@ -463,6 +478,11 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
       spio_file_mvcache_free(file, ioid);
     }
 #if !PIO_USE_ASYNC_WR_THREAD
+    /* When PIO_USE_ASYNC_WR_THREAD is on, every HDF5/HDF5C write above was
+     * queued on the async thread pool (for all rearrangers) and the queued op
+     * still reads these converted buffers while it runs - freeing them here,
+     * on the calling thread, would be a use-after-free. The async op frees
+     * them once it completes. */
     if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
       assert(file->dt_converter);
       static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->free(ioid);
@@ -518,20 +538,24 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
       /* FIXME: Handle fillvalues for HDF5 */
       case PIO_IOTYPE_HDF5:
       case PIO_IOTYPE_HDF5C:
-  #if PIO_USE_ASYNC_WR_THREAD
+          /* As with the DARRAY_DATA dispatch above, queue the fillvalue write
+           * on the async write thread pool for all rearrangers whenever
+           * PIO_USE_ASYNC_WR_THREAD is compiled in - the queued op does its
+           * own sync/async io_desc_info_t selection and I/O proc gating. */
+#if PIO_USE_ASYNC_WR_THREAD
           ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, sp_iodesc,
                                                     DARRAY_FILL, frame);
           if(ierr != PIO_NOERR){
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
                             "Writing multiple variables to file (%s, ncid=%d) failed. Internal error queing async task to write variable fillvalues in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
           }
-  #else
+#else
           if((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
                                              DARRAY_FILL, frame))){
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
                             "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable fillvalues in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
           }
-  #endif
+#endif
           break;
       case PIO_IOTYPE_NETCDF4C:
       case PIO_IOTYPE_NETCDF:
@@ -553,12 +577,15 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
         brel(vdesc0->fillbuf);
         vdesc0->fillbuf = NULL;
       }
-  #if !PIO_USE_ASYNC_WR_THREAD
+#if !PIO_USE_ASYNC_WR_THREAD
+      /* See the matching guard after the DARRAY_DATA dispatch above: with
+       * PIO_USE_ASYNC_WR_THREAD on, the queued async op owns these buffers
+       * until it completes. */
       if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
         assert(file->dt_converter);
         static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->free(ioid);
       }
-  #endif
+#endif
     }
   }
 

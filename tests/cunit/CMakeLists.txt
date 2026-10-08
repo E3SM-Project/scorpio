@@ -96,6 +96,10 @@ if (NOT PIO_USE_MPISERIAL)
                     test_iosystem3_simple2 test_iosystem3 test_pioc test_pioc_unlim test_pioc_putget
                     test_pioc_fill test_darray test_darray_multi test_darray_multivar test_darray_multivar2
                     test_darray_1d test_darray_3d test_decomp_uneven test_decomps test_rearr)
+  if (WITH_HDF5)
+    add_spio_executable (test_darray_hdf5_contig TRUE "" test_darray_hdf5_contig.cpp OBJ_LIBS test_common_obj)
+    add_dependencies (tests test_darray_hdf5_contig)
+  endif ()
   if (PIO_USE_MALLOC)
     add_spio_executable (test_darray_async_simple TRUE "" test_darray_async_simple.cpp OBJ_LIBS test_common_obj)
     add_spio_executable (test_darray_async TRUE "" test_darray_async.cpp OBJ_LIBS test_common_obj)
@@ -340,6 +344,13 @@ else ()
     EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_darray_3d
     NUMPROCS ${AT_LEAST_FOUR_TASKS}
     TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  if (WITH_HDF5)
+    # FIXME: Make sure that the test works with any number of MPI procs
+    add_mpi_test(test_darray_hdf5_contig
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_darray_hdf5_contig
+      NUMPROCS ${AT_LEAST_FOUR_TASKS}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endif ()
   add_mpi_test(test_decomp_uneven
     EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_decomp_uneven
     NUMPROCS ${AT_LEAST_FOUR_TASKS}
