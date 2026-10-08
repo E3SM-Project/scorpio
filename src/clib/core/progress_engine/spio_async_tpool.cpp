@@ -47,7 +47,16 @@ PIO_Util::PIO_async_tpool::PIO_async_tpool(int nthreads)
    * dataset identifier" crash seen with async CONTIG HDF5 writes: that was
    * caused by dispatching those writes to async I/O ranks disjoint from the
    * sync I/O ranks that created the HDF5 file/datasets, and is mitigated by
-   * the fallback in io_desc_t::select_io_desc_info(). */
+   * the fallback in io_desc_t::select_io_desc_info().
+   *
+   * It is, however, implicated (together with the unsynchronized bget()/
+   * brel() allocator - see the FIXME in
+   * SPIO_Util::File_Util::DTConverter::convert(), spio_dt_converter.cpp -
+   * and a non-thread-safe HDF5 build) in nondeterministic ASAN
+   * heap-use-after-free/double-free failures observed in worker-thread
+   * H5Dwrite calls whenever an HDF5 async write requires a datatype
+   * conversion. Confirmed during review to predate this file's CONTIG-write
+   * changes; tracked as a follow-up, not fixed here. */
   for(int i=0; i<nthreads; i++){
     pool_threads_.push_back(std::thread(PIO_async_tpool::dequeue_and_process, this));
   }
@@ -80,6 +89,15 @@ int PIO_Util::PIO_async_tpool::dequeue_and_process(
       SPIO_Util::Async_op op = tpool->mtq_.dequeue();
       ret = op.wait();
       if(ret != PIO_NOERR){
+        /* FIXME: this return kills the worker thread outright instead of
+         * continuing to service the queue. Every op already enqueued behind
+         * this one (including file-close ops) is then stranded: its
+         * pending-op counters are never decremented, so
+         * spio_wait_file_async_pend_ops() (pio_file.cpp) now blocks on them
+         * for the full SPIO_ASYNC_OP_WAIT_TIMEOUT (120s default) before
+         * giving up, rather than being silently harmless as before that
+         * wait existed. Pre-existing bug, confirmed during review; not
+         * fixed here - tracked as a follow-up. */
         return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
                         "Internal error dequeuing and processing asynchronous operation (%s) in the thread pool. Internal error waiting on asynchronous file write operation",
                         SPIO_Util::Async_op::op_type_to_string(op.type()).c_str());
