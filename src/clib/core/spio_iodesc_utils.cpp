@@ -237,6 +237,23 @@ io_desc_t::~io_desc_t()
   }
 }
 
+/* Get I/O desc to use for an I/O type:
+ * Sync I/O : Use the sync I/O desc
+ * Async I/O : If using the Contig rearranger use async I/O desc for writes with HDF5 I/O types.
+ *              Use sync I/O desc for all other cases
+ */
+io_desc_info_t &io_desc_t::select_io_desc_info(int iotype)
+{
+#if PIO_USE_ASYNC_WR_THREAD
+  if(((iotype == PIO_IOTYPE_HDF5) || (iotype == PIO_IOTYPE_HDF5C)) &&
+      (async_io_desc_info != NULL) &&
+      (sync_io_desc_info.rearranger == PIO_REARR_CONTIG)){
+    return *async_io_desc_info;
+  }
+#endif
+  return sync_io_desc_info;
+}
+
 /**
  * Free a decomposition map.
  *

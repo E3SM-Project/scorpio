@@ -392,6 +392,11 @@ struct io_desc_t
     io_desc_t(iosystem_desc_t *ios, int piotype, int ndims, const int *gdimlen,
               int maplen, const PIO_Offset *compmap, int rearranger, bool map_zero_based);
     ~io_desc_t();
+
+    /* Returns the io_desc_info_t to use for a write/read of the given iotype:
+     * async_io_desc_info for CONTIG-rearranger HDF5/HDF5C writes when async
+     * writes are enabled and have been allocated, sync_io_desc_info otherwise. */
+    io_desc_info_t &select_io_desc_info(int iotype);
 };
 
 /* Forward decl for I/O file summary stats info */
