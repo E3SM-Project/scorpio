@@ -603,51 +603,55 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
   return PIO_NOERR;
 }
 
-static void init_iodesc_contig_rearr_fields(iosystem_desc_t *ios, io_desc_t *iodesc)
+static int init_iodesc_contig_rearr_fields(iosystem_desc_t *ios, io_desc_t *iodesc,
+                                            io_desc_info_t &desc_info,
+                                            bool targets_async_comm)
 {
-  assert(ios && iodesc && iodesc->sync_io_desc_info.rearr && iodesc->sync_io_desc_info.rearr->is_init());
+  assert(ios && iodesc && desc_info.rearr && desc_info.rearr->is_init());
 
-  iodesc->sync_io_desc_info.ndof = iodesc->sync_io_desc_info.rearr->get_decomp_map_lsz();
-  if(ios->io_comm_info->is_sync_io_proc()){
-    iodesc->sync_io_desc_info.num_aiotasks = ios->io_comm_info->get_sync_io_comm_sz();
+  desc_info.ndof = desc_info.rearr->get_decomp_map_lsz();
+  if(targets_async_comm ? ios->io_comm_info->is_async_io_proc() : ios->io_comm_info->is_sync_io_proc()){
+    desc_info.num_aiotasks = targets_async_comm ? ios->io_comm_info->get_async_io_comm_sz() : ios->io_comm_info->get_sync_io_comm_sz();
   }
 
   /* The first region is pre-allocated when iodesc is allocated */
-  iodesc->sync_io_desc_info.maxregions = 0;
+  desc_info.maxregions = 0;
   /* FIXME: We only need fillvalues when the total decomp map size is less than var size */
-  iodesc->sync_io_desc_info.needsfill = true;
+  desc_info.needsfill = true;
   /* FIXME: Remove the field since we no longer use maxbytes */
-  iodesc->sync_io_desc_info.maxbytes = 0;
-  iodesc->sync_io_desc_info.llen = iodesc->sync_io_desc_info.rearr->get_rearrange_buf_sz();
-  iodesc->sync_io_desc_info.maxiobuflen = iodesc->sync_io_desc_info.rearr->get_decomp_gsz();
+  desc_info.maxbytes = 0;
+  desc_info.llen = desc_info.rearr->get_rearrange_buf_sz();
+  desc_info.maxiobuflen = desc_info.rearr->get_decomp_gsz();
 
-  if(ios->io_comm_info->is_sync_io_proc()){
-    assert(iodesc->sync_io_desc_info.firstregion && iodesc->sync_io_desc_info.firstregion->start && iodesc->sync_io_desc_info.firstregion->count);
+  if(targets_async_comm ? ios->io_comm_info->is_async_io_proc() : ios->io_comm_info->is_sync_io_proc()){
+    assert(desc_info.firstregion && desc_info.firstregion->start && desc_info.firstregion->count);
     /* Get (start, count) pairs of contiguous decomp ranges for this I/O process */
-    std::vector<std::pair<PIO_Offset, PIO_Offset> > off_ranges = iodesc->sync_io_desc_info.rearr->get_rearr_decomp_map_contig_ranges();
-    io_region *cur_region = iodesc->sync_io_desc_info.firstregion;
+    std::vector<std::pair<PIO_Offset, PIO_Offset> > off_ranges = desc_info.rearr->get_rearr_decomp_map_contig_ranges();
+    io_region *cur_region = desc_info.firstregion;
     io_region *prev_region = cur_region;
     int loff = 0;
 
-    LOG((1, "Contig rearranger : iodesc {ioid=%d, llen=%lld, maxiobuflen=%lld, ndims=%d, dimlen=%s, maxregions=%lld", iodesc->ioid, static_cast<long long int>(iodesc->sync_io_desc_info.llen), static_cast<long long int>(iodesc->sync_io_desc_info.maxiobuflen), iodesc->sync_io_desc_info.ndims, SPIO_Util::Dbg_Util::vec1d_to_string(iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.dimlen + iodesc->sync_io_desc_info.ndims).c_str(), static_cast<long long int>(off_ranges.size())));
+    LOG((1, "Contig rearranger : iodesc {ioid=%d, llen=%lld, maxiobuflen=%lld, ndims=%d, dimlen=%s, maxregions=%lld", iodesc->ioid, static_cast<long long int>(desc_info.llen), static_cast<long long int>(desc_info.maxiobuflen), desc_info.ndims, SPIO_Util::Dbg_Util::vec1d_to_string(desc_info.dimlen, desc_info.dimlen + desc_info.ndims).c_str(), static_cast<long long int>(off_ranges.size())));
     // FIXME : Move to C++ lists for region list
     for(std::size_t i = 0; i < off_ranges.size(); i++){
       if(cur_region == NULL){
-        alloc_region2(ios, iodesc->sync_io_desc_info.ndims, &cur_region);
+        alloc_region2(ios, desc_info.ndims, &cur_region);
         prev_region->next = cur_region;
       }
       cur_region->loffset = loff;
       loff += static_cast<int>(off_ranges[i].second);
       /* Convert the range (start, count) offsets to dim indices & store in the region info */
-      iodesc->sync_io_desc_info.rearr->off_range_to_dim_range(off_ranges[i].first, off_ranges[i].second,
+      desc_info.rearr->off_range_to_dim_range(off_ranges[i].first, off_ranges[i].second,
                                             cur_region->start, cur_region->count);
 
-      LOG((1, "Contig range = [%lld, %lld), start=%s, count=%s", static_cast<long long int>(off_ranges[i].first), static_cast<long long int>(off_ranges[i].second), SPIO_Util::Dbg_Util::vec1d_to_string(cur_region->start, cur_region->start + iodesc->sync_io_desc_info.ndims).c_str(), SPIO_Util::Dbg_Util::vec1d_to_string(cur_region->count, cur_region->count + iodesc->sync_io_desc_info.ndims).c_str()));
+      LOG((1, "Contig range = [%lld, %lld), start=%s, count=%s", static_cast<long long int>(off_ranges[i].first), static_cast<long long int>(off_ranges[i].second), SPIO_Util::Dbg_Util::vec1d_to_string(cur_region->start, cur_region->start + desc_info.ndims).c_str(), SPIO_Util::Dbg_Util::vec1d_to_string(cur_region->count, cur_region->count + desc_info.ndims).c_str()));
       prev_region = cur_region;
       cur_region = cur_region->next;
     }
-    iodesc->sync_io_desc_info.maxregions = iodesc->sync_io_desc_info.rearr->get_rearr_decomp_map_contig_max_nranges();
+    desc_info.maxregions = desc_info.rearr->get_rearr_decomp_map_contig_max_nranges();
   }
+
+  return PIO_NOERR;
 }
 
 static int contig_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PIO_Offset *iostart, const PIO_Offset *iocount)
@@ -661,6 +665,7 @@ static int contig_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const
     /* FIXME: We should at least convert iostart/iocount arrays to decomp maps */
   }
 
+  /* Create rearranger for sync I/O. SPIO::DataRearr::Contig_rearr(..., targets_async_comm=false) by default */
   iodesc->sync_io_desc_info.rearr = new SPIO::DataRearr::Contig_rearr(ios);
   ret = iodesc->sync_io_desc_info.rearr->init(iodesc->sync_io_desc_info.piotype, iodesc->sync_io_desc_info.map, iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.ndims, iodesc);
   if(ret != PIO_NOERR){
@@ -668,7 +673,34 @@ static int contig_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const
                     "Error initializing the I/O decomposition. Error initializing PIO_REARR_CONTIG rearranger");
   }
 
-  init_iodesc_contig_rearr_fields(ios, iodesc);
+  ret = init_iodesc_contig_rearr_fields(ios, iodesc, iodesc->sync_io_desc_info, false);
+  if(ret != PIO_NOERR){
+    return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                    "Error initializing the I/O decomposition. Error initializing PIO_REARR_CONTIG sync rearranger fields");
+  }
+
+#if PIO_USE_ASYNC_WR_THREAD
+  /* Create rearranger for async I/O. The information on the data (type, dim info, map info etc) is the same for async and
+   * sync I/O, only the I/O processes differ. The async I/O processes are picked in SPIO::DataRearr::Contig_rearr() since
+   * targets_async_comm is set to true
+   */
+  iodesc->async_io_desc_info = new io_desc_info_t(ios, iodesc->sync_io_desc_info.piotype,
+    iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen,
+    iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map,
+    iodesc->sync_io_desc_info.rearranger, /*map_zero_based=*/true);
+  iodesc->async_io_desc_info->rearr = new SPIO::DataRearr::Contig_rearr(ios, /*targets_async_comm=*/true);
+  ret = iodesc->async_io_desc_info->rearr->init(iodesc->async_io_desc_info->piotype, iodesc->async_io_desc_info->map, iodesc->async_io_desc_info->maplen, iodesc->async_io_desc_info->dimlen, iodesc->async_io_desc_info->ndims, iodesc);
+  if(ret != PIO_NOERR){
+    return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                    "Error initializing the I/O decomposition. Error initializing PIO_REARR_CONTIG async rearranger");
+  }
+
+  ret = init_iodesc_contig_rearr_fields(ios, iodesc, *(iodesc->async_io_desc_info), true);
+  if(ret != PIO_NOERR){
+    return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                    "Error initializing the I/O decomposition. Error initializing PIO_REARR_CONTIG async rearranger fields");
+  }
+#endif
 
   return PIO_NOERR;
 }
