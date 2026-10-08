@@ -8,7 +8,23 @@ void *SPIO_Util::File_Util::DTConverter::convert(int ncid, void *buf, std::size_
   }
 
   std::size_t nelems = sz / size_of(from_pio_type);
-  
+
+  /* FIXME: bget()/brel() (src/clib/util/bget.cpp) use unsynchronized global
+   * free lists. This function is reachable from both the calling thread and
+   * the async write thread pool worker (see
+   * PIO_Util::PIO_async_tpool::dequeue_and_process in spio_async_tpool.cpp),
+   * so concurrent bget()/brel() calls from those two threads race on the
+   * same free lists - a separate, deeper issue than the cbufs_ map race the
+   * mutex below fixes. This, combined with HDF5 not being built thread-safe
+   * and SCORPIO never requesting MPI_THREAD_MULTIPLE (see the FIXME in
+   * PIO_async_tpool::PIO_async_tpool, spio_async_tpool.cpp), was confirmed
+   * during review to produce nondeterministic ASAN heap-use-after-free and
+   * double-free failures in worker-thread H5Dwrite calls when HDF5 async
+   * writes require a datatype conversion (tests/cunit/test_darray_hdf5_contig,
+   * PIO_USE_ASYNC_WR_THREAD=ON). This predates and is not introduced by that
+   * CONTIG-write work; synchronizing bget()/brel() (or avoiding them on the
+   * worker thread) is a needed follow-up before HDF5 async writes with
+   * datatype conversion can be considered safe for concurrent use. */
   Cachebuf cbuf = { bget(nelems * size_of(to_pio_type)), to_pio_type };
 
   copy_to(buf, from_pio_type, cbuf.buf, to_pio_type, nelems);

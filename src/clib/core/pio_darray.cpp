@@ -481,8 +481,9 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     /* When PIO_USE_ASYNC_WR_THREAD is on, every HDF5/HDF5C write above was
      * queued on the async thread pool (for all rearrangers) and the queued op
      * still reads these converted buffers while it runs - freeing them here,
-     * on the calling thread, would be a use-after-free. The async op frees
-     * them once it completes. */
+     * on the calling thread, would be a use-after-free. These buffers are
+     * instead released later, at file teardown, by DTConverter::clear()
+     * (pio_lists.cpp) - not per-op when the queued write completes. */
     if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
       assert(file->dt_converter);
       static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->free(ioid);
@@ -580,7 +581,8 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
 #if !PIO_USE_ASYNC_WR_THREAD
       /* See the matching guard after the DARRAY_DATA dispatch above: with
        * PIO_USE_ASYNC_WR_THREAD on, the queued async op owns these buffers
-       * until it completes. */
+       * until it completes, and they are only released later at file
+       * teardown by DTConverter::clear() (pio_lists.cpp), not per-op. */
       if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
         assert(file->dt_converter);
         static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->free(ioid);
