@@ -1,0 +1,36 @@
+---
+#
+# ========== SCORPIO Lint testing workflow ============
+# This workflow runs actionlint (static code analysis) for all github workflows
+# The current workflow,
+# 1) Checks out SCORPIO source
+# 2) Use prebuilt raven actions to run actionlint
+#
+name: SCORPIO + Actionlint
+
+on:  # yamllint disable-line rule:truthy
+  workflow_call:
+    inputs:
+      branch_name:
+        description: 'Branch to run the SCORPIO + Actionlint'
+        type: string
+        required: true
+
+jobs:
+  actionlint:
+    name: 'Checkout and run actionlint'
+    runs-on: ubuntu-latest  # Or other suitable runner
+
+    steps:
+      # Actionlint requires newer Node.js (the default one throws errors)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Or '18', '22'
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run actionlint
+        uses: raven-actions/actionlint@v2
+        with:
+          fail-on-error: true

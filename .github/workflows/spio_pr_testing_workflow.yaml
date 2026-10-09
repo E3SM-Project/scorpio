@@ -1,0 +1,39 @@
+---
+#
+# ========== SCORPIO PR testing workflow ============
+# The current workflow,
+# 1) Run tests with PnetCDF if a commit is pushed to master
+# 2) Run tests with PnetCDF if a PR is created/updated on master
+# The tests are run on a single node (with PnetCDF)
+#
+name: SCORPIO PR - build and test
+
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Branch to run the SCORPIO + PnetCDF tests'
+        required: true
+        default: 'master'
+  push:
+    branches:
+      - master
+      # Includes all branches starting with "copilot/"
+      # A "*" matches any char except "/", so use "**" to handle all branch names
+      - 'copilot/**'
+  pull_request:
+    branches:
+      - master
+      # Includes all branches starting with "copilot/"
+      # A "*" matches any char except "/", so use "**" to handle all branch names
+      - 'copilot/**'
+
+jobs:
+  call_spio_actionlint_testing_workflow:
+    uses: ./.github/workflows/spio_lint_workflow.yaml
+    with:
+      branch_name: ${{ github.ref_name }}
+  call_spio_pnetcdf_testing_workflow:
+    uses: ./.github/workflows/spio_pnetcdf_testing_workflow.yaml
+    with:
+      branch_name: ${{ github.ref_name }}
