@@ -664,6 +664,10 @@ static int pio_iosys_async_op_hdf5_write_impl(void *pdata)
   void *iobuf = (wr_fillbuf) ? (wcache->fillbuf) : (wcache->iobuf);
   std::size_t iobuf_sz = (wr_fillbuf) ? (wcache->fillbuf_sz) : (wcache->iobuf_sz);
 
+  /* FIXME: for wr_fillbuf with nvars > 1 this fires - see the FIXME on
+   * fillbuf_sz's computation in pio_iosys_async_hdf5_write_op_add() above.
+   * Pre-existing (identical in master, modulo the iodesc -> io_desc_info
+   * rename); not fixed here. */
   assert(region && (nvars * llen * io_desc_info.mpitype_size == static_cast<PIO_Offset>(iobuf_sz)));
   assert(((iobuf_sz == 0) && !iobuf) || ((iobuf_sz != 0) && iobuf));
 
@@ -940,6 +944,20 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
   var_desc_t *v1desc = file->varlist + varids[0];
   //PIO_Offset llen = fill ? sel_desc.holegridsize : sel_desc.llen;
   if(fill){
+    /* FIXME: fillbuf_sz is not multiplied by nvars, but the write loop in
+     * pio_iosys_async_op_hdf5_write_impl() (see the assert at the top of
+     * that function, and the per-variable "bufptr = iobuf + vidx *
+     * mpitype_size * llen" offset below it) indexes wcache->fillbuf as if it
+     * held nvars copies of a single variable's fill region. For nvars > 1
+     * this undersizes/underfills fillbuf: the assert
+     * "nvars * llen * mpitype_size == iobuf_sz" then fails (confirmed via
+     * test pio_decomp_fillval2_np4_nio2_st2, PIO_USE_ASYNC_WR_THREAD=ON,
+     * which crashes on this assert), and without that assert vidx >= 1
+     * would read past the end of the undersized fillbuf. Pre-existing bug -
+     * this computation is an unchanged, mechanical port of master's
+     * "iodesc->holegridsize * iodesc->mpitype_size" (same missing nvars
+     * factor there); never exercised by CI since CI never sets
+     * PIO_USE_ASYNC_WR_THREAD=ON. Not fixed here - tracked as a follow-up. */
     std::size_t fillbuf_sz = sel_desc.holegridsize * sel_desc.mpitype_size;
     /* On I/O processes with no data (after rearrangement) to write the fillbuf_sz will be 0 */
     if(fillbuf_sz > 0){
