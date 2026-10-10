@@ -256,7 +256,9 @@ extern "C" {
 
     /* Create a box rearranger. */
     int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *compmap, const int *gsize,
-                             int ndim, io_desc_t *iodesc);
+                             int ndim, io_desc_t *iodesc,
+                             io_desc_info_t &desc_info,
+                             const SPIO_Util::Iosys_Util::Io_comm_target &io_target);
 
 
     /* Move data from IO tasks to compute tasks. */

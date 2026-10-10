@@ -580,7 +580,7 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
     }
 
     /* Compute the max io buffer size needed for an iodesc. */
-    if((ret = compute_maxIObuffersize(ios->io_comm_info->get_sync_io_comm(), iodesc))){
+    if((ret = compute_maxIObuffersize(ios->io_comm_info->get_sync_io_comm(), iodesc->sync_io_desc_info))){
       return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                       "Initializing the PIO decomposition failed. Internal error computing max io buffer size needed for the decomposition");
     }
@@ -595,7 +595,8 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
   LOG((3, "iodesc->sync_io_desc_info.num_aiotasks = %d", iodesc->sync_io_desc_info.num_aiotasks));
 
   /* Compute the communications pattern for this decomposition. */
-  if((ret = box_rearrange_create(ios, iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map, iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.ndims, iodesc))){
+  if((ret = box_rearrange_create(ios, iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map, iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.ndims, iodesc,
+                                  iodesc->sync_io_desc_info, SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios)))){
     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                     "Error initializing the PIO decomposition. Error creating the BOX rearranger");
   }

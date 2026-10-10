@@ -765,7 +765,8 @@ int test_box_rearrange_create(MPI_Comm test_comm, int my_rank)
     iodesc->sync_io_desc_info.firstregion = ior1;
 
     /* We are finally ready to run the code under test. */
-    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc)))
+    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc,
+                                    iodesc->sync_io_desc_info, SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios))))
         return ret;
 
     /* Check some results. */
@@ -886,7 +887,8 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
     iodesc->sync_io_desc_info.firstregion = ior1;
 
     /* We are finally ready to run the code under test. */
-    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc)))
+    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc,
+                                    iodesc->sync_io_desc_info, SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios))))
         return ret;
 
     /* Check some results. */
@@ -1008,7 +1010,8 @@ int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
         compmap[0] = 1;
 
     /* We are finally ready to run the code under test. */
-    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc)))
+    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc,
+                                    iodesc->sync_io_desc_info, SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios))))
         return ret;
 
     /* Check some results. */
@@ -1162,7 +1165,8 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
     iodesc->sync_io_desc_info.firstregion = ior1;
 
     /* Create the box rearranger. */
-    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc)))
+    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc,
+                                    iodesc->sync_io_desc_info, SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios))))
         return ret;
 
     /* Run the function to test. */
@@ -1288,7 +1292,8 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
     iodesc->sync_io_desc_info.firstregion = ior1;
 
     /* Create the box rearranger. */
-    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc)))
+    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc,
+                                    iodesc->sync_io_desc_info, SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios))))
         return ret;
 
     /* Run the function to test. */
