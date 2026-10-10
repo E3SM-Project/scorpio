@@ -268,7 +268,8 @@ extern "C" {
     int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf, void *rbuf);
 
     /* Move data from compute tasks to IO tasks. */
-    int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file,
+    int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, io_desc_info_t &desc_info,
+                          const SPIO_Util::Iosys_Util::Io_comm_target &io_target, file_desc_t *file,
                           const void *sbuf, void *rbuf, int nvars);
 
     void performance_tune_rearranger(iosystem_desc_t *ios, io_desc_t *iodesc);

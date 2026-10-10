@@ -842,7 +842,8 @@ int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc, io_desc_info_t &desc
  * @param nvars number of variables.
  * @returns 0 on success, error code otherwise.
  */
-int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file,
+int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, io_desc_info_t &desc_info,
+                      const SPIO_Util::Iosys_Util::Io_comm_target &io_target, file_desc_t *file,
                       const void *sbuf, void *rbuf, int nvars)
 {
     int ntasks;       /* Number of tasks in communicator. */
@@ -856,18 +857,18 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
     /* Caller must provide these. */
     pioassert(ios && iodesc && nvars > 0, "invalid input", __FILE__, __LINE__);
 
-    LOG((1, "rearrange_comp2io nvars = %d iodesc->sync_io_desc_info.rearranger = %d", nvars,
-         iodesc->sync_io_desc_info.rearranger));
+    LOG((1, "rearrange_comp2io nvars = %d desc_info.rearranger = %d", nvars,
+         desc_info.rearranger));
 
     /* Different rearraangers use different communicators. */
-    if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_BOX)
+    if (desc_info.rearranger == PIO_REARR_BOX)
     {
         mycomm = ios->union_comm;
-        niotasks = ios->io_comm_info->get_sync_io_comm_sz();
+        niotasks = io_target.get_comm_sz();
     }
     else
     {
-        mycomm = iodesc->sync_io_desc_info.subset_comm;
+        mycomm = desc_info.subset_comm;
         niotasks = 1;
     }
 
@@ -897,12 +898,12 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
         recvtypes[i] = MPI_DATATYPE_NULL;
         sendtypes[i] = MPI_DATATYPE_NULL;
     }
-    LOG((3, "ntasks = %d iodesc->sync_io_desc_info.mpitype_size = %d niotasks = %d", ntasks,
-         iodesc->sync_io_desc_info.mpitype_size, niotasks));
+    LOG((3, "ntasks = %d desc_info.mpitype_size = %d niotasks = %d", ntasks,
+         desc_info.mpitype_size, niotasks));
 
     /* If it has not already been done, define the MPI data types that
      * will be used for this io_desc_t. */
-    if ((ret = define_iodesc_datatypes(ios, iodesc)))
+    if ((ret = define_iodesc_datatypes(ios, iodesc, desc_info, io_target)))
     {
         GPTLstop("PIO:rearrange_comp2io");
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
@@ -911,16 +912,16 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
 
     /* If this io proc, we need to exchange data with compute
      * tasks. Create a MPI DataType for that exchange. */
-    LOG((2, "ios->io_comm_info->is_sync_io_proc() %d iodesc->sync_io_desc_info.nrecvs = %d", ios->io_comm_info->is_sync_io_proc(), iodesc->sync_io_desc_info.nrecvs));
-    if (ios->io_comm_info->is_sync_io_proc() && iodesc->sync_io_desc_info.nrecvs > 0)
+    LOG((2, "io_target.is_io_proc() %d desc_info.nrecvs = %d", io_target.is_io_proc(), desc_info.nrecvs));
+    if (io_target.is_io_proc() && desc_info.nrecvs > 0)
     {
-        for (int i = 0; i < iodesc->sync_io_desc_info.nrecvs; i++)
+        for (int i = 0; i < desc_info.nrecvs; i++)
         {
-            if (iodesc->sync_io_desc_info.rtype[i] != MPI_DATATYPE_NULL)
+            if (desc_info.rtype[i] != MPI_DATATYPE_NULL)
             {
-                LOG((3, "iodesc->sync_io_desc_info.rtype[%d] = %d iodesc->sync_io_desc_info.rearranger = %d", i, iodesc->sync_io_desc_info.rtype[i],
-                        iodesc->sync_io_desc_info.rearranger));
-                if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET)
+                LOG((3, "desc_info.rtype[%d] = %d desc_info.rearranger = %d", i, desc_info.rtype[i],
+                        desc_info.rearranger));
+                if (desc_info.rearranger == PIO_REARR_SUBSET)
                 {
                     LOG((3, "exchanging data for subset rearranger"));
                     recvcounts[i] = 1;
@@ -929,8 +930,8 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
                      *  spaced blocks of the same size. The block size
                      *  is 1, the stride here is the length of the
                      *  collected array (llen). */
-                    if ((mpierr = MPI_Type_create_hvector(nvars, 1, (MPI_Aint)iodesc->sync_io_desc_info.llen * iodesc->sync_io_desc_info.mpitype_size,
-                                                          iodesc->sync_io_desc_info.rtype[i], &recvtypes[i])))
+                    if ((mpierr = MPI_Type_create_hvector(nvars, 1, (MPI_Aint)desc_info.llen * desc_info.mpitype_size,
+                                                          desc_info.rtype[i], &recvtypes[i])))
                     {
                         GPTLstop("PIO:rearrange_comp2io");
                         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
@@ -945,27 +946,27 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
                 }
                 else
                 {
-                    recvcounts[iodesc->sync_io_desc_info.rfrom[i]] = 1;
-                    LOG((3, "exchanging data for box rearranger i = %d iodesc->sync_io_desc_info.rfrom[i] = %d "
-                         "recvcounts[iodesc->sync_io_desc_info.rfrom[i]] = %d", i, iodesc->sync_io_desc_info.rfrom[i],
-                         recvcounts[iodesc->sync_io_desc_info.rfrom[i]]));
+                    recvcounts[desc_info.rfrom[i]] = 1;
+                    LOG((3, "exchanging data for box rearranger i = %d desc_info.rfrom[i] = %d "
+                         "recvcounts[desc_info.rfrom[i]] = %d", i, desc_info.rfrom[i],
+                         recvcounts[desc_info.rfrom[i]]));
 
-                    if ((mpierr = MPI_Type_create_hvector(nvars, 1, (MPI_Aint)iodesc->sync_io_desc_info.llen * iodesc->sync_io_desc_info.mpitype_size,
-                                                          iodesc->sync_io_desc_info.rtype[i], &recvtypes[iodesc->sync_io_desc_info.rfrom[i]])))
+                    if ((mpierr = MPI_Type_create_hvector(nvars, 1, (MPI_Aint)desc_info.llen * desc_info.mpitype_size,
+                                                          desc_info.rtype[i], &recvtypes[desc_info.rfrom[i]])))
                     {
                         GPTLstop("PIO:rearrange_comp2io");
                         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
                     }
-                    pioassert(recvtypes[iodesc->sync_io_desc_info.rfrom[i]] != MPI_DATATYPE_NULL,  "bad mpi type",
+                    pioassert(recvtypes[desc_info.rfrom[i]] != MPI_DATATYPE_NULL,  "bad mpi type",
                               __FILE__, __LINE__);
 
-                    if ((mpierr = MPI_Type_commit(&recvtypes[iodesc->sync_io_desc_info.rfrom[i]])))
+                    if ((mpierr = MPI_Type_commit(&recvtypes[desc_info.rfrom[i]])))
                     {
                         GPTLstop("PIO:rearrange_comp2io");
                         return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
                     }
 
-                    rdispls[iodesc->sync_io_desc_info.rfrom[i]] = 0;
+                    rdispls[desc_info.rfrom[i]] = 0;
                 }
             }
         }
@@ -975,21 +976,21 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
      * each exchange.  */
     if(!ios->async || ios->compproc)
     {
-        const std::vector<int> ios_ioranks = ios->io_comm_info->get_sync_io_ranks();
+        const std::vector<int> ios_ioranks = io_target.get_ranks();
         for (int i = 0; i < niotasks; i++)
         {
             int io_comprank = ios_ioranks[i];
             LOG((3, "ios_ioranks[%d] = %d", i, ios_ioranks[i]));
-            if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET)
+            if (desc_info.rearranger == PIO_REARR_SUBSET)
                 io_comprank = 0;
 
-            LOG((3, "i = %d iodesc->sync_io_desc_info.scount[i] = %d", i, iodesc->sync_io_desc_info.scount[i]));
-            if (iodesc->sync_io_desc_info.scount[i] > 0 && sbuf)
+            LOG((3, "i = %d desc_info.scount[i] = %d", i, desc_info.scount[i]));
+            if (desc_info.scount[i] > 0 && sbuf)
             {
                 LOG((3, "io task %d creating sendtypes[%d]", i, io_comprank));
                 sendcounts[io_comprank] = 1;
-                if ((mpierr = MPI_Type_create_hvector(nvars, 1, (MPI_Aint)iodesc->sync_io_desc_info.ndof * iodesc->sync_io_desc_info.mpitype_size,
-                                                      iodesc->sync_io_desc_info.stype[i], &sendtypes[io_comprank])))
+                if ((mpierr = MPI_Type_create_hvector(nvars, 1, (MPI_Aint)desc_info.ndof * desc_info.mpitype_size,
+                                                      desc_info.stype[i], &sendtypes[io_comprank])))
                 {
                     GPTLstop("PIO:rearrange_comp2io");
                     return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
@@ -1013,7 +1014,7 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file
     LOG((2, "about to call pio_swapm for sbuf"));
     if ((ret = pio_swapm(sbuf, sendcounts, sdispls, sendtypes,
                          rbuf, recvcounts, rdispls, recvtypes, mycomm,
-                         &iodesc->sync_io_desc_info.rearr_opts.comp2io)))
+                         &desc_info.rearr_opts.comp2io)))
     {
         GPTLstop("PIO:rearrange_comp2io");
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,

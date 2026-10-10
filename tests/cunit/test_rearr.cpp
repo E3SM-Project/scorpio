@@ -1171,7 +1171,8 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
         return ret;
 
     /* Run the function to test. */
-    if ((ret = rearrange_comp2io(ios, iodesc, file, sbuf, rbuf, nvars)))
+    if ((ret = rearrange_comp2io(ios, iodesc, iodesc->sync_io_desc_info,
+                                 SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios), file, sbuf, rbuf, nvars)))
         return ret;
     printf("returned from rearrange_comp2io\n");
 
