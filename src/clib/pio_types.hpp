@@ -383,8 +383,9 @@ struct io_desc_t
     /* I/O decomposition info for synchronous reads/writes */
     io_desc_info_t sync_io_desc_info;
 
-    /* I/O decomposition info for asynchronous writes. Only allocated for PIO_REARR_CONTIG
-     * decomps for now (when using async I/O : PIO_USE_ASYNC_WR_THREAD). NULL otherwise.
+    /* I/O decomposition info for asynchronous writes. Allocated for
+     * PIO_REARR_CONTIG, PIO_REARR_BOX, and PIO_REARR_SUBSET decomps when
+     * using async I/O (PIO_USE_ASYNC_WR_THREAD). NULL otherwise.
      */
     io_desc_info_t *async_io_desc_info;
 
