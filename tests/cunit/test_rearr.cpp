@@ -1038,6 +1038,104 @@ int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
     return 0;
 }
 
+/* Test that box_rearranger_init() (and subset_rearranger_init()) eagerly
+ * allocate iodesc->async_io_desc_info when PIO_USE_ASYNC_WR_THREAD is on,
+ * mirroring what contig_rearranger_init() already does for CONTIG. This
+ * only compiles the assertion in when the flag is actually on, since
+ * async_io_desc_info is guaranteed NULL (by io_desc_t's constructor) and
+ * untouched when the flag is off - see pio_darray.cpp Review Focus: "a BOX
+ * or SUBSET decomposition built with PIO_USE_ASYNC_WR_THREAD off must still
+ * build and run correctly". */
+int test_async_io_desc_info_allocated(MPI_Comm test_comm, int my_rank)
+{
+#if PIO_USE_ASYNC_WR_THREAD
+    iosystem_desc_t *ios;
+    int maplen = 2;
+    PIO_Offset compmap[2] = {my_rank * 2 + 1, my_rank * 2 + 2};
+    const int gdimlen[NDIM1] = {8};
+    int ndims = NDIM1;
+    int ret;
+
+    if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
+        return PIO_ENOMEM;
+
+    ios->compproc = 1;
+    ios->union_comm = test_comm;
+    ios->my_comm = test_comm;
+    ios->num_uniontasks = TARGET_NTASKS;
+    ios->union_rank = my_rank;
+    ios->num_comptasks = TARGET_NTASKS;
+    if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
+        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
+    for (int i = 0; i < TARGET_NTASKS; i++)
+        ios->compranks[i] = i;
+
+    MPI_Comm sync_comm_dup = MPI_COMM_NULL, async_comm_dup = MPI_COMM_NULL;
+    MPI_Comm_dup(test_comm, &sync_comm_dup);
+    MPI_Comm_dup(test_comm, &async_comm_dup);
+
+    {
+        std::vector<int> sync_io_ranks(TARGET_NTASKS);
+        for (int i = 0; i < TARGET_NTASKS; i++)
+            sync_io_ranks[i] = i;
+        /* Sync and async I/O share the same rank membership for this test.
+         * This is IO_comm_info's test-only "both comms explicitly provided"
+         * mock constructor (spio_iosys_utils.hpp - the 10-arg overload, not
+         * the 9-arg single-role one used elsewhere in this file, which has no
+         * async role at all): it unconditionally owns/frees both comms it is
+         * given (owns_resources=true, hardcoded), so each role is handed its
+         * own MPI_Comm_dup() of test_comm rather than test_comm itself -
+         * freeing test_comm here (owned by the caller) or double-freeing one
+         * handle under two roles would corrupt the caller's communicator. */
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(
+            sync_comm_dup, my_rank, TARGET_NTASKS, MPI_GROUP_NULL, sync_io_ranks,
+            async_comm_dup, my_rank, TARGET_NTASKS, MPI_GROUP_NULL, sync_io_ranks);
+    }
+
+    io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, ndims, gdimlen, maplen, compmap, PIO_REARR_BOX, true);
+    SPIO_Util::Iosys_Util::Io_comm_target sync_target = SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios);
+    if ((ret = CalcStartandCount(iodesc->sync_io_desc_info.piotype, iodesc->sync_io_desc_info.ndims,
+                                  iodesc->sync_io_desc_info.dimlen, sync_target.get_comm_sz(), sync_target.get_comm_rank(),
+                                  iodesc->sync_io_desc_info.firstregion->start, iodesc->sync_io_desc_info.firstregion->count,
+                                  &iodesc->sync_io_desc_info.num_aiotasks)))
+        return ret;
+    if ((ret = box_rearrange_create(ios, iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map,
+                                     iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.ndims, iodesc,
+                                     iodesc->sync_io_desc_info, sync_target)))
+        return ret;
+
+    iodesc->async_io_desc_info = new io_desc_info_t(ios, iodesc->sync_io_desc_info.piotype,
+        iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen,
+        iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map,
+        iodesc->sync_io_desc_info.rearranger, /*map_zero_based=*/false);
+    SPIO_Util::Iosys_Util::Io_comm_target async_target = SPIO_Util::Iosys_Util::make_async_io_comm_target(ios);
+    if ((ret = CalcStartandCount(iodesc->async_io_desc_info->piotype, iodesc->async_io_desc_info->ndims,
+                                  iodesc->async_io_desc_info->dimlen, async_target.get_comm_sz(), async_target.get_comm_rank(),
+                                  iodesc->async_io_desc_info->firstregion->start, iodesc->async_io_desc_info->firstregion->count,
+                                  &iodesc->async_io_desc_info->num_aiotasks)))
+        return ret;
+    if ((ret = box_rearrange_create(ios, iodesc->async_io_desc_info->maplen, iodesc->async_io_desc_info->map,
+                                     iodesc->async_io_desc_info->dimlen, iodesc->async_io_desc_info->ndims, iodesc,
+                                     *(iodesc->async_io_desc_info), async_target)))
+        return ret;
+
+    if (iodesc->async_io_desc_info->maplen != iodesc->sync_io_desc_info.maplen)
+        return ERR_WRONG;
+    for (int i = 0; i < iodesc->sync_io_desc_info.maplen; i++)
+        if (iodesc->async_io_desc_info->map[i] != iodesc->sync_io_desc_info.map[i])
+            return ERR_WRONG;
+
+    delete(ios->io_comm_info);
+    free(ios->compranks);
+    delete(iodesc);
+    free(ios);
+#else
+    (void)test_comm;
+    (void)my_rank;
+#endif
+    return 0;
+}
+
 /* Test function default_subset_partition. */
 int test_default_subset_partition(MPI_Comm test_comm, int my_rank)
 {
@@ -1390,6 +1488,12 @@ int run_no_iosys_tests(int my_rank, MPI_Comm test_comm)
 
     if ((ret = test_box_rearrange_create_3(test_comm, my_rank)))
         return ret;
+
+    if ((ret = test_async_io_desc_info_allocated(test_comm, my_rank)))
+    {
+        printf("test_async_io_desc_info_allocated FAILED!\n");
+        return ret;
+    }
 
     printf("%d running tests for default_subset_partition\n", my_rank);
     if ((ret = test_default_subset_partition(test_comm, my_rank)))
