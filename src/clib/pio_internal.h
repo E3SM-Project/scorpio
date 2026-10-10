@@ -196,7 +196,8 @@ extern "C" {
                        const int *dest_ioproc, const PIO_Offset *dest_ioindex);
 
     /* Create the MPI communicators needed by the subset rearranger. */
-    int default_subset_partition(iosystem_desc_t *ios, io_desc_t *iodesc);
+    int default_subset_partition(iosystem_desc_t *ios, io_desc_t *iodesc, io_desc_info_t &desc_info,
+                                 const SPIO_Util::Iosys_Util::Io_comm_target &io_target);
 
     /* Check return from MPI function and print error message. */
     void CheckMPIReturn(int ierr, const char *file, int line);
@@ -251,7 +252,9 @@ extern "C" {
 
     /* Create a subset rearranger. */
     int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compmap, const int *gsize,
-                                int ndim, io_desc_t *iodesc);
+                                int ndim, io_desc_t *iodesc,
+                                io_desc_info_t &desc_info,
+                                const SPIO_Util::Iosys_Util::Io_comm_target &io_target);
 
 
     /* Create a box rearranger. */

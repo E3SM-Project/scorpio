@@ -543,7 +543,8 @@ static int subset_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const
   iodesc->sync_io_desc_info.num_aiotasks = ios->io_comm_info->get_sync_io_comm_sz();
   LOG((2, "creating subset rearranger iodesc->sync_io_desc_info.num_aiotasks = %d", iodesc->sync_io_desc_info.num_aiotasks));
   if((ret = subset_rearrange_create(ios, iodesc->sync_io_desc_info.maplen, (PIO_Offset *)(iodesc->sync_io_desc_info.map),
-                                      iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.ndims, iodesc))){
+                                      iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.ndims, iodesc,
+                                      iodesc->sync_io_desc_info, SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios)))){
     return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                     "Initializing the PIO decomposition failed. Error creating the SUBSET rearranger");
   }
