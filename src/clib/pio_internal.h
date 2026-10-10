@@ -33,6 +33,8 @@
 #include <string>
 #include <memory>
 
+namespace SPIO_Util{ namespace Iosys_Util{ class Io_comm_target; } }
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
