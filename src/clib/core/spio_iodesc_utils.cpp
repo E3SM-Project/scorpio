@@ -247,8 +247,18 @@ io_desc_info_t &io_desc_t::select_io_desc_info(int iotype, const iosystem_desc_t
 #if PIO_USE_ASYNC_WR_THREAD
   if(((iotype == PIO_IOTYPE_HDF5) || (iotype == PIO_IOTYPE_HDF5C)) &&
       (async_io_desc_info != NULL) &&
-      (sync_io_desc_info.rearranger == PIO_REARR_CONTIG)){
-    /* An async-dispatched HDF5/HDF5C write executes on the *async* I/O ranks,
+      ((sync_io_desc_info.rearranger == PIO_REARR_CONTIG) ||
+       (sync_io_desc_info.rearranger == PIO_REARR_BOX) ||
+       (sync_io_desc_info.rearranger == PIO_REARR_SUBSET))){
+    /* PIO_REARR_ANY never appears in sync_io_desc_info.rearranger here (or
+     * anywhere else this plan touches) and so needs no case of its own: it is
+     * resolved to PIO_REARR_BOX or PIO_REARR_SUBSET by box_rearranger_init()/
+     * subset_rearranger_init()'s caller before an io_desc_info_t is ever
+     * constructed, so by the time this function runs, rearranger already
+     * holds the resolved value. No dedicated PIO_REARR_ANY test is needed for
+     * the same reason.
+     *
+     * An async-dispatched HDF5/HDF5C write executes on the *async* I/O ranks,
      * but the HDF5 file and all its datasets are only ever created on the
      * *sync* I/O ranks (TComm_info's io_comm comes from get_sync_io_comm(),
      * and the HDF5 create/def_var/enddef async ops early-return on anything
@@ -257,18 +267,20 @@ io_desc_info_t &io_desc_t::select_io_desc_info(int iotype, const iosystem_desc_t
      * processes; when dedicated (disjoint) async I/O procs exist, those ranks
      * would call H5Dget_space()/H5Dwrite() on a dataset they never created
      * ("invalid dataset identifier") and then MPI_Barrier() on MPI_COMM_NULL.
+     * This applies equally to CONTIG, BOX, and SUBSET decomps - none of them
+     * create HDF5 files/datasets on the async I/O ranks.
      *
      * Until HDF5 file/dataset creation is extended to span the async I/O comm
      * as well (a separate, architectural change), fall back to the sync
-     * io_desc_info for this decomposition in that case - i.e. treat a CONTIG
-     * decomp exactly like BOX/SUBSET. The write is still queued on the async
-     * thread pool, it just targets the sync I/O ranks (and the sync CONTIG
-     * rearranger) like it did before async CONTIG writes were introduced. */
+     * io_desc_info for this decomposition in that case. The write is still
+     * queued on the async thread pool, it just targets the sync I/O ranks
+     * (and the sync rearranger) like it did before async writes were
+     * introduced for this decomposition's rearranger. */
     if(ios && ios->io_comm_info && !(ios->io_comm_info->sync_and_async_io_share_procs())){
       if(!async_io_disabled_warned){
         async_io_disabled_warned = true;
         PIOc_warn(ios->iosysid, PIO_DEFAULT, __FILE__, __LINE__,
-          "Asynchronous HDF5 writes for this PIO_REARR_CONTIG I/O decomposition are disabled "
+          "Asynchronous HDF5 writes for this I/O decomposition are disabled "
           "because the asynchronous I/O processes are disjoint from the synchronous I/O processes "
           "(HDF5 files/datasets are only created on the synchronous I/O processes). "
           "The writes will use the synchronous I/O processes instead. This may impact write I/O throughput");

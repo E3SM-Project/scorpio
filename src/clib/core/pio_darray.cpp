@@ -262,8 +262,8 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
 
   pioassert(!spio_file_mvcache_get(file, ioid), "buffer overwrite",__FILE__, __LINE__);
 
-  /* Use async io_desc_info_t for writing with PIO_REARR_CONTIG + HDF5[C] +
-   * PIO_ASYNC_WR_THREAD. Use sync io_desc_info_t otherwise
+  /* Use async io_desc_info_t for writing with HDF5[C] + PIO_ASYNC_WR_THREAD (for all rearrangers)
+   * Use sync io_desc_info_t otherwise
    */
   io_desc_info_t &write_desc_info = iodesc->select_io_desc_info(file->iotype, ios);
 
