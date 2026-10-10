@@ -342,14 +342,18 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
   }
 
   /* Move data from compute to IO tasks.
-   * For PIO_REARR_CONTIG + PIO_USE_ASYNC_WR_THREAD + HDF5[C] :
+   * For PIO_USE_ASYNC_WR_THREAD + HDF5[C] (for all rearrangers):
    *  write_desc_info is set to use the async io_desc_info_t so that the data is rearranged to the async I/O procs.
    */
   if(write_desc_info.rearranger == PIO_REARR_CONTIG){
     ierr = write_desc_info.rearr->rearrange_comp2io(array, arraylen * nvars * write_desc_info.mpitype_size, mv_iobuf, rlen * write_desc_info.mpitype_size, nvars);
   }
   else{
-    ierr = rearrange_comp2io(ios, iodesc, file, array, mv_iobuf, nvars);
+    bool is_async_write = (&write_desc_info == iodesc->async_io_desc_info);
+    SPIO_Util::Iosys_Util::Io_comm_target io_target = is_async_write ?
+      SPIO_Util::Iosys_Util::make_async_io_comm_target(ios) :
+      SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios);
+    ierr = rearrange_comp2io(ios, iodesc, write_desc_info, io_target, file, array, mv_iobuf, nvars);
   }
   if(ierr != PIO_NOERR){
     return pio_err(ios, file, ierr, __FILE__, __LINE__,

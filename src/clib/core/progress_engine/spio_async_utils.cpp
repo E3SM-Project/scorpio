@@ -560,7 +560,8 @@ int pio_var_rearr_and_cache(file_desc_t *file, var_desc_t *vdesc,
    * rearrange is complete
    */
   int nvars = 1;
-  ierr = rearrange_comp2io(ios, iodesc, file, sbuf, rbuf, nvars);
+  ierr = rearrange_comp2io(ios, iodesc, iodesc->sync_io_desc_info,
+                           SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios), file, sbuf, rbuf, nvars);
   if(ierr != PIO_NOERR){
     return pio_err(ios, file, ierr, __FILE__, __LINE__,
                     "Error while rearranging data from compute processes to I/O processes before writing it out to file (%s, ncid=%d). Internal error occured while rearranging data", pio_get_fname_from_file(file), file->pio_ncid);
