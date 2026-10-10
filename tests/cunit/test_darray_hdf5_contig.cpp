@@ -149,7 +149,7 @@ static int test_write_read_hdf5(int iosysid, int my_rank, int ntasks, int rearra
   return cmp_ret;
 }
 
-/* Write and read back a 1D array using HDF5+PIO_REARR_SUBSET, where
+/* Write and read back a 1D array using HDF5 (all rearrs), where
  * the decomposition's PIO type is different from the variable type,
  * PIO_DOUBLE, forcing data conversion
  */
@@ -198,6 +198,65 @@ static int test_write_read_hdf5_dtconv(int iosysid, int my_rank, int ntasks)
               "(> 1, confirms the H5S_SELECT_OR union-hyperslab branch is exercised below)\n",
               iodesc->sync_io_desc_info.maxregions);
   }
+
+#if PIO_USE_ASYNC_WR_THREAD
+  /* Explicitly confirm the fallback described in the comment above: this
+   * decomposition's disjoint sync/async I/O ranks must still route this
+   * SUBSET write through sync_io_desc_info, not async_io_desc_info, so this
+   * test keeps avoiding the unrelated CONTIG-async deadlock/crash now that
+   * select_io_desc_info() no longer excludes SUBSET from the async path. */
+  if (my_rank == 0){
+    io_desc_t *iodesc = pio_get_iodesc_from_id(ioid);
+    iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
+    if (iodesc == NULL || ios == NULL){
+      LOG_RANK0(my_rank, "FAIL: pio_get_iodesc_from_id/pio_get_iosystem_from_id returned NULL (dtconv)\n");
+      PIOc_freedecomp(iosysid, ioid);
+      return PIO_EINTERNAL;
+    }
+    /* This decomposition's I/O ranks (TARGET_NTASKS=4, NUM_IO1=1) are the
+     * real, production-built, genuinely disjoint sync/async I/O rank sets
+     * (same shape as test_hdf5_async_contig.c) - not a cunit mock, which
+     * cannot represent disjoint membership (see Task 6's Context: the
+     * existing IO_comm_info test-mock constructors hard-code
+     * is_sync_io_proc_/is_async_io_proc_ to true and do not model per-rank
+     * membership). So this is the one place in the whole plan that proves,
+     * for a real disjoint-procs IO configuration, that
+     * subset_rearranger_init()'s Task 6 eager-allocation block still leaves
+     * iodesc->async_io_desc_info non-NULL and correctly populated even
+     * though (per the check below) it ends up unused for this test's writes.
+     * box_rearranger_init()'s equivalent block is structurally identical
+     * (same io_desc_info_t constructor call, same CalcStartandCount/
+     * compute_maxIObuffersize sequence, gated the same way) and is exercised
+     * end-to-end, in an equally disjoint niotasks=1 configuration, by Task
+     * 8's test_hdf5_async_box.c - that example cannot reach into
+     * iodesc->async_io_desc_info (it only calls the public C API), so this
+     * SUBSET check is the plan's one white-box confirmation of this
+     * behavior; BOX relies on the code-path equivalence above plus Task 8's
+     * example completing (no crash/hang) in the same disjoint shape. */
+    if (iodesc->async_io_desc_info == NULL){
+      LOG_RANK0(my_rank, "FAIL: test_write_read_hdf5_dtconv's SUBSET decomposition has a NULL "
+                "async_io_desc_info even with PIO_USE_ASYNC_WR_THREAD on - subset_rearranger_init() "
+                "should have eagerly allocated it regardless of the disjoint-procs fallback\n");
+      PIOc_freedecomp(iosysid, ioid);
+      return PIO_EINTERNAL;
+    }
+    if ((iodesc->async_io_desc_info->maplen != iodesc->sync_io_desc_info.maplen) ||
+        (iodesc->async_io_desc_info->ndims != iodesc->sync_io_desc_info.ndims)){
+      LOG_RANK0(my_rank, "FAIL: test_write_read_hdf5_dtconv's async_io_desc_info maplen/ndims do not "
+                "match sync_io_desc_info - the disjoint-procs eager allocation populated it "
+                "incorrectly\n");
+      PIOc_freedecomp(iosysid, ioid);
+      return PIO_EINTERNAL;
+    }
+    if (&(iodesc->select_io_desc_info(format, ios)) != &(iodesc->sync_io_desc_info)){
+      LOG_RANK0(my_rank, "FAIL: test_write_read_hdf5_dtconv's SUBSET decomposition unexpectedly "
+                "routed to the async io_desc_info_t - this would resurface the unrelated "
+                "CONTIG-async deadlock/crash this test was written to avoid\n");
+      PIOc_freedecomp(iosysid, ioid);
+      return PIO_EINTERNAL;
+    }
+  }
+#endif
 
   std::vector<int> wdata(MAPLEN_PER_RANK);
   for(int i = 0; i < MAPLEN_PER_RANK; i++){
