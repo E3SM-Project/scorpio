@@ -191,8 +191,9 @@ extern "C" {
                           int myiorank, PIO_Offset *start, PIO_Offset *count, int *num_aiotasks);
 
     /* Completes the mapping for the box rearranger. */
-    int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc, const int *dest_ioproc,
-                       const PIO_Offset *dest_ioindex);
+    int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc, io_desc_info_t &desc_info,
+                       const SPIO_Util::Iosys_Util::Io_comm_target &io_target,
+                       const int *dest_ioproc, const PIO_Offset *dest_ioindex);
 
     /* Create the MPI communicators needed by the subset rearranger. */
     int default_subset_partition(iosystem_desc_t *ios, io_desc_t *iodesc);
@@ -221,7 +222,7 @@ extern "C" {
     void init_rearr_opts(iosystem_desc_t *iosys);
 
     /* Determine whether fill values are needed. */
-    int determine_fill(iosystem_desc_t *ios, io_desc_t *iodesc, const int *gsize,
+    int determine_fill(iosystem_desc_t *ios, io_desc_info_t &desc_info, const int *gsize,
                        const PIO_Offset *compmap);
 
     /* Set start and count so that they describe the first region in map.*/
@@ -271,7 +272,7 @@ extern "C" {
     int flush_output_buffer(file_desc_t *file, bool force, PIO_Offset addsize);
 
     /* Compute the size that the IO tasks will need to hold the data. */
-    int compute_maxIObuffersize(MPI_Comm io_comm, io_desc_t *iodesc);
+    int compute_maxIObuffersize(MPI_Comm io_comm, io_desc_info_t &desc_info);
 
     /* Allocation memory for a data region. */
     int alloc_region2(iosystem_desc_t *ios, int ndims, io_region **region);
@@ -294,7 +295,8 @@ extern "C" {
     int pair(int np, int p, int k);
 
     /* Create MPI datatypes used for comp2io and io2comp data transfers. */
-    int define_iodesc_datatypes(iosystem_desc_t *ios, io_desc_t *iodesc);
+    int define_iodesc_datatypes(iosystem_desc_t *ios, io_desc_t *iodesc, io_desc_info_t &desc_info,
+                                const SPIO_Util::Iosys_Util::Io_comm_target &io_target);
 
     /* Create the derived MPI datatypes used for comp2io and io2comp
      * transfers. */
@@ -313,7 +315,8 @@ extern "C" {
     /* Flush PIO's data buffer. */
     int flush_buffer(int ncid, wmulti_buffer *wmb, bool flushtodisk);
 
-    int compute_maxaggregate_bytes(iosystem_desc_t *ios, io_desc_t *iodesc);
+    int compute_maxaggregate_bytes(iosystem_desc_t *ios, io_desc_info_t &desc_info,
+                                   const SPIO_Util::Iosys_Util::Io_comm_target &io_target);
 
     /* Compute an element of start/count arrays. */
     void compute_one_dim(int gdim, int ioprocs, int rank, PIO_Offset *start,

@@ -2765,26 +2765,24 @@ int flush_buffer(int ncid, wmulti_buffer *wmb, bool flushtodisk)
  * @param iodesc a pointer to decomposition description.
  * @returns 0 for success, error code otherwise.
  */
-int compute_maxaggregate_bytes(iosystem_desc_t *ios, io_desc_t *iodesc)
+int compute_maxaggregate_bytes(iosystem_desc_t *ios, io_desc_info_t &desc_info,
+                               const SPIO_Util::Iosys_Util::Io_comm_target &io_target)
 {
     int maxbytesoniotask = INT_MAX;
     int maxbytesoncomputetask = INT_MAX;
     int maxbytes;
     int mpierr;  /* Return code from MPI functions. */
 
-    /* Check inputs. */
-    pioassert(iodesc, "invalid input", __FILE__, __LINE__);
-
     LOG((2, "compute_maxaggregate_bytes iodesc->sync_io_desc_info.maxiobuflen = %d iodesc->sync_io_desc_info.ndof = %d",
-         iodesc->sync_io_desc_info.maxiobuflen, iodesc->sync_io_desc_info.ndof));
+         desc_info.maxiobuflen, desc_info.ndof));
 
     /* Determine the max bytes that can be held on IO task. */
-    if (ios->io_comm_info->is_sync_io_proc() && iodesc->sync_io_desc_info.maxiobuflen > 0)
-        maxbytesoniotask = pio_buffer_size_limit / iodesc->sync_io_desc_info.maxiobuflen;
+    if (io_target.is_io_proc() && desc_info.maxiobuflen > 0)
+        maxbytesoniotask = pio_buffer_size_limit / desc_info.maxiobuflen;
 
     /* Determine the max bytes that can be held on computation task. */
-    if (ios->comp_rank >= 0 && iodesc->sync_io_desc_info.ndof > 0)
-        maxbytesoncomputetask = pio_cnbuffer_limit / iodesc->sync_io_desc_info.ndof;
+    if (ios->comp_rank >= 0 && desc_info.ndof > 0)
+        maxbytesoncomputetask = pio_cnbuffer_limit / desc_info.ndof;
 
     /* Take the min of the max IO and max comp bytes. */
     maxbytes = std::min(maxbytesoniotask, maxbytesoncomputetask);
@@ -2799,7 +2797,7 @@ int compute_maxaggregate_bytes(iosystem_desc_t *ios, io_desc_t *iodesc)
     LOG((3, "after allreaduce maxbytes = %d", maxbytes));
 
     /* Remember the result. */
-    iodesc->sync_io_desc_info.maxbytes = maxbytes;
+    desc_info.maxbytes = maxbytes;
 
     return PIO_NOERR;
 }

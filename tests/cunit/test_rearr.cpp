@@ -329,7 +329,7 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
         iodesc.sync_io_desc_info.ndims = 1;
 
         /* Run the function. Simplest possible case. */
-        if ((ret = compute_maxIObuffersize(test_comm, &iodesc)))
+        if ((ret = compute_maxIObuffersize(test_comm, iodesc.sync_io_desc_info)))
             return ret;
         if (iodesc.sync_io_desc_info.maxiobuflen != 1)
             return ERR_WRONG;
@@ -366,7 +366,7 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
         iodesc.sync_io_desc_info.ndims = 2;
 
         /* Run the function. */
-        if ((ret = compute_maxIObuffersize(test_comm, &iodesc)))
+        if ((ret = compute_maxIObuffersize(test_comm, iodesc.sync_io_desc_info)))
             return ret;
         if (iodesc.sync_io_desc_info.maxiobuflen != 20)
             return ERR_WRONG;
@@ -403,7 +403,7 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
         iodesc.sync_io_desc_info.ndims = 2;
 
         /* Run the function. */
-        if ((ret = compute_maxIObuffersize(test_comm, &iodesc)))
+        if ((ret = compute_maxIObuffersize(test_comm, iodesc.sync_io_desc_info)))
             return ret;
         printf("iodesc.sync_io_desc_info.maxiobuflen = %lld\n", (unsigned long long) (iodesc.sync_io_desc_info.maxiobuflen));
         if (iodesc.sync_io_desc_info.maxiobuflen != 520)
@@ -444,14 +444,14 @@ int test_determine_fill(MPI_Comm test_comm)
     iodesc->sync_io_desc_info.llen = 1;
 
     /* We don't need fill. */
-    if ((ret = determine_fill(ios, iodesc, gsize, compmap)))
+    if ((ret = determine_fill(ios, iodesc->sync_io_desc_info, gsize, compmap)))
         return ret;
     if (iodesc->sync_io_desc_info.needsfill)
         return ERR_WRONG;
 
     /* Change settings, so now we do need fill. */
     iodesc->sync_io_desc_info.llen = 0;
-    if ((ret = determine_fill(ios, iodesc, gsize, compmap)))
+    if ((ret = determine_fill(ios, iodesc->sync_io_desc_info, gsize, compmap)))
         return ret;
     if (!iodesc->sync_io_desc_info.needsfill)
         return ERR_WRONG;
@@ -590,7 +590,8 @@ int test_define_iodesc_datatypes()
         }
 
         /* Run the test function. */
-        if ((ret = define_iodesc_datatypes(&ios, &iodesc)))
+        if ((ret = define_iodesc_datatypes(&ios, &iodesc, iodesc.sync_io_desc_info,
+                                           SPIO_Util::Iosys_Util::make_sync_io_comm_target(&ios))))
             return ret;
 
         /* We created send types, so free them. */
@@ -654,7 +655,9 @@ int test_compute_counts(MPI_Comm test_comm, int my_rank)
     iodesc->sync_io_desc_info.rearr_opts.fcd = PIO_REARR_COMM_FC_2D_DISABLE;
 
     /* Test the function. */
-    if ((ret = compute_counts(ios, iodesc, dest_ioproc, dest_ioindex)))
+    if ((ret = compute_counts(ios, iodesc, iodesc->sync_io_desc_info,
+                              SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios),
+                              dest_ioproc, dest_ioindex)))
         return ret;
 
     /* Check results. */
