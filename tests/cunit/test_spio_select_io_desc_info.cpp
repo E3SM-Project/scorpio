@@ -196,7 +196,7 @@ int test_select_subset_with_async(int wrank, iosystem_desc_t *ios)
     iodesc->async_io_desc_info = new io_desc_info_t(ios, PIO_DOUBLE,
         static_cast<int>(gdimlen.size()), gdimlen.data(),
         static_cast<int>(compmap.size()), compmap.data(), PIO_REARR_SUBSET,
-        /*map_zero_based=*/false);
+        /*map_zero_based=*/true);
   }
   catch(...){
     LOG_RANK0(wrank, "Unable to create stub async io_desc_info_t for PIO_REARR_SUBSET\n");
@@ -244,7 +244,7 @@ int test_select_box_with_async(int wrank, iosystem_desc_t *ios)
     iodesc->async_io_desc_info = new io_desc_info_t(ios, PIO_DOUBLE,
         static_cast<int>(gdimlen.size()), gdimlen.data(),
         static_cast<int>(compmap.size()), compmap.data(), PIO_REARR_BOX,
-        /*map_zero_based=*/false);
+        /*map_zero_based=*/true);
   }
   catch(...){
     LOG_RANK0(wrank, "Unable to create stub async io_desc_info_t for PIO_REARR_BOX\n");

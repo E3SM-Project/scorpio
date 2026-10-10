@@ -855,12 +855,12 @@ static int pio_iosys_async_op_hdf5_write_impl(void *pdata)
    * no sync/async role distinction - it is built from the *sync* I/O comm
    * (see TComm_info's construction from io_comm_info->get_sync_io_comm()), so
    * it is MPI_COMM_NULL on async-only I/O ranks. An async-dispatched write
-   * (CONTIG + HDF5/HDF5C + PIO_USE_ASYNC_WR_THREAD) would therefore barrier
-   * on the wrong rank set here if it ever ran on async I/O ranks disjoint
-   * from the sync ones. That configuration is currently prevented upstream by
-   * io_desc_t::select_io_desc_info(), which falls a CONTIG decomp back to
-   * sync_io_desc_info unless the sync and async I/O roles are performed by
-   * the same set of processes
+   * (CONTIG/BOX/SUBSET + HDF5/HDF5C + PIO_USE_ASYNC_WR_THREAD) would
+   * therefore barrier on the wrong rank set here if it ever ran on async I/O
+   * ranks disjoint from the sync ones. That configuration is currently
+   * prevented upstream by io_desc_t::select_io_desc_info(), which falls any
+   * of CONTIG/BOX/SUBSET back to sync_io_desc_info unless the sync and async
+   * I/O roles are performed by the same set of processes
    * (IO_comm_info::sync_and_async_io_share_procs()), so this barrier is
    * always reached by the full sync-I/O rank set today. It still needs a
    * TComm_info audit (a sync/async role-aware io_comm) before HDF5
@@ -924,10 +924,10 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
 
   /* Select the io_desc_info_t (sync or async) that this write targets, and
    * gate on the role-correct membership check: an async-dispatched write
-   * (CONTIG rearranger, PIO_USE_ASYNC_WR_THREAD on) is only queued/executed
-   * on async I/O procs, everything else (including the flag compiled off,
-   * where select_io_desc_info() always returns sync_io_desc_info) keeps the
-   * original sync I/O proc gate. */
+   * (CONTIG/BOX/SUBSET rearranger, PIO_USE_ASYNC_WR_THREAD on) is only
+   * queued/executed on async I/O procs, everything else (including the flag
+   * compiled off, where select_io_desc_info() always returns
+   * sync_io_desc_info) keeps the original sync I/O proc gate. */
   io_desc_info_t &sel_desc = iodesc->select_io_desc_info(file->iotype, ios);
   bool is_async_write = (&sel_desc == iodesc->async_io_desc_info);
 

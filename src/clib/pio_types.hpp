@@ -403,8 +403,9 @@ struct io_desc_t
     ~io_desc_t();
 
     /* Returns the io_desc_info_t to use for a write/read of the given iotype:
-     * async_io_desc_info for CONTIG-rearranger HDF5/HDF5C writes when async
-     * writes are enabled and have been allocated, sync_io_desc_info otherwise.
+     * async_io_desc_info for CONTIG/BOX/SUBSET-rearranger HDF5/HDF5C writes
+     * when async writes are enabled and have been allocated, sync_io_desc_info
+     * otherwise.
      *
      * @param iotype The iotype of the file being written/read
      * @param ios The I/O system the file belongs to. Used to check whether the
