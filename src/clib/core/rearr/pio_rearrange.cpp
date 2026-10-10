@@ -1274,7 +1274,9 @@ int determine_fill(iosystem_desc_t *ios, io_desc_info_t &desc_info, const int *g
  * @returns 0 on success, error code otherwise.
  */
 int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *compmap,
-                         const int *gdimlen, int ndims, io_desc_t *iodesc)
+                         const int *gdimlen, int ndims, io_desc_t *iodesc,
+                         io_desc_info_t &desc_info,
+                         const SPIO_Util::Iosys_Util::Io_comm_target &io_target)
 {
     int ret;
 
@@ -1283,7 +1285,7 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
     pioassert(ios && maplen >= 0 && ((maplen == 0) || compmap) && ((ndims == 0) || gdimlen) && ndims >= 0 && iodesc,
               "invalid input", __FILE__, __LINE__);
     LOG((1, "box_rearrange_create maplen = %d ndims = %d ios->num_comptasks = %d "
-         "ios->io_comm_info->get_sync_io_comm_sz() = %d", maplen, ndims, ios->num_comptasks, ios->io_comm_info->get_sync_io_comm_sz()));
+         "io_target.get_comm_sz() = %d", maplen, ndims, ios->num_comptasks, io_target.get_comm_sz()));
 
     /* Allocate arrays needed for this function. */
     int *dest_ioproc = NULL; /* Destination IO task for each data element on compute task. */
@@ -1294,20 +1296,20 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
     int recvcounts[ios->num_uniontasks]; /* Receive counts for swapm. */
     int rdispls[ios->num_uniontasks];    /* Receive displacements for swapm. */
     MPI_Datatype dtypes[ios->num_uniontasks]; /* Array of MPI_OFFSET types for swapm. */
-    PIO_Offset iomaplen[ios->io_comm_info->get_sync_io_comm_sz()];   /* Gets the llen of all IO tasks. */
+    PIO_Offset iomaplen[io_target.get_comm_sz()];   /* Gets the llen of all IO tasks. */
 
     /* sc_info msg = [iomaplen, starts_for_all_dims, count_for_all_dims] */
     int sc_info_msg_maplen_sz = 1; /* The iomaplen, == 0 implies start/count are invalid */
     int sc_info_msg_sc_sz = 2 * ndims; /* The (start + count) for all dims */
     int sc_info_msg_sz = sc_info_msg_maplen_sz + sc_info_msg_sc_sz;
     PIO_Offset sc_info_msg_send[sc_info_msg_sz];
-    PIO_Offset sc_info_msg_recv[ios->io_comm_info->get_sync_io_comm_sz() * sc_info_msg_sz];
+    PIO_Offset sc_info_msg_recv[io_target.get_comm_sz() * sc_info_msg_sz];
 
     /* This is the box rearranger. */
-    iodesc->sync_io_desc_info.rearranger = PIO_REARR_BOX;
+    desc_info.rearranger = PIO_REARR_BOX;
 
     /* Number of elements of data on compute node. */
-    iodesc->sync_io_desc_info.ndof = maplen;
+    desc_info.ndof = maplen;
 
     if (maplen > 0)
     {
@@ -1350,11 +1352,11 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
     }
 
     /* The sc_info_msg_recv[i * sc_msg_info_sz] contains the sc_info from
-     * iorank i (the union rank for iorank i is ios->io_comm_info->get_sync_io_ranks()[i], see
+     * iorank i (the union rank for iorank i is io_target.get_ranks()[i], see
      * ios_ioranks below). Each
      * sc_info message contains [iomaplen, start_for_all_dims, count_for_all_dims]
      */
-    for(int i=0; i<ios->io_comm_info->get_sync_io_comm_sz() * sc_info_msg_sz; i++)
+    for(int i=0; i<io_target.get_comm_sz() * sc_info_msg_sz; i++)
     {
         sc_info_msg_recv[i] = 0;
     }
@@ -1380,48 +1382,48 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
      * the IO task. For computation tasks, llen will remain at 0. Also
      * set up arrays for the allgather which will give every IO task a
      * complete list of llens for each IO task. */
-    LOG((3, "ios->io_comm_info->is_sync_io_proc() = %d ios->num_uniontasks = %d", ios->io_comm_info->is_sync_io_proc(),
+    LOG((3, "io_target.is_io_proc() = %d ios->num_uniontasks = %d", io_target.is_io_proc(),
          ios->num_uniontasks));
-    pioassert(iodesc->sync_io_desc_info.llen == 0, "error", __FILE__, __LINE__);
-    if (ios->io_comm_info->is_sync_io_proc())
+    pioassert(desc_info.llen == 0, "error", __FILE__, __LINE__);
+    if (io_target.is_io_proc())
     {
         /* Determine llen, the lenght of the data array on this IO
          * node, by multipliying the counts in the
-         * iodesc->sync_io_desc_info.firstregion. */
-        iodesc->sync_io_desc_info.llen = 1;
+         * desc_info.firstregion. */
+        desc_info.llen = 1;
         for (int i = 0; i < ndims; i++)
         {
-            iodesc->sync_io_desc_info.llen *= iodesc->sync_io_desc_info.firstregion->count[i];
-            LOG((3, "iodesc->sync_io_desc_info.firstregion->start[%d] = %d iodesc->sync_io_desc_info.firstregion->count[%d] = %d",
-                 i, iodesc->sync_io_desc_info.firstregion->start[i], i, iodesc->sync_io_desc_info.firstregion->count[i]));
+            desc_info.llen *= desc_info.firstregion->count[i];
+            LOG((3, "desc_info.firstregion->start[%d] = %d desc_info.firstregion->count[%d] = %d",
+                 i, desc_info.firstregion->start[i], i, desc_info.firstregion->count[i]));
         }
-        LOG((2, "iodesc->sync_io_desc_info.llen = %d", iodesc->sync_io_desc_info.llen));
+        LOG((2, "desc_info.llen = %d", desc_info.llen));
     }
 
     /* Determine whether fill values will be needed. */
-    if ((ret = determine_fill(ios, iodesc, gdimlen, compmap)))
+    if ((ret = determine_fill(ios, desc_info, gdimlen, compmap)))
     {
         GPTLstop("PIO:box_rearrange_create");
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Creating BOX rearranger failed for I/O decomposition (iodi=%d) on iosystem (iosysid=%d). Unable to determine fillvalue to use", iodesc->ioid, ios->iosysid);
     }
-    LOG((2, "iodesc->sync_io_desc_info.needsfill = %d ios->io_comm_info->get_sync_io_comm_sz() = %d", iodesc->sync_io_desc_info.needsfill,
-         ios->io_comm_info->get_sync_io_comm_sz()));
+    LOG((2, "desc_info.needsfill = %d io_target.get_comm_sz() = %d", desc_info.needsfill,
+         io_target.get_comm_sz()));
 
     /* Set the iomaplen in the sc_info msg */
-    sc_info_msg_send[0] = iodesc->sync_io_desc_info.llen;
+    sc_info_msg_send[0] = desc_info.llen;
 
     /* start/count array to be sent: 1st half for start, 2nd half for count */
     for (int j = 0; j < ndims; j++)
     {
         /* The first data in sc_info_msg_send[] is the iomaplen */
-        sc_info_msg_send[j + 1] = iodesc->sync_io_desc_info.firstregion->start[j];
-        sc_info_msg_send[ndims + j + 1] = iodesc->sync_io_desc_info.firstregion->count[j];
+        sc_info_msg_send[j + 1] = desc_info.firstregion->start[j];
+        sc_info_msg_send[ndims + j + 1] = desc_info.firstregion->count[j];
     }
 
     /* Set the recvcounts/recv displs for the sc_info msg from each io task */
-    const std::vector<int> ios_ioranks = ios->io_comm_info->get_sync_io_ranks();
-    for (int i = 0; i < ios->io_comm_info->get_sync_io_comm_sz(); i++)
+    const std::vector<int> ios_ioranks = io_target.get_ranks();
+    for (int i = 0; i < io_target.get_comm_sz(); i++)
     {
         /* From each iotask all procs (compute and I/O procs) receive an
          * sc_info message containing [iomaplen, start_for_all_dims,
@@ -1441,14 +1443,14 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
       sendcounts[i] = 0;
       sdispls[i] = 0;
     }
-    if(ios->io_comm_info->is_sync_io_proc()){
+    if(io_target.is_io_proc()){
         /* Only I/O procs send sc_info messages */
         for (int i = 0; i < ios->num_comptasks; i++)
         {
             sendcounts[ios->compranks[i]] = sc_info_msg_sz;
             sdispls[ios->compranks[i]] = 0;
         }
-        for (int i = 0; i < ios->io_comm_info->get_sync_io_comm_sz(); i++)
+        for (int i = 0; i < io_target.get_comm_sz(); i++)
         {
             sendcounts[ios_ioranks[i]] = sc_info_msg_sz;
             sdispls[ios_ioranks[i]] = 0;
@@ -1460,7 +1462,7 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
          ndims));
     if ((ret = pio_swapm(sc_info_msg_send, sendcounts, sdispls, dtypes, sc_info_msg_recv,
                          recvcounts, rdispls, dtypes, ios->union_comm,
-                         &iodesc->sync_io_desc_info.rearr_opts.io2comp)))
+                         &desc_info.rearr_opts.io2comp)))
     {
         GPTLstop("PIO:box_rearrange_create");
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
@@ -1469,7 +1471,7 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
 
 #if PIO_ENABLE_LOGGING
     /* First entry in the sc_info msg for each iorank is the iomaplen */
-    for (int i = 0; i < ios->io_comm_info->get_sync_io_comm_sz(); i++)
+    for (int i = 0; i < io_target.get_comm_sz(); i++)
         LOG((3, "iomaplen[%d] = %d", i, sc_info_msg_recv[i * sc_info_msg_sz]));
 #endif /* PIO_ENABLE_LOGGING */
 
@@ -1485,7 +1487,7 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
 #endif /* PIO_ENABLE_LOGGING */
     }
 
-    for (int i = 0; i < ios->io_comm_info->get_sync_io_comm_sz(); i++)
+    for (int i = 0; i < io_target.get_comm_sz(); i++)
     {
         /* First entry in the sc_info msg is the iomaplen */
         iomaplen[i] = sc_info_msg_recv[i * sc_info_msg_sz];
@@ -1565,7 +1567,7 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
 
     /* Completes the mapping for the box rearranger. */
     LOG((2, "calling compute_counts maplen = %d", maplen));
-    if ((ret = compute_counts(ios, iodesc, dest_ioproc, dest_ioindex)))
+    if ((ret = compute_counts(ios, iodesc, desc_info, io_target, dest_ioproc, dest_ioindex)))
     {
         GPTLstop("PIO:box_rearrange_create");
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
@@ -1578,26 +1580,26 @@ int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *com
     dest_ioindex = NULL;
 
     /* Compute the max io buffer size needed for an iodesc. */
-    if (ios->io_comm_info->is_sync_io_proc())
+    if (io_target.is_io_proc())
     {
-        if ((ret = compute_maxIObuffersize(ios->io_comm_info->get_sync_io_comm(), iodesc)))
+        if ((ret = compute_maxIObuffersize(io_target.get_comm(), desc_info)))
         {
             GPTLstop("PIO:box_rearrange_create");
             return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                             "Creating BOX rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Unable to compute hte maximum I/O buffer size required for caching data", iodesc->ioid, ios->iosysid);
         }
-        LOG((3, "iodesc->sync_io_desc_info.maxiobuflen = %d", iodesc->sync_io_desc_info.maxiobuflen));
+        LOG((3, "desc_info.maxiobuflen = %d", desc_info.maxiobuflen));
     }
 
     /* Using maxiobuflen compute the maximum number of bytes that the
      * io task buffer can handle. */
-    if ((ret = compute_maxaggregate_bytes(ios, iodesc)))
+    if ((ret = compute_maxaggregate_bytes(ios, desc_info, io_target)))
     {
         GPTLstop("PIO:box_rearrange_create");
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
                         "Creating BOX rearranger failed for I/O decomposition (ioid=%d) on iosystem (iosysid=%d). Unable to calculate the max aggregate bytes across all processes", iodesc->ioid, ios->iosysid);
     }
-    LOG((3, "iodesc->sync_io_desc_info.maxbytes = %d", iodesc->sync_io_desc_info.maxbytes));
+    LOG((3, "desc_info.maxbytes = %d", desc_info.maxbytes));
 
     GPTLstop("PIO:box_rearrange_create");
     return PIO_NOERR;
