@@ -442,7 +442,7 @@ int define_iodesc_datatypes(iosystem_desc_t *ios, io_desc_t *iodesc, io_desc_inf
     int ret; /* Return value. */
 
     pioassert(ios && iodesc, "invalid input", __FILE__, __LINE__);
-    LOG((1, "define_iodesc_datatypes ios->io_comm_info->is_sync_io_proc() = %d iodesc->sync_io_desc_info.rtype is %sNULL, iodesc->sync_io_desc_info.nrecvs",
+    LOG((1, "define_iodesc_datatypes io_target.is_io_proc() = %d desc_info.rtype is %sNULL, desc_info.nrecvs = %d",
          io_target.is_io_proc(), desc_info.rtype ? "not " : "", desc_info.nrecvs));
 
     /* Set up the to transfer data to and from the IO tasks. */

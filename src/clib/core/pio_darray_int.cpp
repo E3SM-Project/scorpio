@@ -2773,7 +2773,7 @@ int compute_maxaggregate_bytes(iosystem_desc_t *ios, io_desc_info_t &desc_info,
     int maxbytes;
     int mpierr;  /* Return code from MPI functions. */
 
-    LOG((2, "compute_maxaggregate_bytes iodesc->sync_io_desc_info.maxiobuflen = %d iodesc->sync_io_desc_info.ndof = %d",
+    LOG((2, "compute_maxaggregate_bytes desc_info.maxiobuflen = %d desc_info.ndof = %d",
          desc_info.maxiobuflen, desc_info.ndof));
 
     /* Determine the max bytes that can be held on IO task. */

@@ -442,9 +442,10 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
          * when PIO_USE_ASYNC_WR_THREAD is compiled in, for *all* rearrangers.
          * pio_iosys_async_hdf5_write_op_add() makes the sync-vs-async
          * io_desc_info_t selection (via iodesc->select_io_desc_info()) and
-         * gates on the role-correct I/O proc set itself, so BOX/SUBSET
-         * decomps keep targeting the sync I/O ranks exactly as before while a
-         * CONTIG decomp can additionally target the async I/O ranks. */
+         * gates on the role-correct I/O proc set itself: CONTIG, BOX and
+         * SUBSET decomps alike target the async I/O ranks whenever the sync
+         * and async I/O roles are performed by the same set of processes,
+         * and fall back to the sync I/O ranks otherwise. */
 #if PIO_USE_ASYNC_WR_THREAD
         ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, sp_iodesc,
                                                   DARRAY_DATA, frame);
