@@ -196,6 +196,46 @@ namespace SPIO_Util{
         bool needs_sync_btw_sync_and_async_ops_;
     };
 
+    /* Forwards comm/group/rank/root/master/ranks queries to either the sync
+     * or the async side of an IO_comm_info, chosen once at construction. Lets
+     * rearranger-setup code (box_rearrange_create(), subset_rearrange_create(),
+     * etc.) be written once and used for both the sync io_desc_info_t and an
+     * eagerly-allocated async io_desc_info_t, instead of duplicating every
+     * function or branching on a bool at every single IO_comm_info call. */
+    class Io_comm_target{
+      public:
+        Io_comm_target(const IO_comm_info &io_comm_info, bool targets_async_comm)
+          : io_comm_info_(io_comm_info), targets_async_comm_(targets_async_comm) { }
+
+        MPI_Comm get_comm(void) const
+        { return targets_async_comm_ ? io_comm_info_.get_async_io_comm() : io_comm_info_.get_sync_io_comm(); }
+        MPI_Group get_group(void) const
+        { return targets_async_comm_ ? io_comm_info_.get_async_io_group() : io_comm_info_.get_sync_io_group(); }
+        int get_comm_sz(void) const
+        { return targets_async_comm_ ? io_comm_info_.get_async_io_comm_sz() : io_comm_info_.get_sync_io_comm_sz(); }
+        int get_comm_rank(void) const
+        { return targets_async_comm_ ? io_comm_info_.get_async_io_comm_rank() : io_comm_info_.get_sync_io_comm_rank(); }
+        int get_master(void) const
+        { return targets_async_comm_ ? io_comm_info_.get_async_io_master() : io_comm_info_.get_sync_io_master(); }
+        int get_root(void) const
+        { return targets_async_comm_ ? io_comm_info_.get_async_io_root() : io_comm_info_.get_sync_io_root(); }
+        std::vector<int> get_ranks(void) const
+        { return targets_async_comm_ ? io_comm_info_.get_async_io_ranks() : io_comm_info_.get_sync_io_ranks(); }
+        bool is_io_proc(void) const
+        { return targets_async_comm_ ? io_comm_info_.is_async_io_proc() : io_comm_info_.is_sync_io_proc(); }
+        bool targets_async_comm(void) const { return targets_async_comm_; }
+
+      private:
+        const IO_comm_info &io_comm_info_;
+        bool targets_async_comm_;
+    };
+
+    inline Io_comm_target make_sync_io_comm_target(const iosystem_desc_t *ios)
+    { return Io_comm_target(*(ios->io_comm_info), false); }
+
+    inline Io_comm_target make_async_io_comm_target(const iosystem_desc_t *ios)
+    { return Io_comm_target(*(ios->io_comm_info), true); }
+
     bool iosys_uses_async_io_service(iosystem_desc_t *iosys);
   } // namespace Iosys_Util
 } // namespace SPIO_Util
