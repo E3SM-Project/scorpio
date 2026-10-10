@@ -1061,7 +1061,8 @@ int test_default_subset_partition(MPI_Comm test_comm, int my_rank)
     ios->union_comm = test_comm;
 
     /* Run the function to test. */
-    if ((ret = default_subset_partition(ios, iodesc)))
+    if ((ret = default_subset_partition(ios, iodesc, iodesc->sync_io_desc_info,
+                                        SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios))))
         return ret;
 
     /* Free the created communicator. */
