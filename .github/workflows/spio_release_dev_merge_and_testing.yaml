@@ -1,19 +1,20 @@
 ---
 #
-# ========== SCORPIO testing and merge to develop branch for releases ======
-# If a PR has a "Release PR" label and its merged to master,
-# 1) Run tests with PnetCDF
-# 2) Merge branch to develop
+# ========== SCORPIO testing after merging to develop branch for releases ======
+# If a PR has a "Release PR" label,
+# 1) Merge branch to develop (locally)
+# 2) Run tests with PnetCDF
 # The tests are run on a single node (with PnetCDF)
+# (Note: The merge to develop is "local" and the changes are NOT pushed to remote)
 #
-# FIXME: Use this workflow for merging all PRs to develop
-name: SCORPIO Release PR merge to develop after testing
+# FIXME: Use this workflow for testing PRs after merging to develop
+name: SCORPIO Release PR testing after merge to develop
 
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
     inputs:
       branch_name:
-        description: 'Branch to run the SCORPIO + PnetCDF tests and merge to develop'
+        description: 'Branch to run the SCORPIO + PnetCDF tests after local merge to develop'
         required: true
   pull_request:
     types: [labeled]
@@ -67,7 +68,3 @@ jobs:
           branch_name: develop
           checkout_repo: false
           install_sw: true
-
-      - name: Push develop branch (with merged branch) to remote
-        run: |
-          git push origin develop
