@@ -30,6 +30,8 @@ jobs:
       - name: Checkout repository
         if: ${{ inputs.checkout_repo }} # Check out repo iff checkout_repo == true
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch_name }}
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3

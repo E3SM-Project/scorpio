@@ -13,8 +13,7 @@ on:  # yamllint disable-line rule:truthy
     inputs:
       branch_name:
         description: 'Branch to run the SCORPIO + PnetCDF tests'
-        required: true
-        default: 'master'
+        required: false
   push:
     branches:
       - master
@@ -32,8 +31,15 @@ jobs:
   call_spio_actionlint_testing_workflow:
     uses: ./.github/workflows/spio_lint_workflow.yaml
     with:
-      branch_name: ${{ github.ref_name }}
+      # Branch name is used in the following order (first valid one is used):
+      # 1. inputs.branch_name : Branch name given in input (manual trigger of workflow)
+      # 2. github.head_ref : Branch that was used to create the PR.
+      #     Only available for "pull_request" events. e.g. jayeshkrishna/fixed_issue_xxx
+      # 3. github.ref : Branch that caused the workflow to run.
+      #     Available for almost all event types ("pull_request", "push", "workflow_dispatch", ...)
+      #     e.g. refs/pull/1000/merge
+      branch_name: ${{ inputs.branch_name || github.head_ref || github.ref }}
   call_spio_pnetcdf_testing_workflow:
     uses: ./.github/workflows/spio_pnetcdf_testing_workflow.yaml
     with:
-      branch_name: ${{ github.ref_name }}
+      branch_name: ${{ inputs.branch_name || github.head_ref || github.ref }}
