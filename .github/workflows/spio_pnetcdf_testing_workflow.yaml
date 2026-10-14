@@ -70,6 +70,10 @@ jobs:
 
       - name: Run SCORPIO tests
         shell: bash -l {0}  # Ensure environment is active for test cmds
+        env:
+          # Disable non-tcp transport
+          UCX_TLS: tcp,self
+          UCX_NET_DEVICES: lo
         run: |
           conda activate scorpio_env  # Activate environment
           cd scorpio_build_dir
