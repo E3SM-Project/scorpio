@@ -29,6 +29,8 @@ jobs:
           node-version: '20' # Or '18', '22'
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch_name }}
 
       - name: Run actionlint
         uses: raven-actions/actionlint@v2
