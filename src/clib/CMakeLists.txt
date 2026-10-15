@@ -165,6 +165,7 @@ else ()
 endif ()
 
 #===== ADIOS-C =====
+set(SCORPIO_WITH_ADIOS2 OFF CACHE INTERNAL "Whether SCORPIO is configured with ADIOS2")
 if (WITH_ADIOS2)
   # ADIOS 2.8.0 overwrites/resets CMAKE_MODULE_PATH, so cache and restore it after
   # finding ADIOS
@@ -181,6 +182,7 @@ if (WITH_ADIOS2)
   if (ADIOS2_FOUND)
     message(STATUS "Found ADIOS library")
     set(PIO_USE_ADIOS 1)
+    set(SCORPIO_WITH_ADIOS2 ON CACHE INTERNAL "Whether SCORPIO is configured with ADIOS2")
     target_compile_definitions (spio_default_public_options
       INTERFACE _ADIOS2)
     # 2001 edition of the POSIX standard (IEEE Standard 1003.1-2001)
@@ -198,11 +200,15 @@ else ()
 endif ()
 
 #===== HDF5-C =====
+set(SCORPIO_WITH_HDF5 OFF CACHE INTERNAL "Whether SCORPIO is configured with HDF5")
+set(SCORPIO_WITH_H5Z_ZFP OFF CACHE INTERNAL "Whether SCORPIO is configured with H5Z_ZFP")
+set(SCORPIO_WITH_H5Z_BLOSC2 OFF CACHE INTERNAL "Whether SCORPIO is configured with H5Z_BLOSC2")
 if (WITH_HDF5)
   find_package (HDF5 COMPONENTS HL C)
   if (HDF5_C_FOUND)
     message(STATUS "HDF5 C library dependencies: ${HDF5_C_LIBRARIES} ${HDF5_HL_LIBRARIES}")
     set(PIO_USE_HDF5 1)
+    set(SCORPIO_WITH_HDF5 ON CACHE INTERNAL "Whether SCORPIO is configured with HDF5")
     target_compile_definitions (spio_default_public_options
       INTERFACE _HDF5)
     target_include_directories (spio_default_public_options
@@ -223,6 +229,7 @@ if (WITH_HDF5)
     find_package(H5Z_ZFP)
     if (H5Z_ZFP_FOUND)
       message (STATUS "Found ZFP filter for HDF5")
+      set(SCORPIO_WITH_H5Z_ZFP ON CACHE INTERNAL "Whether SCORPIO is configured with H5Z_ZFP")
       target_compile_definitions (spio_default_public_options INTERFACE _SPIO_HAS_H5Z_ZFP)
       target_include_directories (spio_default_public_options INTERFACE ${H5Z_ZFP_INCLUDE_DIR})
       target_link_libraries (spio_default_public_options INTERFACE h5z_zfp::h5z_zfp)
@@ -239,6 +246,7 @@ if (WITH_HDF5)
     find_package(H5Z_BLOSC2)
     if (H5Z_BLOSC2_FOUND)
       message (STATUS "Found BLOSC2 filter for HDF5")
+      set(SCORPIO_WITH_H5Z_BLOSC2 ON CACHE INTERNAL "Whether SCORPIO is configured with H5Z_BLOSC2")
       target_compile_definitions (spio_default_public_options INTERFACE _SPIO_HAS_H5Z_BLOSC2)
       target_include_directories (spio_default_public_options INTERFACE ${H5Z_BLOSC2_INCLUDE_DIR})
       target_link_libraries (spio_default_public_options INTERFACE h5z_blosc2::h5z_blosc2)
