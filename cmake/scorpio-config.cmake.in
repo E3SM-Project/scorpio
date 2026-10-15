@@ -2,20 +2,24 @@
 
 include(CMakeFindDependencyMacro)
 
-#find_dependency(GPTL
-#                PATHS ${CMAKE_CURRENT_LIST_DIR}/lib/scorpio/cmake)
-#find_dependency(MPI
-#                PATHS ${CMAKE_CURRENT_LIST_DIR}/lib/scorpio/cmake)
-#find_dependency(NetCDF
-#                PATHS ${CMAKE_CURRENT_LIST_DIR}/lib/scorpio/cmake)
-#find_dependency(PnetCDF
-#                PATHS ${CMAKE_CURRENT_LIST_DIR}/lib/scorpio/cmake)
-#find_dependency(ADIOS2
-#                PATHS ${CMAKE_CURRENT_LIST_DIR}/lib/scorpio/cmake)
-#find_dependency(HDF5
-#                PATHS ${CMAKE_CURRENT_LIST_DIR}/lib/scorpio/cmake)
+set(SCORPIO_WITH_ADIOS2 @SCORPIO_WITH_ADIOS2@)
+set(SCORPIO_WITH_HDF5 @SCORPIO_WITH_HDF5@)
+set(SCORPIO_WITH_H5Z_ZFP @SCORPIO_WITH_H5Z_ZFP@)
+set(SCORPIO_WITH_H5Z_BLOSC2 @SCORPIO_WITH_H5Z_BLOSC2@)
 
 find_dependency (MPI REQUIRED COMPONENTS C Fortran)
+if(SCORPIO_WITH_ADIOS2)
+  find_dependency (ADIOS2 COMPONENTS C CXX)
+endif()
+if(SCORPIO_WITH_HDF5)
+  find_dependency (HDF5 COMPONENTS HL C)
+  if(SCORPIO_WITH_H5Z_ZFP)
+    find_dependency (H5Z_ZFP)
+  endif()
+  if(SCORPIO_WITH_H5Z_BLOSC2)
+    find_dependency (H5Z_BLOSC2)
+  endif()
+endif()
 
 # The GPTL targets config file is only generated when SCORPIO
 # uses the internal (in SCORPIO) GPTL library
