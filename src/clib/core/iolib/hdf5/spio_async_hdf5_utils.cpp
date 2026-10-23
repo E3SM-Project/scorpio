@@ -967,6 +967,16 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
                         "Queuing asynchronous op/task for writing fillvalue for variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for caching variable fillvalue", nvars, pio_get_fname_from_file(file), file->pio_ncid, static_cast<long long int>(fillbuf_sz));
       }
 
+      /* FIXME: v1desc->fillbuf is NULL whenever no fill value was ever set for
+       * this variable (its default), but fillbuf_sz > 0 can still hold (e.g.
+       * holes from rearrangement) - memcpy() from a NULL source here is a
+       * NULL-pointer dereference. Confirmed reproducible: a var with no fill
+       * value set, PIO_USE_ASYNC_WR_THREAD=ON, crashes here with a SEGV
+       * (test_darray_hdf5_contig's test_write_read_hdf5_dtconv, once
+       * file->uses_async_io correctly resolves true - see commit
+       * 969b502e1a). Pre-existing bug, never exercised by CI since CI never
+       * sets PIO_USE_ASYNC_WR_THREAD=ON. Not fixed here - tracked as a
+       * follow-up alongside the nvars-sizing FIXME above. */
       std::memcpy(wcache->fillbuf, v1desc->fillbuf, fillbuf_sz);
       wcache->fillbuf_sz = fillbuf_sz;
     }
