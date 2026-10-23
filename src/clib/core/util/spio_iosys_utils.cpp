@@ -8,6 +8,8 @@
 #include <vector>
 #include <algorithm>
 #include <exception>
+#include <random>
+#include <cstdint>
 
 SPIO_Util::Iosys_Util::IO_comm_info::IO_comm_info(MPI_Comm union_comm,
   MPI_Group union_group,
@@ -254,6 +256,35 @@ bool SPIO_Util::Iosys_Util::iosys_uses_async_io_service(iosystem_desc_t *iosys)
 {
   assert(iosys);
   return (iosys->intercomm != MPI_COMM_NULL);
+}
+
+uint64_t SPIO_Util::Iosys_Util::generate_and_bcast_lock_id(MPI_Comm comm, int root)
+{
+  assert(comm != MPI_COMM_NULL);
+
+  int ret = MPI_SUCCESS;
+  int rank = -1;
+  ret = MPI_Comm_rank(comm, &rank); assert(ret == MPI_SUCCESS);
+
+  /* Two independent 32-bit draws from true entropy (std::random_device),
+   * combined into a 64-bit id - not a std::mt19937/other PRNG seeded from
+   * the random_device, per this function's explicit requirement of using
+   * true entropy rather than a reproducible seed. Only drawn on root; every
+   * other rank just receives the broadcast values below. */
+  uint32_t hi = 0, lo = 0;
+  if(rank == root){
+    std::random_device rd;
+    hi = rd();
+    lo = rd();
+  }
+
+  /* Broadcast as two separate MPI_UNSIGNED calls, rather than a single
+   * MPI_UINT64_T bcast, since MPI_UINT64_T support under the project's
+   * MPI_SERIAL stub build is unconfirmed. */
+  ret = MPI_Bcast(&hi, 1, MPI_UNSIGNED, root, comm); assert(ret == MPI_SUCCESS);
+  ret = MPI_Bcast(&lo, 1, MPI_UNSIGNED, root, comm); assert(ret == MPI_SUCCESS);
+
+  return (static_cast<uint64_t>(hi) << 32) | static_cast<uint64_t>(lo);
 }
 
 #ifdef _HDF5

@@ -1411,6 +1411,11 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
         MPI_Group_free(&union_group);
     }
 
+    /* Root 0 is always a valid union_comm rank regardless of I/O-proc
+     * layout, unlike sync_io_root/async_io_root which may not be rank 0 in
+     * union_comm. */
+    ios->spio_lock_id = SPIO_Util::Iosys_Util::generate_and_bcast_lock_id(ios->union_comm, 0);
+
 #ifdef _ADIOS2
     /* Initialize ADIOS for each io system */
     ios->adiosH = NULL;

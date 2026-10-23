@@ -11,6 +11,7 @@
 #include <vector>
 #include <exception>
 #include <algorithm>
+#include <cstdint>
 
 namespace SPIO_Util{
   namespace Iosys_Util{
@@ -236,6 +237,14 @@ namespace SPIO_Util{
     { return Io_comm_target(*(ios->io_comm_info), true); }
 
     bool iosys_uses_async_io_service(iosystem_desc_t *iosys);
+
+    /* Draws a 64-bit id from true entropy (std::random_device, not a seeded
+     * PRNG) on comm-rank root and broadcasts it to every rank in comm, which
+     * all return the identical combined value. Used once per iosystem (at
+     * PIOc_Init_Intracomm_impl() time) to generate iosystem_desc_t's
+     * spio_lock_id, which later (Task 8) names a filesystem lock file that
+     * every rank which might create or wait on it must already agree on. */
+    uint64_t generate_and_bcast_lock_id(MPI_Comm comm, int root);
 
 #ifdef _HDF5
     /* Returns true if the calling MPI rank owns I/O duty for this specific
