@@ -1193,8 +1193,19 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
     }
 
-    /* If this is an IO task, then call the netCDF function. */
-    if (ios->io_comm_info->is_sync_io_proc())
+    /* If this is an IO task, then call the netCDF function.
+     * For HDF5/HDF5C files, the task that owns the actual I/O work may be an
+     * async-write-thread-pool-owning rank rather than a sync I/O rank (see
+     * file->uses_async_io); for every other iotype, behavior is unchanged
+     * (sync I/O rank only). */
+#ifdef _HDF5
+    bool enter_io_proc_block = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)
+        : ios->io_comm_info->is_sync_io_proc();
+#else
+    bool enter_io_proc_block = ios->io_comm_info->is_sync_io_proc();
+#endif
+    if (enter_io_proc_block)
     {
         LOG((2, "file->iotype = %d xtype = %d file->do_io = %d", file->iotype, xtype, file->do_io));
 #ifdef _PNETCDF
@@ -1353,7 +1364,30 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC && file->do_io)
+#ifdef _HDF5
+        if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        {
+            /* SCORPIO does not guarantee that a read sees a prior write on
+             * the same file within the same program unless the caller
+             * explicitly calls PIOc_sync() (or closes and reopens the file)
+             * between the write and the read - PIOc_sync_impl() (pio_file.cpp)
+             * and spio_hard_closefile() (pio_file.cpp) are what actually drain
+             * this file's pending async writes via spio_wait_file_async_pend_ops().
+             * A wait used to be duplicated here as well, making every read
+             * (not only ones that follow a write) block on this file's pending
+             * async ops even though the documented contract never promised
+             * that visibility without an explicit sync - removed in favor of
+             * relying solely on PIOc_sync()/PIOc_closefile()'s existing drains.
+             * See tests/cunit/test_putget_hdf5.cpp and
+             * tests/cunit/test_hdf5_async_full_lifecycle.cpp's
+             * test_read_write_interleaved_no_race(), both updated to call
+             * PIOc_sync() between a write and a same-file read. */
+            ierr = spio_hdf5_get_var(ios, file, varid, start, count, stride, xtype, buf);
+        }
+#endif /* _HDF5 */
+
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC &&
+            file->iotype != PIO_IOTYPE_HDF5 && file->iotype != PIO_IOTYPE_HDF5C && file->do_io)
             switch(xtype)
             {
 #ifdef _NETCDF

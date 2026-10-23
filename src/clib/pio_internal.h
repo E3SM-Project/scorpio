@@ -150,6 +150,10 @@ extern "C" {
     std::shared_ptr<io_desc_t> spio_get_iodesc_ref_from_file(file_desc_t *file, const std::vector<int> &varids, int ioid);
     int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file, bool sync_with_ioprocs);
     int spio_soft_closefile(iosystem_desc_t *ios, file_desc_t *file);
+    /* Wait for pending asynchronous (e.g. HDF5 async write thread pool) ops on
+     * this file to complete. Returns PIO_NOERR once none are pending,
+     * PIO_EINTERNAL on timeout (caller is expected to warn and continue). */
+    int spio_wait_file_async_pend_ops(file_desc_t *file);
 
     iosystem_desc_t *pio_get_iosystem_from_id(int iosysid);
     int pio_add_to_iosystem_list(iosystem_desc_t *ios, MPI_Comm comm);
