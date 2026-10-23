@@ -349,7 +349,7 @@ int PIOc_setframe_impl(int ncid, int varid, int frame)
 
 #ifdef _HDF5
     if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
-      if((frame >= 0) && (ios->io_comm_info->is_sync_io_proc())){
+      if((frame >= 0) && (SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file))){
 #if PIO_USE_ASYNC_WR_THREAD
         ret = spio_iosys_async_hdf5_set_frame_op_add(file, varid, frame);
 #else
