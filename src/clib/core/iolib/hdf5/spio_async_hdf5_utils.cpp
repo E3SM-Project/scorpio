@@ -851,21 +851,18 @@ static int pio_iosys_async_op_hdf5_write_impl(void *pdata)
     }
   }
 
-  /* FIXME: Is this barrier needed ? TComm_info caches a single io_comm with
-   * no sync/async role distinction - it is built from the *sync* I/O comm
-   * (see TComm_info's construction from io_comm_info->get_sync_io_comm()), so
-   * it is MPI_COMM_NULL on async-only I/O ranks. An async-dispatched write
-   * (CONTIG/BOX/SUBSET + HDF5/HDF5C + PIO_USE_ASYNC_WR_THREAD) would
-   * therefore barrier on the wrong rank set here if it ever ran on async I/O
-   * ranks disjoint from the sync ones. That configuration is currently
-   * prevented upstream by io_desc_t::select_io_desc_info(), which falls any
-   * of CONTIG/BOX/SUBSET back to sync_io_desc_info unless the file uses async
-   * I/O (file->uses_async_io, computed once at file create/open time - see
-   * spio_createfile_int()/PIOc_openfile_retry_impl()), so this barrier is
-   * always reached by the full sync-I/O rank set today. It still needs a
-   * TComm_info audit (a sync/async role-aware io_comm) before HDF5
-   * file/dataset creation is extended to span the async comm. */
-  MPI_Barrier(ios->tcomm_info->get_io_comm());
+  /* FIXME: Is this barrier needed ?
+   * This op can run for either role - on the sync I/O ranks (is_async ==
+   * false) or on the disjoint async I/O ranks (is_async == true, see
+   * is_async's computation and the role assert above) - depending on which
+   * io_desc_info was selected when the op was queued. TComm_info caches
+   * per-role comms (get_io_comm() for the sync role, get_async_io_comm()
+   * for the async role; the "wrong" role's comm is MPI_COMM_NULL on a rank
+   * that only owns the other role), so the comm barriered on here must be
+   * selected using is_async, matching the role actually executing this op,
+   * rather than unconditionally using get_io_comm() (which is
+   * MPI_COMM_NULL on async-only I/O ranks and would abort the barrier). */
+  MPI_Barrier(is_async ? ios->tcomm_info->get_async_io_comm() : ios->tcomm_info->get_io_comm());
 
   return PIO_NOERR;
 #else // _HDF5

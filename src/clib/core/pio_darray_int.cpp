@@ -1192,11 +1192,37 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
     /* Get the variable info. */
     vdesc = file->varlist + vid;
 
-    /* Get the number of dimensions in the decomposition. */
-    ndims = iodesc->sync_io_desc_info.ndims;
+    /* Select the io_desc_info_t (sync or async) matching the role that will
+     * actually perform this read - mirrors the selection already done for
+     * HDF5 async-dispatched writes (see pio_iosys_async_hdf5_write_op_add()/
+     * io_desc_t::select_io_desc_info()). For every iotype other than HDF5/
+     * HDF5C with file->uses_async_io, this is identical to iodesc->sync_io_desc_info
+     * today, so behavior is unchanged in that case. */
+    io_desc_info_t &io_desc_info = iodesc->select_io_desc_info(file->iotype, file);
 
-    /* IO procs will actially read the data. */
-    if (ios->io_comm_info->is_sync_io_proc())
+    /* Get the number of dimensions in the decomposition. */
+    ndims = io_desc_info.ndims;
+
+    /* IO procs will actially read the data. HDF5/HDF5C reads are always
+     * synchronous (no thread-pool dispatch - see the comment on the
+     * PIO_IOTYPE_HDF5/HDF5C case below), but they still execute on whichever
+     * rank actually owns the open HDF5 dataset (file->hdf5_vars[vid] is only
+     * populated on that rank's local file_desc_t - see is_file_owning_io_proc()
+     * and how it gates HDF5 dataset creation): the async-owning rank when
+     * file->uses_async_io, the sync I/O rank otherwise. Every other iotype's
+     * read still runs on the sync I/O ranks only, unchanged. Since
+     * io_desc_info above is selected consistently with that same role, its
+     * region/start/count data (computed by the matching sync- or
+     * async-targeted rearrange) is valid for whichever rank enters this
+     * block. */
+#ifdef _HDF5
+    bool enter_io_proc_block = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)
+        : ios->io_comm_info->is_sync_io_proc();
+#else
+    bool enter_io_proc_block = ios->io_comm_info->is_sync_io_proc();
+#endif
+    if (enter_io_proc_block)
     {
         io_region *region;
         size_t start[fndims];
@@ -1204,8 +1230,8 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
         size_t tmp_bufsize = 1;
         void *bufptr;
         int rrlen = 0;
-        PIO_Offset *startlist[iodesc->sync_io_desc_info.maxregions];
-        PIO_Offset *countlist[iodesc->sync_io_desc_info.maxregions];
+        PIO_Offset *startlist[io_desc_info.maxregions];
+        PIO_Offset *countlist[io_desc_info.maxregions];
 #ifdef _HDF5
         /* Total number of data elements to read, accumulated across all regions */
         hsize_t dsize_all = 0;
@@ -1214,7 +1240,7 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
         /* buffer is incremented by byte and loffset is in terms of
            the iodessc->mpitype so we need to multiply by the size of
            the mpitype. */
-        region = iodesc->sync_io_desc_info.firstregion;
+        region = io_desc_info.firstregion;
 
         /* This is a record (or quasi-record) var. If the record
            number has not been set yet, set it to 0 by default */
@@ -1225,10 +1251,10 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
         }
 
         /* For each regions, read the data. */
-        for (int regioncnt = 0; regioncnt < iodesc->sync_io_desc_info.maxregions; regioncnt++)
+        for (int regioncnt = 0; regioncnt < io_desc_info.maxregions; regioncnt++)
         {
             tmp_bufsize = 1;
-            if (region == NULL || iodesc->sync_io_desc_info.llen == 0)
+            if (region == NULL || io_desc_info.llen == 0)
             {
                 /* No data for this region. */
                 for (int i = 0; i < fndims; i++)
@@ -1244,9 +1270,9 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
                 if (regioncnt == 0 || region == NULL)
                     bufptr = iobuf;
                 else
-                    bufptr=(void *)((char *)iobuf + iodesc->sync_io_desc_info.mpitype_size * region->loffset);
+                    bufptr=(void *)((char *)iobuf + io_desc_info.mpitype_size * region->loffset);
 
-                LOG((2, "%d %d %d", iodesc->sync_io_desc_info.llen - region->loffset, iodesc->sync_io_desc_info.llen, region->loffset));
+                LOG((2, "%d %d %d", io_desc_info.llen - region->loffset, io_desc_info.llen, region->loffset));
 
                 /* Allow extra outermost dimensions in the decomposition */
                 int num_extra_dims = (vdesc->record >= 0 && fndims > 1)? (ndims - (fndims - 1)) : (ndims - fndims);
@@ -1254,7 +1280,7 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
                 if (num_extra_dims > 0)
                 {
                     for (int d = 0; d < num_extra_dims; d++)
-                        pioassert(iodesc->sync_io_desc_info.dimlen[d] == 1, "Extra outermost dimensions must have lengths of 1",
+                        pioassert(io_desc_info.dimlen[d] == 1, "Extra outermost dimensions must have lengths of 1",
                                   __FILE__, __LINE__);
                 }
 
@@ -1293,7 +1319,7 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
             case PIO_IOTYPE_NETCDF4P:
             case PIO_IOTYPE_NETCDF4P_NCZARR:
                 /* ierr = nc_get_vara(file->fh, vid, start, count, bufptr); */
-                switch (iodesc->sync_io_desc_info.piotype)
+                switch (io_desc_info.piotype)
                 {
                 case PIO_BYTE:
                     ierr = nc_get_vara_schar(file->fh, vid, start, count, (signed char*)bufptr);
@@ -1359,15 +1385,15 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
                 }
 
                 /* Is this is the last region to process? */
-                if (regioncnt == iodesc->sync_io_desc_info.maxregions - 1)
+                if (regioncnt == io_desc_info.maxregions - 1)
                 {
                     /* Read a list of subarrays. */
                     ierr = ncmpi_get_varn_all(file->fh, vid, rrlen, startlist,
-                                              countlist, iobuf, iodesc->sync_io_desc_info.llen, iodesc->sync_io_desc_info.mpitype);
+                                              countlist, iobuf, io_desc_info.llen, io_desc_info.mpitype);
                     if(ierr != PIO_NOERR)
                     {
                         ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
-                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with PIO_IOTYPE_PNETCDF iotype. The low level (PnetCDF) I/O library call failed to read the variable (Number of regions = %d, iodesc id = %d, Bytes to read on this process = %llu)", pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid, rrlen, iodesc->ioid, (unsigned long long int) iodesc->sync_io_desc_info.llen);
+                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with PIO_IOTYPE_PNETCDF iotype. The low level (PnetCDF) I/O library call failed to read the variable (Number of regions = %d, iodesc id = %d, Bytes to read on this process = %llu)", pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid, rrlen, iodesc->ioid, (unsigned long long int) io_desc_info.llen);
                         break;
                     }
 
@@ -1423,7 +1449,7 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
                 }
 
                 /* Is this the last region to process? */
-                if (regioncnt == iodesc->sync_io_desc_info.maxregions - 1)
+                if (regioncnt == io_desc_info.maxregions - 1)
                 {
                     hid_t file_space_id = H5Dget_space(file->hdf5_vars[vid].hdf5_dataset_id);
                     if (file_space_id == H5I_INVALID_HID)
@@ -1506,14 +1532,14 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
                         }
                     }
 
-                    hid_t mem_type_id = spio_nc_type_to_hdf5_type(iodesc->sync_io_desc_info.piotype);
+                    hid_t mem_type_id = spio_nc_type_to_hdf5_type(io_desc_info.piotype);
                     if (mem_type_id == H5I_INVALID_HID)
                     {
                         ierr = pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                                        "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
                                        "Unsupported memory type (type=%d) for the variable",
                                        pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid,
-                                       iodesc->sync_io_desc_info.piotype);
+                                       io_desc_info.piotype);
                         H5Sclose(mem_space_id);
                         H5Sclose(file_space_id);
                         break;
@@ -1581,20 +1607,20 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
                             SPIO_Util::File_Util::DTConverter::size_of(spio_hdf5_type_to_pio_type(file_var_ntype_id));
                         void *converted_buf = static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->convert(
                                 native_buf, native_buf_sz, spio_hdf5_type_to_pio_type(file_var_ntype_id),
-                                iodesc->sync_io_desc_info.piotype);
+                                io_desc_info.piotype);
                         if (converted_buf == NULL)
                         {
                             ierr = pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                                            "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
                                            "Unable to convert the type (from %d to %d) of the variable",
                                            pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid,
-                                           spio_hdf5_type_to_pio_type(file_var_ntype_id), iodesc->sync_io_desc_info.piotype);
+                                           spio_hdf5_type_to_pio_type(file_var_ntype_id), io_desc_info.piotype);
                             brel(native_buf);
                             H5Sclose(mem_space_id);
                             H5Sclose(file_space_id);
                             break;
                         }
-                        memcpy(iobuf, converted_buf, iodesc->sync_io_desc_info.mpitype_size * dsize_all);
+                        memcpy(iobuf, converted_buf, io_desc_info.mpitype_size * dsize_all);
                         brel(converted_buf);
                         brel(native_buf);
                     }
