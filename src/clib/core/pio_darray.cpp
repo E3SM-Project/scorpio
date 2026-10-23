@@ -265,7 +265,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
   /* Use async io_desc_info_t for writing with HDF5[C] + PIO_ASYNC_WR_THREAD (for all rearrangers)
    * Use sync io_desc_info_t otherwise
    */
-  io_desc_info_t &write_desc_info = iodesc->select_io_desc_info(file->iotype, ios);
+  io_desc_info_t &write_desc_info = iodesc->select_io_desc_info(file->iotype, file);
 
   /* Determine total size of aggregated data (all vars/records).
    * For netcdf serial writes we collect the data on io nodes and
@@ -441,11 +441,11 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
         /* Every HDF5/HDF5C write is queued on the async write thread pool
          * when PIO_USE_ASYNC_WR_THREAD is compiled in, for *all* rearrangers.
          * pio_iosys_async_hdf5_write_op_add() makes the sync-vs-async
-         * io_desc_info_t selection (via iodesc->select_io_desc_info()) and
-         * gates on the role-correct I/O proc set itself: CONTIG, BOX and
-         * SUBSET decomps alike target the async I/O ranks whenever the sync
-         * and async I/O roles are performed by the same set of processes,
-         * and fall back to the sync I/O ranks otherwise. */
+         * io_desc_info_t selection (via iodesc->select_io_desc_info(), which
+         * routes through file->uses_async_io) and gates on the role-correct
+         * I/O proc set itself: CONTIG, BOX and SUBSET decomps alike target
+         * the async I/O ranks when the file uses async I/O, and the sync I/O
+         * ranks otherwise. */
 #if PIO_USE_ASYNC_WR_THREAD
         ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, sp_iodesc,
                                                   DARRAY_DATA, frame);
