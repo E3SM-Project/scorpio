@@ -915,6 +915,13 @@ typedef struct file_desc_t
     /** Number of global attrs defined */
     int hdf5_num_gattrs;
 
+    /** True if this file's HDF5/HDF5C writes are routed to the async I/O
+     * procs instead of the sync I/O procs. Computed once, at file create/open
+     * time, from PIO_USE_ASYNC_WR_THREAD, file->mode (write-capable) and
+     * whether the iosystem has a usable async I/O comm at all - never
+     * re-derived per call. */
+    bool uses_async_io;
+
 #endif /* _HDF5 */
     /** A datatype converter for user buffers */
     void *dt_converter;

@@ -289,6 +289,52 @@ static int test_write_read_hdf5_dtconv(int iosysid, int my_rank, int ntasks)
     return ret;
   }
 
+#if PIO_USE_ASYNC_WR_THREAD
+  /* Since Task 3, select_io_desc_info() routes purely on file->uses_async_io
+   * (set once at file open/create time - see spio_createfile_int()), not on
+   * this io_desc_t's own (disjoint) sync/async I/O comm topology. file->
+   * uses_async_io is computed as (file->mode & PIO_WRITE) &&
+   * !iosys_uses_async_io_service(ios). spio_createfile_int() always ORs the
+   * PIO_WRITE bit into file->mode once the underlying create call succeeds
+   * (created files are always writable), and uses_async_io is now computed
+   * *after* that fixup - so even though this test creates its file via
+   * PIOc_createfile(..., PIO_CLOBBER) (PIO_CLOBBER == NC_CLOBBER == 0, which
+   * does not itself set the PIO_WRITE/NC_WRITE bit), file->mode & PIO_WRITE
+   * is 1 by the time uses_async_io is computed. This test's iosystem is a
+   * plain PIOc_Init_Intracomm iosystem (not an intercomm-based async I/O
+   * service), so iosys_uses_async_io_service(ios) is false and
+   * uses_async_io is true here. So this file's SUBSET writes route through
+   * async_io_desc_info (assuming it is non-NULL, confirmed above, and the
+   * rearranger is CONTIG/BOX/SUBSET, confirmed by the PIO_REARR_SUBSET used
+   * here). */
+  if (my_rank == 0){
+    io_desc_t *iodesc = pio_get_iodesc_from_id(ioid);
+    file_desc_t *file = NULL;
+    if (iodesc == NULL || pio_get_file(ncid, &file) != PIO_NOERR || file == NULL){
+      LOG_RANK0(my_rank, "FAIL: pio_get_iodesc_from_id()/pio_get_file() returned NULL (dtconv)\n");
+      PIOc_closefile(ncid);
+      PIOc_freedecomp(iosysid, ioid);
+      return PIO_EINTERNAL;
+    }
+    if (!file->uses_async_io){
+      LOG_RANK0(my_rank, "FAIL: test_write_read_hdf5_dtconv's file unexpectedly has "
+                "uses_async_io == false (spio_createfile_int() ORs the PIO_WRITE bit "
+                "into file->mode before computing uses_async_io, so a created file "
+                "should have uses_async_io == true here)\n");
+      PIOc_closefile(ncid);
+      PIOc_freedecomp(iosysid, ioid);
+      return PIO_EINTERNAL;
+    }
+    if (&(iodesc->select_io_desc_info(format, file)) != iodesc->async_io_desc_info){
+      LOG_RANK0(my_rank, "FAIL: test_write_read_hdf5_dtconv's SUBSET decomposition unexpectedly "
+                "did not route to async_io_desc_info even though file->uses_async_io is true\n");
+      PIOc_closefile(ncid);
+      PIOc_freedecomp(iosysid, ioid);
+      return PIO_EINTERNAL;
+    }
+  }
+#endif
+
   if ((ret = PIOc_write_darray(ncid, varid, ioid, MAPLEN_PER_RANK, wdata.data(), NULL))){
     LOG_RANK0(my_rank, "FAIL: PIOc_write_darray() failed (dtconv), ret = %d\n", ret);
     PIOc_closefile(ncid);
