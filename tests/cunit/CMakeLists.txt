@@ -98,7 +98,8 @@ if (NOT PIO_USE_MPISERIAL)
                     test_darray_1d test_darray_3d test_decomp_uneven test_decomps test_rearr)
   if (WITH_HDF5)
     add_spio_executable (test_darray_hdf5_contig TRUE "" test_darray_hdf5_contig.cpp OBJ_LIBS test_common_obj)
-    add_dependencies (tests test_darray_hdf5_contig)
+    add_spio_executable (test_putget_hdf5 TRUE "" test_putget_hdf5.cpp OBJ_LIBS test_common_obj)
+    add_dependencies (tests test_darray_hdf5_contig test_putget_hdf5)
   endif ()
   if (PIO_USE_MALLOC)
     add_spio_executable (test_darray_async_simple TRUE "" test_darray_async_simple.cpp OBJ_LIBS test_common_obj)
@@ -360,6 +361,10 @@ else ()
     add_mpi_test(test_darray_hdf5_contig
       EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_darray_hdf5_contig
       NUMPROCS ${AT_LEAST_FOUR_TASKS}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+    add_mpi_test(test_putget_hdf5
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_putget_hdf5
+      NUMPROCS 1
       TIMEOUT ${DEFAULT_TEST_TIMEOUT})
   endif ()
   add_mpi_test(test_decomp_uneven

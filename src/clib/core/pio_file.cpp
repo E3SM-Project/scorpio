@@ -567,7 +567,7 @@ std::shared_ptr<io_desc_t> spio_get_iodesc_ref_from_file(file_desc_t *file, cons
  * timed out (the caller is expected to warn and continue - aborting a close
  * or a sync is worse than proceeding)
  */
-static int spio_wait_file_async_pend_ops(file_desc_t *file)
+int spio_wait_file_async_pend_ops(file_desc_t *file)
 {
   const int SLEEP_TIME_IN_MILLISECONDS = 1;
   const int WARN_TIME_IN_MILLISECONDS = 5000;
