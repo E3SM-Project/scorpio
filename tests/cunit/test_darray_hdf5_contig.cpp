@@ -287,15 +287,19 @@ static int test_write_read_hdf5_dtconv(int iosysid, int my_rank, int ntasks)
    * (set once at file open/create time - see spio_createfile_int()), not on
    * this io_desc_t's own (disjoint) sync/async I/O comm topology. file->
    * uses_async_io is computed as (file->mode & PIO_WRITE) &&
-   * !iosys_uses_async_io_service(ios); this test creates its file via
-   * PIOc_createfile(..., PIO_CLOBBER), and PIO_CLOBBER (NC_CLOBBER == 0)
-   * does not set the PIO_WRITE (NC_WRITE) bit, so file->mode & PIO_WRITE is
-   * 0 and file->uses_async_io is false here - independent of
-   * PIO_USE_ASYNC_WR_THREAD and independent of this decomposition's (real,
-   * disjoint) sync/async I/O comm topology. So this file's SUBSET writes
-   * still route through sync_io_desc_info, exactly as before Task 3 (which
-   * avoided the same destination for a different reason: the old disjoint-
-   * procs topology check). */
+   * !iosys_uses_async_io_service(ios). spio_createfile_int() always ORs the
+   * PIO_WRITE bit into file->mode once the underlying create call succeeds
+   * (created files are always writable), and uses_async_io is now computed
+   * *after* that fixup - so even though this test creates its file via
+   * PIOc_createfile(..., PIO_CLOBBER) (PIO_CLOBBER == NC_CLOBBER == 0, which
+   * does not itself set the PIO_WRITE/NC_WRITE bit), file->mode & PIO_WRITE
+   * is 1 by the time uses_async_io is computed. This test's iosystem is a
+   * plain PIOc_Init_Intracomm iosystem (not an intercomm-based async I/O
+   * service), so iosys_uses_async_io_service(ios) is false and
+   * uses_async_io is true here. So this file's SUBSET writes route through
+   * async_io_desc_info (assuming it is non-NULL, confirmed above, and the
+   * rearranger is CONTIG/BOX/SUBSET, confirmed by the PIO_REARR_SUBSET used
+   * here). */
   if (my_rank == 0){
     io_desc_t *iodesc = pio_get_iodesc_from_id(ioid);
     file_desc_t *file = NULL;
@@ -305,17 +309,18 @@ static int test_write_read_hdf5_dtconv(int iosysid, int my_rank, int ntasks)
       PIOc_freedecomp(iosysid, ioid);
       return PIO_EINTERNAL;
     }
-    if (file->uses_async_io){
+    if (!file->uses_async_io){
       LOG_RANK0(my_rank, "FAIL: test_write_read_hdf5_dtconv's file unexpectedly has "
-                "uses_async_io == true (PIOc_createfile(..., PIO_CLOBBER) does not set "
-                "the PIO_WRITE bit in file->mode, so uses_async_io should be false here)\n");
+                "uses_async_io == false (spio_createfile_int() ORs the PIO_WRITE bit "
+                "into file->mode before computing uses_async_io, so a created file "
+                "should have uses_async_io == true here)\n");
       PIOc_closefile(ncid);
       PIOc_freedecomp(iosysid, ioid);
       return PIO_EINTERNAL;
     }
-    if (&(iodesc->select_io_desc_info(format, file)) != &(iodesc->sync_io_desc_info)){
+    if (&(iodesc->select_io_desc_info(format, file)) != iodesc->async_io_desc_info){
       LOG_RANK0(my_rank, "FAIL: test_write_read_hdf5_dtconv's SUBSET decomposition unexpectedly "
-                "routed away from sync_io_desc_info even though file->uses_async_io is false\n");
+                "did not route to async_io_desc_info even though file->uses_async_io is true\n");
       PIOc_closefile(ncid);
       PIOc_freedecomp(iosysid, ioid);
       return PIO_EINTERNAL;

@@ -2974,15 +2974,6 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     }
     file->mode = mode;
 
-#ifdef _HDF5
-#if PIO_USE_ASYNC_WR_THREAD
-    file->uses_async_io = (file->mode & PIO_WRITE) &&
-                           !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
-#else
-    file->uses_async_io = false;
-#endif
-#endif
-
     /* Set to true if this task should participate in IO (only true for
      * one task with netcdf serial files. */
     if (file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR ||
@@ -3672,6 +3663,15 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     /* This flag is implied by netcdf create functions but we need
        to know if its set. */
     file->mode = file->mode | PIO_WRITE;
+
+#ifdef _HDF5
+#if PIO_USE_ASYNC_WR_THREAD
+    file->uses_async_io = (file->mode & PIO_WRITE) &&
+                           !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
+#else
+    file->uses_async_io = false;
+#endif
+#endif
 
     /* Add the struct with this files info to the global list of
      * open files. */
