@@ -552,6 +552,33 @@ int main(int argc, char **argv)
   {
     int iosysid;
 
+    /* Close-time async-write drain (Task 6, Bug 6) - disjoint sync/async I/O
+     * procs. Deliberately run FIRST, before any other test in this file:
+     * both test_write_read_hdf5(PIO_REARR_SUBSET) below and
+     * test_write_read_hdf5_dtconv() are known to crash the whole process
+     * under PIO_USE_ASYNC_WR_THREAD (the dtconv test hits the
+     * already-documented fillbuf NULL-deref, commit 16f792893b; the plain
+     * SUBSET test has also been observed to crash via an unrelated
+     * pre-existing heap-buffer-overflow in pio_log()/pio_swapm() during
+     * PIOc_closefile() - not deterministic, but real). Running this test
+     * after either of them risks it silently never executing, with no FAIL
+     * output to show for it. Running it first guarantees it actually
+     * executes regardless of what those pre-existing, out-of-scope bugs do
+     * afterward. */
+    if ((ret = PIOc_Init_Intracomm(test_comm, NUM_IO1, STRIDE1, BASE0,
+                                   PIO_REARR_SUBSET, &iosysid)))
+      return ret;
+
+    printf("%d running test_write_close_drain_hdf5()\n", my_rank);
+    if ((ret = test_write_close_drain_hdf5(iosysid, my_rank, ntasks)))
+    {
+      LOG_RANK0(my_rank, "test_write_close_drain_hdf5() FAILED, ret = %d\n", ret);
+      num_errors++;
+    }
+
+    if ((ret = PIOc_finalize(iosysid)))
+      return ret;
+
     /* PIO_REARR_CONTIG + HDF5 + PIO_USE_ASYNC_WR_THREAD : async write is enabled */
     if ((ret = PIOc_Init_Intracomm(test_comm, NUM_IO1, STRIDE1, BASE0,
                                    PIO_REARR_SUBSET, &iosysid)))
@@ -561,26 +588,6 @@ int main(int argc, char **argv)
     if ((ret = test_write_read_hdf5(iosysid, my_rank, ntasks, PIO_REARR_SUBSET)))
     {
       LOG_RANK0(my_rank, "test_write_read_hdf5(PIO_REARR_SUBSET) FAILED, ret = %d\n", ret);
-      num_errors++;
-    }
-
-    if ((ret = PIOc_finalize(iosysid)))
-      return ret;
-
-    /* Close-time async-write drain (Task 6, Bug 6) - disjoint sync/async I/O
-     * procs, same shape as the CONTIG case above. Placed before the dtconv
-     * test below: that test hits a separate, already-documented pre-existing
-     * crash (fillbuf NULL-deref, commit 16f792893b) when
-     * PIO_USE_ASYNC_WR_THREAD is on, which would otherwise abort the whole
-     * process before this test gets a chance to run. */
-    if ((ret = PIOc_Init_Intracomm(test_comm, NUM_IO1, STRIDE1, BASE0,
-                                   PIO_REARR_SUBSET, &iosysid)))
-      return ret;
-
-    printf("%d running test_write_close_drain_hdf5()\n", my_rank);
-    if ((ret = test_write_close_drain_hdf5(iosysid, my_rank, ntasks)))
-    {
-      LOG_RANK0(my_rank, "test_write_close_drain_hdf5() FAILED, ret = %d\n", ret);
       num_errors++;
     }
 
