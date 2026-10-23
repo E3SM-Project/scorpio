@@ -369,6 +369,10 @@ struct io_desc_info_t
     ~io_desc_info_t();
 };
 
+/* Forward decl - full definition (typedef struct file_desc_t) comes later in
+ * this header; select_io_desc_info() below only needs a pointer to it. */
+struct file_desc_t;
+
 /**
  * IO descriptor structure.
  *
@@ -392,36 +396,34 @@ struct io_desc_t
     /* Number of pending async ops using this I/O desc */
     std::atomic_int nasync_pend_ops;
 
-    /* Set once the "async HDF5 writes disabled, no dedicated async I/O procs
-     * available" warning has been emitted for this I/O desc, so that
-     * select_io_desc_info() warns at most once per decomposition instead of
-     * once per write call. */
-    bool async_io_disabled_warned;
-
     io_desc_t(iosystem_desc_t *ios, int piotype, int ndims, const int *gdimlen,
               int maplen, const PIO_Offset *compmap, int rearranger, bool map_zero_based);
     ~io_desc_t();
 
     /* Returns the io_desc_info_t to use for a write/read of the given iotype:
      * async_io_desc_info for CONTIG/BOX/SUBSET-rearranger HDF5/HDF5C writes
-     * when async writes are enabled and have been allocated, sync_io_desc_info
-     * otherwise.
+     * when the file uses async I/O (file->uses_async_io) and async_io_desc_info
+     * has been allocated, sync_io_desc_info otherwise.
      *
      * @param iotype The iotype of the file being written/read
-     * @param ios The I/O system the file belongs to. Used to check whether the
-     * sync and async I/O roles are performed by the same set of processes -
-     * async_io_desc_info is only ever returned when they are (HDF5
-     * files/datasets are only created on sync I/O ranks, so async I/O ranks
-     * disjoint from them cannot write to the dataset; see
-     * IO_comm_info::sync_and_async_io_share_procs()). May be NULL (test
-     * callers with no I/O system in hand), in which case the check is skipped.
+     * @param file The file being written/read. file->uses_async_io is computed
+     * once per file, at create/open time (see spio_createfile_int(),
+     * PIOc_openfile_retry_impl()), as (file->mode & PIO_WRITE) &&
+     * !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios) - it is the
+     * single source of truth this function uses to decide whether this file's
+     * writes are eligible for async I/O procs at all. (HDF5 files/datasets
+     * are only ever created on sync I/O ranks, so async I/O ranks disjoint
+     * from them cannot write to the dataset; see
+     * IO_comm_info::sync_and_async_io_share_procs() and
+     * SPIO_Util::Iosys_Util::is_file_owning_io_proc() for the related
+     * role-membership checks made elsewhere.)
      *
      * Note: all callers writing/reading the same buffer *must* pass the same
-     * (iotype, ios) pair - the rearrange step in write_darray_multi() and the
+     * (iotype, file) pair - the rearrange step in write_darray_multi() and the
      * dispatch in pio_iosys_async_hdf5_write_op_add() must agree on the
      * selected io_desc_info_t or the rearranged data lands on a different set
      * of ranks than the one that writes it out. */
-    io_desc_info_t &select_io_desc_info(int iotype, const iosystem_desc_t *ios = NULL);
+    io_desc_info_t &select_io_desc_info(int iotype, const file_desc_t *file);
 };
 
 /* Forward decl for I/O file summary stats info */

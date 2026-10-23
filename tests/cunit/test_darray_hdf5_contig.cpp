@@ -200,16 +200,17 @@ static int test_write_read_hdf5_dtconv(int iosysid, int my_rank, int ntasks)
   }
 
 #if PIO_USE_ASYNC_WR_THREAD
-  /* Explicitly confirm the fallback described in the comment above: this
-   * decomposition's disjoint sync/async I/O ranks must still route this
-   * SUBSET write through sync_io_desc_info, not async_io_desc_info, so this
-   * test keeps avoiding the unrelated CONTIG-async deadlock/crash now that
-   * select_io_desc_info() no longer excludes SUBSET from the async path. */
+  /* Confirm the disjoint-procs eager allocation still leaves
+   * iodesc->async_io_desc_info non-NULL and correctly populated for this
+   * SUBSET decomposition. Routing (sync vs. async io_desc_info_t) is no
+   * longer decided here: since Task 3, select_io_desc_info() reads
+   * file->uses_async_io, a per-*file* flag, not the disjoint-procs comm
+   * topology this io_desc_t was built with - so that check has moved below,
+   * once a real file_desc_t exists (see the comment after PIOc_enddef()). */
   if (my_rank == 0){
     io_desc_t *iodesc = pio_get_iodesc_from_id(ioid);
-    iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
-    if (iodesc == NULL || ios == NULL){
-      LOG_RANK0(my_rank, "FAIL: pio_get_iodesc_from_id/pio_get_iosystem_from_id returned NULL (dtconv)\n");
+    if (iodesc == NULL){
+      LOG_RANK0(my_rank, "FAIL: pio_get_iodesc_from_id() returned NULL (dtconv)\n");
       PIOc_freedecomp(iosysid, ioid);
       return PIO_EINTERNAL;
     }
@@ -222,8 +223,7 @@ static int test_write_read_hdf5_dtconv(int iosysid, int my_rank, int ntasks)
      * membership). So this is the one place in the whole plan that proves,
      * for a real disjoint-procs IO configuration, that
      * subset_rearranger_init()'s Task 6 eager-allocation block still leaves
-     * iodesc->async_io_desc_info non-NULL and correctly populated even
-     * though (per the check below) it ends up unused for this test's writes.
+     * iodesc->async_io_desc_info non-NULL and correctly populated.
      * box_rearranger_init()'s equivalent block is structurally identical
      * (same io_desc_info_t constructor call, same CalcStartandCount/
      * compute_maxIObuffersize sequence, gated the same way) and is exercised
@@ -245,13 +245,6 @@ static int test_write_read_hdf5_dtconv(int iosysid, int my_rank, int ntasks)
       LOG_RANK0(my_rank, "FAIL: test_write_read_hdf5_dtconv's async_io_desc_info maplen/ndims do not "
                 "match sync_io_desc_info - the disjoint-procs eager allocation populated it "
                 "incorrectly\n");
-      PIOc_freedecomp(iosysid, ioid);
-      return PIO_EINTERNAL;
-    }
-    if (&(iodesc->select_io_desc_info(format, ios)) != &(iodesc->sync_io_desc_info)){
-      LOG_RANK0(my_rank, "FAIL: test_write_read_hdf5_dtconv's SUBSET decomposition unexpectedly "
-                "routed to the async io_desc_info_t - this would resurface the unrelated "
-                "CONTIG-async deadlock/crash this test was written to avoid\n");
       PIOc_freedecomp(iosysid, ioid);
       return PIO_EINTERNAL;
     }
@@ -288,6 +281,47 @@ static int test_write_read_hdf5_dtconv(int iosysid, int my_rank, int ntasks)
     PIOc_freedecomp(iosysid, ioid);
     return ret;
   }
+
+#if PIO_USE_ASYNC_WR_THREAD
+  /* Since Task 3, select_io_desc_info() routes purely on file->uses_async_io
+   * (set once at file open/create time - see spio_createfile_int()), not on
+   * this io_desc_t's own (disjoint) sync/async I/O comm topology. file->
+   * uses_async_io is computed as (file->mode & PIO_WRITE) &&
+   * !iosys_uses_async_io_service(ios); this test creates its file via
+   * PIOc_createfile(..., PIO_CLOBBER), and PIO_CLOBBER (NC_CLOBBER == 0)
+   * does not set the PIO_WRITE (NC_WRITE) bit, so file->mode & PIO_WRITE is
+   * 0 and file->uses_async_io is false here - independent of
+   * PIO_USE_ASYNC_WR_THREAD and independent of this decomposition's (real,
+   * disjoint) sync/async I/O comm topology. So this file's SUBSET writes
+   * still route through sync_io_desc_info, exactly as before Task 3 (which
+   * avoided the same destination for a different reason: the old disjoint-
+   * procs topology check). */
+  if (my_rank == 0){
+    io_desc_t *iodesc = pio_get_iodesc_from_id(ioid);
+    file_desc_t *file = NULL;
+    if (iodesc == NULL || pio_get_file(ncid, &file) != PIO_NOERR || file == NULL){
+      LOG_RANK0(my_rank, "FAIL: pio_get_iodesc_from_id()/pio_get_file() returned NULL (dtconv)\n");
+      PIOc_closefile(ncid);
+      PIOc_freedecomp(iosysid, ioid);
+      return PIO_EINTERNAL;
+    }
+    if (file->uses_async_io){
+      LOG_RANK0(my_rank, "FAIL: test_write_read_hdf5_dtconv's file unexpectedly has "
+                "uses_async_io == true (PIOc_createfile(..., PIO_CLOBBER) does not set "
+                "the PIO_WRITE bit in file->mode, so uses_async_io should be false here)\n");
+      PIOc_closefile(ncid);
+      PIOc_freedecomp(iosysid, ioid);
+      return PIO_EINTERNAL;
+    }
+    if (&(iodesc->select_io_desc_info(format, file)) != &(iodesc->sync_io_desc_info)){
+      LOG_RANK0(my_rank, "FAIL: test_write_read_hdf5_dtconv's SUBSET decomposition unexpectedly "
+                "routed away from sync_io_desc_info even though file->uses_async_io is false\n");
+      PIOc_closefile(ncid);
+      PIOc_freedecomp(iosysid, ioid);
+      return PIO_EINTERNAL;
+    }
+  }
+#endif
 
   if ((ret = PIOc_write_darray(ncid, varid, ioid, MAPLEN_PER_RANK, wdata.data(), NULL))){
     LOG_RANK0(my_rank, "FAIL: PIOc_write_darray() failed (dtconv), ret = %d\n", ret);

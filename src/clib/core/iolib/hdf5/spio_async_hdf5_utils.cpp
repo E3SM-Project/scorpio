@@ -859,9 +859,9 @@ static int pio_iosys_async_op_hdf5_write_impl(void *pdata)
    * therefore barrier on the wrong rank set here if it ever ran on async I/O
    * ranks disjoint from the sync ones. That configuration is currently
    * prevented upstream by io_desc_t::select_io_desc_info(), which falls any
-   * of CONTIG/BOX/SUBSET back to sync_io_desc_info unless the sync and async
-   * I/O roles are performed by the same set of processes
-   * (IO_comm_info::sync_and_async_io_share_procs()), so this barrier is
+   * of CONTIG/BOX/SUBSET back to sync_io_desc_info unless the file uses async
+   * I/O (file->uses_async_io, computed once at file create/open time - see
+   * spio_createfile_int()/PIOc_openfile_retry_impl()), so this barrier is
    * always reached by the full sync-I/O rank set today. It still needs a
    * TComm_info audit (a sync/async role-aware io_comm) before HDF5
    * file/dataset creation is extended to span the async comm. */
@@ -928,7 +928,7 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
    * queued/executed on async I/O procs, everything else (including the flag
    * compiled off, where select_io_desc_info() always returns
    * sync_io_desc_info) keeps the original sync I/O proc gate. */
-  io_desc_info_t &sel_desc = iodesc->select_io_desc_info(file->iotype, ios);
+  io_desc_info_t &sel_desc = iodesc->select_io_desc_info(file->iotype, file);
   bool is_async_write = (&sel_desc == iodesc->async_io_desc_info);
 
   if(!(is_async_write ? ios->io_comm_info->is_async_io_proc() : ios->io_comm_info->is_sync_io_proc())){

@@ -226,7 +226,7 @@ io_desc_t::io_desc_t(iosystem_desc_t *ios, int piotype,
   int maplen, const PIO_Offset *compmap,
   int rearranger, bool map_zero_based): ioid(SPIO_INVALID_ID),
     sync_io_desc_info(ios, piotype, ndims, gdimlen, maplen, compmap, rearranger, map_zero_based),
-    async_io_desc_info(NULL), nasync_pend_ops(0), async_io_disabled_warned(false)
+    async_io_desc_info(NULL), nasync_pend_ops(0)
 {
 }
 
@@ -239,14 +239,16 @@ io_desc_t::~io_desc_t()
 
 /* Get I/O desc to use for an I/O type:
  * Sync I/O : Use the sync I/O desc
- * Async I/O : If using the Contig rearranger use async I/O desc for writes with HDF5 I/O types.
- *              Use sync I/O desc for all other cases
+ * Async I/O : If using the Contig/Box/Subset rearranger, and the file uses
+ *             async I/O (file->uses_async_io), use async I/O desc for writes
+ *             with HDF5 I/O types. Use sync I/O desc for all other cases.
  */
-io_desc_info_t &io_desc_t::select_io_desc_info(int iotype, const iosystem_desc_t *ios)
+io_desc_info_t &io_desc_t::select_io_desc_info(int iotype, const file_desc_t *file)
 {
 #if PIO_USE_ASYNC_WR_THREAD
   if(((iotype == PIO_IOTYPE_HDF5) || (iotype == PIO_IOTYPE_HDF5C)) &&
       (async_io_desc_info != NULL) &&
+      file->uses_async_io &&
       ((sync_io_desc_info.rearranger == PIO_REARR_CONTIG) ||
        (sync_io_desc_info.rearranger == PIO_REARR_BOX) ||
        (sync_io_desc_info.rearranger == PIO_REARR_SUBSET))){
@@ -270,28 +272,15 @@ io_desc_info_t &io_desc_t::select_io_desc_info(int iotype, const iosystem_desc_t
      * This applies equally to CONTIG, BOX, and SUBSET decomps - none of them
      * create HDF5 files/datasets on the async I/O ranks.
      *
-     * Until HDF5 file/dataset creation is extended to span the async I/O comm
-     * as well (a separate, architectural change), fall back to the sync
-     * io_desc_info for this decomposition in that case. The write is still
-     * queued on the async thread pool, it just targets the sync I/O ranks
-     * (and the sync rearranger) like it did before async writes were
-     * introduced for this decomposition's rearranger. */
-    if(ios && ios->io_comm_info && !(ios->io_comm_info->sync_and_async_io_share_procs())){
-      if(!async_io_disabled_warned){
-        async_io_disabled_warned = true;
-        PIOc_warn(ios->iosysid, PIO_DEFAULT, __FILE__, __LINE__,
-          "Asynchronous HDF5 writes for this I/O decomposition are disabled "
-          "because the asynchronous I/O processes are disjoint from the synchronous I/O processes "
-          "(HDF5 files/datasets are only created on the synchronous I/O processes). "
-          "The writes will use the synchronous I/O processes instead. This may impact write I/O throughput");
-      }
-      return sync_io_desc_info;
-    }
-
+     * file->uses_async_io (set once, at file create/open time - see
+     * spio_createfile_int()/PIOc_openfile_retry_impl()) is the single source
+     * of truth for whether this file's writes are routed to async I/O procs
+     * at all; this function no longer re-derives that decision per call from
+     * comm topology (e.g. sync_and_async_io_share_procs()). */
     return *async_io_desc_info;
   }
 #else
-  (void )ios;
+  (void )file;
 #endif
   return sync_io_desc_info;
 }
