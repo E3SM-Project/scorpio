@@ -2974,6 +2974,40 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     }
     file->mode = mode;
 
+    /* spio_createfile_int() only ever creates a file for writing - netCDF/HDF5
+     * "create" semantics imply write access regardless of cmode flags like
+     * PIO_CLOBBER/PIO_NOCLOBBER (this is the same write-capable implication that
+     * the file->mode |= PIO_WRITE fixup below documents for file->mode itself).
+     * So, unlike the open path, the write-mode condition used elsewhere for
+     * computing uses_async_io can be dropped entirely here. This must be computed
+     * before the is_sync_io_proc() dispatch block below (which, for HDF5 iotypes,
+     * enqueues the actual file creation onto the async write thread pool based on
+     * this field) - computing it after that block/enqueue (as was done previously)
+     * is an ordering bug: the enqueue decision would read whatever value happened
+     * to be in a freshly calloc'd file_desc_t (i.e. false) rather than the final,
+     * correct value.
+     *
+     * The iotype test is not redundant. uses_async_io also gates
+     * spio_create_async_lock_file() further down in this function, while the
+     * matching spio_remove_async_lock_file() in spio_hard_closefile()
+     * (pio_file.cpp) additionally sits inside an "iotype is HDF5/HDF5C"
+     * block. Without the test here, every write-capable PnetCDF,
+     * NetCDF4P and NetCDF-classic file created in an async-write-thread
+     * build left behind a *.spio_lock file that nothing ever removed - and a
+     * later read-only open of that same filename in the same run then
+     * stalled on it for the full SPIO_ASYNC_OP_WAIT_TIMEOUT before warning
+     * and proceeding. It also makes uses_async_io mean what its own doc
+     * comment (pio_types.hpp) says it means. The same test is applied at the
+     * corresponding computation in PIOc_openfile_retry_impl(). */
+#ifdef _HDF5
+#if PIO_USE_ASYNC_WR_THREAD
+    file->uses_async_io = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)) &&
+                           !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
+#else
+    file->uses_async_io = false;
+#endif
+#endif
+
     /* Set to true if this task should participate in IO (only true for
      * one task with netcdf serial files. */
     if (file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR ||
@@ -3347,8 +3381,19 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     }
 #endif
 
-    /* If this task is in the IO component, do the IO. */
-    if (ios->io_comm_info->is_sync_io_proc())
+    /* If this task is in the IO component, do the IO.
+     * For HDF5/HDF5C files, the task that owns the actual I/O work may be an
+     * async-write-thread-pool-owning rank rather than a sync I/O rank (see
+     * file->uses_async_io, computed above); for every other iotype, behavior
+     * is unchanged (sync I/O rank only). */
+#ifdef _HDF5
+    bool enter_io_proc_block = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)
+        : ios->io_comm_info->is_sync_io_proc();
+#else
+    bool enter_io_proc_block = ios->io_comm_info->is_sync_io_proc();
+#endif
+    if (enter_io_proc_block)
     {
 #ifdef _NETCDF4
         /* All NetCDF4 files use the CDF5 file format by default,
@@ -3664,14 +3709,9 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
        to know if its set. */
     file->mode = file->mode | PIO_WRITE;
 
-#ifdef _HDF5
-#if PIO_USE_ASYNC_WR_THREAD
-    file->uses_async_io = (file->mode & PIO_WRITE) &&
-                           !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
-#else
-    file->uses_async_io = false;
-#endif
-#endif
+    /* Note: file->uses_async_io is computed earlier in this function (right
+     * after file->mode = mode;), before the is_sync_io_proc() dispatch block
+     * that depends on it for HDF5 create. See the comment there for why. */
 
     /* Add the struct with this files info to the global list of
      * open files. */

@@ -20,7 +20,17 @@ SPIO_Util::TComm_info::TComm_info(MPI_Comm union_comm, int union_comm_rank, int 
   int nthreads = 1;
 #if PIO_USE_ASYNC_WR_THREAD
   nthreads += PIO_Util::PIO_async_tpool_manager::get_num_threads();
-  if(io_comm != MPI_COMM_NULL){
+  /* Register this process' thread pool thread ids (used later by
+   * init_thread_info() to map a calling thread to its per-thread comm
+   * slot) whenever this rank is an I/O task of EITHER role - sync or
+   * async. In the disjoint sync/async I/O procs topology (used for HDF5
+   * async writes) a rank that owns only the async I/O role has
+   * io_comm (the sync I/O comm) == MPI_COMM_NULL while async_io_comm is
+   * valid for it, so gating this solely on io_comm left tids_ empty for
+   * async-owning ranks, causing init_thread_info() to fail to resolve
+   * tidx_ (and assert) once such a rank actually dispatches ops onto the
+   * (per-process, singleton) thread pool. */
+  if((io_comm != MPI_COMM_NULL) || (async_io_comm != MPI_COMM_NULL)){
     tids_ = PIO_Util::PIO_async_tpool_manager::get_tpool_instance()->get_thread_ids();
     assert(static_cast<int>(tids_.size()) == nthreads - 1);
   }

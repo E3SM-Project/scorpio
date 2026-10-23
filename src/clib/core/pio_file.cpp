@@ -628,17 +628,27 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
      * function, and holding it while waiting on another thread is an
      * unnecessary deadlock hazard.
      *
-     * Only the sync I/O procs queue/own async write ops for a file (see
-     * pio_iosys_async_hdf5_write_op_add()'s I/O proc gate), so the wait is
-     * restricted to them - on every other proc npend_ops is always 0 and this
-     * is a no-op anyway.
+     * Only the proc that owns async write ops for this file (see
+     * pio_iosys_async_hdf5_write_op_add()'s I/O proc gate - for HDF5/HDF5C
+     * files in a disjoint sync/async-procs topology that is the async-owning
+     * proc, i.e. is_file_owning_io_proc(), not necessarily the sync I/O proc;
+     * for every other iotype it is still exactly the sync I/O proc) ever has
+     * npend_ops > 0 for this file, so the wait is restricted to that proc -
+     * on every other proc npend_ops is always 0 and this is a no-op anyway.
      *
      * Note that this is usually already satisfied when we get here: the
      * "soft close" path (PIOc_closefile_impl() -> spio_soft_closefile() ->
      * pio_iosys_async_file_close_op_wait()) requeues the close op until
      * npend_ops reaches 0 and only then calls this function. This drain
      * covers the direct ("hard close") callers of this function. */
-    if(ios->io_comm_info && ios->io_comm_info->is_sync_io_proc()){
+#ifdef _HDF5
+    bool wait_for_file_async_pend_ops = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)
+        : (ios->io_comm_info && ios->io_comm_info->is_sync_io_proc());
+#else
+    bool wait_for_file_async_pend_ops = (ios->io_comm_info && ios->io_comm_info->is_sync_io_proc());
+#endif
+    if(wait_for_file_async_pend_ops){
       if(spio_wait_file_async_pend_ops(file) != PIO_NOERR){
         PIOc_warn(ios->iosysid, file->pio_ncid, __FILE__, __LINE__,
           "Timed out waiting for pending asynchronous operations on this file to complete before closing it. "
@@ -920,8 +930,19 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
 
     assert((file->iotype != PIO_IOTYPE_ADIOS) && (file->iotype != PIO_IOTYPE_ADIOSC));
 
-    /* If this is an IO task, then call the netCDF function. */
-    if (ios->io_comm_info->is_sync_io_proc())
+    /* If this is an IO task, then call the netCDF function.
+     * For HDF5/HDF5C files, the task that owns the actual I/O work may be an
+     * async-write-thread-pool-owning rank rather than a sync I/O rank (see
+     * file->uses_async_io); for every other iotype, behavior is unchanged
+     * (sync I/O rank only). */
+#ifdef _HDF5
+    bool enter_io_proc_block = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)
+        : ios->io_comm_info->is_sync_io_proc();
+#else
+    bool enter_io_proc_block = ios->io_comm_info->is_sync_io_proc();
+#endif
+    if (enter_io_proc_block)
     {
         switch (file->iotype)
         {
@@ -1022,7 +1043,15 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
  */
 int spio_soft_closefile(iosystem_desc_t *ios, file_desc_t *file)
 {
+  /* Only ever called (from PIOc_closefile_impl()) for HDF5/HDF5C files, by
+   * whichever proc owns this file's I/O (the async-owning proc in a disjoint
+   * sync/async-procs topology, the sync I/O proc otherwise) - see
+   * is_file_owning_io_proc(). */
+#ifdef _HDF5
+  assert(ios && file && SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
+#else
   assert(ios && file && ios->io_comm_info->is_sync_io_proc());
+#endif
   //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + file->fname);
 
 #if PIO_USE_ASYNC_WR_THREAD
@@ -1137,9 +1166,21 @@ int PIOc_closefile_impl(int ncid)
     bool soft_close = false;
 #if PIO_USE_ASYNC_WR_THREAD
     if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+      /* Soft-close (defer the close via the async write thread pool until
+       * this file's pending async ops drain) must be decided by whichever
+       * proc actually owns/queues this file's async ops - the async-owning
+       * proc in a disjoint sync/async-procs topology, the sync I/O proc
+       * otherwise - not unconditionally the sync I/O proc. See
+       * is_file_owning_io_proc(). */
+#ifdef _HDF5
+      if(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
+        soft_close = true;
+      }
+#else
       if(ios->io_comm_info->is_sync_io_proc()){
         soft_close = true;
       }
+#endif
       /* To wait on all hdf5 async ops before a "hard close" (for debugging)
         ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
       */
@@ -1331,10 +1372,21 @@ int PIOc_sync_impl(int ncid)
      * to disk. Without this a PIOc_write_darray() dispatched to the async
      * write thread pool can still be in flight here, so a subsequent
      * PIOc_read_darray() (or any other reader) on the same file could observe
-     * stale/not-yet-written data. Only the sync I/O procs ever have pending
-     * async ops on a file, so this is a no-op everywhere else. */
-    if (file->iosystem && file->iosystem->io_comm_info &&
-        file->iosystem->io_comm_info->is_sync_io_proc())
+     * stale/not-yet-written data. Only the proc that owns async write ops for
+     * this file (the async-owning proc for HDF5/HDF5C files in a disjoint
+     * sync/async-procs topology, the sync I/O proc otherwise - see
+     * is_file_owning_io_proc()) ever has pending async ops on it, so this is
+     * a no-op everywhere else. */
+#ifdef _HDF5
+    bool sync_wait_for_pend_ops = file->iosystem && file->iosystem->io_comm_info &&
+        (((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+             ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(file->iosystem, file)
+             : file->iosystem->io_comm_info->is_sync_io_proc());
+#else
+    bool sync_wait_for_pend_ops = file->iosystem && file->iosystem->io_comm_info &&
+        file->iosystem->io_comm_info->is_sync_io_proc();
+#endif
+    if (sync_wait_for_pend_ops)
     {
         if (spio_wait_file_async_pend_ops(file) != PIO_NOERR)
         {
