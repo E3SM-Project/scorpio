@@ -1599,6 +1599,8 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
         ios->io_comm_info->get_sync_io_root(), ios->comproot,
         ios->io_comm_info->get_sync_io_comm(), ios->io_comm_info->get_sync_io_comm_rank(),
         (ios->io_comm_info->get_sync_io_master()) ? true : false,
+        ios->io_comm_info->get_async_io_comm(), ios->io_comm_info->get_async_io_comm_rank(),
+        (ios->io_comm_info->get_async_io_master() == MPI_ROOT),
         ios->comp_comm, ios->comp_rank, (ios->compmaster) ? true : false,
         ios->intercomm, ios->my_comm, ios->node_comm);
 
@@ -2570,7 +2572,10 @@ int PIOc_init_async_impl(MPI_Comm world, int num_io_procs, const int *io_proc_li
         }
 
         /* FIXME: Catch exceptions and return error */
-        my_iosys->tcomm_info = new SPIO_Util::TComm_info(my_iosys->union_comm, my_iosys->union_rank, my_ioroot, my_iosys->comproot, my_io_comm, my_io_rank, (my_iomaster) ? true : false, my_iosys->comp_comm, my_iosys->comp_rank, (my_iosys->compmaster) ? true : false, my_iosys->intercomm, my_iosys->my_comm, my_iosys->node_comm);
+        /* uses_async_io is always false on this path (Task 1), so these async
+         * values are never exercised - the same sync values are passed again
+         * simply to satisfy the constructor with valid data. */
+        my_iosys->tcomm_info = new SPIO_Util::TComm_info(my_iosys->union_comm, my_iosys->union_rank, my_ioroot, my_iosys->comproot, my_io_comm, my_io_rank, (my_iomaster) ? true : false, my_io_comm, my_io_rank, (my_iomaster) ? true : false, my_iosys->comp_comm, my_iosys->comp_rank, (my_iosys->compmaster) ? true : false, my_iosys->intercomm, my_iosys->my_comm, my_iosys->node_comm);
 
         /* Async I/O service message info */
         my_iosys->async_ios_msg_info.seq_num = PIO_MSG_START_SEQ_NUM;
@@ -3184,7 +3189,10 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
             my_iomaster, my_ioroot, true);
 
         /* FIXME: Catch exceptions and return error */
-        iosys[i]->tcomm_info = new SPIO_Util::TComm_info(iosys[i]->union_comm, iosys[i]->union_rank, my_ioroot, iosys[i]->comproot, io_comm, my_io_rank, (my_iomaster) ? true : false, iosys[i]->comp_comm, iosys[i]->comp_rank, (iosys[i]->compmaster) ? true : false, iosys[i]->intercomm, iosys[i]->my_comm, iosys[i]->node_comm);
+        /* uses_async_io is always false on this path (Task 1), so these async
+         * values are never exercised - the same sync values are passed again
+         * simply to satisfy the constructor with valid data. */
+        iosys[i]->tcomm_info = new SPIO_Util::TComm_info(iosys[i]->union_comm, iosys[i]->union_rank, my_ioroot, iosys[i]->comproot, io_comm, my_io_rank, (my_iomaster) ? true : false, io_comm, my_io_rank, (my_iomaster) ? true : false, iosys[i]->comp_comm, iosys[i]->comp_rank, (iosys[i]->compmaster) ? true : false, iosys[i]->intercomm, iosys[i]->my_comm, iosys[i]->node_comm);
 
         /* Async I/O service message info */
         iosys[i]->async_ios_msg_info.seq_num = PIO_MSG_START_SEQ_NUM;

@@ -26,7 +26,7 @@ namespace SPIO_Util{
 class TComm_info{
   public:
     /* See iosystem_desc_t{} for info on the communicators cached here */
-    TComm_info(MPI_Comm union_comm, int union_comm_rank, int union_comm_io_root, int union_comm_comp_root, MPI_Comm io_comm, int io_comm_rank, bool is_io_master, MPI_Comm comp_comm, int comp_comm_rank, bool is_comp_master, MPI_Comm intercomm, MPI_Comm my_comm, MPI_Comm node_comm);
+    TComm_info(MPI_Comm union_comm, int union_comm_rank, int union_comm_io_root, int union_comm_comp_root, MPI_Comm io_comm, int io_comm_rank, bool is_io_master, MPI_Comm async_io_comm, int async_io_comm_rank, bool is_async_io_master, MPI_Comm comp_comm, int comp_comm_rank, bool is_comp_master, MPI_Comm intercomm, MPI_Comm my_comm, MPI_Comm node_comm);
     MPI_Comm get_union_comm(void );
     int get_union_comm_rank(void ) const { return union_comm_rank_; }
     int get_union_comm_io_root(void ) const { return union_comm_io_root_; }
@@ -35,6 +35,10 @@ class TComm_info{
     MPI_Comm get_io_comm(void );
     int get_io_comm_rank(void ) const { return io_comm_rank_; }
     bool is_io_master(void ) const { return is_io_master_; }
+
+    MPI_Comm get_async_io_comm(void );
+    int get_async_io_comm_rank(void ) const { return async_io_comm_rank_; }
+    bool is_async_io_master(void ) const { return is_async_io_master_; }
 
     MPI_Comm get_comp_comm(void );
     int get_comp_comm_rank(void ) const { return comp_comm_rank_; }
@@ -69,12 +73,15 @@ class TComm_info{
     int union_comm_comp_root_;
     int io_comm_rank_;
     bool is_io_master_;
+    int async_io_comm_rank_;
+    bool is_async_io_master_;
     int comp_comm_rank_;
     bool is_comp_master_;
 
     std::vector<std::size_t> tids_;
     std::vector<MPI_Comm> union_comms_;
     std::vector<MPI_Comm> io_comms_;
+    std::vector<MPI_Comm> async_io_comms_;
     std::vector<MPI_Comm> comp_comms_;
     std::vector<MPI_Comm> intercomms_;
     std::vector<MPI_Comm> my_comms_;

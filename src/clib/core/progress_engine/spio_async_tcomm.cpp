@@ -15,7 +15,7 @@ std::size_t SPIO_Util::TComm_info::tidx_ = -1;
 bool SPIO_Util::TComm_info::is_thread_init_ = false;
 #endif
 
-SPIO_Util::TComm_info::TComm_info(MPI_Comm union_comm, int union_comm_rank, int union_comm_io_root, int union_comm_comp_root, MPI_Comm io_comm, int io_comm_rank, bool is_io_master, MPI_Comm comp_comm, int comp_comm_rank, bool is_comp_master, MPI_Comm intercomm, MPI_Comm my_comm, MPI_Comm node_comm): union_comm_rank_(union_comm_rank), union_comm_io_root_(union_comm_io_root), union_comm_comp_root_(union_comm_comp_root), io_comm_rank_(io_comm_rank), is_io_master_(is_io_master), comp_comm_rank_(comp_comm_rank), is_comp_master_(is_comp_master)
+SPIO_Util::TComm_info::TComm_info(MPI_Comm union_comm, int union_comm_rank, int union_comm_io_root, int union_comm_comp_root, MPI_Comm io_comm, int io_comm_rank, bool is_io_master, MPI_Comm async_io_comm, int async_io_comm_rank, bool is_async_io_master, MPI_Comm comp_comm, int comp_comm_rank, bool is_comp_master, MPI_Comm intercomm, MPI_Comm my_comm, MPI_Comm node_comm): union_comm_rank_(union_comm_rank), union_comm_io_root_(union_comm_io_root), union_comm_comp_root_(union_comm_comp_root), io_comm_rank_(io_comm_rank), is_io_master_(is_io_master), async_io_comm_rank_(async_io_comm_rank), is_async_io_master_(is_async_io_master), comp_comm_rank_(comp_comm_rank), is_comp_master_(is_comp_master)
 {
   int nthreads = 1;
 #if PIO_USE_ASYNC_WR_THREAD
@@ -33,6 +33,7 @@ SPIO_Util::TComm_info::TComm_info(MPI_Comm union_comm, int union_comm_rank, int 
 
   union_comms_.push_back(union_comm);
   io_comms_.push_back(io_comm);
+  async_io_comms_.push_back(async_io_comm);
   comp_comms_.push_back(comp_comm);
   intercomms_.push_back(intercomm);
   my_comms_.push_back(my_comm);
@@ -51,6 +52,12 @@ SPIO_Util::TComm_info::TComm_info(MPI_Comm union_comm, int union_comm_rank, int 
       ret = MPI_Comm_dup(io_comm, &tmp_io_comm); assert(ret == MPI_SUCCESS);
     }
     io_comms_.push_back(tmp_io_comm);
+
+    MPI_Comm tmp_async_io_comm = MPI_COMM_NULL;
+    if(async_io_comm != MPI_COMM_NULL){
+      ret = MPI_Comm_dup(async_io_comm, &tmp_async_io_comm); assert(ret == MPI_SUCCESS);
+    }
+    async_io_comms_.push_back(tmp_async_io_comm);
 
     comp_comms_.push_back(MPI_COMM_NULL);
     intercomms_.push_back(MPI_COMM_NULL);
@@ -79,6 +86,11 @@ MPI_Comm SPIO_Util::TComm_info::get_union_comm(void )
 MPI_Comm SPIO_Util::TComm_info::get_io_comm(void )
 {
   return io_comms_[get_tidx()];
+}
+
+MPI_Comm SPIO_Util::TComm_info::get_async_io_comm(void )
+{
+  return async_io_comms_[get_tidx()];
 }
 
 MPI_Comm SPIO_Util::TComm_info::get_comp_comm(void )
@@ -132,6 +144,7 @@ SPIO_Util::TComm_info::~TComm_info()
   for(int tidx = 1; tidx < nthreads; tidx++){
     assert(union_comms_[tidx] == MPI_COMM_NULL);
     if(io_comms_[tidx] != MPI_COMM_NULL) { MPI_Comm_free(&io_comms_[tidx]); }
+    if(async_io_comms_[tidx] != MPI_COMM_NULL) { MPI_Comm_free(&async_io_comms_[tidx]); }
     assert(comp_comms_[tidx] == MPI_COMM_NULL);
     assert(intercomms_[tidx] == MPI_COMM_NULL);
     assert(node_comms_[tidx] == MPI_COMM_NULL);
