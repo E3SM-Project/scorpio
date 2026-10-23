@@ -126,6 +126,7 @@ add_spio_executable(test_req_block_wait TRUE "" test_req_block_wait.cpp OBJ_LIBS
 add_spio_executable(test_spio_dt_converter TRUE "" test_spio_dt_converter.cpp)
 add_spio_executable(test_spio_select_io_desc_info TRUE "" test_spio_select_io_desc_info.cpp OBJ_LIBS test_common_obj)
 add_spio_executable(test_spio_iodesc_utils TRUE "" test_spio_iodesc_utils.cpp)
+add_spio_executable(test_spio_iosys_utils TRUE "" test_spio_iosys_utils.cpp)
 add_spio_executable(test_spio_async_tcomm TRUE "" test_spio_async_tcomm.cpp)
 add_dependencies (tests test_spmd test_spio_ltimer test_spio_serializer test_spio_tree
                   test_spio_file_mvcache test_spio_sort_utils test_spio_rearr_utils_gather
@@ -133,7 +134,7 @@ add_dependencies (tests test_spmd test_spio_ltimer test_spio_serializer test_spi
                   test_spio_rearr_contig test_spio_rearr_contig_nvars test_spio_rearr_contig_fillval
                   test_spio_decomp_logger test_sdecomp_regex test_req_block_wait
                   test_spio_dt_converter test_spio_select_io_desc_info test_spio_iodesc_utils
-                  test_spio_async_tcomm)
+                  test_spio_iosys_utils test_spio_async_tcomm)
 
 if(PIO_USE_ASYNC_WR_THREAD)
   add_spio_executable (test_mtq TRUE "" test_async_mtq.cpp OBJ_LIBS test_common_obj)
@@ -204,6 +205,12 @@ else ()
     EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_iodesc_utils
     NUMPROCS 2
     TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_iosys_utils${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_iosys_utils
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
   foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
     add_mpi_test(test_spio_rearr_utils_gather${nproc}
       EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_utils_gather

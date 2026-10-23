@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstdbool>
 #include <cstring>
+#include <cstdint>
 
 #ifdef MPI_SERIAL
 #if defined(__cplusplus)
@@ -529,6 +530,15 @@ typedef struct iosystem_desc_t
 
     /** Rearranger options. */
     rearr_opt_t rearr_opts;
+
+    /** Per-iosystem random lock id, generated once (from true entropy, not a
+     * seeded PRNG) and broadcast to every task at PIOc_Init_Intracomm_impl()
+     * time - see SPIO_Util::Iosys_Util::generate_and_bcast_lock_id(). Used to
+     * name a filesystem lock file coordinating async I/O write lifecycle
+     * across ranks. Present regardless of _HDF5/PIO_USE_ASYNC_WR_THREAD so
+     * later code can reference it unconditionally, even though its value is
+     * only ever meaningful under those macros. */
+    uint64_t spio_lock_id;
 
 #ifdef _ADIOS2
     /* ADIOS handles */
