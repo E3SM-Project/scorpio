@@ -205,7 +205,7 @@ int spio_iosys_async_hdf5_create_op_add(file_desc_t *file, const char *filename)
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->io_comm_info->is_sync_io_proc()){
+  if(!SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
     return PIO_NOERR;
   }
 
@@ -269,7 +269,7 @@ int spio_iosys_async_hdf5_def_var_op_add(file_desc_t *file, const char *name,
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->io_comm_info->is_sync_io_proc()){
+  if(!SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
     return PIO_NOERR;
   }
 
@@ -339,7 +339,7 @@ int spio_iosys_async_hdf5_put_att_op_add(file_desc_t *file, int varid,
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->io_comm_info->is_sync_io_proc()){
+  if(!SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
     return PIO_NOERR;
   }
 
@@ -408,7 +408,7 @@ int spio_iosys_async_hdf5_enddef_op_add(file_desc_t *file)
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->io_comm_info->is_sync_io_proc()){
+  if(!SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
     return PIO_NOERR;
   }
 
@@ -479,7 +479,7 @@ int spio_iosys_async_hdf5_put_var_op_add(file_desc_t *file, int varid,
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->io_comm_info->is_sync_io_proc()){
+  if(!SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
     return PIO_NOERR;
   }
 
@@ -567,7 +567,7 @@ int spio_iosys_async_hdf5_set_frame_op_add(file_desc_t *file, int varid, int fra
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->io_comm_info->is_sync_io_proc()){
+  if(!SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
     return PIO_NOERR;
   }
 

@@ -160,6 +160,65 @@ int test_uses_async_io_true_disjoint_procs(int wrank, iosystem_desc_t *ios)
   free_file(file);
   return ret;
 }
+/* Task 4's exact comm-selection pattern, applied to every HDF5/MPI call in
+ * spio_hdf5_utils.cpp that previously always used ios->tcomm_info->get_io_comm():
+ *   file->uses_async_io ? ios->tcomm_info->get_async_io_comm() : ios->tcomm_info->get_io_comm()
+ * The thread-local duplication TComm_info layers on top of IO_comm_info's
+ * sync/async comms is an orthogonal concern (and needs a live async thread
+ * pool to construct); what Task 4 actually changes is *which* of the two
+ * underlying comms gets used, so this test exercises that choice directly
+ * against IO_comm_info's get_sync_io_comm()/get_async_io_comm(, which are
+ * what TComm_info's get_io_comm()/get_async_io_comm() ultimately wrap.
+ */
+static MPI_Comm select_hdf5_comm(const SPIO_Util::Iosys_Util::IO_comm_info *io_comm_info, bool uses_async_io)
+{
+  return uses_async_io ? io_comm_info->get_async_io_comm() : io_comm_info->get_sync_io_comm();
+}
+
+/* Case (e): with disjoint sync/async I/O procs (sync-only rank 0, async-only
+ * rank 1 in ios_disjoint), confirm that Task 4's comm-selection ternary
+ * yields a valid (non-NULL) communicator exactly on the rank that
+ * is_file_owning_io_proc() says owns the file, and MPI_COMM_NULL otherwise -
+ * i.e. is_file_owning_io_proc(ios, file) == true iff
+ * select_hdf5_comm(ios->io_comm_info, file->uses_async_io) != MPI_COMM_NULL.
+ * Before Task 4, every one of these call sites used get_sync_io_comm()
+ * (via get_io_comm()) unconditionally: with uses_async_io == true, that
+ * would hand rank 1 (the async-owning rank) MPI_COMM_NULL - exactly the
+ * "MPI_COMM_NULL is not a valid communicator"/invalid dataset crash seen in
+ * test_hdf5_async_contig/test_hdf5_async_box once the Task 1 mode-ordering
+ * fix made uses_async_io resolve true for disjoint-procs files.
+ */
+int test_hdf5_comm_selection_pattern(int wrank, iosystem_desc_t *ios)
+{
+  int ret = PIO_NOERR;
+  const SPIO_Util::Iosys_Util::IO_comm_info *io_comm_info = ios->io_comm_info;
+
+  for(int i = 0; i < 2; i++){
+    bool uses_async_io = (i == 1);
+    file_desc_t *file = get_file(uses_async_io);
+    if(!file){
+      LOG_ERR(wrank, "Unable to allocate mock file_desc_t\n");
+      return PIO_EINTERNAL;
+    }
+
+    bool owns = SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file);
+    MPI_Comm selected = select_hdf5_comm(io_comm_info, uses_async_io);
+    bool selected_valid = (selected != MPI_COMM_NULL);
+
+    if(owns != selected_valid){
+      LOG_ERR(wrank, "Task 4 comm-selection mismatch: uses_async_io=%d, "
+              "is_file_owning_io_proc()=%d, but selected comm is %s "
+              "(expected %s)\n", uses_async_io, owns,
+              selected_valid ? "non-NULL" : "MPI_COMM_NULL",
+              owns ? "non-NULL" : "MPI_COMM_NULL");
+      ret = PIO_EINTERNAL;
+    }
+
+    free_file(file);
+  }
+
+  return ret;
+}
 #endif /* PIO_USE_ASYNC_WR_THREAD */
 
 /* Mirrors the exact uses_async_io computation Task 1 places at both
@@ -337,6 +396,20 @@ int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
   }
   else{
     LOG_ERR(wrank, "test_uses_async_io_true_disjoint_procs() PASSED\n");
+  }
+
+  try{
+    ret = test_hdf5_comm_selection_pattern(wrank, ios_disjoint);
+  }
+  catch(...){
+    ret = PIO_EINTERNAL;
+  }
+  if(ret != PIO_NOERR){
+    LOG_ERR(wrank, "test_hdf5_comm_selection_pattern() FAILED, ret = %d\n", ret);
+    nerrs++;
+  }
+  else{
+    LOG_ERR(wrank, "test_hdf5_comm_selection_pattern() PASSED\n");
   }
 #endif
 

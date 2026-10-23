@@ -52,7 +52,7 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
 
   assert(ios && file && filename);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
-  assert(ios->io_comm_info->is_sync_io_proc());
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
   if(file->mode & PIO_NOCLOBBER){
     /* No clobber : Check if file exists from all processes */
@@ -72,7 +72,7 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
     }
 
     /* Wait for root process (that might delete an existing file) */
-    if((mpierr = MPI_Barrier(ios->tcomm_info->get_io_comm()))){
+    if((mpierr = MPI_Barrier(file->uses_async_io ? ios->tcomm_info->get_async_io_comm() : ios->tcomm_info->get_io_comm()))){
       return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
     }
   }
@@ -119,7 +119,7 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
                    filename);
   }
 
-  if(H5Pset_fapl_mpio(fapl_id, ios->tcomm_info->get_io_comm(), *pinfo) < 0){
+  if(H5Pset_fapl_mpio(fapl_id, file->uses_async_io ? ios->tcomm_info->get_async_io_comm() : ios->tcomm_info->get_io_comm(), *pinfo) < 0){
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                    "Creating file (%s) using HDF5 iotype failed. "
                    "The low level (HDF5) I/O library call failed to store the user-supplied MPI IO parameters",
@@ -594,7 +594,7 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
   assert(ios && file && name && ndims >= 0 && varid >= 0);
   assert((ndims == 0) || dimidsp);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
-  assert(ios->io_comm_info->is_sync_io_proc());
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
   /* Cache the dim sizes for HDF5 calls */
   std::vector<hsize_t> dim_sz(ndims), max_dim_sz(ndims);
@@ -685,7 +685,7 @@ static int spio_hdf5_sync_defs(iosystem_desc_t *ios, file_desc_t *file)
 
   assert(ios && file);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
-  assert(ios->io_comm_info->is_sync_io_proc());
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
   /* Step 1 : Process dimensions with no coordinate variables associated with it */
   for(i = 0; i < file->hdf5_num_dims; i++){
@@ -944,7 +944,7 @@ static int spio_hdf5_sync_defs(iosystem_desc_t *ios, file_desc_t *file)
            * step between the ranks.
            * Workaround: place a barrier to sync H5DSattach_scale calls.
            */
-          MPI_Barrier(ios->tcomm_info->get_io_comm());
+          MPI_Barrier(file->uses_async_io ? ios->tcomm_info->get_async_io_comm() : ios->tcomm_info->get_io_comm());
         }
       }
     }
@@ -965,7 +965,7 @@ int spio_hdf5_copy_att(iosystem_desc_t *ios, file_desc_t *ifile, int ivarid, con
   assert(ios && ifile && ofile && name);
   assert((ifile->iotype == PIO_IOTYPE_HDF5) || (ifile->iotype == PIO_IOTYPE_HDF5C));
   assert((ofile->iotype == PIO_IOTYPE_HDF5) || (ofile->iotype == PIO_IOTYPE_HDF5C));
-  assert(ios->io_comm_info->is_sync_io_proc());
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, ifile) && SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, ofile));
 
   /* Error message template */
   const std::string err_msg = std::string("Copying attribute (") + name + ") associated with variable (varid=" + std::to_string(ivarid) + " in input file (" + pio_get_fname_from_file(ifile) + ", ncid=" + std::to_string(ifile->pio_ncid) + ") to variable (varid=" + std::to_string(ovarid) + ") in file (" + pio_get_fname_from_file(ofile) + ", ncid=" + std::to_string(ofile->pio_ncid) + ") using HDF5 iotype failed.";
@@ -1041,7 +1041,7 @@ int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const 
 
   assert(ios && file && name && op);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
-  assert(ios->io_comm_info->is_sync_io_proc());
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
   if(varid == PIO_GLOBAL){
     loc_id = file->hdf5_file_id;
@@ -1186,7 +1186,7 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
 
   assert(ios && file && varid >= 0 && buf);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
-  assert(ios->io_comm_info->is_sync_io_proc());
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
   hid_t file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
   if(file_space_id == H5I_INVALID_HID){
@@ -1393,7 +1393,7 @@ int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file)
 
   assert(ios && file);
   assert((file->iotype == PIO_IOTYPE_HDF5) || ((file->iotype == PIO_IOTYPE_HDF5C)));
-  assert(ios->io_comm_info->is_sync_io_proc());
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
   /* Handle pending defines here
    * e.g. If user calls close() without an enddef()
@@ -1467,7 +1467,7 @@ int spio_hdf5_set_frame(file_desc_t *file, int varid, int frame)
 {
   assert(file && file->iosystem && (frame >= 0));
   iosystem_desc_t *ios = file->iosystem;
-  assert(ios->io_comm_info->is_sync_io_proc());
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
   hsize_t dims[H5S_MAX_RANK];
   hsize_t mdims[H5S_MAX_RANK];
