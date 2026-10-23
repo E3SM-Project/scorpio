@@ -3475,7 +3475,15 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
     return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
                     "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed. Invalid arguments provided, I/O descriptor id (ioid=%d) is invalid", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
   }
-  pioassert(iodesc->sync_io_desc_info.rearranger == PIO_REARR_BOX || iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET || iodesc->sync_io_desc_info.rearranger == PIO_REARR_CONTIG,
+  /* Select the io_desc_info_t (sync or async) matching the role that will
+   * actually perform this read - mirrors the selection already done for
+   * HDF5 async-dispatched writes (see pio_iosys_async_hdf5_write_op_add()/
+   * pio_read_darray_nc()). For every iotype other than HDF5/HDF5C with
+   * file->uses_async_io, this is identical to iodesc->sync_io_desc_info
+   * today, so behavior is unchanged in that case. */
+  io_desc_info_t &desc_info = iodesc->select_io_desc_info(file->iotype, file);
+
+  pioassert(desc_info.rearranger == PIO_REARR_BOX || desc_info.rearranger == PIO_REARR_SUBSET || desc_info.rearranger == PIO_REARR_CONTIG,
             "unknown rearranger", __FILE__, __LINE__);
 
   /* Get var description. */
@@ -3541,13 +3549,13 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 
   if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
 #ifdef _ADIOS2
-    ios->io_fstats->rb += vdesc_adios2->adios_type_size * iodesc->sync_io_desc_info.llen;
-    file->io_fstats->rb += vdesc_adios2->adios_type_size * iodesc->sync_io_desc_info.llen;
+    ios->io_fstats->rb += vdesc_adios2->adios_type_size * desc_info.llen;
+    file->io_fstats->rb += vdesc_adios2->adios_type_size * desc_info.llen;
 #endif
   }
   else{
-    ios->io_fstats->rb += vdesc->type_size * iodesc->sync_io_desc_info.llen;
-    file->io_fstats->rb += vdesc->type_size * iodesc->sync_io_desc_info.llen;
+    ios->io_fstats->rb += vdesc->type_size * desc_info.llen;
+    file->io_fstats->rb += vdesc->type_size * desc_info.llen;
   }
 
 #ifdef PIO_MICRO_TIMING
@@ -3581,10 +3589,10 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
    * used to accommodate this serial io method (use iodesc->
    * maxiobuflen to set it). */
   if((file->iotype == PIO_IOTYPE_NETCDF || file->iotype == PIO_IOTYPE_NETCDF4C) && ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
-    rlen = iodesc->sync_io_desc_info.maxiobuflen;
+    rlen = desc_info.maxiobuflen;
   }
   else{
-    rlen = iodesc->sync_io_desc_info.llen;
+    rlen = desc_info.llen;
   }
 
   if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
@@ -3611,11 +3619,22 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
   file->varlist[varid].rb_pend += file->varlist[varid].vrsize;
   file->rb_pend += file->varlist[varid].vrsize;
 
-  /* Allocate a buffer for one record. */
-  if(ios->io_comm_info->is_sync_io_proc() && rlen > 0){
-    if(!(iobuf = bget(iodesc->sync_io_desc_info.mpitype_size * rlen))){
+  /* Allocate a buffer for one record.
+   * rlen (derived from desc_info.llen/maxiobuflen just above) is already
+   * correctly 0 on ranks that don't own this read (mirrors the write-side
+   * iobuf allocation gate at PIOc_write_darray_multi_impl(), which also
+   * relies solely on rlen > 0 - see write_desc_info.llen/maxiobuflen above).
+   * Gating on is_sync_io_proc() here as well is redundant for every iotype
+   * other than HDF5/HDF5C with file->uses_async_io, and actively wrong for
+   * that case: desc_info can there be the async io_desc_info_t, whose llen
+   * is nonzero on the async-owning rank rather than the sync I/O rank, so
+   * the extra is_sync_io_proc() check would leave iobuf NULL on the rank
+   * that pio_read_darray_nc()'s own ownership-aware gate (is_file_owning_io_proc())
+   * actually dispatches the HDF5 read to. */
+  if(rlen > 0){
+    if(!(iobuf = bget(desc_info.mpitype_size * rlen))){
       return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Out of memory allocating space (%lld bytes) in I/O processes to read data from file (before rearrangement)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (iodesc->sync_io_desc_info.mpitype_size * rlen));
+                      "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Out of memory allocating space (%lld bytes) in I/O processes to read data from file (before rearrangement)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (desc_info.mpitype_size * rlen));
     }
   }
 
@@ -3638,19 +3657,35 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
   }
 
 #if PIO_SAVE_DECOMPS
-  if(!(iodesc->sync_io_desc_info.is_saved) &&
+  if(!(desc_info.is_saved) &&
       pio_save_decomps_regex_match(ioid, file->fname, file->varlist[varid].vname)){
     std::string filename;
     pio_create_uniq_str(ios, iodesc, filename, "piodecomp", ".dat");
 
     LOG((2, "Saving decomp map (read) to %s", filename.c_str()));
-    PIOc_writemap_impl(filename.c_str(), ioid, iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map, ios->my_comm);
-    iodesc->sync_io_desc_info.is_saved = true;
+    PIOc_writemap_impl(filename.c_str(), ioid, desc_info.ndims, desc_info.dimlen, desc_info.maplen, desc_info.map, ios->my_comm);
+    desc_info.is_saved = true;
   }
 #endif
 
   /* Call the correct darray read function based on iotype. */
   if(!ios->async || ios->io_comm_info->is_sync_io_proc()){
+#ifdef _HDF5
+      /* The same physical I/O procs that serve the async write thread pool
+       * also serve this read (see
+       * SPIO_Util::Iosys_Util::is_file_owning_io_proc()), so a read must wait
+       * for this file's pending async writes to complete before it can see
+       * their results - reads themselves are always synchronous, there is no
+       * async read op to queue here. Mirrors the equivalent wait added to
+       * spio_get_vars_tc() for the non-decomposed read path. */
+      if(((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)) && file->uses_async_io){
+        if(spio_wait_file_async_pend_ops(file) != PIO_NOERR){
+          PIOc_warn(ios->iosysid, file->pio_ncid, __FILE__, __LINE__,
+            "Timed out waiting for pending asynchronous operations on this file to complete before reading it. "
+            "Continuing with the read - the data read may not reflect those operations");
+        }
+      }
+#endif
       switch (file->iotype){
         case PIO_IOTYPE_NETCDF:
         case PIO_IOTYPE_NETCDF4C:
@@ -3691,12 +3726,20 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 #ifdef PIO_MICRO_TIMING
   mtimer_start(file->varlist[varid].rd_rearr_mtimer);
 #endif
-  /* Rearrange the data. */
-  if(iodesc->sync_io_desc_info.rearranger == PIO_REARR_CONTIG){
-    ierr = iodesc->sync_io_desc_info.rearr->rearrange_io2comp(iobuf, rlen * iodesc->sync_io_desc_info.mpitype_size, array, iodesc->sync_io_desc_info.ndof * iodesc->sync_io_desc_info.mpitype_size, 1);
+  /* Rearrange the data.
+   * For PIO_USE_ASYNC_WR_THREAD + HDF5[C] (for all rearrangers):
+   *  desc_info may be the async io_desc_info_t (see select_io_desc_info() above), so the
+   *  rearrange must use the matching comm target, not unconditionally the sync one.
+   */
+  if(desc_info.rearranger == PIO_REARR_CONTIG){
+    ierr = desc_info.rearr->rearrange_io2comp(iobuf, rlen * desc_info.mpitype_size, array, desc_info.ndof * desc_info.mpitype_size, 1);
   }
   else{
-    ierr = rearrange_io2comp(ios, iodesc, iobuf, array);
+    bool is_async_read = (&desc_info == iodesc->async_io_desc_info);
+    SPIO_Util::Iosys_Util::Io_comm_target io_target = is_async_read ?
+      SPIO_Util::Iosys_Util::make_async_io_comm_target(ios) :
+      SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios);
+    ierr = rearrange_io2comp(ios, iodesc, iobuf, array, desc_info, io_target);
   }
   if(ierr != PIO_NOERR){
     return pio_err(ios, file, ierr, __FILE__, __LINE__,

@@ -370,6 +370,171 @@ static int test_write_read_hdf5_dtconv(int iosysid, int my_rank, int ntasks)
   return cmp_ret;
 }
 
+/* Larger per-rank workload used only by the close-time async-write drain
+ * test below (test_write_close_drain_hdf5()): with the small MAPLEN_PER_RANK
+ * payload the other tests in this file use, the async write thread pool's
+ * HDF5 write usually finishes so quickly that even a completely missing
+ * close-time wait could go unnoticed by luck. A bigger buffer makes the
+ * worker thread's H5Dwrite() take measurably longer, widening the window in
+ * which spio_hard_closefile() closing the file's HDF5 handles without first
+ * waiting on the async-owning rank would be observable (as a data mismatch
+ * on reopen, or worse, a crash from closing a handle the worker thread is
+ * still using).
+ */
+#define CLOSE_DRAIN_MAPLEN_PER_RANK 200000
+/* A single iteration only: looping multiple full create/write/close/open/
+ * read/close cycles back-to-back on the same iosystem (without an
+ * intervening PIOc_finalize()) was found, during development of this test,
+ * to trip a separate, pre-existing, out-of-scope concurrency issue in the
+ * async write thread pool's handling of rapid repeated file create/close
+ * (an MPI_Comm_free() race, unrelated to this task's close-time-drain fix -
+ * see the task-6-report.md for details). Kept at 1 to isolate this test to
+ * the specific close-time-drain behavior Task 6 is responsible for. */
+#define CLOSE_DRAIN_NUM_ITERS 1
+
+/* Repro/regression test for Bug 6's close-time-drain half: a decomposed
+ * (CONTIG) HDF5 write queues an async op on the async-owning I/O rank, and
+ * then the file is closed immediately (no PIOc_sync() in between). With
+ * NUM_IO1=1 and TARGET_NTASKS>1, this test's sync and async I/O ranks are
+ * genuinely disjoint (see the file-level comment above), so the async-owning
+ * rank is specifically a rank that is NOT the sync I/O proc - exactly the
+ * rank on which the old spio_hard_closefile() gate
+ * (ios->io_comm_info->is_sync_io_proc()) would always evaluate false and
+ * skip the drain entirely, letting PIOc_closefile() close the file's HDF5
+ * handles out from under the still-running async write.
+ *
+ * The fix (swapping that gate for
+ * SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file), see pio_file.cpp)
+ * has to be reflected in correct, repeatable round-trip data after each
+ * close+reopen below.
+ */
+static int test_write_close_drain_hdf5(int iosysid, int my_rank, int ntasks)
+{
+  int ret;
+  int ioid;
+  int ncid, ncid2;
+  int dimid, varid;
+  int format = PIO_IOTYPE_HDF5;
+  char filename[PIO_MAX_NAME + 1];
+  int rearranger = PIO_REARR_CONTIG;
+
+  const int gdimlen[NDIM1] = { CLOSE_DRAIN_MAPLEN_PER_RANK * ntasks };
+  std::vector<PIO_Offset> compmap(CLOSE_DRAIN_MAPLEN_PER_RANK);
+  std::iota(compmap.begin(), compmap.end(),
+            static_cast<PIO_Offset>(my_rank * CLOSE_DRAIN_MAPLEN_PER_RANK + 1));
+
+  if ((ret = PIOc_init_decomp(iosysid, PIO_INT, NDIM1, gdimlen, CLOSE_DRAIN_MAPLEN_PER_RANK,
+                              compmap.data(), &ioid, rearranger, NULL, NULL)))
+    return ret;
+
+  int cmp_ret = PIO_NOERR;
+  for(int iter = 0; iter < CLOSE_DRAIN_NUM_ITERS; iter++){
+    std::vector<int> wdata(CLOSE_DRAIN_MAPLEN_PER_RANK);
+    for(int i = 0; i < CLOSE_DRAIN_MAPLEN_PER_RANK; i++){
+      wdata[i] = my_rank * 100000 + iter * 1000 + i;
+    }
+
+    snprintf(filename, PIO_MAX_NAME + 1, "%s_close_drain_%d.nc", TEST_NAME, iter);
+
+    if ((ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER))){
+      PIOc_freedecomp(iosysid, ioid);
+      return ret;
+    }
+
+    if ((ret = PIOc_def_dim(ncid, "x", (PIO_Offset)gdimlen[0], &dimid))){
+      PIOc_closefile(ncid);
+      PIOc_freedecomp(iosysid, ioid);
+      return ret;
+    }
+
+    if ((ret = PIOc_def_var(ncid, VAR_NAME, PIO_INT, NDIM1, &dimid, &varid))){
+      PIOc_closefile(ncid);
+      PIOc_freedecomp(iosysid, ioid);
+      return ret;
+    }
+
+    if ((ret = PIOc_enddef(ncid))){
+      PIOc_closefile(ncid);
+      PIOc_freedecomp(iosysid, ioid);
+      return ret;
+    }
+
+#if PIO_USE_ASYNC_WR_THREAD
+    if ((iter == 0) && (my_rank == 0)){
+      file_desc_t *file = NULL;
+      if ((ret = pio_get_file(ncid, &file)) || (file == NULL)){
+        LOG_RANK0(my_rank, "FAIL: pio_get_file() failed for %s (close drain)\n", filename);
+        PIOc_closefile(ncid);
+        PIOc_freedecomp(iosysid, ioid);
+        return (ret != PIO_NOERR) ? ret : PIO_EINTERNAL;
+      }
+      if (!file->uses_async_io){
+        LOG_RANK0(my_rank, "FAIL: %s unexpectedly has uses_async_io == false with "
+                  "PIO_USE_ASYNC_WR_THREAD on - this test would not be exercising "
+                  "the close-time drain race it is meant to catch\n", filename);
+        PIOc_closefile(ncid);
+        PIOc_freedecomp(iosysid, ioid);
+        return PIO_EINTERNAL;
+      }
+    }
+#endif
+
+    if ((ret = PIOc_write_darray(ncid, varid, ioid, CLOSE_DRAIN_MAPLEN_PER_RANK, wdata.data(), NULL))){
+      LOG_RANK0(my_rank, "FAIL: PIOc_write_darray() failed (close drain), iter = %d, ret = %d\n", iter, ret);
+      PIOc_closefile(ncid);
+      PIOc_freedecomp(iosysid, ioid);
+      return ret;
+    }
+
+    /* Deliberately no PIOc_sync() here - the close-time drain in
+     * spio_hard_closefile() (reached via PIOc_closefile()) is what must wait
+     * for this pending async write, on the rank that actually owns it. */
+    if ((ret = PIOc_closefile(ncid))){
+      PIOc_freedecomp(iosysid, ioid);
+      return ret;
+    }
+
+    if ((ret = PIOc_openfile(iosysid, &ncid2, &format, filename, PIO_NOWRITE))){
+      PIOc_freedecomp(iosysid, ioid);
+      return ret;
+    }
+
+    if ((ret = PIOc_inq_varid(ncid2, VAR_NAME, &varid))){
+      PIOc_closefile(ncid2);
+      PIOc_freedecomp(iosysid, ioid);
+      return ret;
+    }
+
+    std::vector<int> rdata(CLOSE_DRAIN_MAPLEN_PER_RANK, -1);
+    if ((ret = PIOc_read_darray(ncid2, varid, ioid, CLOSE_DRAIN_MAPLEN_PER_RANK, rdata.data()))){
+      LOG_RANK0(my_rank, "FAIL: PIOc_read_darray() failed (close drain), iter = %d, ret = %d\n", iter, ret);
+      PIOc_closefile(ncid2);
+      PIOc_freedecomp(iosysid, ioid);
+      return ret;
+    }
+
+    if ((ret = PIOc_closefile(ncid2))){
+      PIOc_freedecomp(iosysid, ioid);
+      return ret;
+    }
+
+    for(int i = 0; i < CLOSE_DRAIN_MAPLEN_PER_RANK; i++){
+      if(rdata[i] != wdata[i]){
+        LOG_RANK0(my_rank, "FAIL: close drain, iter = %d, rdata[%d] (%d) != wdata[%d] (%d) - "
+                  "closefile() did not wait for a pending asynchronous write to complete "
+                  "before closing the file's HDF5 handles\n", iter, i, rdata[i], i, wdata[i]);
+        cmp_ret = PIO_EINTERNAL;
+        break;
+      }
+    }
+  }
+
+  int free_ret = PIOc_freedecomp(iosysid, ioid);
+  if(cmp_ret == PIO_NOERR) cmp_ret = free_ret;
+
+  return cmp_ret;
+}
+
 int main(int argc, char **argv)
 {
   int my_rank, ntasks;
@@ -396,6 +561,26 @@ int main(int argc, char **argv)
     if ((ret = test_write_read_hdf5(iosysid, my_rank, ntasks, PIO_REARR_SUBSET)))
     {
       LOG_RANK0(my_rank, "test_write_read_hdf5(PIO_REARR_SUBSET) FAILED, ret = %d\n", ret);
+      num_errors++;
+    }
+
+    if ((ret = PIOc_finalize(iosysid)))
+      return ret;
+
+    /* Close-time async-write drain (Task 6, Bug 6) - disjoint sync/async I/O
+     * procs, same shape as the CONTIG case above. Placed before the dtconv
+     * test below: that test hits a separate, already-documented pre-existing
+     * crash (fillbuf NULL-deref, commit 16f792893b) when
+     * PIO_USE_ASYNC_WR_THREAD is on, which would otherwise abort the whole
+     * process before this test gets a chance to run. */
+    if ((ret = PIOc_Init_Intracomm(test_comm, NUM_IO1, STRIDE1, BASE0,
+                                   PIO_REARR_SUBSET, &iosysid)))
+      return ret;
+
+    printf("%d running test_write_close_drain_hdf5()\n", my_rank);
+    if ((ret = test_write_close_drain_hdf5(iosysid, my_rank, ntasks)))
+    {
+      LOG_RANK0(my_rank, "test_write_close_drain_hdf5() FAILED, ret = %d\n", ret);
       num_errors++;
     }
 
