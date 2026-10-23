@@ -2974,6 +2974,15 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     }
     file->mode = mode;
 
+#ifdef _HDF5
+#if PIO_USE_ASYNC_WR_THREAD
+    file->uses_async_io = (file->mode & PIO_WRITE) &&
+                           !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
+#else
+    file->uses_async_io = false;
+#endif
+#endif
+
     /* Set to true if this task should participate in IO (only true for
      * one task with netcdf serial files. */
     if (file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR ||
@@ -4820,6 +4829,15 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 
   file->iosystem = ios;
   file->mode = mode;
+
+#ifdef _HDF5
+#if PIO_USE_ASYNC_WR_THREAD
+  file->uses_async_io = (file->mode & PIO_WRITE) &&
+                         !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
+#else
+  file->uses_async_io = false;
+#endif
+#endif
   /*
   file->num_unlim_dimids = 0;
   file->unlim_dimids = NULL;

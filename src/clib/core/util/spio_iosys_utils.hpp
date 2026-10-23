@@ -236,6 +236,13 @@ namespace SPIO_Util{
     { return Io_comm_target(*(ios->io_comm_info), true); }
 
     bool iosys_uses_async_io_service(iosystem_desc_t *iosys);
+
+#ifdef _HDF5
+    /* Returns true if the calling MPI rank owns I/O duty for this specific
+     * file - the async I/O procs when the file is routed through async I/O
+     * (file->uses_async_io), the sync I/O procs otherwise. */
+    bool is_file_owning_io_proc(const iosystem_desc_t *ios, const file_desc_t *file);
+#endif
   } // namespace Iosys_Util
 } // namespace SPIO_Util
 

@@ -255,3 +255,11 @@ bool SPIO_Util::Iosys_Util::iosys_uses_async_io_service(iosystem_desc_t *iosys)
   assert(iosys);
   return (iosys->intercomm != MPI_COMM_NULL);
 }
+
+#ifdef _HDF5
+bool SPIO_Util::Iosys_Util::is_file_owning_io_proc(const iosystem_desc_t *ios, const file_desc_t *file)
+{
+  assert(ios && ios->io_comm_info && file);
+  return file->uses_async_io ? ios->io_comm_info->is_async_io_proc() : ios->io_comm_info->is_sync_io_proc();
+}
+#endif
