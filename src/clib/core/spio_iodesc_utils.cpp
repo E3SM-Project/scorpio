@@ -260,17 +260,14 @@ io_desc_info_t &io_desc_t::select_io_desc_info(int iotype, const file_desc_t *fi
      * holds the resolved value. No dedicated PIO_REARR_ANY test is needed for
      * the same reason.
      *
-     * An async-dispatched HDF5/HDF5C write executes on the *async* I/O ranks,
-     * but the HDF5 file and all its datasets are only ever created on the
-     * *sync* I/O ranks (TComm_info's io_comm comes from get_sync_io_comm(),
-     * and the HDF5 create/def_var/enddef async ops early-return on anything
-     * that is not a sync I/O proc). So routing the write to the async I/O
-     * ranks is only valid when the two roles are performed by the same set of
-     * processes; when dedicated (disjoint) async I/O procs exist, those ranks
-     * would call H5Dget_space()/H5Dwrite() on a dataset they never created
-     * ("invalid dataset identifier") and then MPI_Barrier() on MPI_COMM_NULL.
-     * This applies equally to CONTIG, BOX, and SUBSET decomps - none of them
-     * create HDF5 files/datasets on the async I/O ranks.
+     * An async-dispatched HDF5/HDF5C write executes on the *async* I/O ranks.
+     * The HDF5 file and its datasets are created on whichever ranks own I/O
+     * for the file (file_desc_t::uses_async_io decides this via
+     * is_file_owning_io_proc() - the sync I/O ranks when uses_async_io is
+     * false, the dedicated async I/O ranks when it's true and sync/async
+     * roles are disjoint), so the ranks that execute the async write are the
+     * same ranks that created the dataset in the first place. This applies
+     * equally to CONTIG, BOX, and SUBSET decomps.
      *
      * file->uses_async_io (set once, at file create/open time - see
      * spio_createfile_int()/PIOc_openfile_retry_impl()) is the single source
