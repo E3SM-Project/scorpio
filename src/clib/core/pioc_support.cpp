@@ -4933,10 +4933,13 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
      * non-recognizing ranks never join - so spio_hdf5_reopen() now agrees on
      * recognition across the file's I/O communicator before any rank commits
      * to that collective open; see the consensus block at the top of that
-     * function.
+     * function. That consensus deliberately excludes non-owning ranks (they
+     * never join the collective open), so a non-owning rank's own
+     * recognition result can still diverge from every owning rank's - see
+     * the first KNOWN RESIDUAL LIMITATION at that consensus block.
      *
      * KNOWN RESIDUAL LIMITATION: that consensus covers divergent
-     * *recognition* only. If spio_hdf5_reopen()'s metadata scan, or its
+     * *recognition* among owning ranks only. If spio_hdf5_reopen()'s metadata scan, or its
      * collective H5Fopen()/H5Dopen2(), fails on some owning ranks and not
      * others, the failing ranks take the `else` (genuine error) branch below
      * and return from this function immediately - skipping the

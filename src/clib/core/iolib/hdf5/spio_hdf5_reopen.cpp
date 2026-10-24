@@ -987,10 +987,18 @@ int spio_hdf5_reopen(iosystem_desc_t *ios, file_desc_t *file, const char *filena
    *
    * Ranks that are not members of that communicator (is_file_owning_io_proc()
    * is false) are deliberately excluded - they never enter the collective
-   * H5Fopen(), so they need not, and must not, participate here.
+   * H5Fopen(), so they need not, and must not, participate here. Note that
+   * this means a non-owning rank's own recognition result is NOT covered by
+   * this consensus: if it disagrees with the owning ranks it still returns
+   * PIO_EBADIOTYPE and switches file->iotype away on its own, independent of
+   * what the owning ranks (who are not waiting on it) decide - see the
+   * KNOWN RESIDUAL LIMITATION below.
    *
    * KNOWN RESIDUAL LIMITATION (not addressed here): this covers divergent
-   * *recognition* only. If the metadata scan below, or the collective
+   * *recognition* among owning ranks only. A non-owning rank's recognition
+   * result is excluded from the consensus entirely (see immediately above),
+   * so it can still diverge from every owning rank's file->iotype - a
+   * divergence this fix does not close. Separately, if the metadata scan below, or the collective
    * H5Fopen()/H5Dopen2() itself, fails on some owning ranks and not others,
    * those ranks take a genuine-error return (which PIOc_openfile_retry_impl()
    * propagates immediately, skipping its later MPI_Allreduce over
@@ -1294,12 +1302,21 @@ int spio_hdf5_reopen(iosystem_desc_t *ios, file_desc_t *file, const char *filena
          * than with an assert() that a non-debug build would compile out. */
         if((file->hdf5_vars[i].ndims <= 0) || !file->hdf5_vars[i].hdf5_dimids ||
            (file->hdf5_vars[i].hdf5_dimids[0] < 0) ||
-           (file->hdf5_vars[i].hdf5_dimids[0] >= file->hdf5_num_dims)){
+           (file->hdf5_vars[i].hdf5_dimids[0] >= file->hdf5_num_dims) ||
+           !file->hdf5_dims[file->hdf5_vars[i].hdf5_dimids[0]].has_coord_var){
+          /* The last check guards against a malformed on-disk
+           * _Netcdf4Coordinates attribute naming a dimension that the scan
+           * did not itself mark has_coord_var: without it this alias would
+           * silently overwrite an id the dimensions loop above already
+           * opened (leaking it), while the genuine has_coord_var dimension
+           * is left unaliased for the consistency scan below to reject -
+           * better to fail here, before any overwrite happens. */
           spio_hdf5_reopen_release_dset_ids(file);
           H5Fclose(fid);
           return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                          "Reopening file (%s) using the HDF5 iotype failed. "
-                         "A coordinate variable (%s) has an out of range or missing dimension id",
+                         "A coordinate variable (%s) has an out of range, missing, or inconsistent "
+                         "dimension id",
                          filename, on_disk_name);
         }
 
@@ -1339,6 +1356,10 @@ int spio_hdf5_reopen(iosystem_desc_t *ios, file_desc_t *file, const char *filena
   file->dxplid_coll = H5Pcreate(H5P_DATASET_XFER);
   file->dxplid_indep = H5Pcreate(H5P_DATASET_XFER);
   if((file->dxplid_coll == H5I_INVALID_HID) || (file->dxplid_indep == H5I_INVALID_HID)){
+    /* file->hdf5_file_id is not yet set on this path, so release the
+     * reopened dataset ids here - otherwise, under H5F_CLOSE_SEMI, the
+     * H5Fclose() below would itself fail with them still open. */
+    spio_hdf5_reopen_release_dset_ids(file);
     H5Fclose(fid);
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                    "Reopening file (%s) using the HDF5 iotype failed. "
@@ -1349,6 +1370,8 @@ int spio_hdf5_reopen(iosystem_desc_t *ios, file_desc_t *file, const char *filena
 
   if(mode & PIO_WRITE){
     if(H5Pset_dxpl_mpio(file->dxplid_coll, H5FD_MPIO_COLLECTIVE) < 0){
+      spio_hdf5_reopen_release_dset_ids(file);
+      H5Fclose(fid);
       return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                      "Reopening file (%s) using the HDF5 iotype failed. "
                      "The low level (HDF5) I/O library call failed to set data transfer mode to collective",

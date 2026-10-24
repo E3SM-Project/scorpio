@@ -1210,15 +1210,17 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
          *    barrier's whole purpose is to guarantee the file is fully
          *    quiescent before any rank proceeds to a subsequent reopen, so
          *    that handle must be gone before the barrier, not after it.
-         *  - Before the ierr return: ierr here is per-rank (check_netcdf()
-         *    above is called with a NULL ios and does not broadcast), so an
-         *    I/O-proc-side close failure leaves ierr != PIO_NOERR only on
-         *    the I/O procs. Gating this cleanup on ierr, as it previously
-         *    was by virtue of sitting after that return, meant a close
-         *    failure anywhere also leaked every non-owning rank's handles.
-         *    Nothing here is collective or ierr-dependent - it only releases
-         *    this rank's own HDF5 handles - so running it unconditionally is
-         *    both safe and strictly better.
+         *  - Before the ierr return: on this rank (!enter_io_proc_block)
+         *    ierr is never assigned anything other than PIO_NOERR - it is
+         *    only ever set inside the ADIOS block or the
+         *    if(enter_io_proc_block) switch above, neither of which this
+         *    rank executes - so the old placement was never actually
+         *    ierr-gated in practice; this move does not fix a latent
+         *    leak-on-error-path. It is still the right placement: nothing
+         *    here is collective or depends on ierr - it only releases this
+         *    rank's own HDF5 handles - so running it unconditionally ahead
+         *    of the return is simply the natural position, independent of
+         *    whatever ierr happens to hold.
          *
          * H5Iis_valid() rather than a comparison against H5I_INVALID_HID:
          * on a rank that never ran spio_hdf5_create()/spio_hdf5_reopen() at
