@@ -1187,6 +1187,85 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
 #endif
 
+#ifdef _HDF5
+    if (((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)) &&
+        !enter_io_proc_block)
+    {
+        /* spio_hdf5_close() (which releases these on the ranks that own
+         * this file's I/O) never ran on this rank, but spio_hdf5_reopen()
+         * runs on every rank unconditionally (see its call site in
+         * pioc_support.cpp) and leaves each of these set - release them
+         * here instead, mirroring spio_hdf5_close()'s own cleanup.
+         * Without this, every non-owning rank leaked an HDF5 file id plus
+         * one dataset id per dimension and per variable for every
+         * reopened file, growing without bound across a run.
+         *
+         * Placement, deliberately, is BOTH before the
+         * !PIO_USE_ASYNC_WR_THREAD quiescence barrier just below AND before
+         * the "if(ierr != PIO_NOERR) return" after it:
+         *
+         *  - Before the barrier: on a non-owning rank the handle released
+         *    here is the read-only probe H5Fopen() spio_hdf5_reopen() left
+         *    behind, which holds a shared flock under HDF5 1.12. The
+         *    barrier's whole purpose is to guarantee the file is fully
+         *    quiescent before any rank proceeds to a subsequent reopen, so
+         *    that handle must be gone before the barrier, not after it.
+         *  - Before the ierr return: ierr here is per-rank (check_netcdf()
+         *    above is called with a NULL ios and does not broadcast), so an
+         *    I/O-proc-side close failure leaves ierr != PIO_NOERR only on
+         *    the I/O procs. Gating this cleanup on ierr, as it previously
+         *    was by virtue of sitting after that return, meant a close
+         *    failure anywhere also leaked every non-owning rank's handles.
+         *    Nothing here is collective or ierr-dependent - it only releases
+         *    this rank's own HDF5 handles - so running it unconditionally is
+         *    both safe and strictly better.
+         *
+         * H5Iis_valid() rather than a comparison against H5I_INVALID_HID:
+         * on a rank that never ran spio_hdf5_create()/spio_hdf5_reopen() at
+         * all these fields are still the calloc'd 0, which is not
+         * H5I_INVALID_HID (-1) but which H5Iis_valid() does correctly report
+         * as invalid.
+         *
+         * The dims-array skip for a has_coord_var dim is load-bearing, not
+         * an optimization: that entry aliases the coordinate variable's
+         * vars-array entry (the same hid_t - see spio_hdf5_utils.cpp:891 and
+         * spio_hdf5_reopen()), so closing both would be a double close.
+         * Mirrors spio_hdf5_close()'s own loops. */
+        for (int i = 0; i < file->hdf5_num_dims; i++)
+        {
+            if (!file->hdf5_dims[i].has_coord_var && H5Iis_valid(file->hdf5_dims[i].hdf5_dataset_id) > 0)
+            {
+                H5Dclose(file->hdf5_dims[i].hdf5_dataset_id);
+            }
+            file->hdf5_dims[i].hdf5_dataset_id = H5I_INVALID_HID;
+        }
+
+        for (int i = 0; i < file->hdf5_num_vars; i++)
+        {
+            if (H5Iis_valid(file->hdf5_vars[i].hdf5_dataset_id) > 0)
+            {
+                H5Dclose(file->hdf5_vars[i].hdf5_dataset_id);
+            }
+            file->hdf5_vars[i].hdf5_dataset_id = H5I_INVALID_HID;
+
+            if ((file->hdf5_vars[i].nc_type == NC_CHAR) && H5Iis_valid(file->hdf5_vars[i].hdf5_type) > 0)
+            {
+                H5Tclose(file->hdf5_vars[i].hdf5_type);
+                file->hdf5_vars[i].hdf5_type = H5I_INVALID_HID;
+            }
+        }
+
+        if (H5Iis_valid(file->dxplid_coll) > 0) { H5Pclose(file->dxplid_coll); }
+        file->dxplid_coll = H5I_INVALID_HID;
+
+        if (H5Iis_valid(file->dxplid_indep) > 0) { H5Pclose(file->dxplid_indep); }
+        file->dxplid_indep = H5I_INVALID_HID;
+
+        if (H5Iis_valid(file->hdf5_file_id) > 0) { H5Fclose(file->hdf5_file_id); }
+        file->hdf5_file_id = H5I_INVALID_HID;
+    }
+#endif
+
 #if !PIO_USE_ASYNC_WR_THREAD
 #ifdef _HDF5
     if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
@@ -1251,48 +1330,10 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
 #ifdef _HDF5
     if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
-        if (!enter_io_proc_block)
-        {
-            /* spio_hdf5_close() (which releases these on the ranks that own
-             * this file's I/O) never ran on this rank, but spio_hdf5_reopen()
-             * runs on every rank unconditionally (see its call site in
-             * pioc_support.cpp) and leaves each of these set - release them
-             * here instead, mirroring spio_hdf5_close()'s own cleanup.
-             * Without this, every non-owning rank leaked an HDF5 file id plus
-             * one dataset id per dimension and per variable for every
-             * reopened file, growing without bound across a run.
-             *
-             * H5Iis_valid() rather than a comparison against
-             * H5I_INVALID_HID: on a rank that never ran
-             * spio_hdf5_create()/spio_hdf5_reopen() at all these fields are
-             * still the calloc'd 0, which is not H5I_INVALID_HID (-1) but
-             * which H5Iis_valid() does correctly report as invalid. */
-            for (int i = 0; i < file->hdf5_num_dims; i++)
-            {
-                if (!file->hdf5_dims[i].has_coord_var && H5Iis_valid(file->hdf5_dims[i].hdf5_dataset_id) > 0)
-                {
-                    H5Dclose(file->hdf5_dims[i].hdf5_dataset_id);
-                }
-            }
-
-            for (int i = 0; i < file->hdf5_num_vars; i++)
-            {
-                if (H5Iis_valid(file->hdf5_vars[i].hdf5_dataset_id) > 0)
-                {
-                    H5Dclose(file->hdf5_vars[i].hdf5_dataset_id);
-                }
-
-                if ((file->hdf5_vars[i].nc_type == NC_CHAR) && H5Iis_valid(file->hdf5_vars[i].hdf5_type) > 0)
-                {
-                    H5Tclose(file->hdf5_vars[i].hdf5_type);
-                }
-            }
-
-            if (H5Iis_valid(file->dxplid_coll) > 0) { H5Pclose(file->dxplid_coll); }
-            if (H5Iis_valid(file->dxplid_indep) > 0) { H5Pclose(file->dxplid_indep); }
-            if (H5Iis_valid(file->hdf5_file_id) > 0) { H5Fclose(file->hdf5_file_id); }
-        }
-
+        /* Note: the non-owning-rank HDF5 handle release that used to sit
+         * here now runs earlier in this function - before both the
+         * quiescence barrier and the close-error return - see the long
+         * comment there for why. */
         for (int i = 0; i < file->hdf5_num_dims; i++)
         {
             free(file->hdf5_dims[i].name);
