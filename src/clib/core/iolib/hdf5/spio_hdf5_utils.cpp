@@ -1590,6 +1590,11 @@ int spio_hdf5_get_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
         SPIO_Util::File_Util::DTConverter::size_of(spio_hdf5_type_to_pio_type(file_var_ntype_id));
     native_buf = bget(native_buf_sz);
     if(native_buf == NULL){
+      /* Release the two type ids this function opened above, exactly as the
+       * sibling error returns below (the H5Dread failure and the
+       * converted_buf failure) already do - without this, both leak. */
+      H5Tclose(file_var_ntype_id);
+      H5Tclose(file_var_type_id);
       return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
                      "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
                      "Out of memory allocating a scratch buffer (%lld bytes) for datatype conversion",
