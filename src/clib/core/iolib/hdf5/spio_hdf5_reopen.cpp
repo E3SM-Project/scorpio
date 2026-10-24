@@ -29,6 +29,11 @@
 
 #include "spio_hdf5_reopen.hpp"
 #include "spio_hdf5_utils.hpp"
+/* For ios->tcomm_info's comm/MPI_Info accessors and
+ * SPIO_Util::Iosys_Util::is_file_owning_io_proc(), both used by the
+ * write-capable reopen's collective H5Pset_fapl_mpio() upgrade below. */
+#include "spio_async_tcomm.hpp"
+#include "spio_iosys_utils.hpp"
 
 #ifdef _HDF5
 
@@ -134,10 +139,21 @@ struct spio_hdf5_reopen_attr_ctx_t
  * - attribute creation-order tracking is disabled everywhere in
  * spio_hdf5_utils.cpp (every H5Pset_attr_creation_order() call site is
  * `#if 0`'d out, due to a documented H5DSattach_scale() hang), so
- * H5_INDEX_CRT_ORDER is not available to iterate by here. Attribute
- * presence/metadata does not depend on iteration order, only the eventual
- * hdf5_attrs[] array index does, and nothing relies on that index having any
- * particular meaning.
+ * H5_INDEX_CRT_ORDER is not available to iterate by here.
+ *
+ * KNOWN, ACCEPTED LIMITATION OF REOPEN (review finding I4): attribute
+ * presence, type and length do not depend on iteration order, but the
+ * eventual hdf5_attrs[] array index does - and that index IS meaningful.
+ * PIOc_inq_attname_impl() (pio_nc.cpp, HDF5 branch) indexes
+ * file->hdf5_attrs[attnum] directly by the caller's attnum, which netCDF
+ * semantics define as the attribute's creation order. So a caller
+ * enumerating attributes with PIOc_inq_natts() + PIOc_inq_attname() sees
+ * creation order on a freshly-written file and alphabetical (name) order on
+ * the same file after a reopen. Attribute lookup *by name*
+ * (PIOc_inq_att/get_att) is unaffected; only enumeration order changes.
+ * Fixing this properly means either re-enabling attribute creation-order
+ * tracking in the writer (blocked by the H5DSattach_scale() hang noted
+ * above) or persisting/sorting the order explicitly; neither is done here.
  */
 extern "C" herr_t spio_hdf5_reopen_attr_cb(hid_t loc_id, const char *name,
                                             const H5A_info_t *ainfo, void *op_data)
@@ -494,6 +510,13 @@ extern "C" herr_t spio_hdf5_reopen_scan_cb(hid_t loc_id, const char *name,
      * variable's NAME is simply its own (and its dimension's) name.
      */
     char scale_name[PIO_MAX_NAME + 64];
+    /* H5DSget_scale_name() returns 0 - not a negative value - and leaves the
+     * buffer untouched for a dimension scale with no NAME attribute, so the
+     * "name_len < 0" check below does not cover that case and the strncmp()
+     * further down would read uninitialized stack memory. A third-party file
+     * can reach here: spio_hdf5_is_scorpio_written() only requires creation
+     * -order flags plus *any* dimension scale. */
+    scale_name[0] = '\0';
     ssize_t name_len = H5DSget_scale_name(did, scale_name, sizeof(scale_name));
     if(name_len < 0){
       H5Dclose(did);
@@ -836,10 +859,18 @@ int spio_hdf5_reopen(iosystem_desc_t *ios, file_desc_t *file, const char *filena
   }
 
   /* A plain, local (not MPI-IO collective) probe open, purely to read the
-   * file-level/dataset-level metadata spio_hdf5_is_scorpio_written() needs.
-   * A full reopen's own parallel/collective open (if one turns out to be
-   * needed) is this function's responsibility to set up below, once
-   * recognition succeeds.
+   * file-level/dataset-level metadata spio_hdf5_is_scorpio_written() needs,
+   * and then (further below) to walk the root group and reconstruct
+   * file->hdf5_dims/hdf5_vars/hdf5_attrs.
+   *
+   * For a write-capable reopen (mode & PIO_WRITE) this probe handle is NOT
+   * the handle the file ends up using: once the metadata scan completes,
+   * the block near the end of this function closes it (and every dataset id
+   * opened against it) and reopens the file collectively, H5F_ACC_RDWR,
+   * through an H5Pset_fapl_mpio() fapl built on the role-correct comm - the
+   * same setup spio_hdf5_create() uses for a fresh create. A read-only
+   * reopen keeps this serial probe handle for the rest of the session,
+   * which is sufficient (and is what the HDF5 read paths already assume).
    *
    * A failure here is treated the same as "not recognized" (PIO_EBADIOTYPE),
    * not as a genuine, propagated error: since this probe is not an MPI
@@ -942,24 +973,155 @@ int spio_hdf5_reopen(iosystem_desc_t *ios, file_desc_t *file, const char *filena
     return ret;
   }
 
-  file->hdf5_file_id = fid;
   file->hdf5_num_dims = ctx.max_dimid_seen + 1;
   file->hdf5_num_vars = ctx.next_varid;
 
-  /* Local (not MPI-IO collective) dataset transfer property lists, matching
-   * spio_hdf5_create()'s - this reopen path never sets up an MPI-IO file
-   * access property list (see the long comment above spio_hdf5_is_scorpio_
-   * written()'s H5Fopen() probe for why that is not done at this point), so
-   * neither of these is ever given H5Pset_dxpl_mpio() collective I/O here.
+  if(mode & PIO_WRITE){
+    /* Upgrade from the serial recognition-probe handle to a real collective
+     * MPI-IO handle, mirroring spio_hdf5_create()'s own fapl/comm setup
+     * (spio_hdf5_utils.cpp) - by this point file->uses_async_io is already
+     * established (PIOc_openfile_retry_impl() now computes it before calling
+     * this function - see that function's comment at the computation site),
+     * so the same role-aware comm selection that function uses for a fresh
+     * create applies equally to a write-capable reopen.
+     *
+     * The probe's dataset ids (file->hdf5_dims[].hdf5_dataset_id /
+     * file->hdf5_vars[].hdf5_dataset_id) and the probe's fid are not valid
+     * against a different, closed-and-reopened file id - every one of them
+     * must be closed here and reopened by name against the new fid.
+     * Coordinate variables intentionally get H5Dopen2()'d twice (once via
+     * their file->hdf5_dims[] entry, once via their file->hdf5_vars[] entry,
+     * both by the identical on-disk name) rather than detected and shared,
+     * exactly as two independent H5Dopen2() calls on the same dataset: both
+     * ids are valid and independently closeable, matching how
+     * spio_hdf5_close() already closes them (it skips the dims-array id for
+     * a has_coord_var dim and closes only the vars-array id - see that
+     * function).
+     *
+     * The probe close runs on EVERY rank (every rank ran the probe open and
+     * the scan above - this function is deliberately not gated by
+     * is_sync_io_proc(), see its call site in PIOc_openfile_retry_impl()),
+     * but the collective reopen that follows it can only run on the ranks
+     * that are actually members of the file's I/O communicator: for every
+     * other rank ios->tcomm_info->get_io_comm()/get_async_io_comm() is
+     * MPI_COMM_NULL, which H5Pset_fapl_mpio() rejects outright. Those ranks
+     * keep no HDF5 file/dataset handle at all after a write-capable reopen -
+     * they only need the reconstructed metadata (names/types/lengths) that
+     * the inq paths read, and every HDF5 I/O entry point asserts
+     * is_file_owning_io_proc() before touching a handle.
+     */
+    for(int i = 0; i < file->hdf5_num_dims; i++){
+      H5Dclose(file->hdf5_dims[i].hdf5_dataset_id);
+      file->hdf5_dims[i].hdf5_dataset_id = H5I_INVALID_HID;
+    }
+    for(int i = 0; i < file->hdf5_num_vars; i++){
+      H5Dclose(file->hdf5_vars[i].hdf5_dataset_id);
+      file->hdf5_vars[i].hdf5_dataset_id = H5I_INVALID_HID;
+    }
+    H5Fclose(fid);
+    fid = H5I_INVALID_HID;
+
+    if(!SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
+      /* Not a member of this file's I/O comm - nothing to reopen here. */
+      file->hdf5_file_id = H5I_INVALID_HID;
+      file->dxplid_coll = H5Pcreate(H5P_DATASET_XFER);
+      file->dxplid_indep = H5Pcreate(H5P_DATASET_XFER);
+      if((file->dxplid_coll == H5I_INVALID_HID) || (file->dxplid_indep == H5I_INVALID_HID)){
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Reopening file (%s) using the HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to create a dataset "
+                       "transfer property list",
+                       filename);
+      }
+      return PIO_NOERR;
+    }
+
+    MPI_Info *pinfo = ios->tcomm_info->create_mpi_info();
+    if(!pinfo){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reopening file (%s) using the HDF5 iotype failed. "
+                     "Failed to create MPI Info object for the file", filename);
+    }
+
+    hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
+    if(fapl_id == H5I_INVALID_HID){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reopening file (%s) using the HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to create a new file access property list",
+                     filename);
+    }
+
+    if(H5Pset_fapl_mpio(fapl_id, file->uses_async_io ? ios->tcomm_info->get_async_io_comm()
+                                                      : ios->tcomm_info->get_io_comm(), *pinfo) < 0){
+      H5Pclose(fapl_id);
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reopening file (%s) using the HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to store the user-supplied MPI IO parameters",
+                     filename);
+    }
+
+    fid = H5Fopen(filename, H5F_ACC_RDWR, fapl_id);
+    H5Pclose(fapl_id);
+    if(fid == H5I_INVALID_HID){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reopening file (%s) using the HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to collectively reopen the file for writing",
+                     filename);
+    }
+
+    for(int i = 0; i < file->hdf5_num_dims; i++){
+      file->hdf5_dims[i].hdf5_dataset_id = H5Dopen2(fid, file->hdf5_dims[i].name, H5P_DEFAULT);
+      if(file->hdf5_dims[i].hdf5_dataset_id == H5I_INVALID_HID){
+        H5Fclose(fid);
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Reopening file (%s) using the HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to reopen a dimension dataset (%s) "
+                       "against the collectively-reopened file handle",
+                       filename, file->hdf5_dims[i].name);
+      }
+    }
+    for(int i = 0; i < file->hdf5_num_vars; i++){
+      const char *on_disk_name = file->hdf5_vars[i].alt_name ? file->hdf5_vars[i].alt_name
+                                                              : file->hdf5_vars[i].name;
+      file->hdf5_vars[i].hdf5_dataset_id = H5Dopen2(fid, on_disk_name, H5P_DEFAULT);
+      if(file->hdf5_vars[i].hdf5_dataset_id == H5I_INVALID_HID){
+        H5Fclose(fid);
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Reopening file (%s) using the HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to reopen a variable dataset (%s) "
+                       "against the collectively-reopened file handle",
+                       filename, on_disk_name);
+      }
+    }
+  }
+
+  file->hdf5_file_id = fid;
+
+  /* Dataset transfer property lists, matching spio_hdf5_create()'s. For a
+   * read-only reopen both stay local (not MPI-IO collective), since that
+   * path keeps the serial recognition-probe handle - see the long comment
+   * above the H5Fopen() probe. For a write-capable reopen the handle was
+   * just upgraded to a collective MPI-IO one above, so dxplid_coll is given
+   * H5Pset_dxpl_mpio(H5FD_MPIO_COLLECTIVE) exactly as a fresh create does.
    */
   file->dxplid_coll = H5Pcreate(H5P_DATASET_XFER);
   file->dxplid_indep = H5Pcreate(H5P_DATASET_XFER);
   if((file->dxplid_coll == H5I_INVALID_HID) || (file->dxplid_indep == H5I_INVALID_HID)){
+    H5Fclose(fid);
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                    "Reopening file (%s) using the HDF5 iotype failed. "
                    "The low level (HDF5) I/O library call failed to create a dataset "
                    "transfer property list",
                    filename);
+  }
+
+  if(mode & PIO_WRITE){
+    if(H5Pset_dxpl_mpio(file->dxplid_coll, H5FD_MPIO_COLLECTIVE) < 0){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reopening file (%s) using the HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to set data transfer mode to collective",
+                     filename);
+    }
   }
 
   return PIO_NOERR;

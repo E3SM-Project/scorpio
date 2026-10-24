@@ -4847,6 +4847,41 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   }
 #endif
 
+  file->iosystem = ios;
+  file->mode = mode;
+
+  /* file->mode and file->uses_async_io are established HERE - before the
+   * native HDF5 reopen block below - rather than after it, because
+   * spio_hdf5_reopen() is now a consumer of both: a write-capable reopen
+   * upgrades its serial recognition probe to a real collective MPI-IO
+   * handle, and the comm it builds that handle's fapl from is chosen by
+   * file->uses_async_io (exactly as spio_hdf5_create() does for a fresh
+   * create). Computing them afterwards, as was done previously, meant
+   * spio_hdf5_reopen() read them out of a freshly calloc'd file_desc_t -
+   * i.e. mode == 0 and uses_async_io == false - regardless of what the
+   * caller asked for.
+   *
+   * This is also after the ADIOS block above, which is where file->iotype
+   * reaches its final value (an ADIOS open can fall back and reassign it),
+   * so the iotype test below sees the iotype this file will actually use.
+   *
+   * The iotype test itself matters beyond HDF5: file->uses_async_io also
+   * gates spio_create_async_lock_file()/spio_remove_async_lock_file(), and
+   * the removal side is additionally gated on an HDF5 iotype. Without the
+   * iotype test here, every write-capable PnetCDF/NetCDF file would create
+   * a lock file that nothing ever removes (and that a later read-only open
+   * of the same name would then stall on for the full
+   * SPIO_ASYNC_OP_WAIT_TIMEOUT). */
+#ifdef _HDF5
+#if PIO_USE_ASYNC_WR_THREAD
+  file->uses_async_io = (file->mode & PIO_WRITE) &&
+                         ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)) &&
+                         !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
+#else
+  file->uses_async_io = false;
+#endif
+#endif
+
 #ifdef _HDF5
   if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
     /* Try a native HDF5 reopen first (no switch-away to NETCDF4/PNETCDF/
@@ -4927,17 +4962,9 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   }
 #endif
 
-  file->iosystem = ios;
-  file->mode = mode;
-
-#ifdef _HDF5
-#if PIO_USE_ASYNC_WR_THREAD
-  file->uses_async_io = (file->mode & PIO_WRITE) &&
-                         !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
-#else
-  file->uses_async_io = false;
-#endif
-#endif
+  /* Note: file->iosystem, file->mode and file->uses_async_io are assigned
+   * earlier in this function, just above the native HDF5 reopen block -
+   * see the comment there for why that ordering is required. */
   /*
   file->num_unlim_dimids = 0;
   file->unlim_dimids = NULL;

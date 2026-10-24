@@ -1517,6 +1517,42 @@ static int test_native_reopen_roundtrip(MPI_Comm test_comm, int my_rank, int nta
     }
   }
 
+  /* WRITE through the write-capable reopen (review finding C2).
+   *
+   * Before C2's fix, spio_hdf5_reopen() ignored its `mode` argument
+   * entirely and always kept the serial, H5F_ACC_RDONLY recognition-probe
+   * handle as file->hdf5_file_id - so this file reported
+   * iotype == PIO_IOTYPE_HDF5 and mode & PIO_WRITE while holding a handle
+   * that physically cannot be written through. This call failed with an
+   * HDF5 "no write intent on file" error. The write-capable reopen now
+   * upgrades to a real collective (H5Pset_fapl_mpio) H5F_ACC_RDWR handle,
+   * so the overwrite below must succeed and must be what the read-back
+   * further down sees.
+   *
+   * Same call style as write_fixture_file() (PIOc_write_darray through the
+   * same ioid/rearranger), writing a distinguishable new value into the
+   * variable that already exists in the file. */
+  std::vector<int> wdata2(MAPLEN_PER_RANK);
+  for(int i = 0; i < MAPLEN_PER_RANK; i++){
+    wdata2[i] = wdata[i] + 1000;
+  }
+
+  if(varid >= 0){
+    if((ret = PIOc_write_darray(ncid, varid, ioid, (PIO_Offset) MAPLEN_PER_RANK,
+                                wdata2.data(), NULL))){
+      fprintf(stderr, "test_native_reopen_roundtrip_%s() FAILED (rank %d): writing through the "
+        "write-capable native reopen returned %d - a reopened file that reports "
+        "iotype == PIO_IOTYPE_HDF5 and mode & PIO_WRITE must actually be writable\n",
+        rearr_name, my_rank, ret);
+      nerrs++;
+    }
+  }
+  else{
+    fprintf(stderr, "test_native_reopen_roundtrip_%s() FAILED (rank %d): no varid available to "
+      "write through the write-capable reopen\n", rearr_name, my_rank);
+    nerrs++;
+  }
+
   PIOc_closefile(ncid);
   drain_async_ops(iosysid);
   MPI_Barrier(test_comm);
@@ -1582,8 +1618,12 @@ static int test_native_reopen_roundtrip(MPI_Comm test_comm, int my_rank, int nta
       nerrs++;
     }
     else{
+      /* The expected values are the OVERWRITTEN ones (wdata2), not the
+       * original fixture's wdata: the write through the write-capable
+       * reopen above must have actually reached the file. Reading back the
+       * original wdata here would mean that write was silently dropped. */
       for(int i = 0; i < MAPLEN_PER_RANK; i++){
-        if(rdata[i] != wdata[i]){
+        if(rdata[i] != wdata2[i]){
           /* KNOWN PRE-EXISTING (backlog item 1): the CONTIG rearranger's
            * HDF5 write path has a documented, pre-existing data-corruption
            * issue that is NOT caused by Tasks 10/11's reopen logic. If this
@@ -1591,7 +1631,10 @@ static int test_native_reopen_roundtrip(MPI_Comm test_comm, int my_rank, int nta
            * vars, attrs, iotype) still prove the native reopen itself
            * worked. Report it, but do not treat it as a reopen failure. */
           fprintf(stderr, "test_native_reopen_roundtrip_%s() FAILED (rank %d): rdata[%d] (%d) "
-            "!= wdata[%d] (%d)\n", rearr_name, my_rank, i, rdata[i], i, wdata[i]);
+            "!= wdata2[%d] (%d)%s\n", rearr_name, my_rank, i, rdata[i], i, wdata2[i],
+            (rdata[i] == wdata[i]) ? " - this is the ORIGINAL fixture value, so the write "
+              "through the write-capable native reopen was silently dropped (review finding "
+              "C2)" : "");
           nerrs++;
           break;
         }
