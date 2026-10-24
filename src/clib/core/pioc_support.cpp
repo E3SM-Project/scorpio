@@ -30,6 +30,7 @@
 #include "spio_decomp_logger.hpp"
 #include "spio_async_utils.hpp"
 #include "spio_hdf5_utils.hpp"
+#include "spio_hdf5_reopen.hpp"
 #if PIO_USE_ASYNC_WR_THREAD
 #include "spio_async_hdf5_utils.hpp"
 #include "spio_iosys_utils.hpp"
@@ -4848,36 +4849,81 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 
 #ifdef _HDF5
   if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
-    if(H5Fis_hdf5(filename) > 0){
+    /* Try a native HDF5 reopen first (no switch-away to NETCDF4/PNETCDF/
+     * NETCDF) - only a file spio_hdf5_is_scorpio_written() recognizes as
+     * SCORPIO-written can take this path; everything else (a file that
+     * predates this feature, or was written by some other HDF5 writer)
+     * falls through to the historical switch-iotype-away logic below,
+     * unchanged. A genuine error reopening a *recognized* file (as opposed
+     * to simply not recognizing it) is propagated like any other ierr
+     * check in this function, not silently downgraded to a fallback.
+     *
+     * Deliberately NOT stored in `ierr`: `ierr` is read again, much further
+     * down in this function, by an MPI_Allreduce(..., MPI_MIN, ios->my_comm)
+     * (via spio_handle_err(..., PIO_REDUCE_ERROR, ...)) that spans every
+     * rank in the union comm - not just the sync I/O rank(s) that run the
+     * switch(file->iotype) open-call block between here and there. This
+     * block itself runs on every rank unconditionally (it is not guarded by
+     * is_sync_io_proc()), so if its result were left sitting in `ierr`, the
+     * PIO_EBADIOTYPE a non-recognized-file fallback leaves behind would
+     * still be sitting in `ierr` on every rank that is not a sync I/O rank
+     * when that later reduce runs - even though the fallback itself
+     * succeeded and the real open's own `ierr` (PIO_NOERR) is what the sync
+     * I/O rank(s) computed. MPI_MIN over negative error codes would then
+     * pick up that stale -500 and fail the whole open. Using a local
+     * variable here instead keeps this block's result out of `ierr`
+     * entirely, exactly as the pre-existing switch-iotype-away code it
+     * replaces also never touched `ierr`.
+     */
+    int hdf5_reopen_ierr = spio_hdf5_reopen(ios, file, filename, mode);
+    if(hdf5_reopen_ierr == PIO_NOERR){
+      /* Native reopen succeeded - keep file->iotype as HDF5/HDF5C and skip
+       * the switch-away logic entirely. */
+    }
+    else if(hdf5_reopen_ierr == PIO_EBADIOTYPE){
+      /* Not recognized as a SCORPIO-written HDF5 file - fall back to the
+       * existing switch-iotype-away behavior, unchanged. */
+      if(H5Fis_hdf5(filename) > 0){
 #ifdef _NETCDF4
-      /* Use NETCDF4 IO type to read files generated with HDF5 IO type so far */
+        /* Use NETCDF4 IO type to read files generated with HDF5 IO type so far */
 #ifdef _MPISERIAL
-      file->iotype = PIO_IOTYPE_NETCDF4C;
+        file->iotype = PIO_IOTYPE_NETCDF4C;
 #else
-      file->iotype = PIO_IOTYPE_NETCDF4P;
+        file->iotype = PIO_IOTYPE_NETCDF4P;
 #endif
 #else
+        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                        "Opening file (%s) with PIO_IOTYPE_HDF5 failed. HDF5 IO type currently requires NETCDF4 (not configured for SCORPIO) to support read operations", filename);
+#endif
+      }
+      else{
+#ifdef _PNETCDF
+        file->iotype = PIO_IOTYPE_PNETCDF;
+#else
+#ifdef _NETCDF
+        file->iotype = PIO_IOTYPE_NETCDF;
+#endif
+#endif
+      }
+      std::string warn_msg = std::string("Opening files with the HDF5 library is currently not supported.") +
+        std::string(" Switching from PIO_IOTYPE_HDF5 to ") +  pio_iotype_to_string(file->iotype) +
+        std::string(" for file, ") + filename;
+      PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, warn_msg.c_str());
+    }
+    else{
+      /* A genuine error occurred trying to reopen a file we did recognize
+       * as SCORPIO-written - propagate it, do not fall back. */
       spio_ltimer_stop(ios->io_fstats->rd_timer_name);
       spio_ltimer_stop(ios->io_fstats->tot_timer_name);
       spio_ltimer_stop(file->io_fstats->rd_timer_name);
       spio_ltimer_stop(file->io_fstats->tot_timer_name);
-      return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
-                      "Opening file (%s) with PIO_IOTYPE_HDF5 failed. HDF5 IO type currently requires NETCDF4 (not configured for SCORPIO) to support read operations", filename);
-#endif
+      return pio_err(ios, NULL, hdf5_reopen_ierr, __FILE__, __LINE__,
+                      "Opening file (%s) with PIO_IOTYPE_HDF5 failed. Native HDF5 reopen failed", filename);
     }
-    else{
-#ifdef _PNETCDF
-      file->iotype = PIO_IOTYPE_PNETCDF;
-#else
-#ifdef _NETCDF
-      file->iotype = PIO_IOTYPE_NETCDF;
-#endif
-#endif
-    }
-    std::string warn_msg = std::string("Opening files with the HDF5 library is currently not supported.") +
-      std::string(" Switching from PIO_IOTYPE_HDF5 to ") +  pio_iotype_to_string(file->iotype) +
-      std::string(" for file, ") + filename;
-    PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, warn_msg.c_str());
   }
 #endif
 
