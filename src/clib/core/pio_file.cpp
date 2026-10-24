@@ -8,6 +8,10 @@
 #include "spio_io_summary.h"
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <cerrno>
+#include <sstream>
+#include <iomanip>
 #include <mutex>
 #include <thread>
 #include <chrono>
@@ -605,6 +609,107 @@ int spio_wait_file_async_pend_ops(file_desc_t *file)
   return PIO_NOERR;
 }
 
+/* Returns the path of the filesystem lock file used to protect a sync-comm
+ * read-only reopen of filename from racing a disjoint async-comm pending
+ * write/close on the same file (see spio_create_async_lock_file()/
+ * spio_remove_async_lock_file() below). lock_id is
+ * iosystem_desc_t::spio_lock_id - a value drawn once (from true entropy, via
+ * generate_and_bcast_lock_id()) and broadcast to every rank at
+ * intracomm-init time, so every rank that might create, wait on, or remove
+ * this lock file independently computes the identical path.
+ */
+std::string spio_get_async_lock_filename(const char *filename, uint64_t lock_id)
+{
+  assert(filename);
+
+  std::ostringstream oss;
+  oss << filename << "_" << std::hex << std::setfill('0') << std::setw(16) << lock_id << ".spio_lock";
+
+  return oss.str();
+}
+
+#ifdef _HDF5
+/* Create the (empty) filesystem lock file that marks file as having a
+ * pending/in-flight asynchronous write (see spio_get_async_lock_filename()
+ * above). A no-op (returns PIO_NOERR without touching the filesystem) unless
+ * file->uses_async_io is set. When it is set, only the async I/O root rank
+ * (ios->io_comm_info->get_async_io_master() == MPI_ROOT) actually creates
+ * the file - every other rank, sync or async, must not touch the
+ * filesystem here, since every rank that might race this file independently
+ * computes the same lock filename from ios->spio_lock_id and only needs one
+ * copy of it to exist.
+ *
+ * Failing to create the lock file is logged (PIOc_warn) but is not treated
+ * as a fatal error for the write that is otherwise proceeding normally - per
+ * the spec's never-block-indefinitely philosophy, a missing lock file simply
+ * means "no protection for this file" on a subsequent reopen, rather than
+ * aborting the write.
+ */
+int spio_create_async_lock_file(const iosystem_desc_t *ios, const file_desc_t *file)
+{
+  assert(ios && ios->io_comm_info && file);
+
+  if(!file->uses_async_io){
+    return PIO_NOERR;
+  }
+
+  if(ios->io_comm_info->get_async_io_master() != MPI_ROOT){
+    return PIO_NOERR;
+  }
+
+  std::string lock_filename = spio_get_async_lock_filename(
+    pio_get_fname_from_file(const_cast<file_desc_t *>(file)), ios->spio_lock_id);
+
+  int fd = open(lock_filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  if(fd < 0){
+    std::string warn_msg = std::string("Creating the asynchronous write lock file (") +
+      lock_filename + std::string(") for file (") +
+      std::string(pio_get_fname_from_file(const_cast<file_desc_t *>(file))) +
+      std::string(") failed");
+    PIOc_warn(ios->iosysid, file->pio_ncid, __FILE__, __LINE__, warn_msg.c_str());
+    return PIO_EIO;
+  }
+
+  close(fd);
+
+  return PIO_NOERR;
+}
+
+/* Remove the filesystem lock file created by spio_create_async_lock_file()
+ * above for file, once the asynchronous write it was protecting has
+ * completed (hard close). Uses the same gating as
+ * spio_create_async_lock_file() (file->uses_async_io and
+ * async-I/O-root-rank-only). Removing a lock file that was never created, or
+ * is already gone, is not an error (ENOENT is ignored).
+ */
+int spio_remove_async_lock_file(const iosystem_desc_t *ios, const file_desc_t *file)
+{
+  assert(ios && ios->io_comm_info && file);
+
+  if(!file->uses_async_io){
+    return PIO_NOERR;
+  }
+
+  if(ios->io_comm_info->get_async_io_master() != MPI_ROOT){
+    return PIO_NOERR;
+  }
+
+  std::string lock_filename = spio_get_async_lock_filename(
+    pio_get_fname_from_file(const_cast<file_desc_t *>(file)), ios->spio_lock_id);
+
+  if((unlink(lock_filename.c_str()) != 0) && (errno != ENOENT)){
+    std::string warn_msg = std::string("Removing the asynchronous write lock file (") +
+      lock_filename + std::string(") for file (") +
+      std::string(pio_get_fname_from_file(const_cast<file_desc_t *>(file))) +
+      std::string(") failed");
+    PIOc_warn(ios->iosysid, file->pio_ncid, __FILE__, __LINE__, warn_msg.c_str());
+    return PIO_EIO;
+  }
+
+  return PIO_NOERR;
+}
+#endif /* _HDF5 */
+
 /* Close the file ("hard close")
  * @param ios: Pointer to the iosystem_desc
  * @param file: Pointer to the file_desc for the file
@@ -1027,6 +1132,13 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
 
         file->hdf5_num_attrs = 0;
         file->hdf5_num_gattrs = 0;
+
+        /* Remove the cross-comm async-write lock file (if any) for this file,
+         * now that its HDF5 close (spio_hdf5_close() above) has completed and
+         * returned success - see spio_remove_async_lock_file()'s own gating
+         * (file->uses_async_io, async I/O root rank only) just above in this
+         * file. */
+        spio_remove_async_lock_file(ios, file);
     }
 #endif
 
