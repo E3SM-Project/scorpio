@@ -1163,10 +1163,37 @@ int spio_hdf5_reopen(iosystem_desc_t *ios, file_desc_t *file, const char *filena
                      filename);
     }
 
-    /* The variables loop runs FIRST so that a coordinate variable's dataset
-     * is opened exactly once here and its id then shared with the matching
-     * dims-array entry (see the aliasing discussion above) - the same shape
-     * the writer uses at spio_hdf5_utils.cpp:891. */
+    /* Dimensions that are not also coordinate variables are reopened here,
+     * in dimension-id order, exactly as before. A has_coord_var dimension is
+     * deliberately skipped: its dataset IS its coordinate variable's
+     * dataset, which the variables loop below opens once and then shares
+     * back into this array - the same aliasing the writer sets up at
+     * spio_hdf5_utils.cpp:891. Opening it here as well would yield two
+     * distinct ids for one dataset, of which spio_hdf5_close() closes only
+     * one (see the discussion above).
+     *
+     * Note on loop order: the dimensions loop deliberately stays FIRST, so
+     * that for a file with no coordinate variables the sequence of
+     * H5Dopen2() calls is byte-for-byte the one this code has always made. */
+    for(int i = 0; i < file->hdf5_num_dims; i++){
+      if(file->hdf5_dims[i].has_coord_var){
+        continue;
+      }
+
+      file->hdf5_dims[i].hdf5_dataset_id = H5Dopen2(fid, file->hdf5_dims[i].name, H5P_DEFAULT);
+      if(file->hdf5_dims[i].hdf5_dataset_id == H5I_INVALID_HID){
+        /* Release everything reopened so far - file->hdf5_file_id is never
+         * set on this path, so no downstream cleanup can reach these ids. */
+        spio_hdf5_reopen_release_dset_ids(file);
+        H5Fclose(fid);
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Reopening file (%s) using the HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to reopen a dimension dataset (%s) "
+                       "against the collectively-reopened file handle",
+                       filename, file->hdf5_dims[i].name);
+      }
+    }
+
     for(int i = 0; i < file->hdf5_num_vars; i++){
       const char *on_disk_name = file->hdf5_vars[i].alt_name ? file->hdf5_vars[i].alt_name
                                                               : file->hdf5_vars[i].name;
@@ -1204,33 +1231,21 @@ int spio_hdf5_reopen(iosystem_desc_t *ios, file_desc_t *file, const char *filena
         file->hdf5_dims[coord_dimid].hdf5_dataset_id = file->hdf5_vars[i].hdf5_dataset_id;
       }
     }
+    /* Every has_coord_var dimension must have been aliased by the variables
+     * loop above. If one was not, the reconstructed metadata is internally
+     * inconsistent (a dimension marked as having a coordinate variable, with
+     * no coordinate variable referring back to it) - fail rather than leave
+     * an invalid id behind for a later read/write to use. Cheap: no HDF5
+     * calls, just a PIO_MAX_DIMS-bounded scan. */
     for(int i = 0; i < file->hdf5_num_dims; i++){
-      if(file->hdf5_dims[i].has_coord_var){
-        /* Already aliased to its coordinate variable's id by the loop above.
-         * If it is not, the reconstructed metadata is internally
-         * inconsistent (a has_coord_var dim with no coordinate variable
-         * pointing back at it) - fail rather than leave an invalid id that
-         * a later read/write would use. */
-        if(file->hdf5_dims[i].hdf5_dataset_id == H5I_INVALID_HID){
-          spio_hdf5_reopen_release_dset_ids(file);
-          H5Fclose(fid);
-          return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
-                         "Reopening file (%s) using the HDF5 iotype failed. "
-                         "A dimension (%s) is marked as having a coordinate variable, but no "
-                         "coordinate variable refers back to it",
-                         filename, file->hdf5_dims[i].name);
-        }
-        continue;
-      }
-
-      file->hdf5_dims[i].hdf5_dataset_id = H5Dopen2(fid, file->hdf5_dims[i].name, H5P_DEFAULT);
-      if(file->hdf5_dims[i].hdf5_dataset_id == H5I_INVALID_HID){
+      if(file->hdf5_dims[i].has_coord_var &&
+         (file->hdf5_dims[i].hdf5_dataset_id == H5I_INVALID_HID)){
         spio_hdf5_reopen_release_dset_ids(file);
         H5Fclose(fid);
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                        "Reopening file (%s) using the HDF5 iotype failed. "
-                       "The low level (HDF5) I/O library call failed to reopen a dimension dataset (%s) "
-                       "against the collectively-reopened file handle",
+                       "A dimension (%s) is marked as having a coordinate variable, but no "
+                       "coordinate variable refers back to it",
                        filename, file->hdf5_dims[i].name);
       }
     }
