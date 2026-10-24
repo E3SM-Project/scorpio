@@ -767,9 +767,13 @@ int spio_wait_on_async_lock_file(const iosystem_desc_t *ios, const char *filenam
 
     struct stat st;
     if(stat(lock_filename.c_str(), &st) == 0){
-      /* FIXME: Make the max time configurable */
       const int MAX_SLEEP_TIME_IN_MILLISECONDS = SPIO_ASYNC_OP_WAIT_TIMEOUT;
-      const int SLEEP_TIME_IN_MILLISECONDS = 500;
+      /* Same poll interval as the sibling waiter spio_wait_file_async_pend_ops()
+       * above. Both are bounded by the same (configurable)
+       * SPIO_ASYNC_OP_WAIT_TIMEOUT, so this is purely a latency fix: at the
+       * previous 500 ms, a reopen that could have proceeded as soon as the
+       * lock cleared waited up to half a second for no reason. */
+      const int SLEEP_TIME_IN_MILLISECONDS = 1;
 
       const int max_tries = (MAX_SLEEP_TIME_IN_MILLISECONDS > SLEEP_TIME_IN_MILLISECONDS) ?
                             (MAX_SLEEP_TIME_IN_MILLISECONDS/SLEEP_TIME_IN_MILLISECONDS) : 1;
@@ -1182,6 +1186,62 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
 #else
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
 #endif
+
+#if !PIO_USE_ASYNC_WR_THREAD
+#ifdef _HDF5
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+    {
+        /* A later native HDF5 reopen (spio_hdf5_reopen(), see
+         * PIOc_openfile_retry_impl()) has every rank independently H5Fopen()
+         * and H5Literate2() the file, relying on the file being quiescent
+         * (fully closed and flushed) by the time that happens. When the
+         * async write thread pool is enabled, spio_wait_on_async_lock_file()
+         * gives a reopening rank that cross-process happens-before guarantee
+         * by polling for this file's lock file to be removed. When it is
+         * disabled (this build), file->uses_async_io is always false, so
+         * spio_create_async_lock_file()/spio_remove_async_lock_file() are
+         * unconditional no-ops and no such lock file ever exists - nothing
+         * otherwise stops another rank's reopen from racing ahead of this
+         * rank's close.
+         *
+         * In this (non-async-write-thread) build every rank reaches this
+         * exact point synchronously and unconditionally - spio_hard_closefile()
+         * is always called directly (never deferred to a background thread,
+         * since the soft-close path above is only ever taken when
+         * PIO_USE_ASYNC_WR_THREAD is enabled) - so a plain barrier here is
+         * both safe (no rank skips or defers past this call) and sufficient:
+         * it establishes the same happens-before relationship between this
+         * (possibly file-owning) rank's completed close and every rank's
+         * next open/reopen of the same file that the lock-file wait provides
+         * in the async-write-thread build.
+         *
+         * Deliberately placed BEFORE the "if(ierr != PIO_NOERR) return" just
+         * below, and run regardless of ierr. check_netcdf() above is called
+         * with a NULL ios and does not broadcast, so on an I/O-proc-side
+         * close failure only the I/O procs have a non-PIO_NOERR ierr: if the
+         * barrier sat after that early return, those ranks would return
+         * while every other rank blocked here forever. Every rank now
+         * reaches the barrier exactly once whether the close succeeded or
+         * failed, and the per-rank error return still happens afterwards.
+         *
+         * UNVERIFIED for the async-I/O-service / intercomm iosystem models,
+         * where ios->my_comm is union_comm (shared by compute and I/O procs
+         * with different roles) rather than comp_comm: this fix round only
+         * confirms the barrier's correctness for the intracomm path the
+         * comment above justifies. Redesigning it for the other models is
+         * out of scope here.
+         *
+         * MPI_Barrier on MPI_COMM_NULL is undefined behavior, not a no-op,
+         * and ios->my_comm is MPI_COMM_NULL on non-participating ranks in
+         * some init paths (see pioc.cpp) - hence the guard. */
+        if (ios->my_comm != MPI_COMM_NULL)
+        {
+            MPI_Barrier(ios->my_comm);
+        }
+    }
+#endif
+#endif
+
     if(ierr != PIO_NOERR){
         LOG((1, "nc*_close failed, ierr = %d", ierr));
         return pio_err(NULL, file, ierr, __FILE__, __LINE__,
@@ -1274,33 +1334,12 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
          * file. */
         spio_remove_async_lock_file(ios, file);
 
-#if !PIO_USE_ASYNC_WR_THREAD
-        /* A later native HDF5 reopen (spio_hdf5_reopen(), see
-         * PIOc_openfile_retry_impl()) has every rank independently H5Fopen()
-         * and H5Literate2() the file, relying on the file being quiescent
-         * (fully closed and flushed) by the time that happens. When the
-         * async write thread pool is enabled, spio_wait_on_async_lock_file()
-         * gives a reopening rank that cross-process happens-before guarantee
-         * by polling for this file's lock file to be removed. When it is
-         * disabled (this build), file->uses_async_io is always false, so
-         * spio_create_async_lock_file()/spio_remove_async_lock_file() above
-         * are unconditional no-ops and no such lock file ever exists -
-         * nothing otherwise stops another rank's reopen from racing ahead of
-         * this rank's close.
-         *
-         * In this (non-async-write-thread) build every rank reaches this
-         * exact point synchronously and unconditionally - spio_hard_closefile()
-         * is always called directly (never deferred to a background thread,
-         * since the soft-close path above is only ever taken when
-         * PIO_USE_ASYNC_WR_THREAD is enabled) - so a plain barrier here is
-         * both safe (no rank skips or defers past this call) and sufficient:
-         * it establishes the same happens-before relationship between this
-         * (possibly file-owning) rank's completed close and every rank's
-         * next open/reopen of the same file that the lock-file wait provides
-         * in the async-write-thread build.
-         */
-        MPI_Barrier(ios->my_comm);
-#endif
+        /* Note: the PIO_USE_ASYNC_WR_THREAD=OFF quiescence barrier that used
+         * to sit here now runs earlier in this function, before the
+         * close-error return - see the long comment there for why. In this
+         * build spio_remove_async_lock_file() above is an unconditional
+         * no-op, so moving the barrier ahead of it changes no ordering that
+         * anything observes. */
     }
 #endif
 
