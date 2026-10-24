@@ -761,6 +761,155 @@ static int test_reopen_fallback_write_mode(MPI_Comm comm, int wrank)
   return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
 }
 
+/* Fix round 2 (R1/R4): a write-capable native HDF5 reopen of a file that
+ * contains a coordinate variable must survive the *production* close path.
+ *
+ * Every other test in this file drives spio_hdf5_reopen() directly on a bare
+ * file_desc_t and tears the result down with test_free_hdf5_reopen_allocs(),
+ * which never touches the HDF5 ids at all - so none of them can observe what
+ * spio_hdf5_close() makes of the dataset ids the reopen left behind.
+ *
+ * For a dimension that is also a coordinate variable, file->hdf5_dims[dimid]
+ * .hdf5_dataset_id and file->hdf5_vars[varid].hdf5_dataset_id must hold the
+ * *same* hid_t (see spio_hdf5_utils.cpp:891 on the writer side) - that
+ * aliasing is exactly why spio_hdf5_close() skips the dims-array close for a
+ * has_coord_var dim. If the write-capable reopen instead H5Dopen2()'s the
+ * coordinate variable's dataset twice (two distinct, independently
+ * reference-counted ids), the dims-array copy is never closed, and the
+ * reopened MPI-IO file handle - whose fclose degree is H5F_CLOSE_SEMI, not
+ * H5F_CLOSE_WEAK - makes H5Fclose() fail with an object still open, so
+ * PIOc_closefile() returns PIO_EHDF5ERR.
+ *
+ * This test goes through the real PIOc_openfile()/PIOc_closefile() entry
+ * points (so spio_hdf5_reopen() runs from PIOc_openfile_retry_impl() and the
+ * teardown is the production spio_hdf5_close()) and asserts the close
+ * succeeds.
+ */
+static int test_write_reopen_coord_var_production_close(MPI_Comm comm, int wrank)
+{
+  int ret = PIO_NOERR;
+  const char *fname = "test_hdf5_reopen_coord_var_close.nc";
+
+  /* The "full" fixture's dim "y" has a coordinate variable (var "y"). */
+  if((ret = make_scorpio_written_hdf5_file_full(comm, fname))){
+    LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: could not "
+      "create the fixture file (ret = %d)\n", ret);
+    return PIO_EINTERNAL;
+  }
+
+  int iosysid = -1;
+  if((ret = PIOc_Init_Intracomm(comm, 1, 1, 0, PIO_REARR_SUBSET, &iosysid))){
+    LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: "
+      "PIOc_Init_Intracomm() returned %d\n", ret);
+    remove(fname);
+    return PIO_EINTERNAL;
+  }
+
+  int nerrs = 0;
+  int ncid = -1;
+  int format = PIO_IOTYPE_HDF5;
+
+  /* In a PIO_USE_ASYNC_WR_THREAD build PIOc_closefile() is a *soft* close -
+   * it hands the real close to an async-op worker and returns PIO_NOERR
+   * regardless of what H5Fclose() later makes of it - so its return code
+   * alone cannot catch the leak in that configuration. Bracket the whole
+   * open/close/finalize sequence with the global HDF5 open-object count
+   * instead: once PIOc_finalize() has drained everything, no HDF5 file or
+   * dataset object from this sequence may still be open. This is the
+   * assertion that catches the leak in both configurations. */
+  ssize_t nobj_before = H5Fget_obj_count(H5F_OBJ_ALL, H5F_OBJ_FILE | H5F_OBJ_DATASET);
+
+  ret = PIOc_openfile(iosysid, &ncid, &format, fname, PIO_WRITE);
+  if(ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: the "
+      "write-capable PIOc_openfile() returned %d, expected PIO_NOERR\n", ret);
+    nerrs++;
+  }
+  else{
+    /* Guard against the test silently proving nothing: if the native HDF5
+     * reopen had not been taken, PIOc_openfile_retry_impl() would have
+     * switched file->iotype away to NETCDF4P/PNETCDF and the close below
+     * would never reach spio_hdf5_close() at all. */
+    file_desc_t *file = NULL;
+    if((pio_get_file(ncid, &file) != PIO_NOERR) || !file){
+      LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: "
+        "pio_get_file() could not find the just-opened file (ncid = %d)\n", ncid);
+      nerrs++;
+    }
+    else if((file->iotype != PIO_IOTYPE_HDF5) && (file->iotype != PIO_IOTYPE_HDF5C)){
+      LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: the "
+        "write-capable open of a SCORPIO-written HDF5 file switched the iotype away "
+        "(iotype = %d) instead of taking the native HDF5 reopen path - this test would "
+        "prove nothing\n", file->iotype);
+      nerrs++;
+    }
+    else{
+      /* Assert the invariant directly, before the close consumes it: for a
+       * dimension that has a coordinate variable, the dims-array entry and
+       * the coordinate variable's vars-array entry must hold the *same*
+       * hid_t (spio_hdf5_utils.cpp:891 is where the writer establishes
+       * this). spio_hdf5_close() relies on it - it skips the dims-array
+       * close for a has_coord_var dim - so two distinct ids here means one
+       * of them is never closed. This check is what makes the test
+       * deterministic in a PIO_USE_ASYNC_WR_THREAD build, where
+       * PIOc_closefile()'s own return code cannot report the failure. */
+      for(int d = 0; d < file->hdf5_num_dims; d++){
+        if(!file->hdf5_dims[d].has_coord_var){
+          continue;
+        }
+
+        bool aliased = false;
+        for(int v = 0; v < file->hdf5_num_vars; v++){
+          if(file->hdf5_vars[v].is_coord_var &&
+             (file->hdf5_vars[v].hdf5_dataset_id == file->hdf5_dims[d].hdf5_dataset_id)){
+            aliased = true;
+            break;
+          }
+        }
+
+        if(!aliased){
+          LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: after a "
+            "write-capable native HDF5 reopen, dimension (%s, dimid = %d) has a coordinate "
+            "variable but its hdf5_dataset_id (%lld) is not the same id as any coordinate "
+            "variable's - the dataset was opened twice instead of once with the id shared, "
+            "so spio_hdf5_close() (which skips the dims-array id for a has_coord_var dim) "
+            "will leave one of the two open\n",
+            (file->hdf5_dims[d].name) ? file->hdf5_dims[d].name : "(null)", d,
+            (long long) file->hdf5_dims[d].hdf5_dataset_id);
+          nerrs++;
+        }
+      }
+    }
+
+    int close_ret = PIOc_closefile(ncid);
+    if(close_ret != PIO_NOERR){
+      LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: "
+        "PIOc_closefile() returned %d, expected PIO_NOERR - a write-capable native HDF5 "
+        "reopen of a file containing a coordinate variable left a dataset id open (the "
+        "coordinate variable's dims-array/vars-array ids must be the same id, opened "
+        "once), so H5Fclose() failed on the MPI-IO (H5F_CLOSE_SEMI) handle\n", close_ret);
+      nerrs++;
+    }
+  }
+
+  PIOc_finalize(iosysid);
+
+  ssize_t nobj_after = H5Fget_obj_count(H5F_OBJ_ALL, H5F_OBJ_FILE | H5F_OBJ_DATASET);
+  if(nobj_after != nobj_before){
+    LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: the number of "
+      "globally open HDF5 file/dataset objects changed from %lld to %lld across a "
+      "write-capable native HDF5 open and close of a file containing a coordinate "
+      "variable - the coordinate variable's dataset was opened twice (once per array) and "
+      "only closed once, so neither it nor the file handle holding it could be released\n",
+      (long long) nobj_before, (long long) nobj_after);
+    nerrs++;
+  }
+
+  remove(fname);
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
 int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
 {
   int nerrs = 0, ret = PIO_NOERR;
@@ -811,6 +960,15 @@ int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
     LOG_RANK0(wrank, "test_reopen_fallback_write_mode() PASSED\n");
   }
 
+  ret = test_write_reopen_coord_var_production_close(comm, wrank);
+  if(ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED, ret = %d\n", ret);
+    nerrs++;
+  }
+  else{
+    LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() PASSED\n");
+  }
+
   *num_errors += nerrs;
   return nerrs;
 }
@@ -844,6 +1002,17 @@ int main(int argc, char *argv[])
   ret = MPI_Comm_size(MPI_COMM_WORLD, &wsz);
   if(ret != MPI_SUCCESS){
     fprintf(stderr, "MPI_Comm_size() FAILED, ret = %d\n", ret);
+    return ret;
+  }
+
+  /* The library's default error handler (PIO_INTERNAL_ERROR) aborts the job
+   * from inside pio_err(). These tests assert on returned error codes - in
+   * particular test_write_reopen_coord_var_production_close() asserts that
+   * PIOc_closefile() returns PIO_NOERR - so the returned-error handler is
+   * what lets a failure be reported rather than abort the process. */
+  ret = PIOc_set_iosystem_error_handling(PIO_DEFAULT, PIO_RETURN_ERROR, NULL);
+  if(ret != PIO_NOERR){
+    fprintf(stderr, "PIOc_set_iosystem_error_handling() FAILED, ret = %d\n", ret);
     return ret;
   }
 
