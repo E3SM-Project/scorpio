@@ -129,6 +129,18 @@ extern "C" {
     int spio_close_soft_closed_file(const char *filename);
     int pio_add_to_file_list(file_desc_t *file, MPI_Comm comm);
 
+    /* Name, create and remove the filesystem lock file used to protect a
+     * sync-comm read-only reopen of a file from racing a disjoint async-comm
+     * pending write/close on that same file (see pio_file.cpp). Create/remove
+     * are gated on file->uses_async_io (an _HDF5-only field), so they are only
+     * declared/defined in _HDF5 builds; the filename helper has no such
+     * dependency and is always available. */
+    std::string spio_get_async_lock_filename(const char *filename, uint64_t lock_id);
+#ifdef _HDF5
+    int spio_create_async_lock_file(const iosystem_desc_t *ios, const file_desc_t *file);
+    int spio_remove_async_lock_file(const iosystem_desc_t *ios, const file_desc_t *file);
+#endif
+
     /* Get a description of the variable represented by varid */
     const char *get_var_desc_str(int ncid, int varid, const char *desc_prefix);
 

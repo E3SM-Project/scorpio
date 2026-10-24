@@ -207,6 +207,22 @@ SPIO_Util::Iosys_Util::IO_comm_info::IO_comm_info(MPI_Comm union_comm,
 
   is_async_io_proc_ = is_async_io_proc;
 
+  /* Mirrors the sync_io_master_ computation above (union_comm_rank ==
+   * sync_io_root ? MPI_ROOT : MPI_PROC_NULL): async_io_root_ is finalized by
+   * this point on every rank (both the disjoint-procs and dup_sync_comm
+   * branches above set it), so every rank - not just async I/O procs - can
+   * determine whether it is specifically the async I/O root. Needed by
+   * get_async_io_master() consumers (e.g. the lock-file gating in
+   * spio_create_async_lock_file()/spio_remove_async_lock_file(), and
+   * PIOc_Init_Intracomm_impl()'s TComm_info construction) that must identify
+   * a single rank, not just "some async I/O proc". This was previously never
+   * assigned past its MPI_PROC_NULL default from the member-initializer list
+   * (unlike sync_io_master_, which already had this ternary) - a pre-existing
+   * gap fixed here since Task 8 of the HDF5 async-write-lifecycle plan is the
+   * first caller that actually depends on get_async_io_master() == MPI_ROOT
+   * being true on some rank. */
+  async_io_master_ = (union_comm_rank == async_io_root_) ? MPI_ROOT : MPI_PROC_NULL;
+
   async_comm_info_.set(async_io_comm, async_io_rank, async_io_nprocs,
     async_io_group, std::move(tmp_async_io_ranks));
 #endif

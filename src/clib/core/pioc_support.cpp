@@ -3726,6 +3726,15 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     LOG((2, "Created file %s file->fh = %d file->pio_ncid = %d", filename,
          file->fh, file->pio_ncid));
 
+#ifdef _HDF5
+    /* Create the cross-comm async-write lock file for this file (a no-op
+     * unless file->uses_async_io, and only on the async I/O root rank) - see
+     * spio_create_async_lock_file() in pio_file.cpp. By this point ierr is
+     * guaranteed PIO_NOERR (checked a few lines above), so this is file's
+     * one and only successful create point. */
+    spio_create_async_lock_file(ios, file);
+#endif
+
     spio_ltimer_stop(file->io_fstats->wr_timer_name);
     spio_ltimer_stop(file->io_fstats->tot_timer_name);
     return ierr;
@@ -5438,6 +5447,19 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
       LOG((3, "File has %d unlimited dimensions", file->num_unlim_dimids));
     }
   }
+
+#ifdef _HDF5
+  /* Create the cross-comm async-write lock file for this file (a no-op
+   * unless file->uses_async_io - which is only ever set when this open is
+   * write-capable, see its computation earlier in this function - and only
+   * on the async I/O root rank) - see spio_create_async_lock_file() in
+   * pio_file.cpp. Guarded on ierr == PIO_NOERR: on failure above,
+   * pio_delete_file_from_list() already freed *file*, so touching it here
+   * would be a use-after-free. */
+  if(ierr == PIO_NOERR){
+    spio_create_async_lock_file(ios, file);
+  }
+#endif
 
   return ierr;
 }
