@@ -5317,6 +5317,27 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   case PIO_IOTYPE_ADIOSC:
       break; /* This case has been handled above */
 #endif
+#ifdef _HDF5
+  case PIO_IOTYPE_HDF5:
+  case PIO_IOTYPE_HDF5C:
+      /* This case has been handled above: by the time execution reaches
+       * this switch, either spio_hdf5_reopen() already fully reopened the
+       * file natively (file->iotype deliberately left as HDF5/HDF5C, see
+       * the switch-iotype-away comment block above) and there is nothing
+       * left to do here, or the native reopen fell back and reassigned
+       * file->iotype away from HDF5/HDF5C to NETCDF4P/PNETCDF/NETCDF
+       * already (in which case this case label is simply never reached).
+       * Before the native reopen feature existed, file->iotype could never
+       * still be HDF5/HDF5C at this point - the fallback always ran first
+       * - so this case was never needed; omitting it made a successful
+       * native reopen fall into `default` below and return PIO_EBADIOTYPE
+       * from only the sync I/O proc (this switch is gated by
+       * is_sync_io_proc()), bypassing the unconditional
+       * "Broadcast open mode to all tasks" MPI_Bcast just below this
+       * switch that every other rank still reaches - a collective
+       * mismatch/hang, not a real error. */
+      break;
+#endif
   default:
       {
         char avail_iotypes[PIO_MAX_NAME + 1];

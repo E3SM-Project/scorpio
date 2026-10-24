@@ -935,6 +935,41 @@ static int spio_hdf5_sync_defs(iosystem_desc_t *ios, file_desc_t *file)
       if(ndims > 0){
         int* dimids = file->hdf5_vars[i].hdf5_dimids;
         for(int j = 0; j < ndims; j++){
+          /* Unlike Steps 1 and 2 above, this used to be unconditional,
+           * because the only callers of spio_hdf5_enddef()/
+           * spio_hdf5_sync_defs() were the original (write-side) def/enddef
+           * flow, where re-running this loop on a redef()/enddef() cycle for
+           * an already-attached dataset was the extent of the "repeat call"
+           * concern. A native HDF5 reopen (spio_hdf5_reopen(), used for a
+           * read-only reopen of a SCORPIO-written file) populates
+           * file->hdf5_vars[]/hdf5_dims[] with dataset handles for
+           * dimension-scale attachments that already exist on disk, and
+           * spio_hdf5_close() unconditionally calls spio_hdf5_enddef() to
+           * "handle pending defines" - so, for a reopened file, this loop
+           * would otherwise call H5DSattach_scale() again on a scale that is
+           * already attached. H5DSattach_scale() writes to the file (it
+           * updates the DIMENSION_LIST/REFERENCE_LIST attributes), which
+           * fails outright on a reopened file's handle (opened read-only by
+           * spio_hdf5_reopen()) with an HDF5 "no write intent on file"
+           * error. Checking H5DSis_attached() first makes this idempotent,
+           * matching Step 1's hdf5_dataset_id/H5I_INVALID_HID check and Step
+           * 2's H5Aexists() check just above.
+           */
+          htri_t is_attached = H5DSis_attached(file->hdf5_vars[i].hdf5_dataset_id,
+                                                file->hdf5_dims[dimids[j]].hdf5_dataset_id, j);
+          if(is_attached < 0){
+            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                           "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "The low level (HDF5) I/O library call failed to determine whether a dimension scale (for dimension %s) is already attached to the %dth dimension of a dataset (for variable %s)",
+                           pio_get_fname_from_file(file), file->pio_ncid, file->hdf5_dims[dimids[j]].name, j, file->hdf5_vars[i].name);
+          }
+
+          if(is_attached > 0){
+            /* Already attached (e.g. a native HDF5 reopen of an already
+             * fully-defined file) - nothing to do for this dimension. */
+            continue;
+          }
+
           if(H5DSattach_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_dims[dimids[j]].hdf5_dataset_id, j) < 0){
             return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                            "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
