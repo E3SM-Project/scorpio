@@ -141,6 +141,18 @@ extern "C" {
     int spio_remove_async_lock_file(const iosystem_desc_t *ios, const file_desc_t *file);
 #endif
 
+    /* Wait, on the sync I/O root only, for the asynchronous write lock file
+     * (named via spio_get_async_lock_filename() above) associated with
+     * filename to be removed, bounded by SPIO_ASYNC_OP_WAIT_TIMEOUT, before a
+     * read-only reopen of filename. A no-op (PIO_NOERR, no filesystem or MPI
+     * activity) when PIO_USE_ASYNC_WR_THREAD is disabled at compile time, or
+     * when this iosystem uses the disjoint-procs async I/O service
+     * (iosys_uses_async_io_service(ios)) rather than the in-process async
+     * write thread pool, since no lock file could ever exist for it. Never
+     * returns an error - a stale/un-removed lock file degrades to a
+     * PIOc_warn(), not a hard failure. See pio_file.cpp for details. */
+    int spio_wait_on_async_lock_file(const iosystem_desc_t *ios, const char *filename);
+
     /* Get a description of the variable represented by varid */
     const char *get_var_desc_str(int ncid, int varid, const char *desc_prefix);
 

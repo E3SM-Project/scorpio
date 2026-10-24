@@ -4658,6 +4658,20 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                     "Creating file (%s) failed. Error closing previous soft closed file", filename);
   }
 
+  /* A read-only reopen of an existing file (mode & PIO_NOWRITE) must not
+   * race a disjoint async-comm pending write/close on the same file - wait
+   * (bounded) for the asynchronous write lock file, if any, to be removed
+   * first. A write-capable reopen does not need this: it will itself become
+   * the async-routed owner of the file and has no lock file of its own yet
+   * to wait on. */
+  if(mode & PIO_NOWRITE){
+    ierr = spio_wait_on_async_lock_file(ios, filename);
+    if(ierr != PIO_NOERR){
+      return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                      "Opening file (%s) failed. Error waiting on the asynchronous write lock file", filename);
+    }
+  }
+
   /* To wait on all hdf5 async ops (for debugging),
    * ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
    */

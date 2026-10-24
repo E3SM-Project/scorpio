@@ -710,6 +710,98 @@ int spio_remove_async_lock_file(const iosystem_desc_t *ios, const file_desc_t *f
 }
 #endif /* _HDF5 */
 
+/* Wait, on the sync I/O root only, for the asynchronous write lock file
+ * created by spio_create_async_lock_file() for filename to be removed,
+ * before a read-only reopen of filename proceeds (see
+ * PIOc_openfile_retry_impl()). The lock file marks a pending/in-flight
+ * asynchronous write, by some other (possibly disjoint) process group, that
+ * a read-only reopen of the same file must not race - without this wait the
+ * reopen could observe a partially-written file.
+ *
+ * A no-op (PIO_NOERR, no filesystem access or MPI communication at all)
+ * when:
+ *  - PIO_USE_ASYNC_WR_THREAD is disabled at compile time - no lock file
+ *    mechanism exists in that build, or
+ *  - iosys_uses_async_io_service(ios) - this iosystem is using the (older,
+ *    MPI-intercomm-based) disjoint-procs async I/O service rather than the
+ *    in-process async write thread pool, so file->uses_async_io - and thus
+ *    the lock file - can never apply to this iosystem, or
+ *  - this rank is not a sync I/O proc (!ios->io_comm_info->is_sync_io_proc())
+ *    - it has no sync I/O comm to broadcast on and nothing to contribute to
+ *    the filesystem poll below.
+ *
+ * Otherwise, only the sync I/O root rank
+ * (ios->io_comm_info->get_sync_io_master() == MPI_ROOT) touches the
+ * filesystem: if the lock file is not present it returns immediately; if it
+ * is present it polls for its removal using the same bounded
+ * SLEEP_TIME_IN_MILLISECONDS/TIMEOUT_IN_MILLISECONDS pattern as
+ * spio_wait_on_hard_close() above and, on timeout, issues a PIOc_warn() and
+ * proceeds anyway - per the spec, a stale lock degrades to a warning, never
+ * a hard failure; this function never returns an error. The final outcome
+ * (cleared vs. timed out) is then broadcast from the sync I/O root to the
+ * rest of ios->io_comm_info->get_sync_io_comm(), so every sync I/O rank
+ * logs/proceeds consistently even though only the root did the filesystem
+ * polling.
+ */
+int spio_wait_on_async_lock_file(const iosystem_desc_t *ios, const char *filename)
+{
+  assert(ios && ios->io_comm_info && filename);
+
+#if PIO_USE_ASYNC_WR_THREAD
+  if(SPIO_Util::Iosys_Util::iosys_uses_async_io_service(const_cast<iosystem_desc_t *>(ios))){
+    return PIO_NOERR;
+  }
+
+  if(!ios->io_comm_info->is_sync_io_proc()){
+    return PIO_NOERR;
+  }
+
+  /* 1 = lock cleared (no lock file ever existed, or it was removed); 0 = the
+   * wait below timed out and the lock file is (still) present. Only
+   * meaningfully computed on the sync I/O root - every other sync I/O rank
+   * just receives it via the MPI_Bcast() below. */
+  int lock_cleared = 1;
+
+  if(ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
+    std::string lock_filename = spio_get_async_lock_filename(filename, ios->spio_lock_id);
+
+    struct stat st;
+    if(stat(lock_filename.c_str(), &st) == 0){
+      /* FIXME: Make the max time configurable */
+      const int MAX_SLEEP_TIME_IN_MILLISECONDS = SPIO_ASYNC_OP_WAIT_TIMEOUT;
+      const int SLEEP_TIME_IN_MILLISECONDS = 500;
+
+      const int max_tries = (MAX_SLEEP_TIME_IN_MILLISECONDS > SLEEP_TIME_IN_MILLISECONDS) ?
+                            (MAX_SLEEP_TIME_IN_MILLISECONDS/SLEEP_TIME_IN_MILLISECONDS) : 1;
+      int i = 0;
+      while((stat(lock_filename.c_str(), &st) == 0) && (i++ < max_tries)){
+        std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME_IN_MILLISECONDS));
+      }
+
+      if(stat(lock_filename.c_str(), &st) == 0){
+        lock_cleared = 0;
+        std::string msg = std::string("Waiting on the asynchronous write lock file (") +
+                            lock_filename + std::string(") before a read-only reopen of file (") +
+                            std::string(filename) +
+                            std::string(") aborted due to exceeding max timelimit") +
+                            std::string(" (max timeout limit(milli secs) = ") +
+                            std::to_string(MAX_SLEEP_TIME_IN_MILLISECONDS) +
+                            std::string("). Proceeding with the reopen anyway");
+        PIOc_warn(ios->iosysid, -1, __FILE__, __LINE__, msg.c_str());
+      }
+    }
+  }
+
+  /* Broadcast the final outcome from the sync I/O root to the rest of the
+   * sync I/O comm, so every sync I/O rank logs/proceeds consistently - only
+   * the root above actually touched the filesystem. */
+  int mpierr = MPI_Bcast(&lock_cleared, 1, MPI_INT, 0, ios->io_comm_info->get_sync_io_comm());
+  assert(mpierr == MPI_SUCCESS);
+#endif /* PIO_USE_ASYNC_WR_THREAD */
+
+  return PIO_NOERR;
+}
+
 /* Close the file ("hard close")
  * @param ios: Pointer to the iosystem_desc
  * @param file: Pointer to the file_desc for the file
