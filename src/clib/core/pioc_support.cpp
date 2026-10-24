@@ -4658,13 +4658,18 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                     "Creating file (%s) failed. Error closing previous soft closed file", filename);
   }
 
-  /* A read-only reopen of an existing file (mode & PIO_NOWRITE) must not
+  /* A read-only reopen of an existing file (!(mode & PIO_WRITE)) must not
    * race a disjoint async-comm pending write/close on the same file - wait
    * (bounded) for the asynchronous write lock file, if any, to be removed
    * first. A write-capable reopen does not need this: it will itself become
    * the async-routed owner of the file and has no lock file of its own yet
-   * to wait on. */
-  if(mode & PIO_NOWRITE){
+   * to wait on.
+   *
+   * Note: PIO_NOWRITE is NC_NOWRITE == 0x0000, so "mode & PIO_NOWRITE" is
+   * always false and must not be used as a read-only test here - check for
+   * the *absence* of the PIO_WRITE bit instead (see the PIO_NOWRITE == 0
+   * gotcha documented in tests/cunit/test_spio_iodesc_utils.cpp). */
+  if(!(mode & PIO_WRITE)){
     ierr = spio_wait_on_async_lock_file(ios, filename);
     if(ierr != PIO_NOERR){
       return pio_err(ios, NULL, ierr, __FILE__, __LINE__,

@@ -13,6 +13,14 @@
 #include "pio_internal.h"
 #include "spio_iosys_utils.hpp"
 
+#if PIO_USE_ASYNC_WR_THREAD && defined(_HDF5)
+/* Only needed by test_wait_on_async_lock_file_real_open_wiring() below, to
+ * drain any pending async ops left over from this test's own real
+ * PIOc_createfile()/PIOc_closefile() calls before manufacturing a lock file
+ * of our own. */
+#include "spio_async_hdf5_utils.hpp"
+#endif
+
 #ifdef SPIO_ENABLE_GPTL_TIMING
 #ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
 #include "gptl.h"
@@ -575,6 +583,194 @@ int test_wait_on_async_lock_file_integration(MPI_Comm comm, int wrank)
 
   return ret;
 }
+
+#ifdef _HDF5
+/* Fix round 1 (post-review): all of the tests above call
+ * spio_wait_on_async_lock_file() directly, which is exactly why the
+ * original wiring bug at the real call site was not caught - that call
+ * site (in PIOc_openfile_retry_impl(), pioc_support.cpp) originally read
+ * "if(mode & PIO_NOWRITE)", but PIO_NOWRITE is NC_NOWRITE == 0x0000 (see
+ * the same gotcha documented in tests/cunit/test_spio_iodesc_utils.cpp), so
+ * "mode & PIO_NOWRITE" is always false for every possible mode value and
+ * spio_wait_on_async_lock_file() was never actually invoked from a real
+ * reopen. The fix is "if(!(mode & PIO_WRITE))". This test exercises the
+ * real, public PIOc_openfile() -> PIOc_openfile_impl() -> openfile_int() ->
+ * PIOc_openfile_retry_impl() entry point end to end, so a regression of
+ * that mode-bit check would be caught here even if every direct-call test
+ * above kept passing.
+ *
+ * As in test_wait_on_async_lock_file_integration() above, a true two-
+ * disjoint-process-group MPI setup is impractical in this single-process
+ * cunit binary, so "group A" (the async writer) is simulated by
+ * manufacturing the lock file directly with Task 8's real
+ * spio_create_async_lock_file()/spio_remove_async_lock_file() helpers on a
+ * background thread, rather than racing the real async write thread pool's
+ * own (non-deterministic) completion timing. What is NOT simulated is the
+ * call site itself: "group B"'s reopen goes through the real, unmodified
+ * PIOc_openfile() public API against a real, single-rank PIOc_Init_Intracomm()
+ * iosystem and a real HDF5 file on disk, using that iosystem's own real
+ * ios->spio_lock_id (not a hand-rolled one), so the exact code path
+ * production code runs is what gets timed and checked below.
+ */
+int test_wait_on_async_lock_file_real_open_wiring(MPI_Comm comm, int wrank)
+{
+  int ret = PIO_NOERR;
+  int iosysid = -1;
+  const char *fname = "test_wait_lock_real_wiring.nc";
+
+  if((ret = PIOc_set_iosystem_error_handling(PIO_DEFAULT, PIO_RETURN_ERROR, NULL))){
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() FAILED: "
+      "PIOc_set_iosystem_error_handling() returned %d\n", ret);
+    return PIO_EINTERNAL;
+  }
+
+  if((ret = PIOc_Init_Intracomm(comm, 1, 1, 0, PIO_REARR_SUBSET, &iosysid))){
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() FAILED: "
+      "PIOc_Init_Intracomm() returned %d\n", ret);
+    return PIO_EINTERNAL;
+  }
+
+  int format = PIO_IOTYPE_HDF5;
+  int ncid = -1;
+  if((ret = PIOc_createfile(iosysid, &ncid, &format, fname, PIO_CLOBBER))){
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() FAILED: "
+      "PIOc_createfile() returned %d\n", ret);
+    PIOc_finalize(iosysid);
+    return PIO_EINTERNAL;
+  }
+
+  int dimid = -1;
+  if((ret = PIOc_def_dim(ncid, "x", (PIO_Offset)4, &dimid)) ||
+     (ret = PIOc_enddef(ncid))){
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() FAILED: "
+      "PIOc_def_dim()/PIOc_enddef() returned %d\n", ret);
+    PIOc_closefile(ncid);
+    PIOc_finalize(iosysid);
+    return PIO_EINTERNAL;
+  }
+
+  iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
+  file_desc_t *file = NULL;
+  if(!ios || (ret = pio_get_file(ncid, &file)) || !file){
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() FAILED: "
+      "pio_get_iosystem_from_id()/pio_get_file() lookup failed (ret = %d)\n", ret);
+    PIOc_closefile(ncid);
+    PIOc_finalize(iosysid);
+    return PIO_EINTERNAL;
+  }
+
+  if(!file->uses_async_io){
+    /* Nothing to prove here - without uses_async_io there would never be a
+     * lock file for this filename in production either. Skip rather than
+     * fail: this can legitimately happen on topologies where
+     * compute_uses_async_io() decides against async routing. */
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() SKIPPED: "
+      "file->uses_async_io is false for this topology - nothing to exercise\n");
+    PIOc_closefile(ncid);
+    PIOc_finalize(iosysid);
+    return PIO_NOERR;
+  }
+
+  if((ret = PIOc_closefile(ncid))){
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() FAILED: "
+      "PIOc_closefile() returned %d\n", ret);
+    PIOc_finalize(iosysid);
+    return PIO_EINTERNAL;
+  }
+  /* Drain any pending async ops (including this real close's own lock-file
+   * handling) before we manufacture our own lock file below, so the two
+   * cannot race/collide - the lock filename is deterministic from
+   * (fname, ios->spio_lock_id) alone, so the real close and our manufactured
+   * one below would otherwise contend for the exact same path. */
+  spio_wait_all_hdf5_async_ops(iosysid);
+
+  std::string lock_filename = spio_get_async_lock_filename(fname, ios->spio_lock_id);
+  remove(lock_filename.c_str());
+
+  file_desc_t fake_async_file{};
+  fake_async_file.pio_ncid = 0;
+  fake_async_file.uses_async_io = true;
+  strncpy(fake_async_file.fname, fname, PIO_MAX_NAME);
+  fake_async_file.fname[PIO_MAX_NAME] = '\0';
+
+  int create_ret = spio_create_async_lock_file(ios, &fake_async_file);
+  if((create_ret != PIO_NOERR) || !spio_test_file_exists(lock_filename)){
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() FAILED: "
+      "could not manufacture the lock file \"%s\" (create_ret = %d)\n",
+      lock_filename.c_str(), create_ret);
+    remove(lock_filename.c_str());
+    PIOc_finalize(iosysid);
+    return PIO_EINTERNAL;
+  }
+
+  /* "Group A" finishing its pending async write/close, backgrounded so it
+   * races the real reopen attempt below. */
+  std::thread writer_finishes([ios, &fake_async_file](){
+    std::this_thread::sleep_for(std::chrono::milliseconds(750));
+    int remove_ret = spio_remove_async_lock_file(ios, &fake_async_file);
+    assert(remove_ret == PIO_NOERR);
+  });
+
+  /* "Group B" (reader): a real read-only reopen through the actual public
+   * PIOc_openfile() entry point - this is the call that must wait on the
+   * lock file. If the mode-bit check at the real call site is broken (e.g.
+   * the "mode & PIO_NOWRITE" bug this test was added to catch), this
+   * reopen races ahead immediately instead of waiting for the thread
+   * above. */
+  int reopen_ncid = -1;
+  int reopen_format = PIO_IOTYPE_HDF5;
+  std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+  int open_ret = PIOc_openfile(iosysid, &reopen_ncid, &reopen_format, fname, PIO_NOWRITE);
+  long long elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::steady_clock::now() - start).count();
+
+  writer_finishes.join();
+
+  if(open_ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() FAILED: "
+      "the real read-only PIOc_openfile() reopen returned %d (expected PIO_NOERR)\n", open_ret);
+    ret = PIO_EINTERNAL;
+  }
+  else{
+    PIOc_closefile(reopen_ncid);
+  }
+
+  /* The key assertion: this real reopen must have actually waited for
+   * group A's (simulated) lock-file removal, not raced ahead of it. A
+   * reopen that returned well before the 750 ms removal delay above,
+   * despite the lock file still being present when it started, means the
+   * real call site never invoked spio_wait_on_async_lock_file() at all -
+   * exactly the "mode & PIO_NOWRITE is always false" bug this test is for.
+   * Leave headroom below the 750 ms delay for scheduling jitter. */
+  if(elapsed_ms < 500){
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() FAILED: "
+      "the real read-only reopen returned after only %lld ms, despite the "
+      "asynchronous write lock file still being present when it started - "
+      "the real PIOc_openfile_retry_impl() call site did not wait on it "
+      "(this is exactly the \"mode & PIO_NOWRITE is always false\" bug)\n",
+      elapsed_ms);
+    ret = PIO_EINTERNAL;
+  }
+  if(elapsed_ms >= SPIO_ASYNC_OP_WAIT_TIMEOUT){
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() FAILED: "
+      "the real read-only reopen took %lld ms (>= the %d ms timeout) - expected "
+      "it to observe group A's lock-file removal well before timing out\n",
+      elapsed_ms, SPIO_ASYNC_OP_WAIT_TIMEOUT);
+    ret = PIO_EINTERNAL;
+  }
+  if(spio_test_file_exists(lock_filename)){
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() FAILED: "
+      "lock file \"%s\" still exists after group A's (simulated) close\n", lock_filename.c_str());
+    ret = PIO_EINTERNAL;
+    remove(lock_filename.c_str());
+  }
+
+  PIOc_deletefile(iosysid, fname);
+  PIOc_finalize(iosysid);
+
+  return ret;
+}
+#endif /* _HDF5 */
 #endif /* PIO_USE_ASYNC_WR_THREAD */
 
 int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
@@ -645,6 +841,23 @@ int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
   else{
     LOG_RANK0(wrank, "test_wait_on_async_lock_file_integration() PASSED\n");
   }
+
+#ifdef _HDF5
+  /* Exercises the real PIOc_openfile() -> ... -> PIOc_openfile_retry_impl()
+   * wiring end to end - see this test's own doc comment above for why it
+   * exists in addition to the direct-call tests above. */
+  ret = test_wait_on_async_lock_file_real_open_wiring(comm, wrank);
+  if(ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() FAILED, ret = %d\n", ret);
+    nerrs++;
+  }
+  else{
+    LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() PASSED\n");
+  }
+#else
+  LOG_RANK0(wrank, "test_wait_on_async_lock_file_real_open_wiring() SKIPPED (_HDF5 is not "
+    "enabled in this build - no HDF5 iotype to open a real file through)\n");
+#endif
 
   /* Deliberately slow (waits for the full SPIO_ASYNC_OP_WAIT_TIMEOUT) - see
    * this test's own doc comment above. Run last so the fast tests above
