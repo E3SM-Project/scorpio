@@ -68,8 +68,17 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
     }
   }
   else{
-    /* Clobber mode : Delete HDF5 file (from root I/O proc) if it exists */
-    if(ios->tcomm_info->get_io_comm_rank() == 0){
+    /* Clobber mode : Delete HDF5 file (from root I/O proc) if it exists.
+     * The rank-0 test must pick the rank out of the same comm the barrier
+     * below synchronizes on (and that the fapl is built from) - for an
+     * async-routed file that is the async I/O comm. Using the sync I/O comm
+     * rank here on a disjoint topology would test a rank number that has no
+     * relationship to the ranks actually running this code (and, for a rank
+     * with no sync I/O comm at all, would come from a default-constructed
+     * Comm_info whose rank is 0 - so either every async rank unlinks, or
+     * none does). */
+    if((file->uses_async_io ? ios->tcomm_info->get_async_io_comm_rank()
+                             : ios->tcomm_info->get_io_comm_rank()) == 0){
       struct stat sd;
       if(0 == stat(filename, &sd)) { unlink(filename); }
     }
@@ -1286,8 +1295,19 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
     hstride[i] = 1;
   }
 
-  /* Only the IO master does the IO */
-  if(ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
+  /* Only the IO master does the IO.
+   *
+   * Which rank that is depends on how this *file* is routed, not on the
+   * comm topology alone: for a write-capable, async-routed file
+   * (file->uses_async_io) the ranks running this function are the async I/O
+   * procs (see this function's is_file_owning_io_proc() assert above), and
+   * on a disjoint sync/async topology no async I/O proc is ever the sync I/O
+   * master - so testing get_sync_io_master() here would leave hcount[]/
+   * nelems at zero on every participating rank and silently write nothing
+   * while still returning PIO_NOERR. Same role-aware selection as
+   * SPIO_Util::Iosys_Util::is_file_owning_io_proc(). */
+  if((file->uses_async_io ? ios->io_comm_info->get_async_io_master()
+                           : ios->io_comm_info->get_sync_io_master()) == MPI_ROOT){
     if(count){
       for(int i = 0; i < ndims; i++){
         hcount[i] = (hsize_t)count[i];
@@ -1468,8 +1488,15 @@ int spio_hdf5_get_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
     hstride[i] = 1;
   }
 
-  /* Only the IO master does the IO */
-  if(ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
+  /* Only the IO master does the IO - selected by this file's own routing
+   * role, not by the comm topology alone. See the identical (and more
+   * fully explained) selection in spio_hdf5_put_var() above: on a disjoint
+   * sync/async topology an async-routed file's owning ranks are never the
+   * sync I/O master, so a get_sync_io_master() test here would leave
+   * hcount[]/nelems at zero and silently read nothing into the caller's
+   * buffer while returning PIO_NOERR. */
+  if((file->uses_async_io ? ios->io_comm_info->get_async_io_master()
+                           : ios->io_comm_info->get_sync_io_master()) == MPI_ROOT){
     if(count){
       for(int i = 0; i < ndims; i++){
         hcount[i] = (hsize_t)count[i];
@@ -1579,6 +1606,8 @@ int spio_hdf5_get_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
     if(native_buf){
       brel(native_buf);
     }
+    H5Tclose(file_var_ntype_id);
+    H5Tclose(file_var_type_id);
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                    "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
                    "The low level (HDF5) I/O library call failed to read the dataset associated with this variable",
@@ -1593,16 +1622,28 @@ int spio_hdf5_get_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
             native_buf, native_buf_sz, spio_hdf5_type_to_pio_type(file_var_ntype_id), xtype);
     if(converted_buf == NULL){
       brel(native_buf);
+      int file_var_pio_type = spio_hdf5_type_to_pio_type(file_var_ntype_id);
+      H5Tclose(file_var_ntype_id);
+      H5Tclose(file_var_type_id);
       return pio_err(ios, file, PIO_EINTERNAL, __FILE__, __LINE__,
                      "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
                      "Unable to convert buffer from %d (variable type in file) to %d (buffer type in memory)",
                      pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid,
-                     spio_hdf5_type_to_pio_type(file_var_ntype_id), static_cast<int>(xtype));
+                     file_var_pio_type, static_cast<int>(xtype));
     }
     memcpy(buf, converted_buf, spio_get_nc_type_size(xtype) * nelems);
     brel(converted_buf);
     brel(native_buf);
   }
+
+  /* Both type handles have had their last use by this point (the datatype
+   * conversion block above is the only consumer of file_var_ntype_id after
+   * the H5Dread). Released here so the success path does not leak an HDF5
+   * type id per call - this is a read path, so it is called far more often
+   * than the equivalent (pre-existing, untouched) leak in
+   * spio_hdf5_put_var(). */
+  H5Tclose(file_var_ntype_id);
+  H5Tclose(file_var_type_id);
 
   if(H5Sclose(mem_space_id) < 0){
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,

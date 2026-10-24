@@ -31,6 +31,9 @@
  *      HDF5 file opened with PIO_IOTYPE_HDF5 through the real
  *      PIOc_openfile() path still falls back to the historical
  *      switch-iotype-away behavior (successful open, non-HDF5 iotype).
+ *  10. test_disjoint_nondecomposed_put_get_roundtrip - async on, disjoint
+ *      procs: a non-decomposed PIOc_put_var on a write-capable (async-
+ *      routed) file actually writes its data (review finding C1).
  *
  * This file adds tests only - it does not change any production code.
  *
@@ -1181,6 +1184,173 @@ static int test_disjoint_write_close_reopen_lock_present(MPI_Comm test_comm, int
 #endif /* PIO_USE_ASYNC_WR_THREAD */
 
 /* ------------------------------------------------------------------------
+ * Scenario 10: non-decomposed (whole-variable) PIOc_put_var/PIOc_get_var on
+ * a write-capable, async-routed file with DISJOINT sync/async I/O procs.
+ *
+ * Regression test for review finding C1: spio_hdf5_put_var()/
+ * spio_hdf5_get_var() (src/clib/core/iolib/hdf5/spio_hdf5_utils.cpp) filled
+ * their hcount[]/nelems only inside "if(get_sync_io_master() == MPI_ROOT)".
+ * On a disjoint topology an async-routed file's owning ranks are the async
+ * I/O procs, and none of those is ever the sync I/O master - so hcount[]
+ * stayed all-zero, H5Dwrite transferred zero elements, and PIOc_put_var
+ * returned PIO_NOERR having written nothing at all. Silent data loss.
+ *
+ * The round trip is deliberately verified through a *second*, read-only
+ * (PIO_NOWRITE, and therefore sync-routed, uses_async_io == false) native
+ * reopen rather than by reading back through the write-capable handle:
+ *
+ *   KNOWN PRE-EXISTING (backlog item 5, confirmed by the final review, out
+ *   of scope for this fix round): spio_get_vars_tc()
+ *   (src/clib/core/pio_getput_int.cpp:2235) broadcasts the result buffer
+ *   from ios->io_comm_info->get_sync_io_root() unconditionally, even for an
+ *   async-routed file whose data was read on an async I/O rank. On a
+ *   disjoint topology that root never read anything, so every rank -
+ *   including the rank that did the read - ends up with the sync root's
+ *   untouched buffer. Fixing C1's inner gate is necessary but not
+ *   sufficient to make a non-decomposed read *through an async-routed
+ *   handle* return correct data; that needs backlog item 5's Bcast root
+ *   fixed too. Reading back through a sync-routed open exercises
+ *   spio_hdf5_get_var() with a coherent Bcast root, and - crucially -
+ *   proves what C1 is really about: that put_var's bytes actually reached
+ *   the file instead of being silently dropped.
+ * ------------------------------------------------------------------------ */
+#define ND_ROUNDTRIP_VAR_NAME "nd_roundtrip_var"
+#define ND_ROUNDTRIP_LEN 8
+
+static int test_disjoint_nondecomposed_put_get_roundtrip(MPI_Comm test_comm, int my_rank,
+                                                         int ntasks)
+{
+  int ret = PIO_NOERR;
+  int iosysid = -1;
+  char filename[PIO_MAX_NAME + 1];
+
+  (void) ntasks;
+
+  snprintf(filename, PIO_MAX_NAME + 1, "%s_nd_put_get.nc", TEST_NAME);
+
+  if((ret = PIOc_Init_Intracomm(test_comm, NUM_IO1, STRIDE1, BASE0,
+                                PIO_REARR_CONTIG, &iosysid))){
+    LOG_RANK0(my_rank, "test_disjoint_nondecomposed_put_get_roundtrip() FAILED: "
+      "PIOc_Init_Intracomm() returned %d\n", ret);
+    return ret;
+  }
+
+  iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
+  if(!ios || !ios->io_comm_info){
+    LOG_RANK0(my_rank, "test_disjoint_nondecomposed_put_get_roundtrip() FAILED: "
+      "pio_get_iosystem_from_id() returned NULL\n");
+    finalize_iosys(iosysid);
+    return PIO_EINTERNAL;
+  }
+
+#if PIO_USE_ASYNC_WR_THREAD
+  if(!iosys_has_disjoint_io_procs(ios)){
+    LOG_RANK0(my_rank, "test_disjoint_nondecomposed_put_get_roundtrip() SKIPPED: this "
+      "iosystem's sync and async I/O procs are not disjoint on this topology (IO_comm_info "
+      "fell back to duplicating the sync comm) - the C1 defect is not reachable here\n");
+    finalize_iosys(iosysid);
+    return PIO_NOERR;
+  }
+#endif
+
+  int nerrs = 0;
+  int ncid = -1, dimid = -1, varid = -1;
+  int format = PIO_IOTYPE_HDF5;
+
+  std::vector<int> nd_wdata(ND_ROUNDTRIP_LEN);
+  for(int i = 0; i < ND_ROUNDTRIP_LEN; i++){
+    /* Deliberately non-zero: an HDF5 dataset that was never written reads
+     * back as the (zero) fill value, which is exactly what the C1 defect
+     * produced - zero-valued data must not be mistaken for a pass. */
+    nd_wdata[i] = 7000 + i;
+  }
+
+  if((ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER)) ||
+     (ret = PIOc_def_dim(ncid, DIM_NAME, (PIO_Offset) ND_ROUNDTRIP_LEN, &dimid)) ||
+     (ret = PIOc_def_var(ncid, ND_ROUNDTRIP_VAR_NAME, PIO_INT, NDIM1, &dimid, &varid)) ||
+     (ret = PIOc_enddef(ncid))){
+    LOG_RANK0(my_rank, "test_disjoint_nondecomposed_put_get_roundtrip() FAILED: defining the "
+      "file returned %d\n", ret);
+    if(ncid >= 0) { PIOc_closefile(ncid); }
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+#if PIO_USE_ASYNC_WR_THREAD
+  {
+    file_desc_t *file = NULL;
+    if((pio_get_file(ncid, &file) != PIO_NOERR) || !file || !file->uses_async_io){
+      LOG_RANK0(my_rank, "test_disjoint_nondecomposed_put_get_roundtrip() FAILED: the "
+        "write-capable file does not have uses_async_io == true - the put_var would not be "
+        "routed through the async I/O procs and this scenario would prove nothing\n");
+      PIOc_closefile(ncid);
+      finalize_iosys(iosysid);
+      return PIO_EINTERNAL;
+    }
+  }
+#endif
+
+  /* The non-decomposed, whole-variable write path (NOT PIOc_write_darray) -
+   * this is the call that silently wrote zero elements before the C1 fix. */
+  if((ret = PIOc_put_var_int(ncid, varid, nd_wdata.data()))){
+    LOG_RANK0(my_rank, "test_disjoint_nondecomposed_put_get_roundtrip() FAILED: "
+      "PIOc_put_var_int() returned %d\n", ret);
+    PIOc_closefile(ncid);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  if((ret = PIOc_closefile(ncid))){
+    LOG_RANK0(my_rank, "test_disjoint_nondecomposed_put_get_roundtrip() FAILED: "
+      "PIOc_closefile() returned %d\n", ret);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  drain_async_ops(iosysid);
+  MPI_Barrier(test_comm);
+
+  /* Read back through a read-only (sync-routed) reopen - see this
+   * scenario's doc comment for why not through the write-capable handle. */
+  int rd_ncid = -1, rd_varid = -1;
+  int rd_format = PIO_IOTYPE_HDF5;
+  std::vector<int> nd_rdata(ND_ROUNDTRIP_LEN, -1);
+
+  if((ret = PIOc_openfile(iosysid, &rd_ncid, &rd_format, filename, PIO_NOWRITE))){
+    LOG_RANK0(my_rank, "test_disjoint_nondecomposed_put_get_roundtrip() FAILED: the read-only "
+      "reopen returned %d\n", ret);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  if((ret = PIOc_inq_varid(rd_ncid, ND_ROUNDTRIP_VAR_NAME, &rd_varid)) ||
+     (ret = PIOc_get_var_int(rd_ncid, rd_varid, nd_rdata.data()))){
+    fprintf(stderr, "test_disjoint_nondecomposed_put_get_roundtrip() FAILED (rank %d): reading "
+      "the non-decomposed variable back returned %d\n", my_rank, ret);
+    nerrs++;
+  }
+  else{
+    for(int i = 0; i < ND_ROUNDTRIP_LEN; i++){
+      if(nd_rdata[i] != nd_wdata[i]){
+        fprintf(stderr, "test_disjoint_nondecomposed_put_get_roundtrip() FAILED (rank %d): "
+          "nd_rdata[%d] (%d) != nd_wdata[%d] (%d) - PIOc_put_var_int() on a write-capable, "
+          "async-routed file with disjoint sync/async I/O procs did not actually write the "
+          "data (review finding C1: spio_hdf5_put_var() gated hcount[]/nelems on the *sync* "
+          "I/O master, which no async-owning rank ever is)\n",
+          my_rank, i, nd_rdata[i], i, nd_wdata[i]);
+        nerrs++;
+        break;
+      }
+    }
+  }
+
+  PIOc_closefile(rd_ncid);
+  finalize_iosys(iosysid);
+
+  return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* ------------------------------------------------------------------------
  * Scenarios 6-8: write via each rearranger, close, reopen write-capable,
  * and verify the file stayed PIO_IOTYPE_HDF5 (Tasks 10/11's native reopen,
  * not the historical switch-away to NETCDF4P/PNETCDF) with its dims, vars,
@@ -1669,6 +1839,9 @@ int main(int argc, char **argv)
                    "test_read_write_interleaved_no_race");
     }
     MPI_Barrier(test_comm);
+
+    RUN_SCENARIO(test_disjoint_nondecomposed_put_get_roundtrip(test_comm, my_rank, ntasks),
+                 "test_disjoint_nondecomposed_put_get_roundtrip");
 
     RUN_SCENARIO(test_disjoint_write_close_reopen_lock_absent(test_comm, my_rank, ntasks),
                  "test_disjoint_write_close_reopen_lock_absent");
