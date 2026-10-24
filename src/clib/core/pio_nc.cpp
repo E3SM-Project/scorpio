@@ -5152,6 +5152,26 @@ int PIOc_copy_att_impl(int incid, int ivarid, const char *name,
 #ifdef _HDF5
     case PIO_IOTYPE_HDF5:
     case PIO_IOTYPE_HDF5C:
+          /* The two files' HDF5 handles live on disjoint rank sets when they
+           * route differently (e.g. a read-only input file, which is always
+           * sync-routed, and a write-capable output file, which is
+           * async-routed - the single most common real use of copy_att:
+           * carrying global attributes from an input dataset to an output
+           * dataset). The conjunction below is then satisfied on NO rank, so
+           * the copy silently did not happen while ierr stayed PIO_NOERR and
+           * the caller was told it succeeded. The operation is genuinely not
+           * supported in that topology - say so instead of no-op'ing.
+           *
+           * PIO_ENOTSUPPORT does not exist in this codebase (see pio.h's
+           * error code list), so PIO_EINVAL is used. */
+          if(ifile->uses_async_io != ofile->uses_async_io){
+            ierr = pio_err(ios, ifile, PIO_EINVAL, __FILE__, __LINE__,
+                           "Copying attribute (%s) from file (%s) to file (%s) failed. "
+                           "Cross-routing attribute copy between an async-routed and a "
+                           "sync-routed HDF5 file is not supported", name,
+                           pio_get_fname_from_file(ifile), pio_get_fname_from_file(ofile));
+            break;
+          }
           if(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, ifile) &&
              SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, ofile)){
             ierr = spio_hdf5_copy_att(ifile->iosystem, ifile, ivarid, name, ofile, ovarid);
