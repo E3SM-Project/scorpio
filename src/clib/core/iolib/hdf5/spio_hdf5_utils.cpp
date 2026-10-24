@@ -85,8 +85,17 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
     }
   }
   else{
-    /* Clobber mode : Delete HDF5 file (from root I/O proc) if it exists */
-    if(ios->tcomm_info->get_io_comm_rank() == 0){
+    /* Clobber mode : Delete HDF5 file (from root I/O proc) if it exists.
+     * The rank-0 test must pick the rank out of the same comm the barrier
+     * below synchronizes on (and that the fapl is built from) - for an
+     * async-routed file that is the async I/O comm. Using the sync I/O comm
+     * rank here on a disjoint topology would test a rank number that has no
+     * relationship to the ranks actually running this code (and, for a rank
+     * with no sync I/O comm at all, would come from a default-constructed
+     * Comm_info whose rank is 0 - so either every async rank unlinks, or
+     * none does). */
+    if((file->uses_async_io ? ios->tcomm_info->get_async_io_comm_rank()
+                             : ios->tcomm_info->get_io_comm_rank()) == 0){
       struct stat sd;
       if(0 == stat(filename, &sd)) { unlink(filename); }
     }
@@ -1426,8 +1435,19 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
     hstride[i] = 1;
   }
 
-  /* Only the IO master does the IO */
-  if(ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
+  /* Only the IO master does the IO.
+   *
+   * Which rank that is depends on how this *file* is routed, not on the
+   * comm topology alone: for a write-capable, async-routed file
+   * (file->uses_async_io) the ranks running this function are the async I/O
+   * procs (see this function's is_file_owning_io_proc() assert above), and
+   * on a disjoint sync/async topology no async I/O proc is ever the sync I/O
+   * master - so testing get_sync_io_master() here would leave hcount[]/
+   * nelems at zero on every participating rank and silently write nothing
+   * while still returning PIO_NOERR. Same role-aware selection as
+   * SPIO_Util::Iosys_Util::is_file_owning_io_proc(). */
+  if((file->uses_async_io ? ios->io_comm_info->get_async_io_master()
+                           : ios->io_comm_info->get_sync_io_master()) == MPI_ROOT){
     if(count){
       for(int i = 0; i < ndims; i++){
         hcount[i] = (hsize_t)count[i];
