@@ -99,7 +99,8 @@ if (NOT PIO_USE_MPISERIAL)
   if (WITH_HDF5)
     add_spio_executable (test_darray_hdf5_contig TRUE "" test_darray_hdf5_contig.cpp OBJ_LIBS test_common_obj)
     add_spio_executable (test_putget_hdf5 TRUE "" test_putget_hdf5.cpp OBJ_LIBS test_common_obj)
-    add_dependencies (tests test_darray_hdf5_contig test_putget_hdf5)
+    add_spio_executable (test_hdf5_reopen TRUE "" test_hdf5_reopen.cpp OBJ_LIBS test_common_obj)
+    add_dependencies (tests test_darray_hdf5_contig test_putget_hdf5 test_hdf5_reopen)
   endif ()
   if (PIO_USE_MALLOC)
     add_spio_executable (test_darray_async_simple TRUE "" test_darray_async_simple.cpp OBJ_LIBS test_common_obj)
@@ -373,6 +374,10 @@ else ()
       TIMEOUT ${DEFAULT_TEST_TIMEOUT})
     add_mpi_test(test_putget_hdf5
       EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_putget_hdf5
+      NUMPROCS 1
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+    add_mpi_test(test_hdf5_reopen
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_hdf5_reopen
       NUMPROCS 1
       TIMEOUT ${DEFAULT_TEST_TIMEOUT})
   endif ()
