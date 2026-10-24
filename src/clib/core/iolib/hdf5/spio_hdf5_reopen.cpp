@@ -913,9 +913,7 @@ int spio_hdf5_reopen(iosystem_desc_t *ios, file_desc_t *file, const char *filena
    * filesystem is exactly the kind of thing whose visibility can otherwise
    * flip between two closely-spaced, independent local opens.
    */
-  if(H5Fis_hdf5(filename) <= 0){
-    return PIO_EBADIOTYPE;
-  }
+  bool recognized = (H5Fis_hdf5(filename) > 0);
 
   /* A plain, local (not MPI-IO collective) probe open, purely to read the
    * file-level/dataset-level metadata spio_hdf5_is_scorpio_written() needs,
@@ -942,19 +940,97 @@ int spio_hdf5_reopen(iosystem_desc_t *ios, file_desc_t *file, const char *filena
    * function. Falling back uniformly avoids that regardless of why the open
    * failed.
    */
-  hid_t fid = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
-  if(fid == H5I_INVALID_HID){
-    return PIO_EBADIOTYPE;
+  hid_t fid = H5I_INVALID_HID;
+  if(recognized){
+    fid = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
+    if(fid == H5I_INVALID_HID){
+      recognized = false;
+    }
+    else if(!spio_hdf5_is_scorpio_written(fid)){
+      /* Not a SCORPIO-written HDF5 file (or indeterminate) - close the probe
+       * handle and let the caller fall back to the existing (safe, if lossy)
+       * switch-iotype-away behavior. This is an expected outcome, not an
+       * error: every file that predates this feature, or that was written by
+       * some other HDF5 writer, takes this path.
+       */
+      H5Fclose(fid);
+      fid = H5I_INVALID_HID;
+      recognized = false;
+    }
   }
 
-  if(!spio_hdf5_is_scorpio_written(fid)){
-    /* Not a SCORPIO-written HDF5 file (or indeterminate) - close the probe
-     * handle and let the caller fall back to the existing (safe, if lossy)
-     * switch-iotype-away behavior. This is an expected outcome, not an
-     * error: every file that predates this feature, or that was written by
-     * some other HDF5 writer, takes this path.
-     */
-    H5Fclose(fid);
+  /* Collective consensus on recognition, for a write-capable reopen only.
+   *
+   * Everything above is a per-rank, serial, NON-collective probe, and (as
+   * the comments above spell out) different ranks can legitimately observe
+   * different outcomes for the same file at the same instant on a parallel
+   * filesystem - which is exactly why a probe failure degrades to
+   * PIO_EBADIOTYPE rather than being raised as a hard error.
+   *
+   * For a read-only reopen that divergence is merely inconsistent-but-
+   * progressing: each rank keeps its own serial handle and makes its own
+   * independent, non-collective decisions from then on. For a write-capable
+   * reopen it is not: the block near the end of this function upgrades to a
+   * COLLECTIVE H5Fopen() over the file's I/O communicator. A rank that
+   * recognized the file would enter that collective call, and a rank in the
+   * same communicator that did not recognize it would return PIO_EBADIOTYPE
+   * here and never join - a hang, not a degradation.
+   *
+   * So, before any rank can commit to that collective open, every rank that
+   * would participate in it agrees on recognition first, over the exact same
+   * communicator the collective H5Fopen() will use. On any disagreement all
+   * of them take the identical PIO_EBADIOTYPE fallback.
+   *
+   * This is placed here, at the top of the function, because it is the only
+   * point every member of that communicator is guaranteed to reach: every
+   * later point is downstream of at least one early return.
+   *
+   * Ranks that are not members of that communicator (is_file_owning_io_proc()
+   * is false) are deliberately excluded - they never enter the collective
+   * H5Fopen(), so they need not, and must not, participate here.
+   *
+   * KNOWN RESIDUAL LIMITATION (not addressed here): this covers divergent
+   * *recognition* only. If the metadata scan below, or the collective
+   * H5Fopen()/H5Dopen2() itself, fails on some owning ranks and not others,
+   * those ranks take a genuine-error return (which PIOc_openfile_retry_impl()
+   * propagates immediately, skipping its later MPI_Allreduce over
+   * ios->my_comm) while ranks that already returned PIO_NOERR - in
+   * particular every non-owning rank - fall through to that reduce. That is
+   * still a hang rather than a uniform error. Closing it needs a second
+   * consensus point covering ios->my_comm after the collective open, which
+   * in turn needs the scan's several genuine-error early returns to be
+   * restructured into a single, agreed exit - more than this fix round
+   * covers. See also the matching note at this function's call site in
+   * pioc_support.cpp.
+   */
+  if(mode & PIO_WRITE){
+    MPI_Comm coll_comm = file->uses_async_io ? ios->tcomm_info->get_async_io_comm()
+                                             : ios->tcomm_info->get_io_comm();
+
+    if(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file) &&
+       (coll_comm != MPI_COMM_NULL)){
+      int local_recognized = recognized ? 1 : 0;
+      int all_recognized = 0;
+
+      int mpierr = MPI_Allreduce(&local_recognized, &all_recognized, 1, MPI_INT,
+                                 MPI_MIN, coll_comm);
+      if(mpierr != MPI_SUCCESS){
+        if(fid != H5I_INVALID_HID){
+          H5Fclose(fid);
+        }
+        return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
+      }
+
+      if(!all_recognized){
+        if(fid != H5I_INVALID_HID){
+          H5Fclose(fid);
+        }
+        return PIO_EBADIOTYPE;
+      }
+    }
+  }
+
+  if(!recognized){
     return PIO_EBADIOTYPE;
   }
 

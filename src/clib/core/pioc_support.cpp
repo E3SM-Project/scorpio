@@ -4923,6 +4923,31 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
      * variable here instead keeps this block's result out of `ierr`
      * entirely, exactly as the pre-existing switch-iotype-away code it
      * replaces also never touched `ierr`.
+     *
+     * On rank divergence. spio_hdf5_reopen()'s recognition probes
+     * (H5Fis_hdf5(), the probe H5Fopen(), spio_hdf5_is_scorpio_written())
+     * are per-rank, serial and non-collective, so ranks can legitimately
+     * disagree about the same file on a parallel filesystem. For a
+     * write-capable reopen that would be fatal rather than merely
+     * inconsistent - the recognizing ranks enter a COLLECTIVE H5Fopen() the
+     * non-recognizing ranks never join - so spio_hdf5_reopen() now agrees on
+     * recognition across the file's I/O communicator before any rank commits
+     * to that collective open; see the consensus block at the top of that
+     * function.
+     *
+     * KNOWN RESIDUAL LIMITATION: that consensus covers divergent
+     * *recognition* only. If spio_hdf5_reopen()'s metadata scan, or its
+     * collective H5Fopen()/H5Dopen2(), fails on some owning ranks and not
+     * others, the failing ranks take the `else` (genuine error) branch below
+     * and return from this function immediately - skipping the
+     * MPI_Allreduce(..., MPI_MIN, ios->my_comm) further down - while every
+     * rank that got PIO_NOERR (in particular every non-owning rank, which
+     * returns early from that block without touching HDF5 at all) falls
+     * through and reaches it. The result is a hang rather than a uniform
+     * error. Closing it requires a second consensus point over ios->my_comm
+     * after the collective open, which in turn requires that function's
+     * several genuine-error early returns to be restructured into a single
+     * agreed exit.
      */
     int hdf5_reopen_ierr = spio_hdf5_reopen(ios, file, filename, mode);
     if(hdf5_reopen_ierr == PIO_NOERR){
