@@ -37,6 +37,9 @@
  *  11. test_cross_routing_copy_att_errors - PIOc_copy_att between an
  *      async-routed and a sync-routed HDF5 file reports an error instead
  *      of silently doing nothing (review finding I2).
+ *  12. test_non_hdf5_write_open_leaves_no_lock_file - a write-capable
+ *      PnetCDF file leaves no *.spio_lock behind, on either the create or
+ *      the write-capable open path (backlog item 8).
  *
  * This file adds tests only - it does not change any production code.
  *
@@ -1354,6 +1357,115 @@ static int test_disjoint_nondecomposed_put_get_roundtrip(MPI_Comm test_comm, int
 }
 
 /* ------------------------------------------------------------------------
+ * Scenario 12: a write-capable NON-HDF5 (PnetCDF) file must not leave a
+ * *.spio_lock file behind (backlog item 8, re-triaged Important by the
+ * final review).
+ *
+ * The async write lock file is created whenever file->uses_async_io is
+ * set, but removed only inside spio_hard_closefile()'s
+ * "iotype is HDF5/HDF5C" block. Both uses_async_io computations
+ * (spio_createfile_int() and PIOc_openfile_retry_impl(), both in
+ * pioc_support.cpp) used to omit any iotype test, so uses_async_io was
+ * true for PnetCDF/NetCDF4P/NetCDF-classic files too. Every write-capable
+ * file of every non-HDF5 iotype therefore leaked a lock file into the
+ * user's output directory, and a later read-only open of the same
+ * filename in the same run stalled on it for the full
+ * SPIO_ASYNC_OP_WAIT_TIMEOUT (120 s) before warning and proceeding.
+ *
+ * This scenario lives in this (HDF5-named) file because the lock-file
+ * machinery it is testing is HDF5-async-specific and all the helpers for
+ * it are here - the file under test is deliberately NOT an HDF5 file.
+ * ------------------------------------------------------------------------ */
+#ifdef _PNETCDF
+#define LOCK_LEAK_VAR_NAME "lock_leak_var"
+#define LOCK_LEAK_DIM_LEN 4
+
+static int check_no_lock_file(const iosystem_desc_t *ios, const char *filename,
+                              const char *stage, int my_rank)
+{
+  std::string lock_filename = spio_get_async_lock_filename(filename, ios->spio_lock_id);
+  if(test_file_exists(lock_filename)){
+    fprintf(stderr, "test_non_hdf5_write_open_leaves_no_lock_file() FAILED (rank %d): the "
+      "asynchronous write lock file (%s) still exists after %s a write-capable PnetCDF file "
+      "- uses_async_io must not be set for a non-HDF5 iotype, because only the HDF5 close "
+      "path ever removes the lock file (backlog item 8)\n",
+      my_rank, lock_filename.c_str(), stage);
+    /* Clean up so a repeat run of this binary is not poisoned by it. */
+    remove(lock_filename.c_str());
+    return 1;
+  }
+
+  return 0;
+}
+
+static int test_non_hdf5_write_open_leaves_no_lock_file(MPI_Comm test_comm, int my_rank)
+{
+  int ret = PIO_NOERR;
+  int iosysid = -1;
+  char filename[PIO_MAX_NAME + 1];
+
+  snprintf(filename, PIO_MAX_NAME + 1, "%s_pnetcdf_lock_leak.nc", TEST_NAME);
+
+  if((ret = PIOc_Init_Intracomm(test_comm, NUM_IO1, STRIDE1, BASE0,
+                                PIO_REARR_CONTIG, &iosysid))){
+    LOG_RANK0(my_rank, "test_non_hdf5_write_open_leaves_no_lock_file() FAILED: "
+      "PIOc_Init_Intracomm() returned %d\n", ret);
+    return ret;
+  }
+
+  iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
+  if(!ios){
+    LOG_RANK0(my_rank, "test_non_hdf5_write_open_leaves_no_lock_file() FAILED: "
+      "pio_get_iosystem_from_id() returned NULL\n");
+    finalize_iosys(iosysid);
+    return PIO_EINTERNAL;
+  }
+
+  int nerrs = 0;
+  int ncid = -1, dimid = -1, varid = -1;
+  int format = PIO_IOTYPE_PNETCDF;
+
+  /* (a) the create path - spio_createfile_int()'s uses_async_io */
+  if((ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER)) ||
+     (ret = PIOc_def_dim(ncid, DIM_NAME, (PIO_Offset) LOCK_LEAK_DIM_LEN, &dimid)) ||
+     (ret = PIOc_def_var(ncid, LOCK_LEAK_VAR_NAME, PIO_INT, NDIM1, &dimid, &varid)) ||
+     (ret = PIOc_enddef(ncid)) ||
+     (ret = PIOc_closefile(ncid))){
+    LOG_RANK0(my_rank, "test_non_hdf5_write_open_leaves_no_lock_file() FAILED: creating and "
+      "closing the PnetCDF file returned %d\n", ret);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  MPI_Barrier(test_comm);
+  nerrs += check_no_lock_file(ios, filename, "creating and closing", my_rank);
+
+  /* (b) the write-capable open path - PIOc_openfile_retry_impl()'s
+   * uses_async_io (the same computation, at its own site) */
+  int wr_ncid = -1;
+  int wr_format = PIO_IOTYPE_PNETCDF;
+  if((ret = PIOc_openfile(iosysid, &wr_ncid, &wr_format, filename, PIO_WRITE)) ||
+     (ret = PIOc_closefile(wr_ncid))){
+    LOG_RANK0(my_rank, "test_non_hdf5_write_open_leaves_no_lock_file() FAILED: the "
+      "write-capable open/close of the PnetCDF file returned %d\n", ret);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  MPI_Barrier(test_comm);
+  nerrs += check_no_lock_file(ios, filename, "write-capable opening and closing", my_rank);
+
+  finalize_iosys(iosysid);
+
+  if(my_rank == 0){
+    remove(filename);
+  }
+
+  return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+#endif /* _PNETCDF */
+
+/* ------------------------------------------------------------------------
  * Scenario 11: PIOc_copy_att between two HDF5 files that route differently
  * must report an error, not silently do nothing (review finding I2).
  *
@@ -1419,11 +1531,33 @@ static int test_cross_routing_copy_att_errors(MPI_Comm test_comm, int my_rank, i
   std::vector<int> wdata(MAPLEN_PER_RANK);
   fill_wdata(wdata, my_rank, 0);
 
-  /* The input file: written, closed, then reopened PIO_NOWRITE so that it
-   * is sync-routed (uses_async_io == false). It carries GATT_NAME. */
+  /* Both files are written and closed up front, one at a time, and only
+   * then reopened - the input PIO_NOWRITE (so it is sync-routed,
+   * uses_async_io == false) and the output PIO_WRITE (so it is
+   * async-routed). Deliberately NOT PIOc_createfile()'ing the output file
+   * while the input file is already open: that shape - a create dispatched
+   * onto the async thread pool concurrently with the main thread's own
+   * collective in spio_createfile_int() - is backlog item 7, a documented,
+   * pre-existing, out-of-scope collective mismatch, and it made this
+   * scenario crash non-deterministically (observed as a SEGV inside HDF5's
+   * collective metadata-cache flush). Reopening two already-written files
+   * exercises exactly the cross-routing copy_att this scenario is about,
+   * and is also the realistic shape the review describes: carrying
+   * attributes from an input dataset to an output dataset. */
   if((ret = write_fixture_file(iosysid, ioid, in_filename, gdimlen, wdata, NULL, NULL))){
-    LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() FAILED: writing the fixture file "
-      "returned %d\n", ret);
+    LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() FAILED: writing the input "
+      "fixture file returned %d\n", ret);
+    PIOc_freedecomp(iosysid, ioid);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  drain_async_ops(iosysid);
+  MPI_Barrier(test_comm);
+
+  if((ret = write_fixture_file(iosysid, ioid, out_filename, gdimlen, wdata, NULL, NULL))){
+    LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() FAILED: writing the output "
+      "fixture file returned %d\n", ret);
     PIOc_freedecomp(iosysid, ioid);
     finalize_iosys(iosysid);
     return ret;
@@ -1444,11 +1578,12 @@ static int test_cross_routing_copy_att_errors(MPI_Comm test_comm, int my_rank, i
     return ret;
   }
 
-  /* The output file: freshly created, so write-capable and async-routed. */
-  if((ret = PIOc_createfile(iosysid, &out_ncid, &out_format, out_filename, PIO_CLOBBER))){
-    LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() FAILED: creating the output file "
-      "returned %d\n", ret);
+  /* The output file: reopened write-capable, so async-routed. */
+  if((ret = PIOc_openfile(iosysid, &out_ncid, &out_format, out_filename, PIO_WRITE))){
+    LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() FAILED: the write-capable "
+      "reopen of the output file returned %d\n", ret);
     PIOc_closefile(in_ncid);
+    drain_async_ops(iosysid);
     PIOc_freedecomp(iosysid, ioid);
     finalize_iosys(iosysid);
     return ret;
@@ -1484,8 +1619,25 @@ static int test_cross_routing_copy_att_errors(MPI_Comm test_comm, int my_rank, i
     }
   }
 
+  /* Drain between the two closes: the write-capable output file's close is
+   * an async op, and closing the read-only input file (which, since the
+   * native reopen landed, is still iotype == PIO_IOTYPE_HDF5 and so also
+   * queues an async close) right behind it leaves two async closes for two
+   * different files in flight at once. That is backlog item 9 territory -
+   * the same pre-existing read-only-reopen async-close defect this file's
+   * drain_async_ops() helper documents - and was observed here as a
+   * non-deterministic SEGV inside HDF5's collective metadata-cache flush
+   * (H5AC__run_sync_point) on the async thread. Draining in between keeps
+   * this scenario deterministic without suppressing anything it asserts
+   * on: the copy_att assertion above has already been evaluated. */
   PIOc_closefile(out_ncid);
+  drain_async_ops(iosysid);
+  MPI_Barrier(test_comm);
+
   PIOc_closefile(in_ncid);
+  drain_async_ops(iosysid);
+  MPI_Barrier(test_comm);
+
   PIOc_freedecomp(iosysid, ioid);
   finalize_iosys(iosysid);
 
@@ -2031,6 +2183,15 @@ int main(int argc, char **argv)
 
     RUN_SCENARIO(test_cross_routing_copy_att_errors(test_comm, my_rank, ntasks),
                  "test_cross_routing_copy_att_errors");
+
+#ifdef _PNETCDF
+    RUN_SCENARIO(test_non_hdf5_write_open_leaves_no_lock_file(test_comm, my_rank),
+                 "test_non_hdf5_write_open_leaves_no_lock_file");
+#else
+    LOG_RANK0(my_rank, "test_non_hdf5_write_open_leaves_no_lock_file() SKIPPED "
+      "(PnetCDF is not configured in this build - no non-HDF5 parallel iotype to "
+      "exercise the lock-file leak with)\n");
+#endif
 
     RUN_SCENARIO(test_disjoint_write_close_reopen_lock_absent(test_comm, my_rank, ntasks),
                  "test_disjoint_write_close_reopen_lock_absent");

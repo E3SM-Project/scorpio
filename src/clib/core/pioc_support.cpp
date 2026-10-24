@@ -2986,10 +2986,24 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
      * this field) - computing it after that block/enqueue (as was done previously)
      * is an ordering bug: the enqueue decision would read whatever value happened
      * to be in a freshly calloc'd file_desc_t (i.e. false) rather than the final,
-     * correct value. */
+     * correct value.
+     *
+     * The iotype test is not redundant. uses_async_io also gates
+     * spio_create_async_lock_file() further down in this function, while the
+     * matching spio_remove_async_lock_file() in spio_hard_closefile()
+     * (pio_file.cpp) additionally sits inside an "iotype is HDF5/HDF5C"
+     * block. Without the test here, every write-capable PnetCDF,
+     * NetCDF4P and NetCDF-classic file created in an async-write-thread
+     * build left behind a *.spio_lock file that nothing ever removed - and a
+     * later read-only open of that same filename in the same run then
+     * stalled on it for the full SPIO_ASYNC_OP_WAIT_TIMEOUT before warning
+     * and proceeding. It also makes uses_async_io mean what its own doc
+     * comment (pio_types.hpp) says it means. The same test is applied at the
+     * corresponding computation in PIOc_openfile_retry_impl(). */
 #ifdef _HDF5
 #if PIO_USE_ASYNC_WR_THREAD
-    file->uses_async_io = !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
+    file->uses_async_io = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)) &&
+                           !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
 #else
     file->uses_async_io = false;
 #endif
