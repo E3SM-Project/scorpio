@@ -100,7 +100,9 @@ if (NOT PIO_USE_MPISERIAL)
     add_spio_executable (test_darray_hdf5_contig TRUE "" test_darray_hdf5_contig.cpp OBJ_LIBS test_common_obj)
     add_spio_executable (test_putget_hdf5 TRUE "" test_putget_hdf5.cpp OBJ_LIBS test_common_obj)
     add_spio_executable (test_hdf5_reopen TRUE "" test_hdf5_reopen.cpp OBJ_LIBS test_common_obj)
-    add_dependencies (tests test_darray_hdf5_contig test_putget_hdf5 test_hdf5_reopen)
+    add_spio_executable (test_hdf5_async_full_lifecycle TRUE "" test_hdf5_async_full_lifecycle.cpp OBJ_LIBS test_common_obj)
+    add_dependencies (tests test_darray_hdf5_contig test_putget_hdf5 test_hdf5_reopen
+                      test_hdf5_async_full_lifecycle)
   endif ()
   if (PIO_USE_MALLOC)
     add_spio_executable (test_darray_async_simple TRUE "" test_darray_async_simple.cpp OBJ_LIBS test_common_obj)
@@ -379,6 +381,15 @@ else ()
     add_mpi_test(test_hdf5_reopen
       EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_hdf5_reopen
       NUMPROCS 1
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+    # End-to-end async-write lifecycle/lock-file/native-reopen integration
+    # tests. Several scenarios use a disjoint sync/async I/O proc topology,
+    # which is where this library's known, pre-existing async concurrency
+    # issues live - an explicit TIMEOUT makes such a scenario fail fast
+    # instead of hanging the whole ctest run.
+    add_mpi_test(test_hdf5_async_full_lifecycle
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_hdf5_async_full_lifecycle
+      NUMPROCS ${AT_LEAST_FOUR_TASKS}
       TIMEOUT ${DEFAULT_TEST_TIMEOUT})
   endif ()
   add_mpi_test(test_decomp_uneven

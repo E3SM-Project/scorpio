@@ -1305,6 +1305,15 @@ int PIOc_inq_var_impl(int ncid, int varid, char *name, int namelen, nc_type *xty
             if (dimidsp)
                 memcpy(dimidsp, file->hdf5_vars[varid].hdf5_dimids, file->hdf5_vars[varid].ndims * sizeof(int));
 
+            if (nattsp)
+            {
+                *nattsp = 0;
+                for (int i = 0; i < file->hdf5_num_attrs; i++)
+                    if (file->hdf5_attrs[i].att_varid == varid &&
+                        file->hdf5_attrs[i].att_ncid == ncid)
+                        (*nattsp)++;
+            }
+
             strncpy(file->varlist[varid].vname, file->hdf5_vars[varid].name, PIO_MAX_NAME);
 
             ierr = PIO_NOERR;
