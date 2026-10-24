@@ -4956,6 +4956,16 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
       spio_ltimer_stop(ios->io_fstats->tot_timer_name);
       spio_ltimer_stop(file->io_fstats->rd_timer_name);
       spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+      /* Release the partially-populated file_desc_t, the same way the
+       * default: case of the open switch further down does - this error
+       * return happens before pio_add_to_file_list(), so nothing else will
+       * ever see or free it. */
+      delete(file->pmtx);
+      delete(file->io_desc_refs);
+      free(file->io_fstats);
+      free(file);
+
       return pio_err(ios, NULL, hdf5_reopen_ierr, __FILE__, __LINE__,
                       "Opening file (%s) with PIO_IOTYPE_HDF5 failed. Native HDF5 reopen failed", filename);
     }

@@ -603,7 +603,16 @@ extern "C" herr_t spio_hdf5_reopen_scan_cb(hid_t loc_id, const char *name,
        * variable that collides with a dimension name (see pio_nc.cpp's
        * def_var()) - so no alt_name recovery is needed here.
        */
+      /* Every failure return from here on must close `did` itself: the
+       * dimension-scale section above already stored it in
+       * file->hdf5_dims[dimid].hdf5_dataset_id, but on a failed scan the
+       * caller (spio_hdf5_reopen()) never sets file->hdf5_num_dims /
+       * hdf5_num_vars, so nothing downstream will ever iterate over - and
+       * release - that entry. The stored copy is invalidated alongside the
+       * close so no stale id is left behind either. */
       if(ctx->next_varid >= PIO_MAX_VARS){
+        H5Dclose(did);
+        file->hdf5_dims[dimid].hdf5_dataset_id = H5I_INVALID_HID;
         ctx->ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
                             "Reopening file (%s) using the HDF5 iotype failed. "
                             "The file has more variables than PIO_MAX_VARS (%d)",
@@ -617,6 +626,8 @@ extern "C" herr_t spio_hdf5_reopen_scan_cb(hid_t loc_id, const char *name,
       hid_t hdf5_type = H5I_INVALID_HID;
       ret = spio_hdf5_reopen_get_var_type(ios, file, did, name, &nc_type, &hdf5_type);
       if(ret != PIO_NOERR){
+        H5Dclose(did);
+        file->hdf5_dims[dimid].hdf5_dataset_id = H5I_INVALID_HID;
         ctx->ierr = ret;
         return -1;
       }
@@ -626,6 +637,8 @@ extern "C" herr_t spio_hdf5_reopen_scan_cb(hid_t loc_id, const char *name,
       ret = spio_hdf5_reopen_get_var_dimids(ios, file, did, name, &ndims, &dimids);
       if(ret != PIO_NOERR){
         if(nc_type == NC_CHAR) { H5Tclose(hdf5_type); }
+        H5Dclose(did);
+        file->hdf5_dims[dimid].hdf5_dataset_id = H5I_INVALID_HID;
         ctx->ierr = ret;
         return -1;
       }
@@ -637,6 +650,8 @@ extern "C" herr_t spio_hdf5_reopen_scan_cb(hid_t loc_id, const char *name,
          */
         if(nc_type == NC_CHAR) { H5Tclose(hdf5_type); }
         if(dimids) { free(dimids); }
+        H5Dclose(did);
+        file->hdf5_dims[dimid].hdf5_dataset_id = H5I_INVALID_HID;
         ctx->ierr = pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                             "Reopening file (%s) using the HDF5 iotype failed. "
                             "A coordinate variable (%s) is missing its dimension ids",
@@ -655,6 +670,9 @@ extern "C" herr_t spio_hdf5_reopen_scan_cb(hid_t loc_id, const char *name,
 
       ret = spio_hdf5_reopen_scan_attrs(ios, file, did, varid);
       if(ret != PIO_NOERR){
+        H5Dclose(did);
+        file->hdf5_dims[dimid].hdf5_dataset_id = H5I_INVALID_HID;
+        file->hdf5_vars[varid].hdf5_dataset_id = H5I_INVALID_HID;
         ctx->ierr = ret;
         return -1;
       }
@@ -712,6 +730,11 @@ extern "C" herr_t spio_hdf5_reopen_scan_cb(hid_t loc_id, const char *name,
 
   ret = spio_hdf5_reopen_scan_attrs(ios, file, did, varid);
   if(ret != PIO_NOERR){
+    /* As in the coordinate-variable section above: a failed scan means
+     * file->hdf5_num_vars is never set, so nothing downstream releases the
+     * id already stored in file->hdf5_vars[varid].hdf5_dataset_id. */
+    H5Dclose(did);
+    file->hdf5_vars[varid].hdf5_dataset_id = H5I_INVALID_HID;
     ctx->ierr = ret;
     return -1;
   }
