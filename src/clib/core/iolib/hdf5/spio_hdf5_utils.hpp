@@ -10,6 +10,15 @@
 
 #ifdef _HDF5
 
+/* Reserved HDF5 attribute names written by spio_hdf5_utils.cpp to encode
+ * netCDF-4-compatible structure (dimension ids / coordinate-variable
+ * dimension ids) in a raw HDF5 file. Shared so that readers (e.g.
+ * spio_hdf5_reopen.cpp's introspection of a SCORPIO-written file) do not
+ * need to duplicate these literals.
+ */
+extern const char *SPIO_HDF5_ATT_NETCDF4_DIMID;
+extern const char *SPIO_HDF5_ATT_NETCDF4_COORDINATES;
+
 /* Function declarations */
 int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filename);
 

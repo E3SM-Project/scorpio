@@ -4861,6 +4861,41 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   }
 #endif
 
+  file->iosystem = ios;
+  file->mode = mode;
+
+  /* file->mode and file->uses_async_io are established HERE - before the
+   * native HDF5 reopen block below - rather than after it, because
+   * spio_hdf5_reopen() is now a consumer of both: a write-capable reopen
+   * upgrades its serial recognition probe to a real collective MPI-IO
+   * handle, and the comm it builds that handle's fapl from is chosen by
+   * file->uses_async_io (exactly as spio_hdf5_create() does for a fresh
+   * create). Computing them afterwards, as was done previously, meant
+   * spio_hdf5_reopen() read them out of a freshly calloc'd file_desc_t -
+   * i.e. mode == 0 and uses_async_io == false - regardless of what the
+   * caller asked for.
+   *
+   * This is also after the ADIOS block above, which is where file->iotype
+   * reaches its final value (an ADIOS open can fall back and reassign it),
+   * so the iotype test below sees the iotype this file will actually use.
+   *
+   * The iotype test itself matters beyond HDF5: file->uses_async_io also
+   * gates spio_create_async_lock_file()/spio_remove_async_lock_file(), and
+   * the removal side is additionally gated on an HDF5 iotype. Without the
+   * iotype test here, every write-capable PnetCDF/NetCDF file would create
+   * a lock file that nothing ever removes (and that a later read-only open
+   * of the same name would then stall on for the full
+   * SPIO_ASYNC_OP_WAIT_TIMEOUT). */
+#ifdef _HDF5
+#if PIO_USE_ASYNC_WR_THREAD
+  file->uses_async_io = (file->mode & PIO_WRITE) &&
+                         ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)) &&
+                         !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
+#else
+  file->uses_async_io = false;
+#endif
+#endif
+
 #ifdef _HDF5
   if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
     /* Try a native HDF5 reopen first (no switch-away to NETCDF4/PNETCDF/
@@ -4888,6 +4923,34 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
      * variable here instead keeps this block's result out of `ierr`
      * entirely, exactly as the pre-existing switch-iotype-away code it
      * replaces also never touched `ierr`.
+     *
+     * On rank divergence. spio_hdf5_reopen()'s recognition probes
+     * (H5Fis_hdf5(), the probe H5Fopen(), spio_hdf5_is_scorpio_written())
+     * are per-rank, serial and non-collective, so ranks can legitimately
+     * disagree about the same file on a parallel filesystem. For a
+     * write-capable reopen that would be fatal rather than merely
+     * inconsistent - the recognizing ranks enter a COLLECTIVE H5Fopen() the
+     * non-recognizing ranks never join - so spio_hdf5_reopen() now agrees on
+     * recognition across the file's I/O communicator before any rank commits
+     * to that collective open; see the consensus block at the top of that
+     * function. That consensus deliberately excludes non-owning ranks (they
+     * never join the collective open), so a non-owning rank's own
+     * recognition result can still diverge from every owning rank's - see
+     * the first KNOWN RESIDUAL LIMITATION at that consensus block.
+     *
+     * KNOWN RESIDUAL LIMITATION: that consensus covers divergent
+     * *recognition* among owning ranks only. If spio_hdf5_reopen()'s metadata scan, or its
+     * collective H5Fopen()/H5Dopen2(), fails on some owning ranks and not
+     * others, the failing ranks take the `else` (genuine error) branch below
+     * and return from this function immediately - skipping the
+     * MPI_Allreduce(..., MPI_MIN, ios->my_comm) further down - while every
+     * rank that got PIO_NOERR (in particular every non-owning rank, which
+     * returns early from that block without touching HDF5 at all) falls
+     * through and reaches it. The result is a hang rather than a uniform
+     * error. Closing it requires a second consensus point over ios->my_comm
+     * after the collective open, which in turn requires that function's
+     * several genuine-error early returns to be restructured into a single
+     * agreed exit.
      */
     int hdf5_reopen_ierr = spio_hdf5_reopen(ios, file, filename, mode);
     if(hdf5_reopen_ierr == PIO_NOERR){
@@ -4935,23 +4998,25 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
       spio_ltimer_stop(ios->io_fstats->tot_timer_name);
       spio_ltimer_stop(file->io_fstats->rd_timer_name);
       spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+      /* Release the partially-populated file_desc_t, the same way the
+       * default: case of the open switch further down does - this error
+       * return happens before pio_add_to_file_list(), so nothing else will
+       * ever see or free it. */
+      delete(file->pmtx);
+      delete(file->io_desc_refs);
+      free(file->io_fstats);
+      free(file);
+
       return pio_err(ios, NULL, hdf5_reopen_ierr, __FILE__, __LINE__,
                       "Opening file (%s) with PIO_IOTYPE_HDF5 failed. Native HDF5 reopen failed", filename);
     }
   }
 #endif
 
-  file->iosystem = ios;
-  file->mode = mode;
-
-#ifdef _HDF5
-#if PIO_USE_ASYNC_WR_THREAD
-  file->uses_async_io = (file->mode & PIO_WRITE) &&
-                         !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
-#else
-  file->uses_async_io = false;
-#endif
-#endif
+  /* Note: file->iosystem, file->mode and file->uses_async_io are assigned
+   * earlier in this function, just above the native HDF5 reopen block -
+   * see the comment there for why that ordering is required. */
   /*
   file->num_unlim_dimids = 0;
   file->unlim_dimids = NULL;
@@ -5331,6 +5396,27 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   case PIO_IOTYPE_ADIOSC:
       break; /* This case has been handled above */
 #endif
+#ifdef _HDF5
+  case PIO_IOTYPE_HDF5:
+  case PIO_IOTYPE_HDF5C:
+      /* This case has been handled above: by the time execution reaches
+       * this switch, either spio_hdf5_reopen() already fully reopened the
+       * file natively (file->iotype deliberately left as HDF5/HDF5C, see
+       * the switch-iotype-away comment block above) and there is nothing
+       * left to do here, or the native reopen fell back and reassigned
+       * file->iotype away from HDF5/HDF5C to NETCDF4P/PNETCDF/NETCDF
+       * already (in which case this case label is simply never reached).
+       * Before the native reopen feature existed, file->iotype could never
+       * still be HDF5/HDF5C at this point - the fallback always ran first
+       * - so this case was never needed; omitting it made a successful
+       * native reopen fall into `default` below and return PIO_EBADIOTYPE
+       * from only the sync I/O proc (this switch is gated by
+       * is_sync_io_proc()), bypassing the unconditional
+       * "Broadcast open mode to all tasks" MPI_Bcast just below this
+       * switch that every other rank still reaches - a collective
+       * mismatch/hang, not a real error. */
+      break;
+#endif
   default:
       {
         char avail_iotypes[PIO_MAX_NAME + 1];
@@ -5488,6 +5574,18 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
 #ifdef _ADIOS2
     for(int i = 0; i < file->num_attrs; i++) { file->adios_attrs[i].att_ncid = *ncidp; }
+#endif
+  }
+
+  /* Set ncid to HDF5 attributes. A native HDF5 reopen (spio_hdf5_reopen(),
+   * called above this function's HDF5-iotype open path before *ncidp/
+   * file->pio_ncid are known) fills in file->hdf5_attrs[].att_ncid with
+   * whatever file->pio_ncid held at that point (0, for a freshly-constructed
+   * file_desc_t) - backfill it with the real ncid now, the same way the
+   * ADIOS path above does for file->adios_attrs[].att_ncid. */
+  if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+#ifdef _HDF5
+    for(int i = 0; i < file->hdf5_num_attrs; i++) { file->hdf5_attrs[i].att_ncid = *ncidp; }
 #endif
   }
 

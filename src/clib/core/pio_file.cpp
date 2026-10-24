@@ -767,9 +767,13 @@ int spio_wait_on_async_lock_file(const iosystem_desc_t *ios, const char *filenam
 
     struct stat st;
     if(stat(lock_filename.c_str(), &st) == 0){
-      /* FIXME: Make the max time configurable */
       const int MAX_SLEEP_TIME_IN_MILLISECONDS = SPIO_ASYNC_OP_WAIT_TIMEOUT;
-      const int SLEEP_TIME_IN_MILLISECONDS = 500;
+      /* Same poll interval as the sibling waiter spio_wait_file_async_pend_ops()
+       * above. Both are bounded by the same (configurable)
+       * SPIO_ASYNC_OP_WAIT_TIMEOUT, so this is purely a latency fix: at the
+       * previous 500 ms, a reopen that could have proceeded as soon as the
+       * lock cleared waited up to half a second for no reason. */
+      const int SLEEP_TIME_IN_MILLISECONDS = 1;
 
       const int max_tries = (MAX_SLEEP_TIME_IN_MILLISECONDS > SLEEP_TIME_IN_MILLISECONDS) ?
                             (MAX_SLEEP_TIME_IN_MILLISECONDS/SLEEP_TIME_IN_MILLISECONDS) : 1;
@@ -1182,6 +1186,143 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
 #else
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
 #endif
+
+#ifdef _HDF5
+    if (((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)) &&
+        !enter_io_proc_block)
+    {
+        /* spio_hdf5_close() (which releases these on the ranks that own
+         * this file's I/O) never ran on this rank, but spio_hdf5_reopen()
+         * runs on every rank unconditionally (see its call site in
+         * pioc_support.cpp) and leaves each of these set - release them
+         * here instead, mirroring spio_hdf5_close()'s own cleanup.
+         * Without this, every non-owning rank leaked an HDF5 file id plus
+         * one dataset id per dimension and per variable for every
+         * reopened file, growing without bound across a run.
+         *
+         * Placement, deliberately, is BOTH before the
+         * !PIO_USE_ASYNC_WR_THREAD quiescence barrier just below AND before
+         * the "if(ierr != PIO_NOERR) return" after it:
+         *
+         *  - Before the barrier: on a non-owning rank the handle released
+         *    here is the read-only probe H5Fopen() spio_hdf5_reopen() left
+         *    behind, which holds a shared flock under HDF5 1.12. The
+         *    barrier's whole purpose is to guarantee the file is fully
+         *    quiescent before any rank proceeds to a subsequent reopen, so
+         *    that handle must be gone before the barrier, not after it.
+         *  - Before the ierr return: on this rank (!enter_io_proc_block)
+         *    ierr is never assigned anything other than PIO_NOERR - it is
+         *    only ever set inside the ADIOS block or the
+         *    if(enter_io_proc_block) switch above, neither of which this
+         *    rank executes - so the old placement was never actually
+         *    ierr-gated in practice; this move does not fix a latent
+         *    leak-on-error-path. It is still the right placement: nothing
+         *    here is collective or depends on ierr - it only releases this
+         *    rank's own HDF5 handles - so running it unconditionally ahead
+         *    of the return is simply the natural position, independent of
+         *    whatever ierr happens to hold.
+         *
+         * H5Iis_valid() rather than a comparison against H5I_INVALID_HID:
+         * on a rank that never ran spio_hdf5_create()/spio_hdf5_reopen() at
+         * all these fields are still the calloc'd 0, which is not
+         * H5I_INVALID_HID (-1) but which H5Iis_valid() does correctly report
+         * as invalid.
+         *
+         * The dims-array skip for a has_coord_var dim is load-bearing, not
+         * an optimization: that entry aliases the coordinate variable's
+         * vars-array entry (the same hid_t - see spio_hdf5_utils.cpp:891 and
+         * spio_hdf5_reopen()), so closing both would be a double close.
+         * Mirrors spio_hdf5_close()'s own loops. */
+        for (int i = 0; i < file->hdf5_num_dims; i++)
+        {
+            if (!file->hdf5_dims[i].has_coord_var && H5Iis_valid(file->hdf5_dims[i].hdf5_dataset_id) > 0)
+            {
+                H5Dclose(file->hdf5_dims[i].hdf5_dataset_id);
+            }
+            file->hdf5_dims[i].hdf5_dataset_id = H5I_INVALID_HID;
+        }
+
+        for (int i = 0; i < file->hdf5_num_vars; i++)
+        {
+            if (H5Iis_valid(file->hdf5_vars[i].hdf5_dataset_id) > 0)
+            {
+                H5Dclose(file->hdf5_vars[i].hdf5_dataset_id);
+            }
+            file->hdf5_vars[i].hdf5_dataset_id = H5I_INVALID_HID;
+
+            if ((file->hdf5_vars[i].nc_type == NC_CHAR) && H5Iis_valid(file->hdf5_vars[i].hdf5_type) > 0)
+            {
+                H5Tclose(file->hdf5_vars[i].hdf5_type);
+                file->hdf5_vars[i].hdf5_type = H5I_INVALID_HID;
+            }
+        }
+
+        if (H5Iis_valid(file->dxplid_coll) > 0) { H5Pclose(file->dxplid_coll); }
+        file->dxplid_coll = H5I_INVALID_HID;
+
+        if (H5Iis_valid(file->dxplid_indep) > 0) { H5Pclose(file->dxplid_indep); }
+        file->dxplid_indep = H5I_INVALID_HID;
+
+        if (H5Iis_valid(file->hdf5_file_id) > 0) { H5Fclose(file->hdf5_file_id); }
+        file->hdf5_file_id = H5I_INVALID_HID;
+    }
+#endif
+
+#if !PIO_USE_ASYNC_WR_THREAD
+#ifdef _HDF5
+    if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+    {
+        /* A later native HDF5 reopen (spio_hdf5_reopen(), see
+         * PIOc_openfile_retry_impl()) has every rank independently H5Fopen()
+         * and H5Literate2() the file, relying on the file being quiescent
+         * (fully closed and flushed) by the time that happens. When the
+         * async write thread pool is enabled, spio_wait_on_async_lock_file()
+         * gives a reopening rank that cross-process happens-before guarantee
+         * by polling for this file's lock file to be removed. When it is
+         * disabled (this build), file->uses_async_io is always false, so
+         * spio_create_async_lock_file()/spio_remove_async_lock_file() are
+         * unconditional no-ops and no such lock file ever exists - nothing
+         * otherwise stops another rank's reopen from racing ahead of this
+         * rank's close.
+         *
+         * In this (non-async-write-thread) build every rank reaches this
+         * exact point synchronously and unconditionally - spio_hard_closefile()
+         * is always called directly (never deferred to a background thread,
+         * since the soft-close path above is only ever taken when
+         * PIO_USE_ASYNC_WR_THREAD is enabled) - so a plain barrier here is
+         * both safe (no rank skips or defers past this call) and sufficient:
+         * it establishes the same happens-before relationship between this
+         * (possibly file-owning) rank's completed close and every rank's
+         * next open/reopen of the same file that the lock-file wait provides
+         * in the async-write-thread build.
+         *
+         * Deliberately placed BEFORE the "if(ierr != PIO_NOERR) return" just
+         * below, and run regardless of ierr. check_netcdf() above is called
+         * with a NULL ios and does not broadcast, so on an I/O-proc-side
+         * close failure only the I/O procs have a non-PIO_NOERR ierr: if the
+         * barrier sat after that early return, those ranks would return
+         * while every other rank blocked here forever. Every rank now
+         * reaches the barrier exactly once whether the close succeeded or
+         * failed, and the per-rank error return still happens afterwards.
+         *
+         * UNVERIFIED for the async-I/O-service / intercomm iosystem models,
+         * where ios->my_comm is union_comm (shared by compute and I/O procs
+         * with different roles) rather than comp_comm: this fix round only
+         * confirms the barrier's correctness for the intracomm path the
+         * comment above justifies. Redesigning it for the other models is
+         * out of scope here.
+         *
+         * MPI_Barrier on MPI_COMM_NULL is undefined behavior, not a no-op,
+         * and ios->my_comm is MPI_COMM_NULL on non-participating ranks in
+         * some init paths (see pioc.cpp) - hence the guard. */
+        if (ios->my_comm != MPI_COMM_NULL)
+        {
+            MPI_Barrier(ios->my_comm);
+        }
+    }
+#endif
+#endif
+
     if(ierr != PIO_NOERR){
         LOG((1, "nc*_close failed, ierr = %d", ierr));
         return pio_err(NULL, file, ierr, __FILE__, __LINE__,
@@ -1191,6 +1332,10 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
 #ifdef _HDF5
     if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
+        /* Note: the non-owning-rank HDF5 handle release that used to sit
+         * here now runs earlier in this function - before both the
+         * quiescence barrier and the close-error return - see the long
+         * comment there for why. */
         for (int i = 0; i < file->hdf5_num_dims; i++)
         {
             free(file->hdf5_dims[i].name);
@@ -1231,6 +1376,13 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
          * (file->uses_async_io, async I/O root rank only) just above in this
          * file. */
         spio_remove_async_lock_file(ios, file);
+
+        /* Note: the PIO_USE_ASYNC_WR_THREAD=OFF quiescence barrier that used
+         * to sit here now runs earlier in this function, before the
+         * close-error return - see the long comment there for why. In this
+         * build spio_remove_async_lock_file() above is an unconditional
+         * no-op, so moving the barrier ahead of it changes no ordering that
+         * anything observes. */
     }
 #endif
 
