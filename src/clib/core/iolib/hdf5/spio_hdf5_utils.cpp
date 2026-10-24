@@ -46,6 +46,9 @@
 #endif
 
 #ifdef _HDF5
+const char *SPIO_HDF5_ATT_NETCDF4_DIMID = "_Netcdf4Dimid";
+const char *SPIO_HDF5_ATT_NETCDF4_COORDINATES = "_Netcdf4Coordinates";
+
 int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filename)
 {
   int mpierr = MPI_SUCCESS, ret = PIO_NOERR;
@@ -535,7 +538,7 @@ static inline int spio_add_nc_hidden_coord(iosystem_desc_t *ios, file_desc_t *fi
    * variable dimensions in an integer array.
    * This attribute is required for NetCDF to read HDF5 output
    */
-  const char* attr_name = "_Netcdf4Coordinates";
+  const char* attr_name = SPIO_HDF5_ATT_NETCDF4_COORDINATES;
 
   /* Sanity check : Ensure that "_Netcdf4Coordinates" attribute does not exist */
   htri_t attr_exists = H5Aexists(file->hdf5_vars[varid].hdf5_dataset_id, attr_name);
@@ -774,7 +777,7 @@ static int spio_hdf5_sync_defs(iosystem_desc_t *ios, file_desc_t *file)
       }
 
       /* Writing _Netcdf4Dimid attribute */
-      const char* attr_name = "_Netcdf4Dimid";
+      const char* attr_name = SPIO_HDF5_ATT_NETCDF4_DIMID;
 
       /* H5Aexists() returns zero (false), a positive (true) or a negative (failure) value */
       attr_exists = H5Aexists(dimscale_id, attr_name);
@@ -849,7 +852,7 @@ static int spio_hdf5_sync_defs(iosystem_desc_t *ios, file_desc_t *file)
       htri_t attr_exists;
 
       /* Writing _Netcdf4Dimid attribute */
-      const char* attr_name = "_Netcdf4Dimid";
+      const char* attr_name = SPIO_HDF5_ATT_NETCDF4_DIMID;
 
       attr_exists = H5Aexists(dimscale_id, attr_name);
       if(attr_exists < 0){

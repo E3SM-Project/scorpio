@@ -5477,6 +5477,18 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #endif
   }
 
+  /* Set ncid to HDF5 attributes. A native HDF5 reopen (spio_hdf5_reopen(),
+   * called above this function's HDF5-iotype open path before *ncidp/
+   * file->pio_ncid are known) fills in file->hdf5_attrs[].att_ncid with
+   * whatever file->pio_ncid held at that point (0, for a freshly-constructed
+   * file_desc_t) - backfill it with the real ncid now, the same way the
+   * ADIOS path above does for file->adios_attrs[].att_ncid. */
+  if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+#ifdef _HDF5
+    for(int i = 0; i < file->hdf5_num_attrs; i++) { file->hdf5_attrs[i].att_ncid = *ncidp; }
+#endif
+  }
+
   spio_ltimer_stop(ios->io_fstats->rd_timer_name);
   spio_ltimer_stop(ios->io_fstats->tot_timer_name);
   spio_ltimer_stop(file->io_fstats->rd_timer_name);

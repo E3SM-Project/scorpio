@@ -8,21 +8,27 @@
  * itself wrote with the HDF5 iotype can never be read back with the HDF5
  * iotype's own (eventual) read support.
  *
- * This file adds the detection half of fixing that: spio_hdf5_is_scorpio_written()
- * recognizes a file written by spio_hdf5_create()/spio_hdf5_def_var()/
- * spio_hdf5_enddef() (see spio_hdf5_utils.cpp), and spio_hdf5_reopen() is the
- * entry point PIOc_openfile_retry_impl() calls before falling back to the
- * historical switch-away behavior. The dimension/variable/attribute
- * introspection that lets a recognized file's reopen actually succeed
- * (returning PIO_NOERR) is added by the task that immediately follows this
- * one in the same plan - until then, spio_hdf5_reopen() always reports
- * PIO_EBADIOTYPE (see the TODO below), so observable behavior is unchanged.
+ * This file fixes that: spio_hdf5_is_scorpio_written() recognizes a file
+ * written by spio_hdf5_create()/spio_hdf5_def_var()/spio_hdf5_enddef() (see
+ * spio_hdf5_utils.cpp), and spio_hdf5_reopen() is the entry point
+ * PIOc_openfile_retry_impl() calls before falling back to the historical
+ * switch-away behavior. For a file it recognizes, spio_hdf5_reopen() walks
+ * the file's root group and reconstructs file->hdf5_dims/hdf5_vars/
+ * hdf5_attrs from what spio_hdf5_utils.cpp's writer actually put on disk -
+ * see spio_hdf5_reopen_scan_cb()'s comment for the dimension/variable
+ * classification and id-numbering scheme. For a file it does not recognize,
+ * it reports PIO_EBADIOTYPE so the caller falls back to the existing
+ * switch-to-NETCDF4 behavior instead.
  */
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
 
+#include <cstring>
+#include <cstdlib>
+
 #include "spio_hdf5_reopen.hpp"
+#include "spio_hdf5_utils.hpp"
 
 #ifdef _HDF5
 
@@ -32,6 +38,665 @@ struct spio_hdf5_dimscale_scan_ctx_t
 {
   bool found_dimscale;
 };
+
+/* Marker written (via H5DSset_scale()) on the dimension-scale dataset
+ * created for a dimension that has no associated coordinate variable - see
+ * spio_hdf5_utils.cpp's spio_hdf5_sync_defs(), Step 1:
+ *   snprintf(dimscale_name, PIO_MAX_NAME, "%s%10d",
+ *            "This is a netCDF dimension but not a netCDF variable.",
+ *            (int) dims[0]);
+ * i.e. the actual on-disk NAME is this literal followed by the dimension's
+ * (10-char field width, printf("%10d", ...)) length - so recognizing a
+ * "pure dimension" (as opposed to a coordinate variable, whose NAME is
+ * simply its own name) requires a *prefix* match, not an exact match.
+ */
+const char *SPIO_HDF5_PURE_DIM_SCALE_NAME_PREFIX =
+  "This is a netCDF dimension but not a netCDF variable.";
+
+/* Reserved attribute names that are either HDF5 dimension-scale internals
+ * (CLASS, NAME, DIMENSION_LIST, REFERENCE_LIST - see H5DSpublic.h) or
+ * SCORPIO's own hidden netCDF-4-compatibility/marker attributes
+ * (_Netcdf4Dimid, _Netcdf4Coordinates - see spio_hdf5_utils.hpp -  and
+ * _NCProperties, a global attribute spio_hdf5_create() writes on every
+ * SCORPIO-created HDF5 file recording the scorpio/HDF5 version that created
+ * it, see spio_hdf5_utils.cpp). None of these are ordinary user-visible
+ * attributes, so introspection must not surface them in file->hdf5_attrs[].
+ */
+const char *SPIO_HDF5_RESERVED_ATTR_NAMES[] =
+{
+  "CLASS", "NAME", "DIMENSION_LIST", "REFERENCE_LIST", "_NCProperties"
+  /* _Netcdf4Dimid/_Netcdf4Coordinates are checked separately, via the
+   * SPIO_HDF5_ATT_NETCDF4_DIMID/SPIO_HDF5_ATT_NETCDF4_COORDINATES extern
+   * consts (spio_hdf5_utils.hpp), not duplicated here.
+   */
+};
+
+bool spio_hdf5_is_reserved_attr_name(const char *name)
+{
+  if(strcmp(name, SPIO_HDF5_ATT_NETCDF4_DIMID) == 0){ return true; }
+  if(strcmp(name, SPIO_HDF5_ATT_NETCDF4_COORDINATES) == 0){ return true; }
+
+  for(size_t i = 0; i < sizeof(SPIO_HDF5_RESERVED_ATTR_NAMES) / sizeof(SPIO_HDF5_RESERVED_ATTR_NAMES[0]); i++){
+    if(strcmp(name, SPIO_HDF5_RESERVED_ATTR_NAMES[i]) == 0){ return true; }
+  }
+
+  return false;
+}
+
+/* spio_hdf5_type_to_pio_type() (spio_hdf5_utils.hpp) only maps numeric
+ * H5T_NATIVE_* types - it was written for variable/attribute *definition*,
+ * where the on-disk type is always one of spio_nc_type_to_hdf5_type()'s
+ * fixed set, never a string type (NC_CHAR is represented by a dynamically
+ * created H5T_STRING-class type - see spio_create_hdf5_str_type() and
+ * spio_hdf5_put_att()'s NC_CHAR branch - which is never H5Tequal() to
+ * H5T_NATIVE_CHAR). Introspection has to recognize that on-disk case too, so
+ * this thin wrapper checks the type *class* for H5T_STRING first and only
+ * falls through to the shared helper (which remains the single place that
+ * knows the numeric-type mapping) for everything else.
+ */
+nc_type spio_hdf5_reopen_type_to_pio_type(hid_t h5_type)
+{
+  if(H5Tget_class(h5_type) == H5T_STRING){
+    return NC_CHAR;
+  }
+
+  return spio_hdf5_type_to_pio_type(h5_type);
+}
+
+/* Per-call state threaded through the root-group H5Literate2() walk below:
+ * which file/file_desc_t we are populating, and a running tally of how many
+ * dimensions/variables have been assigned ids so far (ids are assigned in
+ * iteration order - see the long comment on the dimension/variable loop in
+ * spio_hdf5_reopen() for why that reproduces the original numbering).
+ */
+struct spio_hdf5_reopen_ctx_t
+{
+  iosystem_desc_t *ios;
+  file_desc_t *file;
+  int next_varid;
+  int max_dimid_seen;
+  int ierr;
+};
+
+/* Per-attribute-scan state: which file/varid (PIO_GLOBAL for file-level
+ * attributes) the attributes being iterated belong to.
+ */
+struct spio_hdf5_reopen_attr_ctx_t
+{
+  iosystem_desc_t *ios;
+  file_desc_t *file;
+  int varid;
+  int ierr;
+};
+
+/* H5Aiterate2() callback, shared by both per-dataset and file-level
+ * (global) attribute scans. Indexes by H5_INDEX_NAME, not H5_INDEX_CRT_ORDER
+ * - attribute creation-order tracking is disabled everywhere in
+ * spio_hdf5_utils.cpp (every H5Pset_attr_creation_order() call site is
+ * `#if 0`'d out, due to a documented H5DSattach_scale() hang), so
+ * H5_INDEX_CRT_ORDER is not available to iterate by here. Attribute
+ * presence/metadata does not depend on iteration order, only the eventual
+ * hdf5_attrs[] array index does, and nothing relies on that index having any
+ * particular meaning.
+ */
+extern "C" herr_t spio_hdf5_reopen_attr_cb(hid_t loc_id, const char *name,
+                                            const H5A_info_t *ainfo, void *op_data)
+{
+  (void) ainfo;
+  spio_hdf5_reopen_attr_ctx_t *ctx = static_cast<spio_hdf5_reopen_attr_ctx_t *>(op_data);
+
+  if(spio_hdf5_is_reserved_attr_name(name)){
+    return 0;
+  }
+
+  if(ctx->file->hdf5_num_attrs >= PIO_MAX_ATTRS){
+    ctx->ierr = pio_err(ctx->ios, ctx->file, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Reopening file (%s) using the HDF5 iotype failed. "
+                        "The file has more attributes than PIO_MAX_ATTRS (%d)",
+                        pio_get_fname_from_file(ctx->file), PIO_MAX_ATTRS);
+    return -1;
+  }
+
+  hid_t attr_id = H5Aopen(loc_id, name, H5P_DEFAULT);
+  if(attr_id == H5I_INVALID_HID){
+    ctx->ierr = pio_err(ctx->ios, ctx->file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                        "Reopening file (%s) using the HDF5 iotype failed. "
+                        "The low level (HDF5) I/O library call failed to open an attribute (%s)",
+                        pio_get_fname_from_file(ctx->file), name);
+    return -1;
+  }
+
+  hid_t atype = H5Aget_type(attr_id);
+  hid_t aspace = H5Aget_space(attr_id);
+  if((atype == H5I_INVALID_HID) || (aspace == H5I_INVALID_HID)){
+    if(atype != H5I_INVALID_HID) { H5Tclose(atype); }
+    if(aspace != H5I_INVALID_HID) { H5Sclose(aspace); }
+    H5Aclose(attr_id);
+    ctx->ierr = pio_err(ctx->ios, ctx->file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                        "Reopening file (%s) using the HDF5 iotype failed. "
+                        "The low level (HDF5) I/O library call failed to get the type/dataspace "
+                        "of an attribute (%s)",
+                        pio_get_fname_from_file(ctx->file), name);
+    return -1;
+  }
+
+  nc_type pio_type = spio_hdf5_reopen_type_to_pio_type(atype);
+
+  PIO_Offset att_len = 0;
+  if(pio_type == NC_CHAR){
+    /* A string attribute is written (see spio_hdf5_put_att()) as a scalar
+     * dataspace with a fixed-size H5T_STRING type whose size is the string
+     * length - except a zero-length string, which is written with an
+     * H5S_NULL dataspace (and a type size of 1, since H5Tset_size(0) is not
+     * meaningful). Detect that case via the dataspace class, not the type
+     * size, so a true zero-length string round-trips as len == 0.
+     */
+    if(H5Sget_simple_extent_type(aspace) == H5S_NULL){
+      att_len = 0;
+    }
+    else{
+      att_len = static_cast<PIO_Offset>(H5Tget_size(atype));
+    }
+  }
+  else{
+    hssize_t npoints = H5Sget_simple_extent_npoints(aspace);
+    att_len = (npoints > 0) ? static_cast<PIO_Offset>(npoints) : 0;
+  }
+
+  H5Sclose(aspace);
+  H5Tclose(atype);
+  H5Aclose(attr_id);
+
+  int idx = ctx->file->hdf5_num_attrs;
+  ctx->file->hdf5_attrs[idx].att_name = spio_strdup(name);
+  ctx->file->hdf5_attrs[idx].att_type = pio_type;
+  ctx->file->hdf5_attrs[idx].att_len = att_len;
+  /* file->pio_ncid is not assigned until after spio_hdf5_reopen() returns
+   * (PIOc_openfile_retry_impl() only calls pio_add_to_file_list() later) -
+   * the caller is responsible for backfilling att_ncid once it is known,
+   * the same way the ADIOS read path backfills adios_attrs[].att_ncid right
+   * after pio_add_to_file_list() succeeds.
+   */
+  ctx->file->hdf5_attrs[idx].att_ncid = ctx->file->pio_ncid;
+  ctx->file->hdf5_attrs[idx].att_varid = ctx->varid;
+
+  ctx->file->hdf5_num_attrs++;
+  if(ctx->varid == PIO_GLOBAL){
+    ctx->file->hdf5_num_gattrs++;
+  }
+
+  return 0;
+}
+
+/* Scan every attribute attached to loc_id (a dataset or the file's root
+ * group) into file->hdf5_attrs[], skipping reserved/internal names. Returns
+ * PIO_NOERR, or the genuine PIO error code a callback already reported via
+ * pio_err() (ctx.ierr) if iteration had to stop early.
+ */
+int spio_hdf5_reopen_scan_attrs(iosystem_desc_t *ios, file_desc_t *file, hid_t loc_id, int varid)
+{
+  spio_hdf5_reopen_attr_ctx_t actx;
+  actx.ios = ios;
+  actx.file = file;
+  actx.varid = varid;
+  actx.ierr = PIO_NOERR;
+
+  herr_t iret = H5Aiterate2(loc_id, H5_INDEX_NAME, H5_ITER_INC, NULL,
+                            spio_hdf5_reopen_attr_cb, &actx);
+  if(iret < 0){
+    if(actx.ierr != PIO_NOERR){
+      return actx.ierr;
+    }
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reopening file (%s) using the HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to iterate over attributes",
+                   pio_get_fname_from_file(file));
+  }
+
+  return PIO_NOERR;
+}
+
+/* Read the dimension length (and record-dimension status) of a 1-D
+ * dimension-scale dataset's current on-disk extent - not necessarily the
+ * length at the time the file was first written, since a record dimension
+ * can have grown since then.
+ */
+int spio_hdf5_reopen_get_dim_len(iosystem_desc_t *ios, file_desc_t *file,
+                                  hid_t did, const char *dim_name, PIO_Offset *lenp)
+{
+  hid_t sid = H5Dget_space(did);
+  if(sid == H5I_INVALID_HID){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reopening file (%s) using the HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to get the dataspace "
+                   "of a dimension-scale dataset (%s)",
+                   pio_get_fname_from_file(file), dim_name);
+  }
+
+  hsize_t dims[1] = {0}, max_dims[1] = {0};
+  if(H5Sget_simple_extent_dims(sid, dims, max_dims) < 0){
+    H5Sclose(sid);
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reopening file (%s) using the HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to get the extent "
+                   "of a dimension-scale dataset (%s)",
+                   pio_get_fname_from_file(file), dim_name);
+  }
+  H5Sclose(sid);
+
+  *lenp = (max_dims[0] == H5S_UNLIMITED) ? static_cast<PIO_Offset>(PIO_UNLIMITED) :
+                                            static_cast<PIO_Offset>(dims[0]);
+  return PIO_NOERR;
+}
+
+/* Read the "_Netcdf4Coordinates" hidden attribute (see
+ * spio_add_nc_hidden_coord(), spio_hdf5_utils.cpp) off a variable's dataset,
+ * allocating and filling *dimidsp with its *ndimsp dimension ids. A
+ * variable with ndims == 0 (scalar) never has this attribute (see
+ * spio_add_nc_hidden_coord()'s early return) - that is not an error, it just
+ * means *ndimsp = 0 and *dimidsp = NULL.
+ */
+int spio_hdf5_reopen_get_var_dimids(iosystem_desc_t *ios, file_desc_t *file,
+                                     hid_t did, const char *var_name,
+                                     int *ndimsp, int **dimidsp)
+{
+  *ndimsp = 0;
+  *dimidsp = NULL;
+
+  htri_t attr_exists = H5Aexists(did, SPIO_HDF5_ATT_NETCDF4_COORDINATES);
+  if(attr_exists < 0){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reopening file (%s) using the HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to determine whether "
+                   "an attribute (%s) exists on a variable (%s)",
+                   pio_get_fname_from_file(file), SPIO_HDF5_ATT_NETCDF4_COORDINATES, var_name);
+  }
+
+  if(attr_exists == 0){
+    /* Scalar variable - no hidden coordinates attribute, by design */
+    return PIO_NOERR;
+  }
+
+  hid_t attr_id = H5Aopen(did, SPIO_HDF5_ATT_NETCDF4_COORDINATES, H5P_DEFAULT);
+  if(attr_id == H5I_INVALID_HID){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reopening file (%s) using the HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to open an attribute (%s) "
+                   "on a variable (%s)",
+                   pio_get_fname_from_file(file), SPIO_HDF5_ATT_NETCDF4_COORDINATES, var_name);
+  }
+
+  hid_t aspace = H5Aget_space(attr_id);
+  if(aspace == H5I_INVALID_HID){
+    H5Aclose(attr_id);
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reopening file (%s) using the HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to get the dataspace of "
+                   "an attribute (%s) on a variable (%s)",
+                   pio_get_fname_from_file(file), SPIO_HDF5_ATT_NETCDF4_COORDINATES, var_name);
+  }
+
+  hssize_t npoints = H5Sget_simple_extent_npoints(aspace);
+  H5Sclose(aspace);
+  if(npoints <= 0){
+    H5Aclose(attr_id);
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reopening file (%s) using the HDF5 iotype failed. "
+                   "An attribute (%s) on a variable (%s) has an unexpected (non-positive) length",
+                   pio_get_fname_from_file(file), SPIO_HDF5_ATT_NETCDF4_COORDINATES, var_name);
+  }
+
+  int ndims = static_cast<int>(npoints);
+  int *dimids = static_cast<int *>(malloc(ndims * sizeof(int)));
+  if(!dimids){
+    H5Aclose(attr_id);
+    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                   "Reopening file (%s) using the HDF5 iotype failed. "
+                   "Out of memory allocating space for the dimension ids of a variable (%s)",
+                   pio_get_fname_from_file(file), var_name);
+  }
+
+  if(H5Aread(attr_id, H5T_NATIVE_INT, dimids) < 0){
+    free(dimids);
+    H5Aclose(attr_id);
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reopening file (%s) using the HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to read an attribute (%s) "
+                   "on a variable (%s)",
+                   pio_get_fname_from_file(file), SPIO_HDF5_ATT_NETCDF4_COORDINATES, var_name);
+  }
+
+  H5Aclose(attr_id);
+
+  *ndimsp = ndims;
+  *dimidsp = dimids;
+  return PIO_NOERR;
+}
+
+/* Fill in nc_type/hdf5_type for a dataset's on-disk type, following the same
+ * ownership convention spio_hdf5_def_var()/spio_hdf5_close() established for
+ * the write path: for NC_CHAR, keep the (dynamically typed) H5Dget_type()
+ * handle alive in hdf5_type (spio_hdf5_close() only H5Tclose()s it when
+ * nc_type == NC_CHAR); for every other type, close the transient handle and
+ * store the shared predefined constant instead.
+ */
+int spio_hdf5_reopen_get_var_type(iosystem_desc_t *ios, file_desc_t *file,
+                                   hid_t did, const char *var_name,
+                                   int *nc_typep, hid_t *hdf5_typep)
+{
+  hid_t h5_type = H5Dget_type(did);
+  if(h5_type == H5I_INVALID_HID){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reopening file (%s) using the HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to get the type of a "
+                   "dataset (%s)",
+                   pio_get_fname_from_file(file), var_name);
+  }
+
+  nc_type pio_type = spio_hdf5_reopen_type_to_pio_type(h5_type);
+
+  if(pio_type == NC_CHAR){
+    *nc_typep = pio_type;
+    *hdf5_typep = h5_type;
+  }
+  else{
+    H5Tclose(h5_type);
+    *nc_typep = pio_type;
+    *hdf5_typep = spio_nc_type_to_hdf5_type(pio_type);
+  }
+
+  return PIO_NOERR;
+}
+
+/* The "_nc4_non_coord_" prefix spio_hdf5_def_var() (spio_hdf5_utils.cpp)
+ * mangles an on-disk dataset name with, when an ordinary (non-coordinate)
+ * variable happens to share its name with some other dimension (see
+ * pio_nc.cpp's def_var() for where alt_name gets set). Recovering it lets a
+ * reopened variable's name and alt_name match exactly what a fresh def_var()
+ * of the same schema would have produced.
+ */
+const char *SPIO_HDF5_NON_COORD_VAR_ALT_NAME_PREFIX = "_nc4_non_coord_";
+
+/* H5Literate2() callback: the real introspection work. Iterates the root
+ * group's immediate children in link-creation-order (H5_INDEX_CRT_ORDER -
+ * tracked/indexed on the root group's GCPL, unlike attribute creation order;
+ * see spio_hdf5_is_scorpio_written()'s check (a)), classifying each dataset
+ * as one of:
+ *   - a "pure" dimension (an HDF5 dimension-scale dataset with no associated
+ *     coordinate variable - see spio_hdf5_utils.cpp's spio_hdf5_sync_defs()
+ *     Step 1): recorded only into file->hdf5_dims[].
+ *   - a coordinate variable (an HDF5 dimension-scale dataset that *is* also
+ *     a variable - Step 2 of the same function): recorded into both
+ *     file->hdf5_dims[] and file->hdf5_vars[].
+ *   - an ordinary (non-scale) variable: recorded only into file->hdf5_vars[].
+ *
+ * Variable ids are assigned sequentially (0, 1, 2, ...) in the same order
+ * the original def_var() calls created them: spio_hdf5_def_var() always
+ * creates a variable's dataset immediately, at def_var() time, while
+ * spio_hdf5_sync_defs() Step 1 only creates "pure" dimension datasets later,
+ * at enddef() time - so the root group's link-creation-order is exactly
+ * [vars in original def_var() call order] followed by [pure dimensions in
+ * dimension-index order]. Filtering out "pure" dimensions and assigning
+ * sequential ids to everything else therefore reproduces the exact original
+ * varid numbering, without needing to persist it anywhere on disk.
+ */
+extern "C" herr_t spio_hdf5_reopen_scan_cb(hid_t loc_id, const char *name,
+                                            const H5L_info2_t *info, void *op_data)
+{
+  (void) info;
+  spio_hdf5_reopen_ctx_t *ctx = static_cast<spio_hdf5_reopen_ctx_t *>(op_data);
+  iosystem_desc_t *ios = ctx->ios;
+  file_desc_t *file = ctx->file;
+
+  H5O_info2_t oinfo;
+  if(H5Oget_info_by_name3(loc_id, name, &oinfo, H5O_INFO_BASIC, H5P_DEFAULT) < 0){
+    ctx->ierr = pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                        "Reopening file (%s) using the HDF5 iotype failed. "
+                        "The low level (HDF5) I/O library call failed to stat a link (%s) "
+                        "in the root group",
+                        pio_get_fname_from_file(file), name);
+    return -1;
+  }
+
+  if(oinfo.type != H5O_TYPE_DATASET){
+    /* Not a dataset (e.g. a group) - nothing SCORPIO's HDF5 writer creates
+     * at the root group is anything but a dataset, so skip it rather than
+     * fail the whole reopen over something unrelated sharing the file.
+     */
+    return 0;
+  }
+
+  hid_t did = H5Dopen2(loc_id, name, H5P_DEFAULT);
+  if(did == H5I_INVALID_HID){
+    ctx->ierr = pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                        "Reopening file (%s) using the HDF5 iotype failed. "
+                        "The low level (HDF5) I/O library call failed to open a dataset (%s)",
+                        pio_get_fname_from_file(file), name);
+    return -1;
+  }
+
+  htri_t is_ds = H5DSis_scale(did);
+  if(is_ds < 0){
+    H5Dclose(did);
+    ctx->ierr = pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                        "Reopening file (%s) using the HDF5 iotype failed. "
+                        "The low level (HDF5) I/O library call failed to determine whether "
+                        "a dataset (%s) is an HDF5 dimension scale",
+                        pio_get_fname_from_file(file), name);
+    return -1;
+  }
+
+  if(is_ds > 0){
+    /* Dimension-scale dataset: either a "pure" dimension or a coordinate
+     * variable - distinguish them via the dimension-scale NAME attribute
+     * (see H5DSset_scale()/H5DSget_scale_name()): a pure dimension's NAME is
+     * the magic prefix (plus a formatted length suffix); a coordinate
+     * variable's NAME is simply its own (and its dimension's) name.
+     */
+    char scale_name[PIO_MAX_NAME + 64];
+    ssize_t name_len = H5DSget_scale_name(did, scale_name, sizeof(scale_name));
+    if(name_len < 0){
+      H5Dclose(did);
+      ctx->ierr = pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                          "Reopening file (%s) using the HDF5 iotype failed. "
+                          "The low level (HDF5) I/O library call failed to get the "
+                          "dimension-scale name of a dataset (%s)",
+                          pio_get_fname_from_file(file), name);
+      return -1;
+    }
+
+    bool is_pure_dim = (strncmp(scale_name, SPIO_HDF5_PURE_DIM_SCALE_NAME_PREFIX,
+                                strlen(SPIO_HDF5_PURE_DIM_SCALE_NAME_PREFIX)) == 0);
+
+    /* Every dimension-scale dataset (pure or coordinate-variable) carries a
+     * "_Netcdf4Dimid" hidden attribute recording its dimension index - see
+     * spio_hdf5_sync_defs() Steps 1 and 2.
+     */
+    htri_t dimid_attr_exists = H5Aexists(did, SPIO_HDF5_ATT_NETCDF4_DIMID);
+    if(dimid_attr_exists <= 0){
+      H5Dclose(did);
+      ctx->ierr = pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                          "Reopening file (%s) using the HDF5 iotype failed. "
+                          "A dimension-scale dataset (%s) is missing its (%s) hidden attribute",
+                          pio_get_fname_from_file(file), name, SPIO_HDF5_ATT_NETCDF4_DIMID);
+      return -1;
+    }
+
+    hid_t dimid_attr_id = H5Aopen(did, SPIO_HDF5_ATT_NETCDF4_DIMID, H5P_DEFAULT);
+    if(dimid_attr_id == H5I_INVALID_HID){
+      H5Dclose(did);
+      ctx->ierr = pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                          "Reopening file (%s) using the HDF5 iotype failed. "
+                          "The low level (HDF5) I/O library call failed to open an attribute (%s) "
+                          "on a dimension-scale dataset (%s)",
+                          pio_get_fname_from_file(file), SPIO_HDF5_ATT_NETCDF4_DIMID, name);
+      return -1;
+    }
+
+    int dimid = -1;
+    herr_t aret = H5Aread(dimid_attr_id, H5T_NATIVE_INT, &dimid);
+    H5Aclose(dimid_attr_id);
+    if((aret < 0) || (dimid < 0)){
+      H5Dclose(did);
+      ctx->ierr = pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                          "Reopening file (%s) using the HDF5 iotype failed. "
+                          "The low level (HDF5) I/O library call failed to read a valid dimension id "
+                          "from a dimension-scale dataset (%s)",
+                          pio_get_fname_from_file(file), name);
+      return -1;
+    }
+
+    if(dimid >= PIO_MAX_DIMS){
+      H5Dclose(did);
+      ctx->ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                          "Reopening file (%s) using the HDF5 iotype failed. "
+                          "The file has more dimensions than PIO_MAX_DIMS (%d)",
+                          pio_get_fname_from_file(file), PIO_MAX_DIMS);
+      return -1;
+    }
+
+    PIO_Offset dim_len = 0;
+    int ret = spio_hdf5_reopen_get_dim_len(ios, file, did, name, &dim_len);
+    if(ret != PIO_NOERR){
+      H5Dclose(did);
+      ctx->ierr = ret;
+      return -1;
+    }
+
+    file->hdf5_dims[dimid].name = spio_strdup(name);
+    file->hdf5_dims[dimid].len = dim_len;
+    file->hdf5_dims[dimid].chunk_sz = 0;
+    file->hdf5_dims[dimid].has_coord_var = !is_pure_dim;
+    file->hdf5_dims[dimid].hdf5_dataset_id = did;
+
+    if(dimid > ctx->max_dimid_seen){
+      ctx->max_dimid_seen = dimid;
+    }
+
+    if(!is_pure_dim){
+      /* Coordinate variable: also record it as a variable. A coordinate
+       * variable's dataset name on disk is always its own (unmangled) name -
+       * spio_hdf5_def_var() only ever sets alt_name for a *non*-coordinate
+       * variable that collides with a dimension name (see pio_nc.cpp's
+       * def_var()) - so no alt_name recovery is needed here.
+       */
+      if(ctx->next_varid >= PIO_MAX_VARS){
+        ctx->ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                            "Reopening file (%s) using the HDF5 iotype failed. "
+                            "The file has more variables than PIO_MAX_VARS (%d)",
+                            pio_get_fname_from_file(file), PIO_MAX_VARS);
+        return -1;
+      }
+
+      int varid = ctx->next_varid;
+
+      int nc_type = PIO_NAT;
+      hid_t hdf5_type = H5I_INVALID_HID;
+      ret = spio_hdf5_reopen_get_var_type(ios, file, did, name, &nc_type, &hdf5_type);
+      if(ret != PIO_NOERR){
+        ctx->ierr = ret;
+        return -1;
+      }
+
+      int ndims = 0;
+      int *dimids = NULL;
+      ret = spio_hdf5_reopen_get_var_dimids(ios, file, did, name, &ndims, &dimids);
+      if(ret != PIO_NOERR){
+        if(nc_type == NC_CHAR) { H5Tclose(hdf5_type); }
+        ctx->ierr = ret;
+        return -1;
+      }
+
+      if((ndims <= 0) || !dimids){
+        /* A coordinate variable always has exactly one dimension (itself) -
+         * spio_add_nc_hidden_coord() only skips writing the attribute for
+         * ndims == 0 (scalars), which a coordinate variable can never be.
+         */
+        if(nc_type == NC_CHAR) { H5Tclose(hdf5_type); }
+        if(dimids) { free(dimids); }
+        ctx->ierr = pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                            "Reopening file (%s) using the HDF5 iotype failed. "
+                            "A coordinate variable (%s) is missing its dimension ids",
+                            pio_get_fname_from_file(file), name);
+        return -1;
+      }
+
+      file->hdf5_vars[varid].name = spio_strdup(name);
+      file->hdf5_vars[varid].alt_name = NULL;
+      file->hdf5_vars[varid].nc_type = nc_type;
+      file->hdf5_vars[varid].hdf5_type = hdf5_type;
+      file->hdf5_vars[varid].ndims = ndims;
+      file->hdf5_vars[varid].hdf5_dimids = dimids;
+      file->hdf5_vars[varid].is_coord_var = true;
+      file->hdf5_vars[varid].hdf5_dataset_id = did;
+
+      ret = spio_hdf5_reopen_scan_attrs(ios, file, did, varid);
+      if(ret != PIO_NOERR){
+        ctx->ierr = ret;
+        return -1;
+      }
+
+      ctx->next_varid++;
+    }
+
+    return 0;
+  }
+
+  /* Ordinary (non-scale) variable dataset */
+  if(ctx->next_varid >= PIO_MAX_VARS){
+    H5Dclose(did);
+    ctx->ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                        "Reopening file (%s) using the HDF5 iotype failed. "
+                        "The file has more variables than PIO_MAX_VARS (%d)",
+                        pio_get_fname_from_file(file), PIO_MAX_VARS);
+    return -1;
+  }
+
+  int varid = ctx->next_varid;
+
+  const char *alt_name_prefix = SPIO_HDF5_NON_COORD_VAR_ALT_NAME_PREFIX;
+  size_t alt_name_prefix_len = strlen(alt_name_prefix);
+  bool has_alt_name = (strncmp(name, alt_name_prefix, alt_name_prefix_len) == 0);
+  const char *real_name = has_alt_name ? (name + alt_name_prefix_len) : name;
+
+  int nc_type = PIO_NAT;
+  hid_t hdf5_type = H5I_INVALID_HID;
+  int ret = spio_hdf5_reopen_get_var_type(ios, file, did, name, &nc_type, &hdf5_type);
+  if(ret != PIO_NOERR){
+    H5Dclose(did);
+    ctx->ierr = ret;
+    return -1;
+  }
+
+  int ndims = 0;
+  int *dimids = NULL;
+  ret = spio_hdf5_reopen_get_var_dimids(ios, file, did, name, &ndims, &dimids);
+  if(ret != PIO_NOERR){
+    if(nc_type == NC_CHAR) { H5Tclose(hdf5_type); }
+    H5Dclose(did);
+    ctx->ierr = ret;
+    return -1;
+  }
+
+  file->hdf5_vars[varid].name = spio_strdup(real_name);
+  file->hdf5_vars[varid].alt_name = has_alt_name ? spio_strdup(name) : NULL;
+  file->hdf5_vars[varid].nc_type = nc_type;
+  file->hdf5_vars[varid].hdf5_type = hdf5_type;
+  file->hdf5_vars[varid].ndims = ndims;
+  file->hdf5_vars[varid].hdf5_dimids = dimids;
+  file->hdf5_vars[varid].is_coord_var = false;
+  file->hdf5_vars[varid].hdf5_dataset_id = did;
+
+  ret = spio_hdf5_reopen_scan_attrs(ios, file, did, varid);
+  if(ret != PIO_NOERR){
+    ctx->ierr = ret;
+    return -1;
+  }
+
+  ctx->next_varid++;
+
+  return 0;
+}
 
 /* H5Literate2() callback: stop at the first immediate child of the
  * iterated group that H5DSis_scale() recognizes as an HDF5 dimension-scale
@@ -203,28 +868,101 @@ int spio_hdf5_reopen(iosystem_desc_t *ios, file_desc_t *file, const char *filena
     return PIO_EBADIOTYPE;
   }
 
-  /* Recognized as a SCORPIO-written HDF5 file. The dimension/variable/
-   * attribute introspection that would populate file->hdf5_dims/hdf5_vars/
-   * hdf5_attrs from fid, and let this function return PIO_NOERR with
-   * file->hdf5_file_id = fid and file->iotype left as HDF5/HDF5C, is not
-   * implemented yet - it lands in the very next task of this plan, in the
-   * same branch/PR, as a direct continuation of this function.
+  /* Recognized as a SCORPIO-written HDF5 file: walk the root group (in
+   * link-creation order - tracked/indexed per spio_hdf5_is_scorpio_written()'s
+   * check (a), unlike attribute creation order, which is disabled - see the
+   * H5Aiterate2() calls below) and populate file->hdf5_dims/hdf5_vars/
+   * hdf5_attrs from what is actually on disk.
    *
-   * Until then, report PIO_EBADIOTYPE (the same "not recognized, fall
-   * back" sentinel used above) so PIOc_openfile_retry_impl() falls back to
-   * the existing switch-to-NETCDF4 behavior instead of returning PIO_NOERR
-   * over a file with zero populated dims/vars/attrs - which would break
-   * every existing caller that reads back what it just wrote. This keeps
-   * this task's change behavior-neutral for every file, recognized or not,
-   * until the next task gives this branch something real to do.
-   *
-   * TODO: Task 11 replaces this block with a call to the real
-   * introspection routine and returns PIO_NOERR on its success, or a
-   * genuine PIO error code - not PIO_EBADIOTYPE - if that introspection
-   * itself fails.
+   * On genuine-error handling, and why an immediate per-rank pio_err()
+   * return here is safe despite spio_hdf5_reopen() running on every calling
+   * rank unconditionally (not just is_sync_io_proc() ranks - see
+   * PIOc_openfile_retry_impl()'s call site comment in pioc_support.cpp):
+   * unlike the H5Fopen() probe above (whose failure is deliberately folded
+   * into PIO_EBADIOTYPE, not a hard error, precisely because visibility of a
+   * freshly-closed file on a shared filesystem can differ across ranks at
+   * the same instant), everything from here on only runs *after* every rank
+   * has already independently confirmed, locally, that this exact file is
+   * both valid HDF5 and SCORPIO-written. Architecture section 3's async-write lock
+   * file (the create/remove helpers added to pio_file.cpp alongside
+   * iosystem_desc_t::spio_lock_id) is what guarantees the file is quiescent
+   * (no concurrent writer) by the time a read-only reopen gets
+   * this far, so every rank is reading byte-identical, static content
+   * through the same HDF5 library build. The only genuine-error conditions
+   * introduced below - a hidden attribute missing where the write path
+   * always creates one, a dimension/variable count that exceeds
+   * PIO_MAX_DIMS/PIO_MAX_VARS/PIO_MAX_ATTRS, or H5Literate2()/H5Aiterate2()
+   * itself failing - are therefore properties of the file's on-disk content
+   * and this build's compile-time limits, not of anything rank-local or
+   * transient, so every rank hits the same outcome. A truly transient,
+   * rank-specific I/O failure at this point (e.g. a local disk hiccup) is a
+   * known, narrow residual risk shared with any other non-collective
+   * metadata read in this codebase; it is not something this function can
+   * resolve without making the reopen itself collective, which is out of
+   * scope here (file->mode/file->uses_async_io - and so the right
+   * sub-communicator to collect over - are not yet established at this
+   * point in PIOc_openfile_retry_impl(), see the fields' own comments in
+   * pio_types.hpp).
    */
-  H5Fclose(fid);
-  return PIO_EBADIOTYPE;
+  spio_hdf5_reopen_ctx_t ctx;
+  ctx.ios = ios;
+  ctx.file = file;
+  ctx.next_varid = 0;
+  ctx.max_dimid_seen = -1;
+  ctx.ierr = PIO_NOERR;
+
+  hid_t root_id = H5Gopen2(fid, "/", H5P_DEFAULT);
+  if(root_id == H5I_INVALID_HID){
+    H5Fclose(fid);
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reopening file (%s) using the HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to open the root group",
+                   filename);
+  }
+
+  herr_t iret = H5Literate2(root_id, H5_INDEX_CRT_ORDER, H5_ITER_INC, NULL,
+                            spio_hdf5_reopen_scan_cb, &ctx);
+  H5Gclose(root_id);
+
+  if(iret < 0){
+    H5Fclose(fid);
+    if(ctx.ierr != PIO_NOERR){
+      return ctx.ierr;
+    }
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reopening file (%s) using the HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to iterate over the root group",
+                   filename);
+  }
+
+  /* File-level (global) attributes */
+  int ret = spio_hdf5_reopen_scan_attrs(ios, file, fid, PIO_GLOBAL);
+  if(ret != PIO_NOERR){
+    H5Fclose(fid);
+    return ret;
+  }
+
+  file->hdf5_file_id = fid;
+  file->hdf5_num_dims = ctx.max_dimid_seen + 1;
+  file->hdf5_num_vars = ctx.next_varid;
+
+  /* Local (not MPI-IO collective) dataset transfer property lists, matching
+   * spio_hdf5_create()'s - this reopen path never sets up an MPI-IO file
+   * access property list (see the long comment above spio_hdf5_is_scorpio_
+   * written()'s H5Fopen() probe for why that is not done at this point), so
+   * neither of these is ever given H5Pset_dxpl_mpio() collective I/O here.
+   */
+  file->dxplid_coll = H5Pcreate(H5P_DATASET_XFER);
+  file->dxplid_indep = H5Pcreate(H5P_DATASET_XFER);
+  if((file->dxplid_coll == H5I_INVALID_HID) || (file->dxplid_indep == H5I_INVALID_HID)){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reopening file (%s) using the HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to create a dataset "
+                   "transfer property list",
+                   filename);
+  }
+
+  return PIO_NOERR;
 }
 
 #endif /* _HDF5 */
