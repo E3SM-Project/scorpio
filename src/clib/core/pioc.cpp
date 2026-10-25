@@ -555,19 +555,31 @@ static int subset_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const
    * map_zero_based=false (unlike CONTIG's true): iodesc->sync_io_desc_info.map
    * is already the 1-based SUBSET-internal map, and init_map()'s
    * map_zero_based=true branch would add a second, spurious +1 offset for a
-   * non-CONTIG rearranger. */
-  iodesc->async_io_desc_info = new io_desc_info_t(ios, iodesc->sync_io_desc_info.piotype,
-    iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen,
-    iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map,
-    iodesc->sync_io_desc_info.rearranger, /*map_zero_based=*/false);
+   * non-CONTIG rearranger.
+   *
+   * Skipped when this iosystem uses the (older, intercomm-based) async I/O
+   * service: ios->io_comm_info's async_* fields are never populated for that
+   * path (see PIOc_init_intercomm_impl()'s io_comm_info construction), so
+   * get_async_io_comm_sz() would be 0 and default_subset_partition()'s
+   * ios->num_comptasks / io_target.get_comm_sz() would divide by zero. This
+   * matches file_desc_t::uses_async_io's single source of truth (pio_types.hpp)
+   * - async_io_desc_info is never selected for such an iosystem's files either,
+   * so leaving it unallocated here (select_io_desc_info() already falls back
+   * to sync_io_desc_info when async_io_desc_info is NULL) changes no behavior. */
+  if(!SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios)){
+    iodesc->async_io_desc_info = new io_desc_info_t(ios, iodesc->sync_io_desc_info.piotype,
+      iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen,
+      iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map,
+      iodesc->sync_io_desc_info.rearranger, /*map_zero_based=*/false);
 
-  iodesc->async_io_desc_info->num_aiotasks = ios->io_comm_info->get_async_io_comm_sz();
-  LOG((2, "creating async subset rearranger iodesc->async_io_desc_info->num_aiotasks = %d", iodesc->async_io_desc_info->num_aiotasks));
-  if((ret = subset_rearrange_create(ios, iodesc->async_io_desc_info->maplen, (PIO_Offset *)(iodesc->async_io_desc_info->map),
-                                      iodesc->async_io_desc_info->dimlen, iodesc->async_io_desc_info->ndims, iodesc,
-                                      *(iodesc->async_io_desc_info), SPIO_Util::Iosys_Util::make_async_io_comm_target(ios)))){
-    return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                    "Initializing the PIO decomposition failed. Error creating the async SUBSET rearranger");
+    iodesc->async_io_desc_info->num_aiotasks = ios->io_comm_info->get_async_io_comm_sz();
+    LOG((2, "creating async subset rearranger iodesc->async_io_desc_info->num_aiotasks = %d", iodesc->async_io_desc_info->num_aiotasks));
+    if((ret = subset_rearrange_create(ios, iodesc->async_io_desc_info->maplen, (PIO_Offset *)(iodesc->async_io_desc_info->map),
+                                        iodesc->async_io_desc_info->dimlen, iodesc->async_io_desc_info->ndims, iodesc,
+                                        *(iodesc->async_io_desc_info), SPIO_Util::Iosys_Util::make_async_io_comm_target(ios)))){
+      return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                      "Initializing the PIO decomposition failed. Error creating the async SUBSET rearranger");
+    }
   }
 #endif
 
@@ -630,45 +642,57 @@ static int box_rearranger_init(iosystem_desc_t *ios, io_desc_t *iodesc, const PI
    * map_zero_based=false (unlike CONTIG's true): iodesc->sync_io_desc_info.map
    * is already the 1-based BOX-internal map, and init_map()'s
    * map_zero_based=true branch would add a second, spurious +1 offset for a
-   * non-CONTIG rearranger. */
-  iodesc->async_io_desc_info = new io_desc_info_t(ios, iodesc->sync_io_desc_info.piotype,
-    iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen,
-    iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map,
-    iodesc->sync_io_desc_info.rearranger, /*map_zero_based=*/false);
+   * non-CONTIG rearranger.
+   *
+   * Skipped when this iosystem uses the (older, intercomm-based) async I/O
+   * service: ios->io_comm_info's async_* fields are never populated for that
+   * path (see PIOc_init_intercomm_impl()'s io_comm_info construction), so
+   * get_async_io_root() would be -1 and the MPI_Bcast() below would fail with
+   * "Invalid root". This matches file_desc_t::uses_async_io's single source
+   * of truth (pio_types.hpp) - async_io_desc_info is never selected for such
+   * an iosystem's files either, so leaving it unallocated here
+   * (select_io_desc_info() already falls back to sync_io_desc_info when
+   * async_io_desc_info is NULL) changes no behavior. */
+  if(!SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios)){
+    iodesc->async_io_desc_info = new io_desc_info_t(ios, iodesc->sync_io_desc_info.piotype,
+      iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen,
+      iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map,
+      iodesc->sync_io_desc_info.rearranger, /*map_zero_based=*/false);
 
-  if(ios->io_comm_info->is_async_io_proc()){
-    if(iostart && iocount){
-      for(int i = 0; i < iodesc->async_io_desc_info->ndims; i++){
-        iodesc->async_io_desc_info->firstregion->start[i] = iostart[i];
-        iodesc->async_io_desc_info->firstregion->count[i] = iocount[i];
+    if(ios->io_comm_info->is_async_io_proc()){
+      if(iostart && iocount){
+        for(int i = 0; i < iodesc->async_io_desc_info->ndims; i++){
+          iodesc->async_io_desc_info->firstregion->start[i] = iostart[i];
+          iodesc->async_io_desc_info->firstregion->count[i] = iocount[i];
+        }
+        iodesc->async_io_desc_info->num_aiotasks = ios->io_comm_info->get_async_io_comm_sz();
       }
-      iodesc->async_io_desc_info->num_aiotasks = ios->io_comm_info->get_async_io_comm_sz();
-    }
-    else{
-      if((ret = CalcStartandCount(iodesc->async_io_desc_info->piotype, iodesc->async_io_desc_info->ndims, iodesc->async_io_desc_info->dimlen,
-                                   ios->io_comm_info->get_async_io_comm_sz(), ios->io_comm_info->get_async_io_comm_rank(),
-                                   iodesc->async_io_desc_info->firstregion->start, iodesc->async_io_desc_info->firstregion->count,
-                                   &iodesc->async_io_desc_info->num_aiotasks))){
+      else{
+        if((ret = CalcStartandCount(iodesc->async_io_desc_info->piotype, iodesc->async_io_desc_info->ndims, iodesc->async_io_desc_info->dimlen,
+                                     ios->io_comm_info->get_async_io_comm_sz(), ios->io_comm_info->get_async_io_comm_rank(),
+                                     iodesc->async_io_desc_info->firstregion->start, iodesc->async_io_desc_info->firstregion->count,
+                                     &iodesc->async_io_desc_info->num_aiotasks))){
+          return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                          "Initializing the PIO decomposition failed. Internal error calculating start/count for the async decomposition");
+        }
+      }
+
+      if((ret = compute_maxIObuffersize(ios->io_comm_info->get_async_io_comm(), *(iodesc->async_io_desc_info)))){
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                        "Initializing the PIO decomposition failed. Internal error calculating start/count for the async decomposition");
+                        "Initializing the PIO decomposition failed. Internal error computing max io buffer size needed for the async decomposition");
       }
     }
 
-    if((ret = compute_maxIObuffersize(ios->io_comm_info->get_async_io_comm(), *(iodesc->async_io_desc_info)))){
-      return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                      "Initializing the PIO decomposition failed. Internal error computing max io buffer size needed for the async decomposition");
+    if((ret = MPI_Bcast(&(iodesc->async_io_desc_info->num_aiotasks), 1, MPI_INT, ios->io_comm_info->get_async_io_root(), ios->my_comm))){
+      return check_mpi(ios, NULL, ret, __FILE__, __LINE__);
     }
-  }
 
-  if((ret = MPI_Bcast(&(iodesc->async_io_desc_info->num_aiotasks), 1, MPI_INT, ios->io_comm_info->get_async_io_root(), ios->my_comm))){
-    return check_mpi(ios, NULL, ret, __FILE__, __LINE__);
-  }
-
-  if((ret = box_rearrange_create(ios, iodesc->async_io_desc_info->maplen, iodesc->async_io_desc_info->map,
-                                  iodesc->async_io_desc_info->dimlen, iodesc->async_io_desc_info->ndims, iodesc,
-                                  *(iodesc->async_io_desc_info), SPIO_Util::Iosys_Util::make_async_io_comm_target(ios)))){
-    return pio_err(ios, NULL, ret, __FILE__, __LINE__,
-                    "Error initializing the PIO decomposition. Error creating the async BOX rearranger");
+    if((ret = box_rearrange_create(ios, iodesc->async_io_desc_info->maplen, iodesc->async_io_desc_info->map,
+                                    iodesc->async_io_desc_info->dimlen, iodesc->async_io_desc_info->ndims, iodesc,
+                                    *(iodesc->async_io_desc_info), SPIO_Util::Iosys_Util::make_async_io_comm_target(ios)))){
+      return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                      "Error initializing the PIO decomposition. Error creating the async BOX rearranger");
+    }
   }
 #endif
 
