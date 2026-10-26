@@ -94,9 +94,15 @@ int test_lock_filename_uniqueness(int wrank)
   return ret;
 }
 
+#ifdef _HDF5
 /* Test the no-op case: spio_create_async_lock_file()/spio_remove_async_lock_file()
  * must not create/touch any file at all when file->uses_async_io is false -
  * regardless of whether this rank happens to be the async I/O master.
+ *
+ * file_desc_t::uses_async_io and spio_create_async_lock_file()/
+ * spio_remove_async_lock_file() only exist when _HDF5 is defined (see
+ * pio_types.hpp/pio_internal.h), so this test has nothing to exercise
+ * otherwise - see the SKIPPED message at this function's call site below.
  */
 int test_lock_create_remove_noop_when_not_using_async_io(MPI_Comm comm, int wrank)
 {
@@ -158,6 +164,7 @@ int test_lock_create_remove_noop_when_not_using_async_io(MPI_Comm comm, int wran
 
   return ret;
 }
+#endif /* _HDF5 */
 
 #if PIO_USE_ASYNC_WR_THREAD
 /* Test the real create -> remove lifecycle on the async I/O root rank.
@@ -796,6 +803,7 @@ int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
     LOG_RANK0(wrank, "test_lock_filename_uniqueness() PASSED\n");
   }
 
+#ifdef _HDF5
   ret = test_lock_create_remove_noop_when_not_using_async_io(comm, wrank);
   if(ret != PIO_NOERR){
     LOG_RANK0(wrank, "test_lock_create_remove_noop_when_not_using_async_io() FAILED, ret = %d\n", ret);
@@ -804,6 +812,11 @@ int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
   else{
     LOG_RANK0(wrank, "test_lock_create_remove_noop_when_not_using_async_io() PASSED\n");
   }
+#else
+  LOG_RANK0(wrank, "test_lock_create_remove_noop_when_not_using_async_io() SKIPPED (_HDF5 is not "
+    "enabled in this build - file_desc_t::uses_async_io and the lock-file create/remove helpers "
+    "do not exist in this build)\n");
+#endif /* _HDF5 */
 
 #if PIO_USE_ASYNC_WR_THREAD
   ret = test_lock_create_remove_on_async_root(comm, wrank);

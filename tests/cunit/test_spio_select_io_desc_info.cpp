@@ -1,8 +1,11 @@
+#include "pio_config.h"
+
+#ifdef _HDF5
+
 #include <vector>
 #include <cassert>
 #include <cstdlib>
 
-#include "pio_config.h"
 #include "pio.h"
 #include "pio_tests.h"
 #include "pio_internal.h"
@@ -566,3 +569,16 @@ int main(int argc, char *argv[])
   }
   return 0;
 }
+
+#else /* _HDF5 */
+
+/* file_desc_t::uses_async_io and io_desc_t::select_io_desc_info()'s
+ * HDF5/HDF5C routing only exist when _HDF5 is defined - nothing to test
+ * otherwise (mirrors test_spio_iodesc_utils.cpp).
+ */
+int main(int argc, char *argv[])
+{
+  return 0;
+}
+
+#endif /* _HDF5 */
