@@ -89,19 +89,22 @@ int PIO_Util::PIO_async_tpool::dequeue_and_process(
       SPIO_Util::Async_op op = tpool->mtq_.dequeue();
       ret = op.wait();
       if(ret != PIO_NOERR){
-        /* FIXME: this return kills the worker thread outright instead of
-         * continuing to service the queue. Every op already enqueued behind
-         * this one (including file-close ops) is then stranded: its
-         * pending-op counters are never decremented, so
-         * spio_wait_file_async_pend_ops() (pio_file.cpp) now blocks on them
-         * for the full SPIO_ASYNC_OP_WAIT_TIMEOUT (120s default) before
-         * giving up, rather than being silently harmless as before that
-         * wait existed. Pre-existing bug, confirmed during review; not
-         * fixed here - tracked as a follow-up. */
-        return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
-                        "Internal error dequeuing and processing asynchronous operation (%s) in the thread pool. Internal error waiting on asynchronous file write operation",
-                        SPIO_Util::Async_op::op_type_to_string(op.type()).c_str());
+        /* Report the error (pio_err() aborts here if the application left
+         * the error handler at its default PIO_INTERNAL_ERROR, same as
+         * before), but do not let a single failed op kill this worker
+         * thread: SPIO_ASYNC_NTHREADS defaults to 1, so returning out of
+         * this function permanently stops the only thread servicing the
+         * shared op queue - every op enqueued after this point, for every
+         * file and every iosystem in the process (including unrelated
+         * files' close ops), is then stranded forever rather than this one
+         * op simply failing. Pre-existing bug, confirmed during review. */
+        pio_err(NULL, NULL, ret, __FILE__, __LINE__,
+                "Internal error dequeuing and processing asynchronous operation (%s) in the thread pool. Internal error waiting on asynchronous file write operation",
+                SPIO_Util::Async_op::op_type_to_string(op.type()).c_str());
       }
+      /* Always free the op's user data, even on failure - the original
+       * early-return on failure skipped this, leaking it (e.g. the
+       * Hdf5_wcache/Hdf5_create_info the op owns) on every failed op. */
       op.free();
     }catch(const PIO_Util::PIO_mtq<SPIO_Util::Async_op>::Mtq_exception &e){
       /* MTQ exceptions are for MTQ signal handling, stop waiting on the queue */
