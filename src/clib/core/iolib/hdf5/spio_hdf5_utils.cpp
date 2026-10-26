@@ -57,6 +57,23 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
   assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
+  /* Defensively disable HDF5's internal MPI_File_sync() around independent
+   * writes unless the user/launch script has already set this explicitly
+   * (setenv's overwrite=0 never clobbers an existing value). On some
+   * filesystems/ROMIO ADIO drivers (observed on ANL's compute-386* NFS-
+   * backed nodes), HDF5's H5D__ioinfo_adjust() refuses to downgrade a
+   * collective write to independent I/O unless HDF5_DO_MPI_FILE_SYNC=FALSE
+   * is set, aborting instead with a fatal "requires MPI_File_sync" error
+   * (seen on test_put_get_str_idx's offset write to var1d_midx). This is an
+   * HDF5-internal, env-var-only knob with no direct C API, so setenv() is
+   * the only way to set it; the existing H5Fset_mpi_atomicity() workaround
+   * below (SPIO_DISABLE_HDF5_MPI_FILE_SYNC) does not actually substitute
+   * for it - it was confirmed active and still failing on exactly this
+   * failure mode. Must happen before any HDF5 call that might trigger an
+   * independent write.
+   */
+  setenv("HDF5_DO_MPI_FILE_SYNC", "FALSE", 0);
+
   if(file->mode & PIO_NOCLOBBER){
     /* No clobber : Check if file exists from all processes */
     struct stat sd;
