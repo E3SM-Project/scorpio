@@ -3726,12 +3726,20 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 #ifdef PIO_MICRO_TIMING
   mtimer_start(file->varlist[varid].rd_rearr_mtimer);
 #endif
-  /* Rearrange the data. */
+  /* Rearrange the data.
+   * For PIO_USE_ASYNC_WR_THREAD + HDF5[C] (for all rearrangers):
+   *  desc_info may be the async io_desc_info_t (see select_io_desc_info() above), so the
+   *  rearrange must use the matching comm target, not unconditionally the sync one.
+   */
   if(desc_info.rearranger == PIO_REARR_CONTIG){
     ierr = desc_info.rearr->rearrange_io2comp(iobuf, rlen * desc_info.mpitype_size, array, desc_info.ndof * desc_info.mpitype_size, 1);
   }
   else{
-    ierr = rearrange_io2comp(ios, iodesc, iobuf, array);
+    bool is_async_read = (&desc_info == iodesc->async_io_desc_info);
+    SPIO_Util::Iosys_Util::Io_comm_target io_target = is_async_read ?
+      SPIO_Util::Iosys_Util::make_async_io_comm_target(ios) :
+      SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios);
+    ierr = rearrange_io2comp(ios, iodesc, iobuf, array, desc_info, io_target);
   }
   if(ierr != PIO_NOERR){
     return pio_err(ios, file, ierr, __FILE__, __LINE__,

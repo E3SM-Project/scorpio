@@ -1841,6 +1841,48 @@ static int test_native_reopen_roundtrip(MPI_Comm test_comm, int my_rank, int nta
         rearr_name, my_rank, ret);
       nerrs++;
     }
+    else{
+      /* Read back through the SAME write-capable reopen, before closing it.
+       *
+       * This is the exact scenario that used to hit the SEGV documented
+       * below on the second reopen (file->uses_async_io == true, so
+       * PIOc_read_darray_impl() picks the async io_desc_info_t via
+       * select_io_desc_info()). Now that rearrange_io2comp() has a
+       * desc_info/Io_comm_target-parameterized overload and
+       * PIOc_read_darray_impl() passes it the same io_desc_info_t it read
+       * through, the two halves agree and this must succeed and return the
+       * data just written - not the original fixture's wdata. PIOc_sync()
+       * flushes the write_darray's buffered write (ordinary documented PIO
+       * behavior, not a wait on the async thread pool - see
+       * test_read_write_interleaved_no_race()); the async thread pool's own
+       * read/write ordering for the same file handles the rest. */
+      if((ret = PIOc_sync(ncid))){
+        fprintf(stderr, "test_native_reopen_roundtrip_%s() FAILED (rank %d): PIOc_sync() after "
+          "writing through the write-capable native reopen returned %d\n", rearr_name, my_rank,
+          ret);
+        nerrs++;
+      }
+      else{
+        std::vector<int> rdata_direct(MAPLEN_PER_RANK, -1);
+        if((ret = PIOc_read_darray(ncid, varid, ioid, (PIO_Offset) MAPLEN_PER_RANK,
+                                   rdata_direct.data()))){
+          fprintf(stderr, "test_native_reopen_roundtrip_%s() FAILED (rank %d): reading back "
+            "through the write-capable native reopen returned %d\n", rearr_name, my_rank, ret);
+          nerrs++;
+        }
+        else{
+          for(int i = 0; i < MAPLEN_PER_RANK; i++){
+            if(rdata_direct[i] != wdata2[i]){
+              fprintf(stderr, "test_native_reopen_roundtrip_%s() FAILED (rank %d): reading back "
+                "through the write-capable native reopen: rdata_direct[%d] (%d) != wdata2[%d] "
+                "(%d)\n", rearr_name, my_rank, i, rdata_direct[i], i, wdata2[i]);
+              nerrs++;
+              break;
+            }
+          }
+        }
+      }
+    }
   }
   else{
     fprintf(stderr, "test_native_reopen_roundtrip_%s() FAILED (rank %d): no varid available to "
@@ -1852,40 +1894,40 @@ static int test_native_reopen_roundtrip(MPI_Comm test_comm, int my_rank, int nta
   drain_async_ops(iosysid);
   MPI_Barrier(test_comm);
 
-  /* Data.
+  /* Data: a second, read-only native reopen, in addition to the direct
+   * read-back through the write-capable reopen above.
    *
-   * Deliberately verified through a *second*, read-only native reopen
-   * rather than through the write-capable one above.
-   *
-   * NEW BUG (found by this task, NOT in the plan's known-issues backlog -
-   * documented, deliberately NOT fixed here, since this task adds tests
-   * only): PIOc_read_darray_impl() (src/clib/core/pio_darray.cpp) picks the
-   * io_desc_info_t it reads through with
-   * iodesc->select_io_desc_info(file->iotype, file), which since Task 3
-   * returns the *async* io_desc_info_t whenever file->uses_async_io is set.
-   * It then rearranges the result with rearrange_io2comp()
-   * (src/clib/core/rearr/pio_rearrange.cpp), which reads
+   * FIXED BUG (previously documented here as a new, pre-existing read-path
+   * defect, not caused by Tasks 10/11 but made reachable on a *reopened*
+   * file by them): PIOc_read_darray_impl() (src/clib/core/pio_darray.cpp)
+   * picks the io_desc_info_t it reads through with
+   * iodesc->select_io_desc_info(file->iotype, file), which returns the
+   * *async* io_desc_info_t whenever file->uses_async_io is set. It used to
+   * always rearrange the result with the 4-arg rearrange_io2comp()
+   * (src/clib/core/rearr/pio_rearrange.cpp), which read
    * iodesc->sync_io_desc_info unconditionally - its scount/stype/rfrom/rtype
    * and the sync I/O rank list. For a write-capable (uses_async_io == true)
    * file on a disjoint sync/async-procs topology with the BOX or SUBSET
    * rearranger, those two halves describe different I/O rank sets and
    * different MPI datatypes, and the pio_swapm()/MPI_Alltoallw() in
-   * rearrange_io2comp() then packs from a buffer sized/laid out by the other
-   * half - observed as a hard SEGV inside MPICH's blkidx_m2m()
+   * rearrange_io2comp() then packed from a buffer sized/laid out by the
+   * other half - observed as a hard SEGV inside MPICH's blkidx_m2m()
    * (looputil.c:584) via pio_swapm() -> rearrange_io2comp() ->
-   * PIOc_read_darray_impl(). CONTIG is unaffected because that path
+   * PIOc_read_darray_impl(). CONTIG was unaffected because that path
    * rearranges with desc_info.rearr->rearrange_io2comp() - the same
    * io_desc_info_t it read through - instead of the free rearrange_io2comp()
-   * function. This is a pre-existing read-path defect in its own right (any
-   * write-capable BOX/SUBSET HDF5 file would hit it); it is not caused by
-   * Tasks 10/11, but Tasks 10/11 make it reachable on a *reopened* file too,
-   * because a reopened SCORPIO HDF5 file now keeps iotype == HDF5 instead of
-   * being switched away to NETCDF4P.
+   * function.
    *
-   * A read-only reopen has uses_async_io == false, so select_io_desc_info()
-   * and rearrange_io2comp() agree on sync_io_desc_info and the data check
-   * below exercises exactly the round trip the brief asks for, on a file
-   * that is still natively HDF5. */
+   * Fix: rearrange_io2comp() now has a second overload parameterized on
+   * io_desc_info_t &desc_info and a matching Io_comm_target (mirroring the
+   * write path's rearrange_comp2io()), and PIOc_read_darray_impl() passes
+   * it the same desc_info it read through. The 4-arg entry point is now a
+   * thin wrapper defaulting to iodesc->sync_io_desc_info, so callers that
+   * never selected the async side are unaffected. The direct read-back
+   * above exercises exactly the path that used to SEGV; this second,
+   * read-only reopen (uses_async_io == false, so select_io_desc_info() and
+   * rearrange_io2comp() always agreed on sync_io_desc_info even before the
+   * fix) is kept as an independent cross-check of the on-disk data. */
   int rd_ncid = -1;
   int rd_format = PIO_IOTYPE_HDF5;
   if((ret = PIOc_openfile(iosysid, &rd_ncid, &rd_format, filename, PIO_NOWRITE))){

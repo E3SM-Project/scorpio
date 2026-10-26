@@ -292,7 +292,11 @@ extern "C" {
                              const SPIO_Util::Iosys_Util::Io_comm_target &io_target);
 
 
-    /* Move data from IO tasks to compute tasks. */
+    /* Move data from IO tasks to compute tasks. Defaults to iodesc's sync
+     * io_desc_info_t/comm target - callers that read through the async
+     * io_desc_info_t (select_io_desc_info()) must use the C++-only overload
+     * declared below (outside the extern "C" block) so the rearrange matches
+     * the half of the split that was actually read. */
     int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf, void *rbuf);
 
     /* Move data from compute tasks to IO tasks. */
@@ -757,6 +761,13 @@ int spio_find_start_count(int ndims, const int *dimlen, int fndims, var_desc_t *
  * cannot be declared inside the extern "C" block above since C linkage
  * does not support overloading. */
 void PIOc_warn(MPI_Comm comm, const char *fname, int line, const char *uwarn_msg);
+
+/* C++-only overload of rearrange_io2comp() (see the declaration above):
+ * cannot be declared inside the extern "C" block above since C linkage
+ * does not support overloading. */
+int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf, void *rbuf,
+                      io_desc_info_t &desc_info,
+                      const SPIO_Util::Iosys_Util::Io_comm_target &io_target);
 #endif
 
 #endif /* __PIO_INTERNAL__ */

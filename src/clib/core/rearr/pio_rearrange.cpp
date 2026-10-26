@@ -1056,7 +1056,8 @@ int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, io_desc_info_t &d
  * @returns 0 on success, error code otherwise.
  */
 int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
-                      void *rbuf)
+                      void *rbuf, io_desc_info_t &desc_info,
+                      const SPIO_Util::Iosys_Util::Io_comm_target &io_target)
 {
     MPI_Comm mycomm;
     int ntasks;
@@ -1071,14 +1072,14 @@ int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
 
     /* Different rearrangers use different communicators and number of
      * IO tasks. */
-    if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_BOX)
+    if (desc_info.rearranger == PIO_REARR_BOX)
     {
         mycomm = ios->union_comm;
-        niotasks = ios->io_comm_info->get_sync_io_comm_sz();
+        niotasks = io_target.get_comm_sz();
     }
     else
     {
-        mycomm = iodesc->sync_io_desc_info.subset_comm;
+        mycomm = desc_info.subset_comm;
         niotasks = 1;
     }
     LOG((3, "niotasks = %d", niotasks));
@@ -1092,8 +1093,7 @@ int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
 
     /* Define the MPI data types that will be used for this
      * io_desc_t. */
-    if ((ret = define_iodesc_datatypes(ios, iodesc, iodesc->sync_io_desc_info,
-                                       SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios))))
+    if ((ret = define_iodesc_datatypes(ios, iodesc, desc_info, io_target)))
     {
         GPTLstop("PIO:rearrange_io2comp");
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
@@ -1121,24 +1121,24 @@ int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
 
     /* In IO tasks set up sendcounts/sendtypes for pio_swapm() call
      * below. */
-    if (ios->io_comm_info->is_sync_io_proc())
+    if (io_target.is_io_proc())
     {
-        for (int i = 0; i < iodesc->sync_io_desc_info.nrecvs; i++)
+        for (int i = 0; i < desc_info.nrecvs; i++)
         {
-            if (iodesc->sync_io_desc_info.rtype[i] != MPI_DATATYPE_NULL)
+            if (desc_info.rtype[i] != MPI_DATATYPE_NULL)
             {
-                if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET)
+                if (desc_info.rearranger == PIO_REARR_SUBSET)
                 {
                     if (sbuf)
                     {
                         sendcounts[i] = 1;
-                        sendtypes[i] = iodesc->sync_io_desc_info.rtype[i];
+                        sendtypes[i] = desc_info.rtype[i];
                     }
                 }
                 else
                 {
-                    sendcounts[iodesc->sync_io_desc_info.rfrom[i]] = 1;
-                    sendtypes[iodesc->sync_io_desc_info.rfrom[i]] = iodesc->sync_io_desc_info.rtype[i];
+                    sendcounts[desc_info.rfrom[i]] = 1;
+                    sendtypes[desc_info.rfrom[i]] = desc_info.rtype[i];
                 }
             }
         }
@@ -1148,24 +1148,24 @@ int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
      * multiple IO tasks here we are setting the count and data type
      * of the communication of a given compute task with each io
      * task. */
-    const std::vector<int> ios_ioranks = ios->io_comm_info->get_sync_io_ranks();
+    const std::vector<int> ios_ioranks = io_target.get_ranks();
     for (int i = 0; i < niotasks; i++)
     {
         int io_comprank = ios_ioranks[i];
 
-        if (iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET)
+        if (desc_info.rearranger == PIO_REARR_SUBSET)
             io_comprank = 0;
 
-        if (iodesc->sync_io_desc_info.scount[i] > 0 && iodesc->sync_io_desc_info.stype[i] != MPI_DATATYPE_NULL)
+        if (desc_info.scount[i] > 0 && desc_info.stype[i] != MPI_DATATYPE_NULL)
         {
             recvcounts[io_comprank] = 1;
-            recvtypes[io_comprank] = iodesc->sync_io_desc_info.stype[i];
+            recvtypes[io_comprank] = desc_info.stype[i];
         }
     }
 
     /* Data in sbuf on the ionodes is sent to rbuf on the compute nodes */
     if ((ret = pio_swapm(sbuf, sendcounts, sdispls, sendtypes, rbuf, recvcounts,
-                         rdispls, recvtypes, mycomm, &iodesc->sync_io_desc_info.rearr_opts.io2comp)))
+                         rdispls, recvtypes, mycomm, &desc_info.rearr_opts.io2comp)))
     {
         GPTLstop("PIO:rearrange_io2comp");
         return pio_err(ios, NULL, ret, __FILE__, __LINE__,
@@ -1175,6 +1175,17 @@ int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
     GPTLstop("PIO:rearrange_io2comp");
 
     return PIO_NOERR;
+}
+
+/* Legacy entry point: always rearranges through iodesc's sync io_desc_info_t.
+ * Callers that may have read through the async io_desc_info_t instead
+ * (select_io_desc_info()) must call the overload above with that same
+ * io_desc_info_t and a matching Io_comm_target - see PIOc_read_darray_impl(). */
+int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf,
+                      void *rbuf)
+{
+    return rearrange_io2comp(ios, iodesc, sbuf, rbuf, iodesc->sync_io_desc_info,
+                             SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios));
 }
 
 /**
