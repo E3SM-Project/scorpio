@@ -897,6 +897,14 @@ int spio_hdf5_reopen(iosystem_desc_t *ios, file_desc_t *file, const char *filena
 {
   assert(ios && file && filename);
 
+  /* Defensively disable HDF5's internal MPI_File_sync() around independent
+   * writes unless already set explicitly - see the identical setenv() call
+   * (with full rationale) in spio_hdf5_create() in spio_hdf5_utils.cpp.
+   * A process that only reopens (never creates) an HDF5 file still needs
+   * this set before the write-capable collective reopen further below.
+   */
+  setenv("HDF5_DO_MPI_FILE_SYNC", "FALSE", 0);
+
   /* Cheap pre-check, using the exact same local/non-collective call
    * PIOc_openfile_retry_impl() itself uses right next to this function to
    * decide whether a file is HDF5 at all: if H5Fis_hdf5() does not confirm
