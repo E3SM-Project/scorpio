@@ -1223,6 +1223,129 @@ int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const 
   return PIO_NOERR;
 }
 
+/* Read an attribute's value directly via the HDF5 API, using whatever
+ * dataset/file handle this file's hdf5_vars[]/hdf5_file_id currently holds
+ * (e.g. the handles populated by a native HDF5 reopen - see
+ * spio_hdf5_reopen.cpp - for a file whose file->fh is not a valid netCDF
+ * id). H5Aread() performs the same on-the-fly numeric type conversion
+ * between the attribute's on-disk type and memtype that nc_get_att_*()
+ * callers rely on elsewhere in this library.
+ */
+int spio_hdf5_get_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const char *name,
+                      nc_type memtype, void *ip)
+{
+  hid_t attr_id;
+  hid_t loc_id;
+  hid_t h5_memtype;
+  htri_t att_exists;
+
+  assert(ios && file && name && ip);
+  assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
+
+  if(varid == PIO_GLOBAL){
+    loc_id = file->hdf5_file_id;
+  }
+  else{
+    loc_id = file->hdf5_vars[varid].hdf5_dataset_id;
+  }
+
+  /* H5Aexists() returns zero (false), a positive (true) or a negative (failure) value */
+  att_exists = H5Aexists(loc_id, name);
+  if(att_exists <= 0){
+    return pio_err(ios, file, PIO_ENOTATT, __FILE__, __LINE__,
+                   "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "The attribute does not exist",
+                   name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  attr_id = H5Aopen(loc_id, name, H5P_DEFAULT);
+  if(attr_id == H5I_INVALID_HID){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to open this attribute",
+                   name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  if(memtype == NC_CHAR){
+    /* A string attribute is written (see spio_hdf5_put_att()) as a scalar
+     * dataspace with a fixed-size H5T_STRING type sized to the exact
+     * string length - except a zero-length string, which uses an
+     * H5S_NULL dataspace and has nothing to read back. */
+    hid_t aspace_id = H5Aget_space(attr_id);
+    if(aspace_id == H5I_INVALID_HID){
+      H5Aclose(attr_id);
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to get the dataspace of this attribute",
+                     name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    bool is_null_space = (H5Sget_simple_extent_type(aspace_id) == H5S_NULL);
+    if(H5Sclose(aspace_id) < 0){
+      H5Aclose(attr_id);
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to release the dataspace of this attribute",
+                     name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    if(!is_null_space){
+      hid_t atype_id = H5Aget_type(attr_id);
+      if(atype_id == H5I_INVALID_HID){
+        H5Aclose(attr_id);
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to get the type of this attribute",
+                       name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+      }
+
+      if(H5Aread(attr_id, atype_id, ip) < 0){
+        H5Tclose(atype_id);
+        H5Aclose(attr_id);
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to read this attribute",
+                       name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+      }
+
+      if(H5Tclose(atype_id) < 0){
+        H5Aclose(attr_id);
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to release the type of this attribute",
+                       name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+      }
+    }
+  }
+  else{
+    h5_memtype = (memtype == PIO_LONG_INTERNAL) ? H5T_NATIVE_LONG : spio_nc_type_to_hdf5_type(memtype);
+    if(h5_memtype == H5I_INVALID_HID){
+      H5Aclose(attr_id);
+      return pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
+                     "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Unsupported memory type (type=%x)",
+                     name, varid, pio_get_fname_from_file(file), file->pio_ncid, memtype);
+    }
+
+    if(H5Aread(attr_id, h5_memtype, ip) < 0){
+      H5Aclose(attr_id);
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to read this attribute",
+                     name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+  }
+
+  if(H5Aclose(attr_id) < 0){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to close this attribute",
+                   name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  return PIO_NOERR;
+}
+
 int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
                       const PIO_Offset *start, const PIO_Offset *count,
                       const PIO_Offset *stride, nc_type xtype, const void *buf)

@@ -33,6 +33,9 @@ int spio_hdf5_copy_att(iosystem_desc_t *ios, file_desc_t *ifile, int ivarid, con
 int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const char *name,
                       nc_type atttype, PIO_Offset len, const void *op);
 
+int spio_hdf5_get_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const char *name,
+                      nc_type memtype, void *ip);
+
 int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
                       const PIO_Offset *start, const PIO_Offset *count,
                       const PIO_Offset *stride, nc_type xtype, const void *buf);

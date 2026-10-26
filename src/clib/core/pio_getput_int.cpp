@@ -826,8 +826,19 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     }
 #endif
 
-    /* If this is an IO task, then call the netCDF function. */
-    if (ios->io_comm_info->is_sync_io_proc())
+    /* If this is an IO task, then call the netCDF function.
+     * For HDF5/HDF5C files, the task that owns the actual I/O work may be an
+     * async-write-thread-pool-owning rank rather than a sync I/O rank (see
+     * file->uses_async_io); for every other iotype, behavior is unchanged
+     * (sync I/O rank only). */
+#ifdef _HDF5
+    bool enter_io_proc_block = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)
+        : ios->io_comm_info->is_sync_io_proc();
+#else
+    bool enter_io_proc_block = ios->io_comm_info->is_sync_io_proc();
+#endif
+    if (enter_io_proc_block)
     {
         LOG((2, "calling pnetcdf/netcdf"));
 #ifdef _PNETCDF
@@ -882,7 +893,15 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC && file->do_io)
+#ifdef _HDF5
+        if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        {
+            ierr = spio_hdf5_get_att(ios, file, varid, name, memtype, ip);
+        }
+#endif /* _HDF5 */
+
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC &&
+            file->iotype != PIO_IOTYPE_HDF5 && file->iotype != PIO_IOTYPE_HDF5C && file->do_io)
         {
             switch(memtype)
             {
