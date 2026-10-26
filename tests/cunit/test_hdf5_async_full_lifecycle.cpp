@@ -1466,46 +1466,98 @@ static int test_native_reopen_roundtrip_box(MPI_Comm test_comm, int my_rank, int
                                       NUM_IO1);
 }
 
+/* ------------------------------------------------------------------------
+ * Regression test for the createfile Bcast/Barrier race (formerly backlog
+ * item documented on test_native_reopen_roundtrip_subset() below): with
+ * every rank in test_comm acting as an I/O proc (num_io_procs == ntasks),
+ * PIOc_createfile()'s main thread used to run its own synchronous MPI_Bcast
+ * in spio_createfile_int() (src/clib/core/pioc_support.cpp) concurrently
+ * with the async thread pool dequeuing the create op and running
+ * spio_hdf5_create() (src/clib/core/iolib/hdf5/spio_hdf5_utils.cpp), which
+ * does its own MPI_Barrier on a different (but, on some MPI stacks, not
+ * independently progressable) communicator. That raced every rank into a
+ * SEGV inside MPICH's poll_active_fboxes() (MPICH 4.1.2, ch3:nemesis
+ * channel). spio_createfile_int() now drains the just-enqueued create op
+ * (spio_wait_file_async_pend_ops()) before issuing its own Bcast, so the
+ * two collectives can no longer be in flight at the same time. This test
+ * only exercises createfile/closefile (not a write, which would also hit
+ * the unrelated, still-open backlog item 2 fillbuf NULL-deref documented on
+ * test_native_reopen_roundtrip_subset() below) - it is only meaningful
+ * under PIO_USE_ASYNC_WR_THREAD, since that is the only build where the
+ * create is ever actually dispatched onto the async thread pool.
+ * ------------------------------------------------------------------------ */
+static int test_subset_createfile_all_io_procs_no_race(MPI_Comm test_comm, int my_rank, int ntasks)
+{
+#if PIO_USE_ASYNC_WR_THREAD
+  int ret = PIO_NOERR;
+  int iosysid = -1;
+  char filename[PIO_MAX_NAME + 1];
+  int test_comm_sz = 0;
+
+  (void) ntasks; /* pio_test_init2() leaves this at MPI_COMM_WORLD's size even when
+                  * test_comm itself was split down to max_ntasks - use test_comm's
+                  * own size below so every one of its members, and no more, is
+                  * requested as an I/O proc. */
+  MPI_Comm_size(test_comm, &test_comm_sz);
+
+  snprintf(filename, PIO_MAX_NAME + 1, "%s_subset_createfile_all_io_procs.nc", TEST_NAME);
+
+  if((ret = PIOc_Init_Intracomm(test_comm, test_comm_sz, STRIDE1, BASE0, PIO_REARR_SUBSET,
+                                &iosysid))){
+    LOG_RANK0(my_rank, "test_subset_createfile_all_io_procs_no_race() FAILED: "
+      "PIOc_Init_Intracomm() returned %d\n", ret);
+    return ret;
+  }
+
+  int nerrs = 0;
+  int ncid = -1;
+  int format = PIO_IOTYPE_HDF5;
+
+  if((ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER))){
+    LOG_RANK0(my_rank, "test_subset_createfile_all_io_procs_no_race() FAILED (rank %d): "
+      "PIOc_createfile() with every rank as an I/O proc returned %d - this used to crash "
+      "the whole process before it could even return an error (see the doc comment on this "
+      "function)\n", my_rank, ret);
+    nerrs++;
+  }
+  else{
+    PIOc_closefile(ncid);
+  }
+
+  finalize_iosys(iosysid);
+
+  return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
+#else
+  (void) test_comm;
+  (void) my_rank;
+  (void) ntasks;
+  return PIO_NOERR;
+#endif
+}
+
 static int test_native_reopen_roundtrip_subset(MPI_Comm test_comm, int my_rank, int ntasks)
 {
 #if PIO_USE_ASYNC_WR_THREAD
-  /* KNOWN PRE-EXISTING ISSUES - this scenario is skipped under
-   * PIO_USE_ASYNC_WR_THREAD because every way of routing a SUBSET-rearranger
-   * HDF5 write through the async thread pool that was tried here hits a hard
-   * SEGV that takes down the whole test binary (not something that can be
-   * narrowed to a single skipped assertion). Both are pre-existing,
-   * independent of the native reopen logic (Tasks 10/11) this scenario is
-   * actually about, and out of scope to fix here:
+  /* KNOWN PRE-EXISTING ISSUE - this scenario is skipped under
+   * PIO_USE_ASYNC_WR_THREAD because routing a SUBSET-rearranger HDF5 write
+   * through the async thread pool, with disjoint sync/async I/O procs
+   * (num_io_procs == NUM_IO1, as used by the CONTIG/BOX variants above),
+   * hits a hard SEGV that takes down the whole test binary (not something
+   * that can be narrowed to a single skipped assertion). This is
+   * pre-existing, independent of the native reopen logic (Tasks 10/11) this
+   * scenario is actually about, and out of scope to fix here: backlog item
+   * 2 - the SUBSET rearranger's HDF5 async write path dereferences a NULL
+   * v1desc->fillbuf at spio_async_hdf5_utils.cpp:977 (its own in-source
+   * FIXME documents this) whenever the *sync* io_desc_info_t's
+   * holegridsize is 0 (no vdesc0->fillbuf was ever allocated in
+   * PIOc_write_darray_multi_impl()) while the *async* one's is > 0 -
+   * exactly what a disjoint topology produces.
    *
-   *   1. Disjoint sync/async I/O procs (num_io_procs == NUM_IO1, as used by
-   *      the CONTIG/BOX variants above): backlog item 2 - the SUBSET
-   *      rearranger's HDF5 async write path dereferences a NULL
-   *      v1desc->fillbuf at spio_async_hdf5_utils.cpp:977 (its own in-source
-   *      FIXME documents this) whenever the *sync* io_desc_info_t's
-   *      holegridsize is 0 (no vdesc0->fillbuf was ever allocated in
-   *      PIOc_write_darray_multi_impl()) while the *async* one's is > 0 -
-   *      exactly what a disjoint topology produces.
-   *
-   *   2. Every rank in test_comm as an I/O proc (num_io_procs ==
-   *      TARGET_NTASKS, so sync and async I/O share every proc): a NEW bug
-   *      found by this task (not in the plan's known-issues backlog, not
-   *      fixed here). PIOc_createfile()'s main thread runs its own
-   *      synchronous MPI_Bcast in spio_createfile_int()
-   *      (src/clib/core/pioc_support.cpp:3647) while, concurrently, the
-   *      async thread pool dequeues the create op and runs spio_hdf5_create()
-   *      (src/clib/core/iolib/hdf5/spio_hdf5_utils.cpp:78), which does its
-   *      own MPI_Barrier. Reproducibly (both at 4 and 5 ranks, i.e.
-   *      independent of the "spare rank" split in pio_test_init2()), this
-   *      manifests as an MPI collective mismatch that crashes every rank
-   *      with a SEGV inside MPICH's poll_active_fboxes() - some ranks are
-   *      blocked in the main thread's createfile Bcast while others are
-   *      blocked in the async thread's create-op Barrier. Unlike CONTIG
-   *      (whose createfile path does not have this split synchronous/async
-   *      double-dispatch for the same logical create) and BOX (never
-   *      exercised at num_io_procs == ntasks here), SUBSET's write path
-   *      appears to be the one that actually reaches this races on this
-   *      build/MPI combination (MPICH 4.1.2's ch3:nemesis channel) - it was
-   *      not reproduced for CONTIG/BOX in the same configuration.
+   * (A second, previously-documented pre-existing issue here - every rank
+   * in test_comm as an I/O proc racing PIOc_createfile()'s synchronous
+   * MPI_Bcast against the async thread pool's own MPI_Barrier inside
+   * spio_hdf5_create() - is now fixed in spio_createfile_int() and covered
+   * directly by test_subset_createfile_all_io_procs_no_race() above.)
    *
    * The disjoint-procs topology (and hence the native reopen path itself) is
    * still exercised end-to-end by the CONTIG and BOX variants above, and by
@@ -1711,6 +1763,9 @@ int main(int argc, char **argv)
 
     RUN_SCENARIO(test_native_reopen_roundtrip_subset(test_comm, my_rank, ntasks),
                  "test_native_reopen_roundtrip_subset");
+
+    RUN_SCENARIO(test_subset_createfile_all_io_procs_no_race(test_comm, my_rank, ntasks),
+                 "test_subset_createfile_all_io_procs_no_race");
 
     if(single_rank_comm != MPI_COMM_NULL){
       MPI_Comm_free(&single_rank_comm);

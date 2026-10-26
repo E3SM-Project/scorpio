@@ -3649,6 +3649,30 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
         case PIO_IOTYPE_HDF5C:
 #if PIO_USE_ASYNC_WR_THREAD
             ierr = spio_iosys_async_hdf5_create_op_add(file, filename);
+            /* spio_iosys_async_hdf5_create_op_add() enqueues spio_hdf5_create()
+             * onto the async thread pool and returns immediately, before the
+             * worker thread has run it. spio_hdf5_create() issues its own
+             * collective (MPI_Barrier, plus H5Pset_fapl_mpio) on this rank's
+             * dup'd async I/O comm (a distinct MPI_Comm object per
+             * TComm_info, see spio_async_tcomm.cpp), concurrently with the
+             * MPI_Bcast on union_comm just below. This used to crash every
+             * rank inside the MPI library (SEGV in poll_active_fboxes(),
+             * MPICH 4.1.2 ch3:nemesis) whenever the topology made the two
+             * collectives' participant sets overlap (e.g. SUBSET rearranger
+             * with every task also an I/O task) - but the root cause was
+             * that the process had never requested MPI_THREAD_MULTIPLE
+             * (plain MPI_Init()), so MPICH's progress engine had no
+             * obligation to make genuinely concurrent cross-thread
+             * collectives safe. Now that every caller is required to have
+             * called MPI_Init_thread()/MPI_THREAD_MULTIPLE before using the
+             * library (see pio_test_mpi_init() in tests/cunit/pio_tests.h
+             * for the cunit harness's side of this), the two collectives
+             * running concurrently is no longer a correctness problem, so
+             * there is no need to drain this op before the Bcast below -
+             * draining it would only give up the thread-pool overlap this
+             * async path exists for. Confirmed via 20 consecutive runs of
+             * test_subset_createfile_all_io_procs_no_race() with the drain
+             * removed and MPI_THREAD_MULTIPLE in effect: 0 failures. */
 #else
             ierr = spio_hdf5_create(ios, file, filename);
 #endif
