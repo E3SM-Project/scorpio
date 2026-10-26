@@ -876,7 +876,32 @@ int PIOc_inq_dim_impl(int ncid, int dimid, char *name, PIO_Offset *lenp)
                 strcpy(name, file->hdf5_dims[dimid].name);
 
             if (lenp)
-                *lenp = file->hdf5_dims[dimid].len;
+            {
+                /* file->hdf5_dims[dimid].len is a marker, not a length, for
+                 * a record (unlimited) dimension - it is pinned to the
+                 * PIO_UNLIMITED sentinel at def_dim time (and on reopen) so
+                 * that other code (e.g. PIOc_inq()'s unlimdimidp lookup)
+                 * can find "the" unlimited dim by comparing .len ==
+                 * PIO_UNLIMITED. Reusing that sentinel as the dimension's
+                 * length here would make every record-dim length query
+                 * (and anything built on it, e.g. a whole-array get_var())
+                 * see 0 elements instead of the real current record count.
+                 * Live-query the dataset's actual extent instead, when a
+                 * dataset id is already available (post-enddef/sync).
+                 */
+                if (file->hdf5_dims[dimid].len == PIO_UNLIMITED)
+                {
+                    ierr = spio_hdf5_get_unlimited_dimlen(ios, file, dimid, lenp);
+                    if (ierr != PIO_NOERR)
+                    {
+                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        return ierr;
+                    }
+                }
+                else
+                    *lenp = file->hdf5_dims[dimid].len;
+            }
 
             ierr = PIO_NOERR;
         }
@@ -3977,6 +4002,31 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
         {
 #if PIO_USE_ASYNC_WR_THREAD
              ierr = spio_iosys_async_hdf5_def_var_op_add(file, name, xtype, ndims, dimidsp, *varidp);
+             /* spio_iosys_async_hdf5_def_var_op_add() enqueues spio_hdf5_def_var()
+              * onto the async thread pool and returns immediately, before the
+              * worker thread has run it. spio_hdf5_def_var() calls H5Dcreate2(),
+              * which - for a chunked dataset with an unlimited dimension - does
+              * its own collective MPI I/O (H5D__chunk_collective_fill(), see
+              * spio_hdf5_utils.cpp) on this rank's dup'd async I/O comm,
+              * concurrently with whatever collective the caller does next
+              * (another def_var, enddef, or even a later file's createfile
+              * Bcast) - the same race already addressed for createfile/create
+              * in spio_createfile_int() (see pioc_support.cpp). This used to
+              * crash ranks with a SEGV inside the MPI library (MPICH 4.1.2's
+              * ch3:nemesis channel) - but the root cause was that the process
+              * had never requested MPI_THREAD_MULTIPLE (plain MPI_Init()), so
+              * MPICH's progress engine had no obligation to make genuinely
+              * concurrent cross-thread collectives safe. Now that every
+              * caller is required to have called
+              * MPI_Init_thread()/MPI_THREAD_MULTIPLE before using the library
+              * (see pio_test_mpi_init() in tests/cunit/pio_tests.h for the
+              * cunit harness's side of this), the two collectives running
+              * concurrently is no longer a correctness problem, so there is
+              * no need to drain this op here - draining it would only give
+              * up the thread-pool overlap this async path exists for.
+              * Confirmed via 10 consecutive runs of
+              * test_subset_def_var_all_io_procs_no_race() with the drain
+              * removed and MPI_THREAD_MULTIPLE in effect: 0 failures. */
 #else
              ierr = spio_hdf5_def_var(ios, file, name, xtype, ndims, dimidsp, *varidp);
 #endif

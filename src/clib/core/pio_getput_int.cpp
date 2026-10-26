@@ -3410,6 +3410,36 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
 #if PIO_USE_ASYNC_WR_THREAD
         ierr = spio_iosys_async_hdf5_put_var_op_add(file, varid, start, count, stride, xtype, buf);
+        /* spio_iosys_async_hdf5_put_var_op_add() enqueues spio_hdf5_put_var()
+         * onto this rank's async thread pool queue and returns immediately,
+         * before the worker thread has run it. For a variable with an
+         * unlimited (record) dimension, spio_hdf5_put_var() may call
+         * H5Dextend() to grow the dataset - H5Dextend() is a collective HDF5
+         * call that every rank sharing this file's communicator must invoke,
+         * in the same order, to the same effective record index. Since each
+         * rank's async op is dispatched to its own independently-scheduled
+         * worker thread (see spio_async_hdf5_utils.cpp), nothing otherwise
+         * guarantees that two ranks reach their Nth record's H5Dextend() at
+         * the same logical point - one rank's thread can race ahead to a
+         * later record while another is still behind, racing collective
+         * H5Dextend() calls against each other (the same architectural class
+         * of bug fixed for createfile/create in commit 56d2ab618c and for
+         * def_var's collective H5Dcreate2() fill above). Unlike the def_var
+         * and createfile races, this doesn't crash: it silently leaves some
+         * records unwritten/zeroed, since mismatched collective extends
+         * leave the dataset's recognized extent inconsistent across ranks.
+         * Waiting here, right after enqueueing, keeps every rank's record
+         * writes in lockstep with the next PIOc_put_var() call made by the
+         * caller (which issues one call per record, collectively, across
+         * ranks) - the same fix shape used for the two prior races. */
+        if(ierr == PIO_NOERR)
+        {
+          int has_unlimdim_ierr = PIO_NOERR;
+          if(spio_var_has_unlimited_dims(file, varid, has_unlimdim_ierr))
+          {
+            ierr = spio_wait_file_async_pend_ops(file);
+          }
+        }
 #else
         ierr = spio_hdf5_put_var(ios, file, varid, start, count, stride, xtype, buf);
 #endif

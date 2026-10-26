@@ -34,6 +34,24 @@
  *      HDF5 file opened with PIO_IOTYPE_HDF5 through the real
  *      PIOc_openfile() path still falls back to the historical
  *      switch-iotype-away behavior (successful open, non-HDF5 iotype).
+ *  10. test_disjoint_nondecomposed_put_get_roundtrip - async on, disjoint
+ *      procs: a non-decomposed PIOc_put_var on a write-capable (async-
+ *      routed) file actually writes its data (review finding C1).
+ *  11. test_cross_routing_copy_att_errors - PIOc_copy_att between an
+ *      async-routed and a sync-routed HDF5 file reports an error instead
+ *      of silently doing nothing (review finding I2).
+ *  12. test_non_hdf5_write_open_leaves_no_lock_file - a write-capable
+ *      PnetCDF file leaves no *.spio_lock behind, on either the create or
+ *      the write-capable open path (backlog item 8).
+ *  13. test_subset_createfile_all_io_procs_no_race - createfile's Bcast no
+ *      longer races the async create op's Barrier (every rank an I/O proc).
+ *  14. test_subset_def_var_all_io_procs_no_race - def_var's collective fill
+ *      (unlimited-dim var) no longer races a later collective across many
+ *      create/def_var/close/delete cycles (every rank an I/O proc).
+ *  15. test_subset_put_var_record_dim_no_race - a non-decomposed put_var on
+ *      a record (unlimited) dimension no longer races H5Dextend() across
+ *      ranks when writing many records back to back (every rank an I/O
+ *      proc); the race silently dropped data instead of crashing.
  *
  * This file adds tests only - it does not change any production code.
  *
@@ -1535,6 +1553,255 @@ static int test_subset_createfile_all_io_procs_no_race(MPI_Comm test_comm, int m
 #endif
 }
 
+/* ------------------------------------------------------------------------
+ * Regression test for the def_var Bcast/collective-fill race: like
+ * test_subset_createfile_all_io_procs_no_race() above, but for
+ * spio_iosys_async_hdf5_def_var_op_add() (src/clib/core/iolib/hdf5/
+ * spio_async_hdf5_utils.cpp) instead of the create op. PIOc_def_var()
+ * used to enqueue the HDF5 def_var op onto the async thread pool and
+ * return immediately, before the worker thread had run it. For a
+ * variable on an unlimited (record) dimension, spio_hdf5_def_var()'s
+ * H5Dcreate2() does its own collective MPI I/O (H5D__chunk_collective_fill(),
+ * which collectively writes the fill value for the newly allocated chunk) on
+ * this rank's dup'd async I/O comm. Without draining this def_var op before
+ * returning, that worker-thread collective could still be in flight when a
+ * later collective ran concurrently with it - either this same rank's main
+ * thread moving on to the next file's createfile Bcast, or another rank
+ * reaching a different point in its own queue - exactly the same race
+ * already fixed for createfile/create (commit 56d2ab618c) but for def_var's
+ * call site instead. Reproducing it needs several create/def_var/close/
+ * delete cycles in the same long-lived iosystem (a single cycle rarely
+ * raced); DEF_VAR_RACE_NUM_ITERS below is comfortably above the handful of
+ * iterations (2-12) a standalone reproducer needed to crash every run before
+ * the fix. On MPI stacks whose progress engine isn't safe for genuinely
+ * concurrent cross-thread collectives (observed with MPICH 4.1.2's
+ * ch3:nemesis channel), the unfixed race crashed every rank with a SEGV
+ * inside the MPI library (e.g. MPL_atomic_acquire_load_int() /
+ * poll_active_fboxes()) well before this loop could complete.
+ * ------------------------------------------------------------------------ */
+#define DEF_VAR_RACE_NUM_ITERS 30
+#define DEF_VAR_RACE_DIM_LEN 4
+
+static int test_subset_def_var_all_io_procs_no_race(MPI_Comm test_comm, int my_rank, int ntasks)
+{
+#if PIO_USE_ASYNC_WR_THREAD
+  int ret = PIO_NOERR;
+  int iosysid = -1;
+  int test_comm_sz = 0;
+
+  MPI_Comm_size(test_comm, &test_comm_sz);
+
+  if((ret = PIOc_Init_Intracomm(test_comm, test_comm_sz, STRIDE1, BASE0, PIO_REARR_SUBSET,
+                                &iosysid))){
+    LOG_RANK0(my_rank, "test_subset_def_var_all_io_procs_no_race() FAILED: "
+      "PIOc_Init_Intracomm() returned %d\n", ret);
+    return ret;
+  }
+
+  int nerrs = 0;
+
+  for(int iter = 0; (iter < DEF_VAR_RACE_NUM_ITERS) && (nerrs == 0); iter++){
+    char filename[PIO_MAX_NAME + 1];
+    int ncid = -1, dimid = -1, rec_dimid = -1, varid = -1;
+    int format = PIO_IOTYPE_HDF5;
+    int dimids[2];
+
+    snprintf(filename, PIO_MAX_NAME + 1, "%s_subset_def_var_all_io_procs_%d.nc",
+             TEST_NAME, iter);
+
+    if((ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER))){
+      LOG_RANK0(my_rank, "test_subset_def_var_all_io_procs_no_race() FAILED (rank %d, "
+        "iter %d): PIOc_createfile() returned %d\n", my_rank, iter, ret);
+      nerrs++;
+      break;
+    }
+
+    /* The record (unlimited) dimension must be dimids[0] (see the netCDF
+     * classic-model requirement) so that def_var below creates a chunked,
+     * extendible dataset - only that storage layout makes H5Dcreate2()
+     * collectively write fill values (H5D__chunk_collective_fill()), which
+     * is what made the race observable. */
+    if((ret = PIOc_def_dim(ncid, "rec", PIO_UNLIMITED, &rec_dimid)) ||
+       (ret = PIOc_def_dim(ncid, DIM_NAME, (PIO_Offset) DEF_VAR_RACE_DIM_LEN, &dimid))){
+      LOG_RANK0(my_rank, "test_subset_def_var_all_io_procs_no_race() FAILED (rank %d, "
+        "iter %d): PIOc_def_dim() returned %d\n", my_rank, iter, ret);
+      nerrs++;
+      PIOc_closefile(ncid);
+      break;
+    }
+
+    dimids[0] = rec_dimid;
+    dimids[1] = dimid;
+    if((ret = PIOc_def_var(ncid, VAR_NAME, PIO_INT, 2, dimids, &varid))){
+      LOG_RANK0(my_rank, "test_subset_def_var_all_io_procs_no_race() FAILED (rank %d, "
+        "iter %d): PIOc_def_var() on an unlimited-dim variable returned %d - this used to "
+        "crash the whole process before it could even return an error (see the doc comment "
+        "on this function)\n", my_rank, iter, ret);
+      nerrs++;
+      PIOc_closefile(ncid);
+      break;
+    }
+
+    PIOc_closefile(ncid);
+    PIOc_deletefile(iosysid, filename);
+  }
+
+  finalize_iosys(iosysid);
+
+  return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
+#else
+  (void) test_comm;
+  (void) my_rank;
+  (void) ntasks;
+  return PIO_NOERR;
+#endif
+}
+
+/* ------------------------------------------------------------------------
+ * Regression test for the put_var/H5Dextend() record-dimension race: like
+ * test_subset_def_var_all_io_procs_no_race() above, but for
+ * spio_hdf5_put_var() (src/clib/core/iolib/hdf5/spio_hdf5_utils.cpp) instead
+ * of def_var's H5Dcreate2(). A non-decomposed PIOc_put_var*() on a variable
+ * with an unlimited (record) dimension enqueues spio_hdf5_put_var() onto
+ * this rank's async thread pool queue (spio_iosys_async_hdf5_put_var_op_add(),
+ * src/clib/core/pio_getput_int.cpp) and returns immediately, before the
+ * worker thread has run it. When the write grows the record dimension,
+ * spio_hdf5_put_var() calls H5Dextend() - a collective HDF5 call every rank
+ * sharing the file's communicator must invoke, in the same order, for the
+ * same record index. Nothing synchronized two ranks' independently
+ * scheduled worker threads, so one rank's thread could race ahead to a
+ * later record's H5Dextend() while another was still behind on an earlier
+ * one - the same architectural race already fixed for createfile (commit
+ * 56d2ab618c) and for def_var (test 14 above), but for put_var's call site.
+ * Unlike those two, mismatched H5Dextend() calls here don't crash: they
+ * leave the dataset's recognized extent inconsistent across ranks, so some
+ * records silently read back as the (zero) fill value instead of what was
+ * written - exactly the "Got wrong value" data-mismatch symptom this test
+ * reproduces by writing several records back to back and reading them all
+ * back afterward.
+ * ------------------------------------------------------------------------ */
+#define PUT_VAR_RACE_NUM_RECS 20
+#define PUT_VAR_RACE_VAR_NAME "put_var_race_var"
+
+static int test_subset_put_var_record_dim_no_race(MPI_Comm test_comm, int my_rank, int ntasks)
+{
+  int ret = PIO_NOERR;
+  int iosysid = -1;
+  int test_comm_sz = 0;
+  char filename[PIO_MAX_NAME + 1];
+
+  (void) ntasks; /* see test_subset_createfile_all_io_procs_no_race()'s comment on why
+                  * test_comm's own size, not ntasks, is used below. */
+  MPI_Comm_size(test_comm, &test_comm_sz);
+
+  snprintf(filename, PIO_MAX_NAME + 1, "%s_subset_put_var_race.nc", TEST_NAME);
+
+  if((ret = PIOc_Init_Intracomm(test_comm, test_comm_sz, STRIDE1, BASE0, PIO_REARR_SUBSET,
+                                &iosysid))){
+    LOG_RANK0(my_rank, "test_subset_put_var_record_dim_no_race() FAILED: "
+      "PIOc_Init_Intracomm() returned %d\n", ret);
+    return ret;
+  }
+
+  int nerrs = 0;
+  int ncid = -1, rec_dimid = -1, varid = -1;
+  int format = PIO_IOTYPE_HDF5;
+
+  if((ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER)) ||
+     (ret = PIOc_def_dim(ncid, "rec", PIO_UNLIMITED, &rec_dimid)) ||
+     (ret = PIOc_def_var(ncid, PUT_VAR_RACE_VAR_NAME, PIO_INT, 1, &rec_dimid, &varid)) ||
+     (ret = PIOc_enddef(ncid))){
+    LOG_RANK0(my_rank, "test_subset_put_var_record_dim_no_race() FAILED: defining the file "
+      "returned %d\n", ret);
+    if(ncid >= 0) { PIOc_closefile(ncid); }
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+#if PIO_USE_ASYNC_WR_THREAD
+  {
+    file_desc_t *file = NULL;
+    if((pio_get_file(ncid, &file) != PIO_NOERR) || !file || !file->uses_async_io){
+      LOG_RANK0(my_rank, "test_subset_put_var_record_dim_no_race() FAILED: the write-capable "
+        "file does not have uses_async_io == true - the put_var would not be routed through "
+        "the async thread pool and this scenario would prove nothing\n");
+      PIOc_closefile(ncid);
+      finalize_iosys(iosysid);
+      return PIO_EINTERNAL;
+    }
+  }
+#endif
+
+  /* Expected value at record r is deliberately non-zero so that an unwritten
+   * (fill-valued) record cannot be mistaken for a pass. */
+  std::vector<int> wdata(PUT_VAR_RACE_NUM_RECS);
+  for(int r = 0; r < PUT_VAR_RACE_NUM_RECS; r++){
+    wdata[r] = 1000 + r;
+  }
+
+  for(int r = 0; (r < PUT_VAR_RACE_NUM_RECS) && (ret == PIO_NOERR); r++){
+    PIO_Offset start[1] = { (PIO_Offset) r };
+    PIO_Offset count[1] = { 1 };
+
+    if((ret = PIOc_put_vara_int(ncid, varid, start, count, &wdata[r]))){
+      LOG_RANK0(my_rank, "test_subset_put_var_record_dim_no_race() FAILED (rank %d, rec %d): "
+        "PIOc_put_vara_int() returned %d\n", my_rank, r, ret);
+    }
+  }
+
+  if(ret != PIO_NOERR){
+    nerrs++;
+    PIOc_closefile(ncid);
+    finalize_iosys(iosysid);
+    return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
+  }
+
+  if((ret = PIOc_closefile(ncid))){
+    LOG_RANK0(my_rank, "test_subset_put_var_record_dim_no_race() FAILED: PIOc_closefile() "
+      "returned %d\n", ret);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  drain_async_ops(iosysid);
+  MPI_Barrier(test_comm);
+
+  int rd_ncid = -1, rd_varid = -1;
+  int rd_format = PIO_IOTYPE_HDF5;
+  std::vector<int> rdata(PUT_VAR_RACE_NUM_RECS, -1);
+
+  if((ret = PIOc_openfile(iosysid, &rd_ncid, &rd_format, filename, PIO_NOWRITE))){
+    LOG_RANK0(my_rank, "test_subset_put_var_record_dim_no_race() FAILED: the read-only reopen "
+      "returned %d\n", ret);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  if((ret = PIOc_inq_varid(rd_ncid, PUT_VAR_RACE_VAR_NAME, &rd_varid)) ||
+     (ret = PIOc_get_var_int(rd_ncid, rd_varid, rdata.data()))){
+    fprintf(stderr, "test_subset_put_var_record_dim_no_race() FAILED (rank %d): reading the "
+      "record-dim variable back returned %d\n", my_rank, ret);
+    nerrs++;
+  }
+  else{
+    for(int r = 0; r < PUT_VAR_RACE_NUM_RECS; r++){
+      if(rdata[r] != wdata[r]){
+        fprintf(stderr, "test_subset_put_var_record_dim_no_race() FAILED (rank %d): "
+          "rdata[%d] (%d) != wdata[%d] (%d) - PIOc_put_vara_int() on a record dimension raced "
+          "H5Dextend() across ranks and silently dropped this record's data (see this test's "
+          "doc comment)\n", my_rank, r, rdata[r], r, wdata[r]);
+        nerrs++;
+        break;
+      }
+    }
+  }
+
+  PIOc_closefile(rd_ncid);
+  finalize_iosys(iosysid);
+
+  return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
 static int test_native_reopen_roundtrip_subset(MPI_Comm test_comm, int my_rank, int ntasks)
 {
 #if PIO_USE_ASYNC_WR_THREAD
@@ -1766,6 +2033,12 @@ int main(int argc, char **argv)
 
     RUN_SCENARIO(test_subset_createfile_all_io_procs_no_race(test_comm, my_rank, ntasks),
                  "test_subset_createfile_all_io_procs_no_race");
+
+    RUN_SCENARIO(test_subset_def_var_all_io_procs_no_race(test_comm, my_rank, ntasks),
+                 "test_subset_def_var_all_io_procs_no_race");
+
+    RUN_SCENARIO(test_subset_put_var_record_dim_no_race(test_comm, my_rank, ntasks),
+                 "test_subset_put_var_record_dim_no_race");
 
     if(single_rank_comm != MPI_COMM_NULL){
       MPI_Comm_free(&single_rank_comm);

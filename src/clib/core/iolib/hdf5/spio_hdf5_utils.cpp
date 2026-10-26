@@ -1906,6 +1906,87 @@ int spio_hdf5_set_frame(file_desc_t *file, int varid, int frame)
   return PIO_NOERR;
 }
 
+int spio_hdf5_get_cur_dim_len(iosystem_desc_t *ios, file_desc_t *file,
+                              hid_t dim_dataset_id, const char *dim_name, PIO_Offset *lenp)
+{
+  hid_t sid = H5Dget_space(dim_dataset_id);
+  if(sid == H5I_INVALID_HID){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Inquiring the current length of dimension (%s) in file (%s, ncid=%d) using "
+                   "HDF5 iotype failed. The low level (HDF5) I/O library call failed to get the "
+                   "dataspace of the dimension-scale dataset",
+                   dim_name, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  /* dim_dataset_id is not always a 1-D dimension-scale dataset: the "pure
+   * dimension" (no coordinate variable) fallback in
+   * spio_hdf5_get_unlimited_dimlen() calls this with a real variable's
+   * dataset instead, whose rank is that variable's ndims (e.g. 6 for a 6-D
+   * variable). H5Sget_simple_extent_dims() writes one hsize_t per dimension
+   * of the dataspace's actual rank into the buffer it is given, regardless
+   * of the buffer's size, so a buffer sized for only 1 dimension overflows
+   * the stack for any higher-rank dataset. Only dims[0] (the dimension's own
+   * axis, always the variable's first/slowest dimension by convention) is
+   * ever used below.
+   */
+  hsize_t dims[H5S_MAX_RANK] = {0};
+  if(H5Sget_simple_extent_dims(sid, dims, NULL) < 0){
+    H5Sclose(sid);
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Inquiring the current length of dimension (%s) in file (%s, ncid=%d) using "
+                   "HDF5 iotype failed. The low level (HDF5) I/O library call failed to get the "
+                   "extent of the dimension-scale dataset",
+                   dim_name, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+  H5Sclose(sid);
+
+  *lenp = static_cast<PIO_Offset>(dims[0]);
+  return PIO_NOERR;
+}
+
+int spio_hdf5_get_unlimited_dimlen(iosystem_desc_t *ios, file_desc_t *file,
+                                   int dimid, PIO_Offset *lenp)
+{
+  assert(ios && file && lenp);
+  assert(0 <= dimid && dimid < file->hdf5_num_dims);
+
+  if(file->hdf5_dims[dimid].has_coord_var){
+    if(file->hdf5_dims[dimid].hdf5_dataset_id == H5I_INVALID_HID){
+      *lenp = 0;
+      return PIO_NOERR;
+    }
+    return spio_hdf5_get_cur_dim_len(ios, file, file->hdf5_dims[dimid].hdf5_dataset_id,
+                                      file->hdf5_dims[dimid].name, lenp);
+  }
+
+  /* Pure dimension (no coordinate variable) - its own dataset is never
+   * extended, so derive the current length from the real variables that use
+   * it instead (the dimension is always a variable's first dimension).
+   */
+  PIO_Offset max_len = 0;
+  for(int i = 0; i < file->hdf5_num_vars; i++){
+    if((file->hdf5_vars[i].ndims <= 0) || !file->hdf5_vars[i].hdf5_dimids ||
+       (file->hdf5_vars[i].hdf5_dimids[0] != dimid) ||
+       (file->hdf5_vars[i].hdf5_dataset_id == H5I_INVALID_HID)){
+      continue;
+    }
+
+    PIO_Offset var_len = 0;
+    int ret = spio_hdf5_get_cur_dim_len(ios, file, file->hdf5_vars[i].hdf5_dataset_id,
+                                        file->hdf5_vars[i].name, &var_len);
+    if(ret != PIO_NOERR){
+      return ret;
+    }
+
+    if(var_len > max_len){
+      max_len = var_len;
+    }
+  }
+
+  *lenp = max_len;
+  return PIO_NOERR;
+}
+
 PIO_Offset spio_hdf5_get_dim_chunk_sz_from_chunk_info(const std::string &dim_name)
 {
   const std::string dim_chunk_info(SPIO_DIM_CHUNK_INFO);
