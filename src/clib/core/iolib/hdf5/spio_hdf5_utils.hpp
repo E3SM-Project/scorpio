@@ -49,6 +49,33 @@ int spio_hdf5_set_frame(file_desc_t *file, int varid, int frame);
 
 PIO_Offset spio_hdf5_get_dim_chunk_sz_from_chunk_info(const std::string &dim_name);
 
+/* Get the current on-disk extent of a 1-D dataset (a dimension-scale dataset
+ * or a variable's dataset). Unlike file->hdf5_dims[dimid].len (which stores
+ * the PIO_UNLIMITED sentinel for a record dimension - a "this is the
+ * unlimited dim" marker, not a length - see PIOc_inq_dim_impl()'s doc
+ * comment in pio_nc.cpp), this always returns the dataset's real current
+ * length, whether or not it is a record dimension.
+ */
+int spio_hdf5_get_cur_dim_len(iosystem_desc_t *ios, file_desc_t *file,
+                              hid_t dim_dataset_id, const char *dim_name, PIO_Offset *lenp);
+
+/* Get the current (live) length of a dimension, correctly handling a record
+ * (unlimited) dimension. file->hdf5_dims[dimid]'s own dataset is only
+ * actually extended by spio_hdf5_put_var()/spio_hdf5_set_frame() when the
+ * dimension also has a coordinate variable (has_coord_var: the dims-array
+ * entry and the coordinate variable's vars-array entry share one aliased
+ * HDF5 dataset id, so extending the variable also extends this dataset -
+ * see spio_hdf5_utils.cpp:891). A "pure" dimension (no coordinate variable)
+ * has its own, separate phantom dimension-scale dataset that is never
+ * extended by anything - only the datasets of the real variables that use
+ * the dimension are, so for that case this looks up the current extent of
+ * each such variable's dataset (the dimension must be a variable's first/
+ * slowest-varying dimension, same convention real netCDF4 uses to compute
+ * its own reported unlimited dimension length) and returns the max.
+ */
+int spio_hdf5_get_unlimited_dimlen(iosystem_desc_t *ios, file_desc_t *file,
+                                   int dimid, PIO_Offset *lenp);
+
 /* Inline functions */
 inline hid_t spio_nc_type_to_hdf5_type(nc_type xtype)
 {
