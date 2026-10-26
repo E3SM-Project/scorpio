@@ -469,7 +469,8 @@ int spio_wait_on_hard_close(iosystem_desc_t *ios, file_desc_t *file)
     std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME_IN_MILLISECONDS));
   }
 
-  if(!file->is_hard_closed && (i > max_tries)){
+  bool timed_out = (!file->is_hard_closed && (i > max_tries));
+  if(timed_out){
     std::string msg = std::string("Waiting on a close on file aborted due to exceeding max timelimit") +
                         std::string(" (") +
                         std::string("ncid = ") + std::to_string(file->pio_ncid) +
@@ -479,8 +480,27 @@ int spio_wait_on_hard_close(iosystem_desc_t *ios, file_desc_t *file)
     PIOc_warn(ios->iosysid, file->pio_ncid, __FILE__, __LINE__, msg.c_str());
   }
 
-  /* Sync compute procs with I/O procs */
+  /* Sync compute procs with I/O procs. Done unconditionally, even when this
+   * rank timed out above, so that ranks that *did* see the close finish
+   * don't hang here waiting forever for this one. */
   MPI_Barrier(ios->tcomm_info->get_union_comm());
+
+  if(timed_out){
+    /* The real (hard) close never ran: file's HDF5 handles are still open
+     * and its data may never have been flushed to disk. Every caller of
+     * this function (spio_close_soft_closed_file(), via pio_lists.cpp, and
+     * spio_close_all_files_and_delete_from_list()) already checks this
+     * return value and bails out *before* deleting the file from the open
+     * file list and freeing its file_desc_t - previously, returning
+     * PIO_NOERR here regardless let them proceed unconditionally, freeing
+     * file_desc_t out from under a close op that could still be sitting in
+     * the (possibly stalled, see PIO_async_tpool::dequeue_and_process())
+     * async queue, and reporting the close as having succeeded even though
+     * nothing was ever actually flushed/closed. */
+    return pio_err(ios, file, PIO_EINTERNAL, __FILE__, __LINE__,
+                    "Waiting for the asynchronous close of file (%s, ncid=%d) to complete timed out after %d milliseconds. The file's handles were not closed and its data may not have been flushed to disk",
+                    file->fname, file->pio_ncid, MAX_SLEEP_TIME_IN_MILLISECONDS);
+  }
 
   return PIO_NOERR;
 }
@@ -1521,7 +1541,14 @@ int PIOc_closefile_impl(int ncid)
 
     bool soft_close = false;
 #if PIO_USE_ASYNC_WR_THREAD
-    if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+    /* A read-only file never has pending async ops to drain (only writes are
+     * ever queued to the thread pool), so it must take the synchronous hard
+     * close below regardless of iotype - see spio_wait_on_hard_close(), which
+     * skips waiting entirely for !(file->mode & PIO_WRITE) files and would
+     * otherwise race pio_free_file() against this file's soft-close op still
+     * running on the thread pool. */
+    if(((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)) &&
+       (file->mode & PIO_WRITE)){
       /* Soft-close (defer the close via the async write thread pool until
        * this file's pending async ops drain) must be decided by whichever
        * proc actually owns/queues this file's async ops - the async-owning
