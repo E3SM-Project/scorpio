@@ -3649,6 +3649,27 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
         case PIO_IOTYPE_HDF5C:
 #if PIO_USE_ASYNC_WR_THREAD
             ierr = spio_iosys_async_hdf5_create_op_add(file, filename);
+            /* spio_iosys_async_hdf5_create_op_add() enqueues spio_hdf5_create()
+             * onto the async thread pool and returns immediately, before the
+             * worker thread has run it. spio_hdf5_create() issues its own
+             * collective (MPI_Barrier, plus H5Pset_fapl_mpio) on this rank's
+             * dup'd async I/O comm (a distinct MPI_Comm object per
+             * TComm_info, see spio_async_tcomm.cpp). Without draining this
+             * file's pending ops here, that worker-thread collective can run
+             * concurrently with the MPI_Bcast on union_comm just below - on
+             * MPI stacks whose progress engine isn't safe for genuinely
+             * concurrent cross-thread collectives (observed with MPICH
+             * 4.1.2's ch3:nemesis channel), this crashes every rank inside
+             * the MPI library (SEGV in poll_active_fboxes()) whenever the
+             * topology makes the two collectives' participant sets overlap
+             * (e.g. SUBSET rearranger with every task also an I/O task).
+             * Waiting here serializes the create with this thread before any
+             * further collective touches this file, eliminating the race;
+             * file creation is light enough that losing the thread-pool
+             * overlap for it is not a meaningful performance cost. */
+            if(ierr == PIO_NOERR){
+              ierr = spio_wait_file_async_pend_ops(file);
+            }
 #else
             ierr = spio_hdf5_create(ios, file, filename);
 #endif
