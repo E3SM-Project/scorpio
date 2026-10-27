@@ -12,11 +12,6 @@
 name: SCORPIO Release PR merge to develop after testing
 
 on:  # yamllint disable-line rule:truthy
-  workflow_dispatch:
-    inputs:
-      branch_name:
-        description: 'Branch to merge to develop after SCORPIO + PnetCDF testing'
-        required: true
   pull_request:
     # Run workflow when pull request is closed
     types: [closed]

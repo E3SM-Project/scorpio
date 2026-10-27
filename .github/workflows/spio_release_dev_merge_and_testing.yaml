@@ -11,18 +11,13 @@
 name: SCORPIO Release PR testing after merge to develop
 
 on:  # yamllint disable-line rule:truthy
-  workflow_dispatch:
-    inputs:
-      branch_name:
-        description: 'Branch to run the SCORPIO + PnetCDF tests after local merge to develop'
-        required: true
   pull_request:
     types: [labeled]
 
 jobs:
   merge_and_test:
     # Only merge PRs with 'Release PR' label to develop
-    if: ((github.event_name == 'pull_request' && github.event.label.name == 'Release PR') || (github.event_name == 'workflow_dispatch'))
+    if: (github.event_name == 'pull_request' && github.event.label.name == 'Release PR')
     runs-on: ubuntu-latest
 
     permissions:
