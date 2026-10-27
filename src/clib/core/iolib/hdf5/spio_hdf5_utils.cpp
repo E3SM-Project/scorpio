@@ -1955,7 +1955,18 @@ int spio_hdf5_get_cur_dim_len(iosystem_desc_t *ios, file_desc_t *file,
                    dim_name, pio_get_fname_from_file(file), file->pio_ncid);
   }
 
-  hsize_t dims[1] = {0};
+  /* dim_dataset_id is not always a 1-D dimension-scale dataset: the "pure
+   * dimension" (no coordinate variable) fallback in
+   * spio_hdf5_get_unlimited_dimlen() calls this with a real variable's
+   * dataset instead, whose rank is that variable's ndims (e.g. 6 for a 6-D
+   * variable). H5Sget_simple_extent_dims() writes one hsize_t per dimension
+   * of the dataspace's actual rank into the buffer it is given, regardless
+   * of the buffer's size, so a buffer sized for only 1 dimension overflows
+   * the stack for any higher-rank dataset. Only dims[0] (the dimension's own
+   * axis, always the variable's first/slowest dimension by convention) is
+   * ever used below.
+   */
+  hsize_t dims[H5S_MAX_RANK] = {0};
   if(H5Sget_simple_extent_dims(sid, dims, NULL) < 0){
     H5Sclose(sid);
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
