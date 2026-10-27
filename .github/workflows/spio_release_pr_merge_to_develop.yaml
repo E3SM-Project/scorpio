@@ -13,13 +13,19 @@ name: SCORPIO Release PR merge to develop after testing
 
 on:  # yamllint disable-line rule:truthy
   pull_request:
+    # Run workflow on pull requests on master
+    branches:
+      - master
     # Run workflow when pull request is closed
     types: [closed]
 
 jobs:
   merge_and_test:
-    # Only merge PRs with 'Release PR' label to develop
-    if: contains(github.event.pull_request.labels.*.name, 'Release PR')
+    # Merge PRs to develop iff,
+    # 1) The PR has a 'Release PR' label
+    # 2) The PR is merged
+    if: (contains(github.event.pull_request.labels.*.name, 'Release PR') &&
+          github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
 
     permissions:
