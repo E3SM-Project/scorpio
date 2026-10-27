@@ -21,6 +21,19 @@ on:  # yamllint disable-line rule:truthy
 
 jobs:
   merge_and_test:
+    # To prevent two "Release PRs", however unlikely, from running concurrently
+    # queue up these jobs and run them sequentially
+    concurrency:
+      group: release-pr-merge-to-develop
+      # Don't cancel the job in progress, queue the new job
+      cancel-in-progress: false
+      # If "queue" is not specified, the default queue size is 1.
+      # If a job starts while one is running and another is queued
+      # (i.e., queue size = 1, and there is one job queued) the new
+      # job will replace the queued job. Avoid that scenario by setting
+      # queue length to max
+      queue: max
+
     # Merge PRs to develop iff,
     # 1) The PR has a 'Release PR' label
     # 2) The PR is merged
