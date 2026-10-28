@@ -21,6 +21,17 @@ on:  # yamllint disable-line rule:truthy
         type: boolean
         required: false
         default: true
+      test_names_regex:
+        description: 'Regex describing the tests to run (optional)'
+        required: false
+        type: string
+        # Run all tests by default
+        default: ".*"
+      verbose:
+        description: 'Flag to set to run tests in verbose mode (optional)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build_and_test:
@@ -74,7 +85,14 @@ jobs:
           # Disable non-tcp transport
           UCX_TLS: tcp,self
           UCX_NET_DEVICES: lo
+          TEST_NAMES_REGEX: ${{ inputs.test_names_regex }}
+          VERBOSE: ${{ inputs.verbose }}
         run: |
           conda activate scorpio_env  # Activate environment
           cd scorpio_build_dir
-          make test
+          if [ "$VERBOSE" = "true" ]; then
+            ctest --verbose --tests-regex "$TEST_NAMES_REGEX"
+          else
+            # Output stdout/stderr when a test fails
+            ctest --output-on-failure --tests-regex "$TEST_NAMES_REGEX"
+          fi
