@@ -1937,8 +1937,24 @@ int spio_hdf5_set_frame(file_desc_t *file, int varid, int frame)
     }
   }
 
-  /* Cache the frame in the varlist (used by the next write call) */
-  file->varlist[varid].record = frame;
+  /* Note: file->varlist[varid].record is *not* set here. Both callers
+   * (PIOc_setframe_impl()'s synchronous branch, and the deferred
+   * PIO_USE_ASYNC_WR_THREAD op executed by the single async worker thread)
+   * are only ever reached after PIOc_setframe_impl() has already set
+   * file->varlist[varid].record = frame synchronously, on the calling
+   * thread, before either branch runs (pioc.cpp). Re-assigning it here too
+   * used to be a harmless-looking redundant write for the synchronous path,
+   * but for the async path it is a genuine data race: the worker thread can
+   * run this function for an *earlier* setframe() call well after the main
+   * thread has already raced ahead and synchronously set record to a later
+   * frame (the main thread does not wait for this op to be dispatched/run).
+   * That stale write intermittently clobbered the live record value right
+   * as PIOc_write_darray_impl() read it to cache the frame number for the
+   * write-multi-buffer (wmb->frame[]), corrupting which frame/record a
+   * batched write actually targeted. Confirmed via instrumentation: wmb's
+   * cached frame number for one write call was observed to read back as an
+   * earlier call's frame number, reproducing the
+   * nc_wr_rd_2d_unlim_dim_* HDF5/HDF5C darray frame-aliasing test failures. */
 
   return PIO_NOERR;
 }

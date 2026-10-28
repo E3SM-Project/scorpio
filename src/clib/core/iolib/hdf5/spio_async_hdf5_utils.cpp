@@ -729,7 +729,6 @@ static int pio_iosys_async_op_hdf5_write_impl(void *pdata)
         assert(static_cast<int>(wcache->frame.size()) == nvars);
         update_reg_infos_start_frame(vreg_infos, vdesc, wcache->frame[vidx]);
       }
-      
 
       /* Create a hyperslab of all the regions written out for a variable */
       H5S_seloper_t op = H5S_SELECT_SET;
