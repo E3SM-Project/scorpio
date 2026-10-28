@@ -1,0 +1,90 @@
+---
+#
+# ========== SCORPIO build testing and merge to develop branch for releases ======
+# If a PR has a "Release PR" label and its merged to master,
+# 1) Merge branch to develop (locally)
+# 2) Build SCORPIO with PnetCDF
+# 3) Push merged branch (develop) to remote
+#
+# The tests are run on a single node (with PnetCDF)
+#
+# FIXME: Use this workflow for merging all PRs to develop
+name: SCORPIO Release PR merge to develop after testing
+
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+    # Run workflow on pull requests on master
+    branches:
+      - master
+    # Run workflow when pull request is closed
+    types: [closed]
+
+jobs:
+  merge_and_test:
+    # To prevent two "Release PRs", however unlikely, from running concurrently
+    # queue up these jobs and run them sequentially
+    concurrency:
+      group: release-pr-merge-to-develop
+      # Don't cancel the job in progress, queue the new job
+      cancel-in-progress: false
+      # If "queue" is not specified, the default queue size is 1.
+      # If a job starts while one is running and another is queued
+      # (i.e., queue size = 1, and there is one job queued) the new
+      # job will replace the queued job. Avoid that scenario by setting
+      # queue length to max
+      queue: max
+
+    # Merge PRs to develop iff,
+    # 1) The PR has a 'Release PR' label
+    # 2) The PR is merged
+    if: (contains(github.event.pull_request.labels.*.name, 'Release PR') &&
+          github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+
+    permissions:
+      # This workflow needs to merge branch to develop and push it to remote
+      contents: write
+      # This workflow needs to read the PR desc
+      pull-requests: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch depth 0 : Clone the entire history of all branches/tags
+          # (Required to fetch all branches and history for a successful merge)
+          # Note: If fetch depth is not specified, the default fetch depth is 1 (only latest commit)
+          fetch-depth: 0
+
+      # Explicitly indicate that its the Github BOT performing the merge
+      - name: Configure Git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Merge branch to develop
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+          PR_SUBJECT: "CI: Auto merge branch origin/${{ github.event.pull_request.head.ref }} into develop (PR #${{ github.event.pull_request.number }})"
+        run: |
+          PR_DESC=$(gh pr view "${PR_NUMBER}" --json body --jq '.body')
+          git fetch origin
+          git fetch origin "${BRANCH_NAME}"
+          git checkout develop
+          git pull origin develop
+
+          # Perform the merge operation
+          git merge origin/"${BRANCH_NAME}" --no-ff -m "${PR_SUBJECT}" -m "${PR_DESC}"
+
+      - name: Build merged code
+        uses: ./.github/actions/spio_pnetcdf_build_testing
+        with:
+          branch_name: develop
+          checkout_repo: false
+          install_sw: true
+
+      - name: Push develop branch (with merged branch) to remote
+        run: |
+          git push origin develop

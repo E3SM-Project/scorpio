@@ -10,21 +10,17 @@
 name: SCORPIO + PnetCDF - build and test
 
 on:  # yamllint disable-line rule:truthy
-  workflow_dispatch:
+  workflow_call:
     inputs:
       branch_name:
         description: 'Branch to run the SCORPIO + PnetCDF tests'
+        type: string
         required: true
-        default: 'master'
-  push:
-    branches:
-      - master
-      # Includes all branches starting with "copilot/"
-      # A "*" matches any char except "/", so use "**" to handle all branch names
-      - 'copilot/**'
-  pull_request:
-    branches:
-      - master
+      checkout_repo:
+        description: 'Flag to signal if a checkout is required (default: true)'
+        type: boolean
+        required: false
+        default: true
 
 jobs:
   build_and_test:
@@ -32,14 +28,17 @@ jobs:
 
     steps:
       - name: Checkout repository
+        if: ${{ inputs.checkout_repo }} # Check out repo iff checkout_repo == true
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch_name }}
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: 3.9  # Specify your desired Python version
           channels: conda-forge,defaults  # Specify your desired channels
-          auto-activate-base: false  # Prevent auto-activation of base env
+          auto-activate: false  # Prevent auto-activation of base env
 
       - name: Create and activate Conda environment
         shell: bash -l {0}  # Use bash -l to ensure conda commands are available
@@ -71,6 +70,10 @@ jobs:
 
       - name: Run SCORPIO tests
         shell: bash -l {0}  # Ensure environment is active for test cmds
+        env:
+          # Disable non-tcp transport
+          UCX_TLS: tcp,self
+          UCX_NET_DEVICES: lo
         run: |
           conda activate scorpio_env  # Activate environment
           cd scorpio_build_dir
