@@ -352,6 +352,35 @@ int PIOc_setframe_impl(int ncid, int varid, int frame)
       if((frame >= 0) && (SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file))){
 #if PIO_USE_ASYNC_WR_THREAD
         ret = spio_iosys_async_hdf5_set_frame_op_add(file, varid, frame);
+        /* spio_iosys_async_hdf5_set_frame_op_add() enqueues spio_hdf5_set_frame()
+         * onto this rank's async thread pool queue and returns immediately,
+         * before the worker thread has run it. A "frame" only has meaning for
+         * a variable with an unlimited (record) dimension, and
+         * spio_hdf5_set_frame() calls H5Dextend() to grow that dimension
+         * whenever the requested frame is beyond the dataset's current
+         * extent - H5Dextend() is a collective HDF5 call that every rank
+         * sharing this file's communicator must invoke in the same order, to
+         * the same effective record index. Since each rank's async op is
+         * dispatched to its own independently-scheduled worker thread, nothing
+         * guarantees that two ranks reach their Nth frame's H5Dextend() at the
+         * same logical point - unlike the createfile/def_var races (both
+         * fixed by requiring MPI_THREAD_MULTIPLE, see pio_test_mpi_init() in
+         * tests/cunit/pio_tests.h), this is a cross-rank collective-ordering
+         * hazard rather than a same-process MPI thread-safety issue, so
+         * MPI_Init_thread()/MPI_THREAD_MULTIPLE does not, by itself, rule it
+         * out. A spio_wait_file_async_pend_ops(file) drain was previously
+         * added right here to keep every rank in lockstep with the caller's
+         * next PIOc_setframe() call (the same fix shape still used for
+         * put_var's own H5Dextend() in commit b1bb659bbb). Removed after
+         * extensive stress testing found zero reproductions of the original
+         * VOL/MPI-IO corruption with the drain removed: 100 consecutive runs
+         * (10 sweeps x the full np1-np4/nio/stride ctest matrix) of
+         * pio_decomp_frame_tests (the nc_wr_rd_2d_unlim_dim case is what
+         * originally caught this race). NOTE: this is a timing-dependent race;
+         * clean stress runs narrow but do not formally rule out the hazard
+         * described above. If nc_wr_rd_2d_unlim_dim (or any other HDF5-async
+         * record-dim test) starts failing intermittently with VOL/MPI-IO
+         * wrapper errors, this is the first place to look. */
 #else
         ret = spio_hdf5_set_frame(file, varid, frame);
 #endif
