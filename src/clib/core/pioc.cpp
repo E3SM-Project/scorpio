@@ -352,6 +352,34 @@ int PIOc_setframe_impl(int ncid, int varid, int frame)
       if((frame >= 0) && (SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file))){
 #if PIO_USE_ASYNC_WR_THREAD
         ret = spio_iosys_async_hdf5_set_frame_op_add(file, varid, frame);
+        /* spio_iosys_async_hdf5_set_frame_op_add() enqueues spio_hdf5_set_frame()
+         * onto this rank's async thread pool queue and returns immediately,
+         * before the worker thread has run it. A "frame" only has meaning for
+         * a variable with an unlimited (record) dimension, and
+         * spio_hdf5_set_frame() calls H5Dextend() to grow that dimension
+         * whenever the requested frame is beyond the dataset's current
+         * extent - H5Dextend() is a collective HDF5 call that every rank
+         * sharing this file's communicator must invoke in the same order, to
+         * the same effective record index. Since each rank's async op is
+         * dispatched to its own independently-scheduled worker thread (see
+         * spio_async_hdf5_utils.cpp), nothing otherwise guarantees that two
+         * ranks reach their Nth frame's H5Dextend() at the same logical
+         * point: one rank's thread can race ahead to a later frame, or still
+         * be mid-H5Dwrite() on an earlier one, while another rank's thread is
+         * already inside the collective H5Dextend() for a different frame -
+         * the same architectural class of bug already fixed for
+         * createfile/create in commit 56d2ab618c, for def_var's own async op,
+         * and for put_var's H5Dextend() in commit b1bb659bbb. Here the
+         * mismatch doesn't just leave records unwritten: it corrupts HDF5's
+         * internal VOL/MPI-IO state outright, surfacing as VOL wrapper
+         * errors on a later, unrelated H5Dget_space()/H5Dread() call. Waiting
+         * here, right after enqueueing, keeps every rank's frame changes in
+         * lockstep with the caller's next PIOc_setframe() call (callers set
+         * one frame per record, collectively, across ranks) - the same fix
+         * shape used for the three prior races. */
+        if(ret == PIO_NOERR){
+          ret = spio_wait_file_async_pend_ops(file);
+        }
 #else
         ret = spio_hdf5_set_frame(file, varid, frame);
 #endif
