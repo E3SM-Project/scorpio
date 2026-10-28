@@ -14,6 +14,16 @@ on:  # yamllint disable-line rule:truthy
       branch_name:
         description: 'Branch to run the SCORPIO + PnetCDF tests'
         required: false
+        type: string
+      test_names_regex:
+        description: 'Regex describing the tests to run (optional)'
+        required: false
+        type: string
+      verbose:
+        description: 'Flag to set to run tests in verbose mode (optional)'
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
       - master
@@ -43,3 +53,5 @@ jobs:
     uses: ./.github/workflows/spio_pnetcdf_testing_workflow.yaml
     with:
       branch_name: ${{ inputs.branch_name || github.head_ref || github.ref }}
+      test_names_regex: ${{ inputs.test_names_regex || '.*' }}
+      verbose: ${{ inputs.verbose || false }}
