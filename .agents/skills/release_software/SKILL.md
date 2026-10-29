@@ -27,7 +27,7 @@ Automate SCORPIO release management by testing, updating the version, generating
 ## Git Configuration
 * The git settings to use is available at resources/git\_settings.txt
 * Never push changes to the remote repository
-* Always add a "Co-authored-by: <github-username> <github-username@://github.com>" section for all commits. The Co-author is the current github user.
+* Always add a `Co-authored-by: $(git config user.name) <$(git config user.email)>` section for all commits. The Co-author is the current github user.
 
 ## Instructions
 
@@ -73,7 +73,7 @@ git commit -m "Updating version number and adding generated docs"
 
 ### Step 3 : Tag release branch
 * Create a summary of the changes since last release
-* Tag release tag and include the summary of the changes since last release (above) in the commit message
+* Tag release tag and include the summary of the changes since last release (above) and a `Co-authored-by: $(git config user.name) <$(git config user.email)>` section in the tag commit message
 
 ### Step 4 : Post-relase sanity testing
 * Build the source and documentation to ensure that the code builds
