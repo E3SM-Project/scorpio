@@ -664,11 +664,14 @@ static int pio_iosys_async_op_hdf5_write_impl(void *pdata)
   void *iobuf = (wr_fillbuf) ? (wcache->fillbuf) : (wcache->iobuf);
   std::size_t iobuf_sz = (wr_fillbuf) ? (wcache->fillbuf_sz) : (wcache->iobuf_sz);
 
-  /* FIXME: for wr_fillbuf with nvars > 1 this fires - see the FIXME on
-   * fillbuf_sz's computation in pio_iosys_async_hdf5_write_op_add() above.
-   * Pre-existing (identical in master, modulo the iodesc -> io_desc_info
-   * rename); not fixed here. */
-  assert(region && (nvars * llen * io_desc_info.mpitype_size == static_cast<PIO_Offset>(iobuf_sz)));
+  /* region (fillregion/firstregion) is legitimately NULL when this rank has
+   * no local holes/data (under the selected sync/async view) to write - the
+   * while(region) loop below then leaves reg_nelems at 0 and the per-variable
+   * loop further down takes the "no data on this IO task" branch, which
+   * still issues region's collective H5Dwrite() with a NULL selection so
+   * this rank stays in step with peers that do have data. Only require a
+   * non-NULL region when there is actually buffered data to write. */
+  assert((region || (iobuf_sz == 0)) && (nvars * llen * io_desc_info.mpitype_size == static_cast<PIO_Offset>(iobuf_sz)));
   assert(((iobuf_sz == 0) && !iobuf) || ((iobuf_sz != 0) && iobuf));
 
   /* Info on all regions */
@@ -940,22 +943,23 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
   var_desc_t *v1desc = file->varlist + varids[0];
   //PIO_Offset llen = fill ? sel_desc.holegridsize : sel_desc.llen;
   if(fill){
-    /* FIXME: fillbuf_sz is not multiplied by nvars, but the write loop in
-     * pio_iosys_async_op_hdf5_write_impl() (see the assert at the top of
-     * that function, and the per-variable "bufptr = iobuf + vidx *
-     * mpitype_size * llen" offset below it) indexes wcache->fillbuf as if it
-     * held nvars copies of a single variable's fill region. For nvars > 1
-     * this undersizes/underfills fillbuf: the assert
-     * "nvars * llen * mpitype_size == iobuf_sz" then fails (confirmed via
-     * test pio_decomp_fillval2_np4_nio2_st2, PIO_USE_ASYNC_WR_THREAD=ON,
-     * which crashes on this assert), and without that assert vidx >= 1
-     * would read past the end of the undersized fillbuf. Pre-existing bug -
-     * this computation is an unchanged, mechanical port of master's
-     * "iodesc->holegridsize * iodesc->mpitype_size" (same missing nvars
-     * factor there); never exercised by CI since CI never sets
-     * PIO_USE_ASYNC_WR_THREAD=ON. Not fixed here - tracked as a follow-up. */
-    std::size_t fillbuf_sz = sel_desc.holegridsize * sel_desc.mpitype_size;
-    /* On I/O processes with no data (after rearrangement) to write the fillbuf_sz will be 0 */
+    /* fillbuf holds nvars copies of the per-variable hole-fill region (see
+     * the matching allocation/population in PIOc_write_darray_multi_impl(),
+     * pio_darray.cpp, which now also sizes v1desc->fillbuf using
+     * select_io_desc_info() so it agrees with sel_desc here on which
+     * sync/async view - and thus which physical I/O rank's holegridsize -
+     * applies). */
+    std::size_t fillbuf_sz = nvars * sel_desc.holegridsize * sel_desc.mpitype_size;
+    /* On I/O processes with no holes (after rearrangement) to fill, for this
+     * rank's selected view, fillbuf_sz will be 0 - "needsfill" is a
+     * decomposition-wide (not per-rank) flag, so an I/O proc can reach here
+     * with nothing local to fill. The op is still queued and executed (see
+     * pio_iosys_async_op_hdf5_write_impl()): H5Dwrite() below is collective
+     * (file->dxplid_coll), so every rank in the (async or sync) io comm must
+     * call it the same number of times - a rank with no local hole still
+     * participates with a NULL dataspace selection (H5Sselect_none()),
+     * rather than skipping the call, which would leave peer ranks blocked
+     * forever in their own collective H5Dwrite(). */
     if(fillbuf_sz > 0){
       wcache->fillbuf = bget(fillbuf_sz);
       if(!wcache->fillbuf){
@@ -963,16 +967,9 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
                         "Queuing asynchronous op/task for writing fillvalue for variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for caching variable fillvalue", nvars, pio_get_fname_from_file(file), file->pio_ncid, static_cast<long long int>(fillbuf_sz));
       }
 
-      /* FIXME: v1desc->fillbuf is NULL whenever no fill value was ever set for
-       * this variable (its default), but fillbuf_sz > 0 can still hold (e.g.
-       * holes from rearrangement) - memcpy() from a NULL source here is a
-       * NULL-pointer dereference. Confirmed reproducible: a var with no fill
-       * value set, PIO_USE_ASYNC_WR_THREAD=ON, crashes here with a SEGV
-       * (test_darray_hdf5_contig's test_write_read_hdf5_dtconv, once
-       * file->uses_async_io correctly resolves true - see commit
-       * 969b502e1a). Pre-existing bug, never exercised by CI since CI never
-       * sets PIO_USE_ASYNC_WR_THREAD=ON. Not fixed here - tracked as a
-       * follow-up alongside the nvars-sizing FIXME above. */
+      /* v1desc->fillbuf is allocated/populated (pio_darray.cpp) using the
+       * same select_io_desc_info()-selected view as sel_desc above, so it is
+       * non-NULL here exactly when fillbuf_sz > 0. */
       std::memcpy(wcache->fillbuf, v1desc->fillbuf, fillbuf_sz);
       wcache->fillbuf_sz = fillbuf_sz;
     }
@@ -980,7 +977,10 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
   else{
     /* Copy buffer, with rearranged data, for nvars */
     std::size_t iobuf_sz = nvars * sel_desc.llen * sel_desc.mpitype_size;
-    /* On I/O processes with no data (after rearrangement) to write the iobuf_sz will be 0 */
+    /* Same reasoning as the fillbuf_sz == 0 case above: an I/O proc with no
+     * local data (after rearrangement) to write, for this rank's selected
+     * view, must still queue (and execute) the op to keep the collective
+     * H5Dwrite() in sync with its peers. */
     if(iobuf_sz > 0){
       wcache->iobuf = bget(iobuf_sz);
       if(!wcache->iobuf){

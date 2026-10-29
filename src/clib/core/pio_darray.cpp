@@ -506,27 +506,37 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
    * points. This is generally faster than the netcdf method of
    * filling the entire array with missing values before overwriting
    * those values later. */
-  if(iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET && iodesc->sync_io_desc_info.needsfill){
-    LOG((2, "nvars = %d holegridsize = %ld iodesc->sync_io_desc_info.needsfill = %d\n", nvars,
-         iodesc->sync_io_desc_info.holegridsize, iodesc->sync_io_desc_info.needsfill));
+  if(write_desc_info.rearranger == PIO_REARR_SUBSET && write_desc_info.needsfill){
+    LOG((2, "nvars = %d holegridsize = %ld write_desc_info.needsfill = %d\n", nvars,
+         write_desc_info.holegridsize, write_desc_info.needsfill));
 
     pioassert(!vdesc0->fillbuf, "buffer overwrite",__FILE__, __LINE__);
 
-    /* Get a buffer. */
-    if(ios->io_comm_info->get_sync_io_comm_rank() == 0){
-      vdesc0->fillbuf = bget(iodesc->sync_io_desc_info.maxholegridsize * iodesc->sync_io_desc_info.mpitype_size * nvars);
+    /* Get a buffer. This must be sized/populated using the same
+     * sync-vs-async io_desc_info_t view selected above (write_desc_info),
+     * since that is the view the actual I/O proc rank for this file uses -
+     * for an HDF5 file with file->uses_async_io, the sync and async I/O
+     * communicators are disjoint sets of physical ranks (see IO_comm_info),
+     * so mixing views here left vdesc0->fillbuf unpopulated/NULL on the
+     * physical rank that pio_iosys_async_hdf5_write_op_add() (which also
+     * uses select_io_desc_info()) later reads it from. */
+    bool is_async_write = (&write_desc_info == iodesc->async_io_desc_info);
+    int my_io_comm_rank = is_async_write ? ios->io_comm_info->get_async_io_comm_rank() :
+                                            ios->io_comm_info->get_sync_io_comm_rank();
+    if(my_io_comm_rank == 0){
+      vdesc0->fillbuf = bget(write_desc_info.maxholegridsize * write_desc_info.mpitype_size * nvars);
     }
-    else if(iodesc->sync_io_desc_info.holegridsize > 0){
-      vdesc0->fillbuf = bget(iodesc->sync_io_desc_info.holegridsize * iodesc->sync_io_desc_info.mpitype_size * nvars);
+    else if(write_desc_info.holegridsize > 0){
+      vdesc0->fillbuf = bget(write_desc_info.holegridsize * write_desc_info.mpitype_size * nvars);
     }
 
     /* copying the fill value into the data buffer for the box
      * rearranger. This will be overwritten with data where
      * provided. */
     for(int nv = 0; nv < nvars; nv++){
-      for(int i = 0; i < iodesc->sync_io_desc_info.holegridsize; i++){
-        memcpy(&((char *)vdesc0->fillbuf)[iodesc->sync_io_desc_info.mpitype_size * (i + nv * iodesc->sync_io_desc_info.holegridsize)],
-               &((char *)fillvalue)[iodesc->sync_io_desc_info.mpitype_size * nv], iodesc->sync_io_desc_info.mpitype_size);
+      for(int i = 0; i < write_desc_info.holegridsize; i++){
+        memcpy(&((char *)vdesc0->fillbuf)[write_desc_info.mpitype_size * (i + nv * write_desc_info.holegridsize)],
+               &((char *)fillvalue)[write_desc_info.mpitype_size * nv], write_desc_info.mpitype_size);
       }
     }
 
