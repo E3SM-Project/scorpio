@@ -587,6 +587,222 @@ int free_before_close(SPIO_TF::Test_framework &tf)
   return PIO_NOERR;
 }
 
+/* Write 1d array, although diff procs have different
+ * number of elements to write locally they all use
+ * the same buffer size (compdof size is different for
+ * each rank but buf size is the same)
+ * Odd procs write out VEC_LOCAL_SZ_ODD elements &
+ * even procs write out VEC_LOCAL_SZ_EVEN elements, but
+ * all procs use buf[MAX_VEC_SZ]
+ * eg:
+ * Elements in buffer on each proc with MAX_VEC_SZ = 2,
+ * [0 1] [2 X] [3 4] [5 X] ...
+ * The 'X'es in the buffer are not written out
+ */
+template<typename T>
+int nc_wr_1d_const_buf_sz(SPIO_TF::Test_framework &tf)
+{
+  const int MAX_VEC_SZ = 2;
+  const int VEC_LOCAL_SZ_ODD = MAX_VEC_SZ - 1;
+  const int VEC_LOCAL_SZ_EVEN = MAX_VEC_SZ;
+  SPIO_Util::Logger::MPI_logger<std::ofstream> logger = tf.get_logger();
+  int ret = PIO_NOERR;
+  int ioid = -1;
+  int dims[1];
+  const std::string PIO_VAR1_NAME("PIO_TF_test_var1");
+  const std::string PIO_VAR2_NAME("PIO_TF_test_var2");
+
+  int comm_rank = tf.get_comm_rank();
+  int comm_sz = tf.get_comm_size();
+  int nodd_procs = comm_sz / 2;
+  /* Number of odd procs before this rank */
+  int nodd_procs_bfr = comm_rank / 2;
+  int neven_procs = comm_sz - nodd_procs;
+  /* Number of even procs before this rank */
+  int neven_procs_bfr = comm_rank - nodd_procs_bfr;
+
+  /* Odd procs write out VEC_LOCAL_SZ_ODD elements &
+   * even procs write out VEC_LOCAL_SZ_EVEN elements
+   */
+  int cdof_sz = VEC_LOCAL_SZ_ODD;
+  if(comm_rank % 2 == 0){
+    cdof_sz = VEC_LOCAL_SZ_EVEN;
+  }
+
+  std::vector<PIO_Offset> compdof(cdof_sz);
+  std::vector<T> wbuf(MAX_VEC_SZ, 0), rbuf(MAX_VEC_SZ, 0);
+
+  /* Find out where compdof starts for this rank */
+  int compdof_rel_start = nodd_procs_bfr * VEC_LOCAL_SZ_ODD +
+      neven_procs_bfr * VEC_LOCAL_SZ_EVEN;
+  for(int i = 0; i < cdof_sz; i++){
+    compdof[i] = compdof_rel_start + (i + 1);
+    wbuf[i] = i + 1;
+  }
+  dims[0] = nodd_procs * VEC_LOCAL_SZ_ODD + neven_procs * VEC_LOCAL_SZ_EVEN;
+
+  ret = PIOc_InitDecomp(tf.get_iosysid(), Pio_type_map<T>::value, 1, dims,
+          cdof_sz, compdof.data(), &ioid, NULL, NULL, NULL);
+  if(ret != PIO_NOERR){
+    logger.log(SPIO_Util::Logger::Log_level::INFO,
+        "ERROR: PIOc_InitDecomp() FAILED, ret = " + std::to_string(ret) + "\n");
+    return PIO_EINTERNAL;
+  }
+
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  const std::string filename("test_pio_decomp_simple_tests.testfile");
+  for(int i = 0; i < num_flavors; i++){
+    int ncid = -1, dimid = -1, varid1 = -1, varid2 = -1;
+    char iotype_name[PIO_MAX_NAME + 1];
+
+    get_iotype_name(flavors[i], iotype_name);
+    logger.log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : nc_wr_1d_const_buf_sz : ") + iotype_name + "\n");
+
+    ret = PIOc_createfile(tf.get_iosysid(), &ncid, &(flavors[i]), filename.c_str(), PIO_CLOBBER);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Could not create file " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_def_dim(ncid, "PIO_TF_test_dim", dims[0], &dimid);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to define a dim : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_def_var(ncid, PIO_VAR1_NAME.c_str(), Pio_type_map<T>::value, 1, &dimid, &varid1);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to define first var : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_def_var(ncid, PIO_VAR2_NAME.c_str(), Pio_type_map<T>::value, 1, &dimid, &varid2);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to define second var : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_enddef(ncid);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to end redef mode : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    /* Write first variable out */
+    ret = PIOc_write_darray(ncid, varid1, ioid, cdof_sz, wbuf.data(), NULL);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to write first darray : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    /* Write second variable out */
+    ret = PIOc_write_darray(ncid, varid2, ioid, cdof_sz, wbuf.data(), NULL);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to write second darray : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+    ret = PIOc_closefile(ncid);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to close file : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_openfile(tf.get_iosysid(), &ncid, &(flavors[i]), filename.c_str(), PIO_NOWRITE);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Could not reopen file : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_inq_varid(ncid, PIO_VAR1_NAME.c_str(), &varid1);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Could not inq var1 : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_inq_varid(ncid, PIO_VAR2_NAME.c_str(), &varid2);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Could not inq var2 : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+#else
+    ret = PIOc_sync(ncid);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to sync file : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+#endif
+
+    for(std::size_t j = 0; j < rbuf.size(); j++){
+      rbuf[j] = 0;
+    }
+    ret = PIOc_read_darray(ncid, varid1, ioid, cdof_sz, rbuf.data());
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to read first darray : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    if(!check_val(tf, rbuf, wbuf, "Got wrong val (first var)")){
+      return PIO_EINTERNAL;
+    }
+
+    for(std::size_t j = 0; j < rbuf.size(); j++){
+      rbuf[j] = 0;
+    }
+    ret = PIOc_read_darray(ncid, varid2, ioid, cdof_sz, rbuf.data());
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to read second darray : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    if(!check_val(tf, rbuf, wbuf, "Got wrong val (second var)")){
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_closefile(ncid);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to close file : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to delete file : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+  }
+
+  ret = PIOc_freedecomp(tf.get_iosysid(), ioid);
+  if(ret != PIO_NOERR){
+    logger.log(SPIO_Util::Logger::Log_level::INFO,
+        "ERROR: PIOc_freedecomp() FAILED, ret = " + std::to_string(ret) + "\n");
+    return PIO_EINTERNAL;
+  }
+
+  return PIO_NOERR;
+}
+
 int main(int argc, char *argv[])
 {
   int ret = MPI_SUCCESS, nerrs = 0;
@@ -600,7 +816,10 @@ int main(int argc, char *argv[])
     {"nc_write_1d_darray_int", nc_write_1d_darray<int>},
     {"nc_write_1d_darray_float", nc_write_1d_darray<float>},
     {"nc_write_1d_darray_double", nc_write_1d_darray<double>},
-    {"free_before_close", free_before_close}
+    {"free_before_close", free_before_close},
+    {"nc_wr_1d_const_buf_sz_int", nc_wr_1d_const_buf_sz<int>},
+    {"nc_wr_1d_const_buf_sz_float", nc_wr_1d_const_buf_sz<float>},
+    {"nc_wr_1d_const_buf_sz_double", nc_wr_1d_const_buf_sz<double>}
   };
 
   SPIO_TF::Test_framework tf("pio_decomp_tests", MPI_COMM_WORLD, rfuncs);
