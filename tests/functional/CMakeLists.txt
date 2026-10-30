@@ -127,3 +127,17 @@ add_pio_test(pio_fail
   MAXSTRIDE ${PIO_TF_C1_MAXSTRIDE}
   TIMEOUT ${DEFAULT_TEST_TIMEOUT}
   WILLFAIL)
+
+if (PIO_ENABLE_LARGE_TESTS)
+  add_spio_executable(pio_decomp_large_tests_cxx TRUE "" pio_decomp_large_tests.cpp ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
+
+  add_pio_test(pio_decomp_large_tests_cxx
+    EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_decomp_large_tests_cxx
+    MINNUMPROCS 2
+    MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}
+    MINNUMIOPROCS 2
+    MAXNUMIOPROCS 2
+    MINSTRIDE 1
+    MAXSTRIDE 1
+    TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+endif ()
