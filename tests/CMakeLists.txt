@@ -23,6 +23,7 @@ if (PIO_ENABLE_FORTRAN)
 endif()
 
 add_subdirectory (cunit)
+add_subdirectory (functional)
 
 if (WITH_PNETCDF)
   add_subdirectory (pnetcdf)

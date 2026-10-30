@@ -24,7 +24,7 @@ class Test_framework{
     Test_framework(const std::string &name, MPI_Comm comm, std::vector<std::pair<std::string, std::function<int (Test_framework&)> > > &run_funcs) :
       name_(name), log_fname_(tf_name_to_log_fname(name)),
       comm_(comm), comm_rank_(0), comm_root_(DEFAULT_ROOT), comm_sz_(0),
-      run_funcs_(run_funcs) {}
+      run_funcs_(run_funcs), cli_num_io_tasks_(0), cli_stride_(1), iosysid_(-1) {}
 
     void init(int argc, char *argv[]){
       int ret = MPI_SUCCESS;
@@ -39,11 +39,14 @@ class Test_framework{
       std::string log_fname;
       SPIO_Util::Logger::Log_level log_lvl = SPIO_Util::Logger::Log_level::INVALID;
       bool verbose = false;
+      int num_io_tasks = 0, stride = 1;
 
       ret = get_user_options(ap, argc, argv, comm_rank_, comm_root_,
-              log_fname, log_lvl, verbose);
+              log_fname, log_lvl, verbose, num_io_tasks, stride);
       if(ret == PIO_NOERR){
         if(verbose) { log_lvl = SPIO_Util::Logger::Log_level::TRACE; }
+        cli_num_io_tasks_ = num_io_tasks;
+        cli_stride_ = stride;
       }
       else{
         std::cerr << "ERROR: Getting user options failed\n";
@@ -139,6 +142,37 @@ class Test_framework{
     int get_comm_rank(void ) const { return comm_rank_; }
     int get_comm_size(void ) const { return comm_sz_; }
 
+    int init_iosystem(int rearr){
+      int ret = PIO_NOERR;
+      int num_io_tasks = cli_num_io_tasks_;
+      int stride = cli_stride_;
+
+      if(comm_sz_ < num_io_tasks) num_io_tasks = comm_sz_;
+      if(num_io_tasks <= 1 && stride > 1) stride = 1;
+      if(num_io_tasks > 0 && stride * (num_io_tasks - 1) >= comm_sz_)
+        stride = comm_sz_ / num_io_tasks;
+      if(num_io_tasks == 0){
+        num_io_tasks = comm_sz_ / stride;
+        if(num_io_tasks < 1) num_io_tasks = 1;
+      }
+
+      ret = PIOc_Init_Intracomm(comm_, num_io_tasks, stride, /*base=*/0, rearr, &iosysid_);
+      if(ret != PIO_NOERR){
+        get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+            "ERROR: PIOc_Init_Intracomm() FAILED, ret = " + std::to_string(ret));
+      }
+
+      return ret;
+    }
+
+    int get_iosysid(void ) const { return iosysid_; }
+
+    int finalize_iosystem(void ){
+      int ret = PIOc_finalize(iosysid_);
+      iosysid_ = -1;
+      return ret;
+    }
+
     void finalize(void ){
       get_logger().log(SPIO_Util::Logger::Log_level::DEBUG, "Testing framework finalizing...");
 #ifdef SPIO_ENABLE_GPTL_TIMING
@@ -166,14 +200,16 @@ class Test_framework{
     static void init_user_options(spio_tool_utils::ArgParser &ap){
       ap.add_opt("log-file", "Output log file (default output is stdout)")
         .add_opt("log-level", "Output log level, Valid values = " + SPIO_Util::Logger::get_available_log_levels())
-        .add_opt("verbose", "Turn on verbose messages (log level = TRACE)");
+        .add_opt("verbose", "Turn on verbose messages (log level = TRACE)")
+        .add_opt("pio-tf-num-io-tasks", "Number of I/O tasks (0 = auto)")
+        .add_opt("pio-tf-stride", "Stride between I/O tasks");
     }
 
     static int get_user_options(spio_tool_utils::ArgParser &ap,
                 int argc, char *argv[],
                 int comm_rank, int comm_root,
                 std::string &log_fname, SPIO_Util::Logger::Log_level &log_lvl,
-                bool &verbose){
+                bool &verbose, int &num_io_tasks, int &stride){
 #ifdef SPIO_NO_CXX_REGEX
       ap.no_regex_parse(argc, argv);
 #else
@@ -191,7 +227,17 @@ class Test_framework{
 
       verbose = false;
       if(ap.has_arg("verbose")){
-        verbose = true;    
+        verbose = true;
+      }
+
+      num_io_tasks = 0;
+      if(ap.has_arg("pio-tf-num-io-tasks")){
+        num_io_tasks = ap.get_arg<int>("pio-tf-num-io-tasks");
+      }
+
+      stride = 1;
+      if(ap.has_arg("pio-tf-stride")){
+        stride = ap.get_arg<int>("pio-tf-stride");
       }
 
       return PIO_NOERR;
@@ -208,6 +254,9 @@ class Test_framework{
     std::vector<std::pair<std::string, std::function<int (Test_framework &)> > > run_funcs_;
     std::shared_ptr<std::ofstream> logger_fstr_;
     SPIO_Util::Logger::MPI_logger<std::ofstream> flogger_;
+    int cli_num_io_tasks_;
+    int cli_stride_;
+    int iosysid_;
 };
 
 } // namespace SPIO_TF
