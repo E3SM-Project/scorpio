@@ -458,7 +458,7 @@ int free_before_close(SPIO_TF::Test_framework &tf)
     }
 
     /* Read and verify contents of the first file */
-    for(int j = 0; j < VEC_LOCAL_SZ; j++){
+    for(std::size_t j = 0; j < rbuf.size(); j++){
       rbuf[j] = 0;
     }
     ret = PIOc_read_darray(ncid1, varid1_file1, rd_iodesc, VEC_LOCAL_SZ, rbuf.data());
@@ -472,7 +472,7 @@ int free_before_close(SPIO_TF::Test_framework &tf)
       return PIO_EINTERNAL;
     }
 
-    for(int j = 0; j < VEC_LOCAL_SZ; j++){
+    for(std::size_t j = 0; j < rbuf.size(); j++){
       rbuf[j] = 0;
     }
     ret = PIOc_read_darray(ncid1, varid2_file1, rd_iodesc, VEC_LOCAL_SZ, rbuf.data());
@@ -503,7 +503,7 @@ int free_before_close(SPIO_TF::Test_framework &tf)
 
     /* Verify the contents of the remaining files (interleaved reads) */
     /* Read from second file */
-    for(int j = 0; j < VEC_LOCAL_SZ; j++){
+    for(std::size_t j = 0; j < rbuf.size(); j++){
       rbuf[j] = 0;
     }
     ret = PIOc_read_darray(ncid2, varid1_file2, rd_iodesc, VEC_LOCAL_SZ, rbuf.data());
@@ -518,7 +518,7 @@ int free_before_close(SPIO_TF::Test_framework &tf)
     }
 
     /* Read from third file */
-    for(int j = 0; j < VEC_LOCAL_SZ; j++){
+    for(std::size_t j = 0; j < rbuf.size(); j++){
       rbuf[j] = 0;
     }
     ret = PIOc_read_darray(ncid3, varid1_file3, rd_iodesc, VEC_LOCAL_SZ, rbuf.data());
@@ -533,7 +533,7 @@ int free_before_close(SPIO_TF::Test_framework &tf)
     }
 
     /* Now read back from second file */
-    for(int j = 0; j < VEC_LOCAL_SZ; j++){
+    for(std::size_t j = 0; j < rbuf.size(); j++){
       rbuf[j] = 0;
     }
     ret = PIOc_read_darray(ncid2, varid2_file2, rd_iodesc, VEC_LOCAL_SZ, rbuf.data());
@@ -1109,7 +1109,7 @@ int main(int argc, char *argv[])
     {"nc_write_1d_reuse_decomp_double", nc_write_1d_reuse_decomp<double>}
   };
 
-  SPIO_TF::Test_framework tf("pio_decomp_tests", MPI_COMM_WORLD, rfuncs);
+  SPIO_TF::Test_framework tf("pio_decomp_tests_cxx", MPI_COMM_WORLD, rfuncs);
   tf.init(argc, argv);
 
   int rearrs[] = {PIO_REARR_BOX, PIO_REARR_SUBSET, PIO_REARR_CONTIG};

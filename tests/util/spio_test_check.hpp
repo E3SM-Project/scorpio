@@ -16,23 +16,35 @@ template<typename T>
 bool check_val(SPIO_TF::Test_framework &tf, const std::vector<T> &res,
     const std::vector<T> &exp, const std::string &ctx_msg)
 {
+  bool lpass = true;
+
   if(res.size() != exp.size()){
     tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
         ctx_msg + " : ERROR: The result and expected vectors are of different sizes\n");
-    return false;
+    lpass = false;
   }
-
-  for(std::size_t i = 0; i < res.size(); i++){
-    if(res[i] != exp[i]){
-      std::ostringstream oss;
-      oss << ctx_msg << " : ERROR: Invalid/Unexpected value, array[" << i << "] = " << res[i]
-          << " (Expected array[" << i << "] = " << exp[i] << ")\n";
-      tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO, oss.str());
-      return false;
+  else{
+    for(std::size_t i = 0; i < res.size(); i++){
+      if(res[i] != exp[i]){
+        std::ostringstream oss;
+        oss << ctx_msg << " : ERROR: Invalid/Unexpected value, array[" << i << "] = " << res[i]
+            << " (Expected array[" << i << "] = " << exp[i] << ")\n";
+        tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO, oss.str());
+        lpass = false;
+        break;
+      }
     }
   }
 
-  return true;
+  /* Every rank must agree on the pass/fail verdict before returning since
+   * callers return early on failure, and other PIO calls further down are
+   * MPI-collective - a rank-divergent result here would deadlock those.
+   */
+  int lpass_i = lpass ? 1 : 0;
+  int gpass_i = 0;
+  MPI_Allreduce(&lpass_i, &gpass_i, 1, MPI_INT, MPI_LAND, tf.get_comm());
+
+  return (gpass_i != 0);
 }
 
 #endif // __SPIO_TEST_CHECK__
