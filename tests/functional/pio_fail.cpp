@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
   tf.init(argc, argv);
 
   if(tf.init_iosystem(PIO_REARR_BOX) == PIO_NOERR){
-    tf.run();
+    nerrs += tf.run();
     tf.finalize_iosystem();
   }
   else{
