@@ -47,6 +47,7 @@ int file_fail_driver(SPIO_TF::Test_framework &tf)
 
   for(int i = 0; i < num_uiotypes; i++){
     char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
     get_undef_iotype_name(uiotypes[i], iotype_name);
     tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
         std::string("Testing : file_fail : ") + iotype_name + "\n");

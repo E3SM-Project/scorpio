@@ -24,9 +24,11 @@ int create_file_no_opts(SPIO_TF::Test_framework &tf, int iotype, const std::stri
     return PIO_EINTERNAL;
   }
 
-  if(iotype != PIO_IOTYPE_PNETCDF){
+  if(iotype == PIO_IOTYPE_PNETCDF || iotype == PIO_IOTYPE_NETCDF ||
+      iotype == PIO_IOTYPE_NETCDF4C || iotype == PIO_IOTYPE_NETCDF4P){
     ret = PIOc_enddef(ncid);
     if(!check_ret(tf, ret, "Could not end define mode: " + filename)){
+      PIOc_closefile(ncid);
       return PIO_EINTERNAL;
     }
   }
@@ -64,6 +66,7 @@ int file_simple_tests_driver(SPIO_TF::Test_framework &tf)
 
   for(int i = 0; i < num_flavors; i++){
     char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
     get_iotype_name(flavors[i], iotype_name);
     tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
         std::string("Testing : file_simple_tests : ") + iotype_name + "\n");

@@ -5,9 +5,13 @@
 #include "pio.h"
 
 // Covers PNETCDF/NETCDF/NETCDF4C/NETCDF4P/NETCDF4P_NCZARR. ADIOS/ADIOSC/
-// HDF5/HDF5C are not included: PIOc_iotype_available_impl() has no case
-// for them, so they cannot be queried via the public PIOc_iotype_available()
-// API this file is built on without changing src/clib (out of scope here).
+// HDF5/HDF5C are not included here: PIOc_iotype_available_impl() has no
+// case for them, so PIOc_iotype_available() always reports them
+// unavailable regardless of build config. get_undef_iotypes() below
+// queries them correctly via the _ADIOS2/_HDF5/_SPIO_*_USE_COMPRESSION
+// compile-time macros instead (mirroring tests/general/util/pio_tutil.F90's
+// PIO_TF_Get_undef_iotypes), since those are the actual gate
+// PIOc_createfile uses (iotype_is_valid() in pioc_support.cpp).
 const int SPIO_TEST_NUM_FLAVORS = 5;
 
 inline int get_iotypes(int *num_flavors, int *flavors)
@@ -48,6 +52,38 @@ inline int get_iotype_name(int iotype, char *name)
 
 const int SPIO_TEST_NUM_ALL_IOTYPES = 9;
 
+inline bool is_iotype_available_for_tests(int iotype)
+{
+  switch(iotype){
+    case PIO_IOTYPE_ADIOS:
+#ifdef _ADIOS2
+      return true;
+#else
+      return false;
+#endif
+    case PIO_IOTYPE_ADIOSC:
+#if defined(_ADIOS2) && defined(_SPIO_ADIOS_USE_COMPRESSION)
+      return true;
+#else
+      return false;
+#endif
+    case PIO_IOTYPE_HDF5:
+#ifdef _HDF5
+      return true;
+#else
+      return false;
+#endif
+    case PIO_IOTYPE_HDF5C:
+#if defined(_HDF5) && defined(_SPIO_HDF5_USE_COMPRESSION)
+      return true;
+#else
+      return false;
+#endif
+    default:
+      return (PIOc_iotype_available(iotype) != 0);
+  }
+}
+
 inline int get_undef_iotypes(int *num_undef, int *undef_iotypes)
 {
   static const int all_iotypes[SPIO_TEST_NUM_ALL_IOTYPES] =
@@ -57,7 +93,7 @@ inline int get_undef_iotypes(int *num_undef, int *undef_iotypes)
   int num = 0;
 
   for(int i = 0; i < SPIO_TEST_NUM_ALL_IOTYPES; i++){
-    if(!PIOc_iotype_available(all_iotypes[i])){
+    if(!is_iotype_available_for_tests(all_iotypes[i])){
       if(undef_iotypes){
         undef_iotypes[num] = all_iotypes[i];
       }

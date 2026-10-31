@@ -73,6 +73,7 @@ int ncdf_eh_one_test_driver(SPIO_TF::Test_framework &tf)
 
     for(int i = 0; i < num_iotypes; i++){
       char iotype_name[PIO_MAX_NAME + 1];
+      iotype_name[0] = '\0';
       get_iotype_name(iotypes[i], iotype_name);
       tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
           std::string("Testing : ncdf_eh_one_test : ") + err_handler_names[h] + " : " + iotype_name + "\n");
