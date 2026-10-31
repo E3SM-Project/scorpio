@@ -6,6 +6,7 @@
 #include <sstream>
 #include <algorithm>
 #include <iomanip>
+#include <cstdio>
 
 #include "pio.h"
 
@@ -3208,6 +3209,675 @@ int test_put_get_misc_str(SPIO_TF::Test_framework &tf)
   return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
 }
 
+/* Helpers for building/comparing the "Index is: <name>(<idx>...)" style
+ * strings written out by test_put_get_str_frames/test_put_get_str_idx
+ * below (these mirror the Fortran VNAME_WITH_*_IDX_FMT* edit descriptors
+ * in tests/general/ncdf_get_put.F90.in: A<w> is a right-justified,
+ * blank-padded (or leftmost-truncated) string field and I<w> is a
+ * right-justified, space-padded integer field). */
+static std::string spio_fmt_idx_str1(const std::string &vname, int idx)
+{
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "Index is: %5.5s(%5d)", vname.c_str(), idx);
+  return std::string(buf);
+}
+
+static std::string spio_fmt_idx_str2(const std::string &vname, int idx0, int idx1)
+{
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "Index is: %5.5s(%5d,%5d)", vname.c_str(), idx0, idx1);
+  return std::string(buf);
+}
+
+static std::string spio_fmt_idx_str3(const std::string &vname, int idx0, int idx1, int idx2)
+{
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "Index is: %5.5s(%5d,%5d,%5d)", vname.c_str(), idx0, idx1, idx2);
+  return std::string(buf);
+}
+
+static std::string spio_fmt_idx_str_w10(const std::string &vname, int idx)
+{
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "Index is: %10.10s(%5d)", vname.c_str(), idx);
+  return std::string(buf);
+}
+
+/* Blank-pad (or truncate) a string to exactly 'len' chars - matches the
+ * Fortran semantics of assigning/writing a value to a fixed-length
+ * character variable. */
+static std::string spio_pad_str(const std::string &s, std::size_t len)
+{
+  std::string out = s;
+  out.resize(len, ' ');
+  return out;
+}
+
+static int test_put_get_str_frames_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const std::string FNAME_FRAMES("test_pio_ncdf_get_str_frames.testfile");
+
+  const std::string VAR1D_NAME("var1d");
+  const std::string VAR2D_NAME("var2d");
+  const std::string VAR3D_NAME("var3d");
+
+  const int STR_LEN = 64;
+  const int NUM_ROWS = 4;
+  const int NUM_COLS = 8;
+  const int NUM_STEPS = 6;
+
+  const std::string DIM0_NAME("slen");
+  const std::string DIM1_NAME("row");
+  const std::string DIM2_NAME("col");
+  const std::string DIM3_NAME("step");
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, FNAME_FRAMES.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + FNAME_FRAMES)){
+    return PIO_EINTERNAL;
+  }
+
+  int dim_slen = -1, dim_row = -1, dim_col = -1, dim_step = -1;
+  ret = PIOc_def_dim(ncid, DIM0_NAME.c_str(), STR_LEN, &dim_slen);
+  if(!check_ret(tf, ret, "Failed to define dim 0:" + FNAME_FRAMES)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_FRAMES.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, DIM1_NAME.c_str(), NUM_ROWS, &dim_row);
+  if(!check_ret(tf, ret, "Failed to define dim 1:" + FNAME_FRAMES)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_FRAMES.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, DIM2_NAME.c_str(), NUM_COLS, &dim_col);
+  if(!check_ret(tf, ret, "Failed to define dim 2:" + FNAME_FRAMES)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_FRAMES.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, DIM3_NAME.c_str(), NUM_STEPS, &dim_step);
+  if(!check_ret(tf, ret, "Failed to define dim 3:" + FNAME_FRAMES)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_FRAMES.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  int dimids1[2] = {dim_row, dim_slen};
+  int dimids2[3] = {dim_col, dim_row, dim_slen};
+  int dimids3[4] = {dim_step, dim_col, dim_row, dim_slen};
+
+  int var1d = -1, var2d = -1, var3d = -1;
+  ret = PIOc_def_var(ncid, VAR1D_NAME.c_str(), PIO_CHAR, 2, dimids1, &var1d);
+  if(!check_ret(tf, ret, "Failed to define 1 dim char array or 1d array of strings in file " + FNAME_FRAMES)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_FRAMES.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, VAR2D_NAME.c_str(), PIO_CHAR, 3, dimids2, &var2d);
+  if(!check_ret(tf, ret, "Failed to define 2 dim char array or 2d array of strings in file " + FNAME_FRAMES)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_FRAMES.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, VAR3D_NAME.c_str(), PIO_CHAR, 4, dimids3, &var3d);
+  if(!check_ret(tf, ret, "Failed to define 3 dim char array or 3d array of strings in file " + FNAME_FRAMES)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_FRAMES.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + FNAME_FRAMES)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_FRAMES.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* Write the 1d text variable, 1 string (row) at a time. Note: the
+   * content written for var1d uses VAR2D_NAME (not VAR1D_NAME) - this
+   * mirrors a quirk in the original Fortran source
+   * (tests/general/ncdf_get_put.F90.in), not a port defect. */
+  for(int row = 0; row < NUM_ROWS; row++){
+    std::string frame = spio_pad_str(spio_fmt_idx_str1(VAR2D_NAME, row + 1), STR_LEN);
+    PIO_Offset start[2] = {static_cast<PIO_Offset>(row), 0};
+    PIO_Offset count[2] = {1, STR_LEN};
+    ret = PIOc_put_vara(ncid, var1d, start, count, frame.data());
+    if(!check_ret(tf, ret, "Failed to put 1d array of strings 1 frame at a time in file " + FNAME_FRAMES)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), FNAME_FRAMES.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+  /* Write the 2d text variable, 1 array/row of strings (a full column)
+   * at a time. */
+  for(int col = 0; col < NUM_COLS; col++){
+    std::vector<char> frame(static_cast<std::size_t>(NUM_ROWS) * STR_LEN);
+    for(int row = 0; row < NUM_ROWS; row++){
+      std::string s = spio_pad_str(spio_fmt_idx_str2(VAR2D_NAME, row + 1, col + 1), STR_LEN);
+      std::copy(s.begin(), s.end(), frame.begin() + static_cast<std::size_t>(row) * STR_LEN);
+    }
+    PIO_Offset start[3] = {static_cast<PIO_Offset>(col), 0, 0};
+    PIO_Offset count[3] = {1, NUM_ROWS, STR_LEN};
+    ret = PIOc_put_vara(ncid, var2d, start, count, frame.data());
+    if(!check_ret(tf, ret, "Failed to put 2d array of strings 1 frame at a time in file " + FNAME_FRAMES)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), FNAME_FRAMES.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+  /* Write the 3d text variable, 1 2d array (row x col) of strings at a
+   * time. */
+  for(int step = 0; step < NUM_STEPS; step++){
+    std::vector<char> frame(static_cast<std::size_t>(NUM_COLS) * NUM_ROWS * STR_LEN);
+    for(int col = 0; col < NUM_COLS; col++){
+      for(int row = 0; row < NUM_ROWS; row++){
+        std::string s = spio_pad_str(spio_fmt_idx_str3(VAR3D_NAME, row + 1, col + 1, step + 1), STR_LEN);
+        std::size_t off = (static_cast<std::size_t>(col) * NUM_ROWS + row) * STR_LEN;
+        std::copy(s.begin(), s.end(), frame.begin() + off);
+      }
+    }
+    PIO_Offset start[4] = {static_cast<PIO_Offset>(step), 0, 0, 0};
+    PIO_Offset count[4] = {1, NUM_COLS, NUM_ROWS, STR_LEN};
+    ret = PIOc_put_vara(ncid, var3d, start, count, frame.data());
+    if(!check_ret(tf, ret, "Failed to put 3d array of strings 1 frame at a time in file " + FNAME_FRAMES)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), FNAME_FRAMES.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + FNAME_FRAMES)){
+    PIOc_deletefile(tf.get_iosysid(), FNAME_FRAMES.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, FNAME_FRAMES.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + FNAME_FRAMES)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR1D_NAME.c_str(), &var1d);
+  if(!check_ret(tf, ret, "Failed to inquire 1d array of strings var in file " + FNAME_FRAMES)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR2D_NAME.c_str(), &var2d);
+  if(!check_ret(tf, ret, "Failed to inquire 2d array of strings var in file " + FNAME_FRAMES)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR3D_NAME.c_str(), &var3d);
+  if(!check_ret(tf, ret, "Failed to inquire 3d array of strings var in file " + FNAME_FRAMES)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  bool ok = true;
+
+  std::vector<char> gstr1d(static_cast<std::size_t>(NUM_ROWS) * STR_LEN);
+  ret = PIOc_get_var(ncid, var1d, gstr1d.data());
+  if(!check_ret(tf, ret, "Failed to get 1d char var in file " + FNAME_FRAMES)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  for(int row = 0; row < NUM_ROWS; row++){
+    std::string exp = spio_pad_str(spio_fmt_idx_str1(VAR2D_NAME, row + 1), STR_LEN);
+    std::string res(gstr1d.begin() + static_cast<std::size_t>(row) * STR_LEN,
+        gstr1d.begin() + static_cast<std::size_t>(row + 1) * STR_LEN);
+    ok = passert(tf, (res == exp), "Got wrong value for 1d char var") && ok;
+  }
+
+  std::vector<char> gstr2d(static_cast<std::size_t>(NUM_COLS) * NUM_ROWS * STR_LEN);
+  ret = PIOc_get_var(ncid, var2d, gstr2d.data());
+  if(!check_ret(tf, ret, "Failed to get 2d char var in file " + FNAME_FRAMES)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  for(int col = 0; col < NUM_COLS; col++){
+    for(int row = 0; row < NUM_ROWS; row++){
+      std::string exp = spio_pad_str(spio_fmt_idx_str2(VAR2D_NAME, row + 1, col + 1), STR_LEN);
+      std::size_t off = (static_cast<std::size_t>(col) * NUM_ROWS + row) * STR_LEN;
+      std::string res(gstr2d.begin() + off, gstr2d.begin() + off + STR_LEN);
+      ok = passert(tf, (res == exp), "Got wrong value for 2d char var") && ok;
+    }
+  }
+
+  std::vector<char> gstr3d(static_cast<std::size_t>(NUM_STEPS) * NUM_COLS * NUM_ROWS * STR_LEN);
+  ret = PIOc_get_var(ncid, var3d, gstr3d.data());
+  if(!check_ret(tf, ret, "Failed to get 3d char var in file " + FNAME_FRAMES)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  for(int step = 0; step < NUM_STEPS; step++){
+    for(int col = 0; col < NUM_COLS; col++){
+      for(int row = 0; row < NUM_ROWS; row++){
+        std::string exp = spio_pad_str(spio_fmt_idx_str3(VAR3D_NAME, row + 1, col + 1, step + 1), STR_LEN);
+        std::size_t off = ((static_cast<std::size_t>(step) * NUM_COLS + col) * NUM_ROWS + row) * STR_LEN;
+        std::string res(gstr3d.begin() + off, gstr3d.begin() + off + STR_LEN);
+        ok = passert(tf, (res == exp), "Got wrong value for 3d char var") && ok;
+      }
+    }
+  }
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), FNAME_FRAMES.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+int test_put_get_str_frames(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_str_frames : ") + iotype_name + "\n");
+
+    if(test_put_get_str_frames_one_iotype(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* Write 'nchars' chars from 's' (or fewer, if 's' is shorter) into a 2D
+ * (row, slen) text variable's row, 1 PIOc_put_var1_text call per
+ * character - this mirrors the literal "index, no count" single-element
+ * var1 write semantics while still writing a whole string, and silently
+ * writes only the first 'nchars' chars of 's' if 's' is longer
+ * (truncation-on-write, the API contract being verified for var1d_trnc
+ * below, not a defect). */
+static int spio_put_text_var1_row(int ncid, int varid, int row, const std::string &s, int nchars)
+{
+  std::size_t n = std::min(s.size(), static_cast<std::size_t>(nchars));
+  for(std::size_t c = 0; c < n; c++){
+    PIO_Offset index[2] = {static_cast<PIO_Offset>(row), static_cast<PIO_Offset>(c)};
+    int ret = PIOc_put_var1_text(ncid, varid, index, &s[c]);
+    if(ret != PIO_NOERR){
+      return ret;
+    }
+  }
+  return PIO_NOERR;
+}
+
+/* Read 'nchars' chars, starting at char-position 'start_c', from a 2D
+ * (row, slen) text variable's row, 1 PIOc_get_var1_text call per
+ * character. */
+static int spio_get_text_var1_row(int ncid, int varid, int row, int start_c, int nchars, std::string &out)
+{
+  out.assign(static_cast<std::size_t>(nchars), '\0');
+  for(int c = 0; c < nchars; c++){
+    PIO_Offset index[2] = {static_cast<PIO_Offset>(row), static_cast<PIO_Offset>(start_c + c)};
+    int ret = PIOc_get_var1_text(ncid, varid, index, &out[static_cast<std::size_t>(c)]);
+    if(ret != PIO_NOERR){
+      return ret;
+    }
+  }
+  return PIO_NOERR;
+}
+
+static int test_put_get_str_idx_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const std::string FNAME_IDX("test_pio_ncdf_get_str_idx.testfile");
+
+  const std::string VAR1D_NAME("var1d");
+  const std::string VAR1D_LONG_NAME("var1d_long");
+  const std::string VAR1D_SHRT_NAME("var1d_shrt");
+  const std::string VAR1D_TRNC_NAME("var1d_trnc");
+  const std::string VAR1D_MIDX_NAME("var1d_midx");
+  const std::string VAR1D_TMPL_NAME("var1d_____");
+
+  const int SHORT_STR_LEN = 32;
+  const int STR_LEN = 64;
+  const int LONG_STR_LEN = 128;
+  const int NUM_ROWS = 10;
+
+  const std::string DIM0_NAME("slen");
+  const std::string DIM1_NAME("row");
+
+  /* Char position (0-based) within the "Index is: <name>(<idx>)" pattern
+   * (built with a 10-char-wide name field) at which the <name> field
+   * starts - used below to overwrite just the name in-place. */
+  const int NAME_IDX_IN_FMT2 = 10;
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, FNAME_IDX.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + FNAME_IDX)){
+    return PIO_EINTERNAL;
+  }
+
+  int dim_slen = -1, dim_row = -1;
+  ret = PIOc_def_dim(ncid, DIM0_NAME.c_str(), STR_LEN, &dim_slen);
+  if(!check_ret(tf, ret, "Failed to define dim 0:" + FNAME_IDX)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, DIM1_NAME.c_str(), NUM_ROWS, &dim_row);
+  if(!check_ret(tf, ret, "Failed to define dim 1:" + FNAME_IDX)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  int dimids[2] = {dim_row, dim_slen};
+  int var1d = -1, var1d_long = -1, var1d_shrt = -1, var1d_trnc = -1, var1d_midx = -1;
+
+  ret = PIOc_def_var(ncid, VAR1D_NAME.c_str(), PIO_CHAR, 2, dimids, &var1d);
+  if(!check_ret(tf, ret, "Failed to define 1d array of strings in file " + FNAME_IDX)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, VAR1D_SHRT_NAME.c_str(), PIO_CHAR, 2, dimids, &var1d_shrt);
+  if(!check_ret(tf, ret, "Failed to define 1d array of short strings in file " + FNAME_IDX)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, VAR1D_LONG_NAME.c_str(), PIO_CHAR, 2, dimids, &var1d_long);
+  if(!check_ret(tf, ret, "Failed to define 1d array of long strings in file " + FNAME_IDX)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, VAR1D_TRNC_NAME.c_str(), PIO_CHAR, 2, dimids, &var1d_trnc);
+  if(!check_ret(tf, ret, "Failed to define 1d array of truncatable strings in file " + FNAME_IDX)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, VAR1D_MIDX_NAME.c_str(), PIO_CHAR, 2, dimids, &var1d_midx);
+  if(!check_ret(tf, ret, "Failed to define 1d array of mid-index-overwritten strings in file " + FNAME_IDX)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + FNAME_IDX)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* Write each variable 1 string at a time, 1 PIOc_put_var1_text call
+   * per character - this exercises the literal "index, no count" netCDF
+   * var1 semantics (1 element per call) while still writing a whole
+   * string, naturally exercising short-buffer writes and
+   * truncation-on-write for variants shorter/longer than STR_LEN
+   * respectively. */
+  for(int row = 0; row < NUM_ROWS; row++){
+    std::string s = spio_pad_str(spio_fmt_idx_str1(VAR1D_NAME, row + 1), STR_LEN);
+    ret = spio_put_text_var1_row(ncid, var1d, row, s, STR_LEN);
+    if(!check_ret(tf, ret, "Failed to put 1d array of strings 1 string at a time to file " + FNAME_IDX)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+  /* The string written out is shorter than the declared string-length
+   * dimension of the variable - only SHORT_STR_LEN chars are written,
+   * leaving the rest of the row's string-length dimension untouched. */
+  for(int row = 0; row < NUM_ROWS; row++){
+    std::string s = spio_pad_str(spio_fmt_idx_str_w10(VAR1D_SHRT_NAME, row + 1), SHORT_STR_LEN);
+    ret = spio_put_text_var1_row(ncid, var1d_shrt, row, s, SHORT_STR_LEN);
+    if(!check_ret(tf, ret, "Failed to put 1d array of short strings 1 string at a time to file " + FNAME_IDX)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+  /* The string written out (LONG_STR_LEN chars, blank padded) is longer
+   * than the declared string-length dimension of the variable (STR_LEN)
+   * - only the first STR_LEN chars (all content, no truncated garbage)
+   * are ever written. */
+  for(int row = 0; row < NUM_ROWS; row++){
+    std::string s = spio_pad_str(spio_fmt_idx_str_w10(VAR1D_LONG_NAME, row + 1), LONG_STR_LEN);
+    ret = spio_put_text_var1_row(ncid, var1d_long, row, s, STR_LEN);
+    if(!check_ret(tf, ret, "Failed to put 1d array of long strings 1 string at a time to file " + FNAME_IDX)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+  /* The string written out is longer than STR_LEN and, unlike the "long"
+   * case above, has non-blank content (digits) all the way to its end -
+   * writing it is expected to silently truncate at STR_LEN chars, not
+   * error out. This is the API contract being verified here, not a
+   * defect. */
+  for(int row = 0; row < NUM_ROWS; row++){
+    std::string content = spio_fmt_idx_str_w10(VAR1D_TRNC_NAME, row + 1);
+    std::string s = content;
+    s.resize(LONG_STR_LEN);
+    for(std::size_t j = content.size(); j < s.size(); j++){
+      s[j] = static_cast<char>('0' + ((j + 1) % 10));
+    }
+    ret = spio_put_text_var1_row(ncid, var1d_trnc, row, s, STR_LEN);
+    if(!check_ret(tf, ret, "Failed to put 1d array of truncatable strings 1 string at a time to file " + FNAME_IDX)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+  /* Write out the string with the template var name first - its name
+   * field is overwritten, in-place, at a non-zero string-length index
+   * below. */
+  for(int row = 0; row < NUM_ROWS; row++){
+    std::string s = spio_pad_str(spio_fmt_idx_str_w10(VAR1D_TMPL_NAME, row + 1), STR_LEN);
+    ret = spio_put_text_var1_row(ncid, var1d_midx, row, s, STR_LEN);
+    if(!check_ret(tf, ret, "Failed to put 1d array of long strings 1 string at a time to file " + FNAME_IDX)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+  /* Re-open the file in PIO_WRITE (not PIO_NOWRITE, unlike every other
+   * read-back phase below) specifically to allow modifying var1d_midx
+   * in-place. */
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + FNAME_IDX)){
+    PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, FNAME_IDX.c_str(), PIO_WRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + FNAME_IDX)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR1D_MIDX_NAME.c_str(), &var1d_midx);
+  if(!check_ret(tf, ret, "Failed to inquire 1d array of mid-index-overwritten strings var in file " + FNAME_IDX)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  /* Overwrite just the name field, in-place, at a non-zero string-length
+   * index - changes "Index is: var1d_____(<idx>)" to
+   * "Index is: var1d_midx(<idx>)". */
+  for(int row = 0; row < NUM_ROWS; row++){
+    PIO_Offset index[2] = {static_cast<PIO_Offset>(row), 0};
+    for(std::size_t c = 0; c < VAR1D_MIDX_NAME.size(); c++){
+      index[1] = NAME_IDX_IN_FMT2 + static_cast<PIO_Offset>(c);
+      ret = PIOc_put_var1_text(ncid, var1d_midx, index, &VAR1D_MIDX_NAME[c]);
+      if(!check_ret(tf, ret, "Failed to overwrite name in 1d array of strings in file " + FNAME_IDX)){
+        PIOc_closefile(ncid);
+        PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+        return PIO_EINTERNAL;
+      }
+    }
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + FNAME_IDX)){
+    PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, FNAME_IDX.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + FNAME_IDX)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR1D_NAME.c_str(), &var1d);
+  if(!check_ret(tf, ret, "Failed to inquire 1d array of strings var in file " + FNAME_IDX)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR1D_SHRT_NAME.c_str(), &var1d_shrt);
+  if(!check_ret(tf, ret, "Failed to inquire 1d array of short strings var in file " + FNAME_IDX)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR1D_LONG_NAME.c_str(), &var1d_long);
+  if(!check_ret(tf, ret, "Failed to inquire 1d array of long strings var in file " + FNAME_IDX)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR1D_TRNC_NAME.c_str(), &var1d_trnc);
+  if(!check_ret(tf, ret, "Failed to inquire 1d array of truncatable strings var in file " + FNAME_IDX)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR1D_MIDX_NAME.c_str(), &var1d_midx);
+  if(!check_ret(tf, ret, "Failed to inquire 1d array of mid-index-overwritten strings var in file " + FNAME_IDX)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  bool ok = true;
+
+  /* Verify by reading back exactly the extent that was written for each
+   * variant (rather than the whole STR_LEN-wide row) - bytes beyond what
+   * was explicitly written are left untouched by SCORPIO's default
+   * NC_NOFILL fill mode and so have no defined value to compare
+   * against. */
+  for(int row = 0; row < NUM_ROWS; row++){
+    std::string exp = spio_pad_str(spio_fmt_idx_str1(VAR1D_NAME, row + 1), STR_LEN);
+    std::string res;
+    ret = spio_get_text_var1_row(ncid, var1d, row, 0, STR_LEN, res);
+    if(!check_ret(tf, ret, "Failed to get 1d char var in file " + FNAME_IDX)){
+      PIOc_closefile(ncid);
+      return PIO_EINTERNAL;
+    }
+    ok = passert(tf, (res == exp), "Got wrong value for 1d char var") && ok;
+  }
+
+  for(int row = 0; row < NUM_ROWS; row++){
+    std::string exp = spio_pad_str(spio_fmt_idx_str_w10(VAR1D_SHRT_NAME, row + 1), SHORT_STR_LEN);
+    std::string res;
+    ret = spio_get_text_var1_row(ncid, var1d_shrt, row, 0, SHORT_STR_LEN, res);
+    if(!check_ret(tf, ret, "Failed to get short 1d char var in file " + FNAME_IDX)){
+      PIOc_closefile(ncid);
+      return PIO_EINTERNAL;
+    }
+    ok = passert(tf, (res == exp), "Got wrong value for short 1d char var") && ok;
+  }
+
+  for(int row = 0; row < NUM_ROWS; row++){
+    std::string exp = spio_pad_str(spio_fmt_idx_str_w10(VAR1D_LONG_NAME, row + 1), STR_LEN);
+    std::string res;
+    ret = spio_get_text_var1_row(ncid, var1d_long, row, 0, STR_LEN, res);
+    if(!check_ret(tf, ret, "Failed to get long 1d char var in file " + FNAME_IDX)){
+      PIOc_closefile(ncid);
+      return PIO_EINTERNAL;
+    }
+    ok = passert(tf, (res == exp), "Got wrong value for long 1d char var") && ok;
+  }
+
+  for(int row = 0; row < NUM_ROWS; row++){
+    std::string content = spio_fmt_idx_str_w10(VAR1D_TRNC_NAME, row + 1);
+    std::string exp = content;
+    exp.resize(STR_LEN);
+    for(std::size_t j = content.size(); j < exp.size(); j++){
+      exp[j] = static_cast<char>('0' + ((j + 1) % 10));
+    }
+    std::string res;
+    ret = spio_get_text_var1_row(ncid, var1d_trnc, row, 0, STR_LEN, res);
+    if(!check_ret(tf, ret, "Failed to get truncatable 1d char var in file " + FNAME_IDX)){
+      PIOc_closefile(ncid);
+      return PIO_EINTERNAL;
+    }
+    ok = passert(tf, (res == exp), "Got wrong value for truncatable 1d char var") && ok;
+  }
+
+  for(int row = 0; row < NUM_ROWS; row++){
+    std::string exp = spio_pad_str(spio_fmt_idx_str_w10(VAR1D_MIDX_NAME, row + 1), STR_LEN);
+    std::string res;
+    ret = spio_get_text_var1_row(ncid, var1d_midx, row, 0, STR_LEN, res);
+    if(!check_ret(tf, ret, "Failed to get index write of 1d char var in file " + FNAME_IDX)){
+      PIOc_closefile(ncid);
+      return PIO_EINTERNAL;
+    }
+    ok = passert(tf, (res == exp), "Got wrong value for index write of 1d char var") && ok;
+  }
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), FNAME_IDX.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+int test_put_get_str_idx(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_str_idx : ") + iotype_name + "\n");
+
+    if(test_put_get_str_idx_one_iotype(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
 int main(int argc, char *argv[])
 {
   int ret = MPI_SUCCESS, nerrs = 0;
@@ -3262,7 +3932,9 @@ int main(int argc, char *argv[])
     {"test_put_get_time_scalar_rec_double", test_put_get_time_scalar_rec<double>},
     {"test_put_get_1d_str_arr", test_put_get_1d_str_arr},
     {"test_put_get_2d_str_arr", test_put_get_2d_str_arr},
-    {"test_put_get_misc_str", test_put_get_misc_str}
+    {"test_put_get_misc_str", test_put_get_misc_str},
+    {"test_put_get_str_frames", test_put_get_str_frames},
+    {"test_put_get_str_idx", test_put_get_str_idx}
   };
 
   SPIO_TF::Test_framework tf("ncdf_get_put_cxx", MPI_COMM_WORLD, rfuncs);
