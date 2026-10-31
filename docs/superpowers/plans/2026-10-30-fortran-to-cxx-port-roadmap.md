@@ -70,7 +70,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_iodesc_tests.F90.in` (634 lines)
 - [x] `pio_decomp_fillval2.F90.in` (645 lines)
 - [x] `pio_decomp_frame_tests.F90.in` (661 lines)
-- [ ] `pio_decomp_tests_1d.F90.in` (727 lines)
+- [x] `pio_decomp_tests_1d.F90.in` (727 lines)
 - [ ] `pio_sync_tests.F90.in` (802 lines)
 - [ ] `pio_decomp_extra_dims.F90.in` (896 lines)
 - [ ] `ncdf_get_put.F90.in` (3283 lines)
@@ -1927,3 +1927,93 @@ range, any ruling made, final review verdict.)
   confirmed untouched at every checkpoint throughout (implementer,
   coordinator, both task reviewers, and the final whole-branch reviewer,
   via repeated independent `git diff --stat` checks).
+
+### `pio_decomp_tests_1d.F90.in` (727 lines) -> `tests/functional/pio_decomp_tests_1d.cpp` (~1068 lines)
+
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-decomp-tests-1d-to-cxx.md`,
+  2 tasks: Task 1 (3 helpers — `get_1d_bc_info`, `get_1d_bc_with_holes_info`,
+  `get_1d_rev_info` — plus 3 templated test functions — `nc_wr_rd_1d_bc`,
+  `nc_wr_1d_bc_with_holes`, `nc_wr_1d_rev` — plus `main()`/CMake
+  registration), Task 2 (1 more helper — `get_1d_bc_mreg_info` — plus
+  2 more templated test functions — `nc_wr_rd_1d_bc_start_count`,
+  `nc_wr_rd_mreg_1d_bc` — extending the same `rfuncs` vector).
+- Architecture: 4 helper subroutines ported 1:1 (scalar block-cyclic,
+  vector/multi-region block-cyclic, global-reverse-order, block-cyclic
+  with holes), 5 templated test functions (× int/float/double = 15
+  `rfuncs` entries) covering: separate write/read decompositions via
+  `PIOc_InitDecomp` (`nc_wr_rd_1d_bc`), the same via the `start`/`count`
+  variant `PIOc_InitDecomp_bc` (`nc_wr_rd_1d_bc_start_count`), a
+  multi-region decomposition with a single shared iodesc compared
+  directly against the write buffer (`nc_wr_rd_mreg_1d_bc`), and two
+  single-iodesc write-then-read-back tests covering decomposition holes
+  and reversed ordering (`nc_wr_1d_bc_with_holes`, `nc_wr_1d_rev`).
+- **Third instance of the project-wide 0-based/1-based indexing gotcha
+  found in this port series** (after `PIOc_put_vara`/`PIOc_get_vara`'s
+  `start` and `PIOc_setframe`'s `frame`, both found porting
+  `pio_decomp_frame_tests`): `PIOc_InitDecomp_bc`'s `start`/`count`
+  parameters (`const long int *`) are 0-based, unlike `PIOc_InitDecomp`'s
+  `compmap`/`compdof` (1-based) and unlike the Fortran `mapstart` argument
+  to the bc-variant `PIO_initdecomp` (1-based). Confirmed via
+  `src/clib/core/pioc.cpp:1000-1066` (`PIOc_InitDecomp_bc_impl`: the only
+  `+1` in the formula is `compmap[i] = 1` itself; the `start` input is a
+  plain 0-based offset) and `src/flib/spio_decomp.F90.in:261-268`
+  (`cstart(i) = INT(mapstart(...) - 1, ...)`, with the comment "in C the
+  start indices start from 0"). Caught in the plan before implementation
+  began (not found the hard way): the implementer decremented `start`
+  only (not `count`) before every `PIOc_InitDecomp_bc` call, for both the
+  write-side and read-side decompositions, across all 4 rearrange
+  combinations — verified independently by both the Task 2 reviewer and
+  the final whole-branch reviewer against the library sources, not just
+  the plan's claim.
+- **Real bug found and fixed (Task 1, found by the implementer's own
+  build+ctest verification, confirmed present and correct by the task
+  reviewer and the final reviewer):** `nc_wr_rd_1d_bc`'s first draft
+  reused a single set of `dim`/`start`/`count` locals for both the
+  write-decomposition and read-decomposition computation. After the
+  read-side computation overwrote `count`, the per-iotype loop body
+  still passed the overwritten (read-side) count as the `arraylen`
+  argument to both `PIOc_write_darray` and `PIOc_read_darray`, producing
+  a real `ctest` failure (`arraylen=7` vs. required `8`). Fixed by
+  splitting into distinct `wr_start`/`wr_count` and `rd_start`/`rd_count`
+  (keeping `dim` shared, since it is legitimately rearrange-mode-independent).
+- `get_1d_bc_mreg_info`'s Fortran source computes a per-region buffer
+  index as `idx = (i-1)*count(i) + j`, which is only correct because all
+  regions happen to have equal `count` in this test. Per the plan's
+  explicit instruction, this was **not** ported literally — Task 2 used a
+  plain running counter instead, verified by both reviewers to be
+  genuinely absent of the `(i-1)*count` formula.
+- CMake registration uses the C3 (costliest) tier (`MINNUMPROCS 1`,
+  `MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}`, `MINNUMIOPROCS 1`,
+  `MAXNUMIOPROCS ${PIO_TF_C3_MAXNUMIOPROCS}`, `MINSTRIDE 1`,
+  `MAXSTRIDE ${PIO_TF_C3_MAXSTRIDE}`), confirmed field-for-field against
+  the Fortran registration (`tests/general/CMakeLists.txt:609-621`); the
+  `MINSTRIDE 2` used by the nearby `pio_rearr_opts2_cxx`/`pio_rearr_opts_cxx`
+  C3-tier examples was deliberately not copied, since the Fortran source
+  for *this* file specifically registers `MINSTRIDE 1`.
+- Review: Task 1 and Task 2 were each reviewed clean on the first pass (no
+  fix rounds needed) — the implementer's own build+ctest verification
+  caught Task 1's real bug before the task review ever ran. The final
+  whole-branch review (opus) independently re-derived the
+  `PIOc_InitDecomp_bc` 0-based convention and the zero-count-rank library
+  safety guarantees from the C/Fortran sources rather than trusting the
+  plan, confirmed the Fortran source untouched, exactly one CMake
+  registration (added by Task 1 only), `rfuncs` at exactly 15 unique
+  entries, and the two tasks' additions "stylistically indistinguishable"
+  in the finished file. Found two Minor cosmetic issues only: a stale
+  comment at line 718 referencing "compdof" in a function
+  (`nc_wr_rd_1d_bc_start_count`) that has no `compdof` (copied across the
+  task boundary from `nc_wr_rd_1d_bc`, where the comment is accurate) —
+  fixed directly by the coordinator (commit `22ecfe5676`) rather than
+  spinning a further implementer/review round, since it was a one-word,
+  zero-risk, explicitly-recommended text fix; and an optional
+  `compdof`->`wr_compdof` naming-symmetry rename, declined as
+  cosmetic-only.
+- Build/test: `ctest -R pio_decomp_tests_1d_cxx` passed 9/9 at every
+  verification checkpoint (Task 1 post-fix, Task 2, both covering all 5
+  test functions × int/float/double across `np1-4`/`nio1-2`/`st1-2`
+  configurations).
+- Final commits: `77226d9c4d` (Task 1), `cbfbe67b94` (Task 2), `22ecfe5676`
+  (post-final-review cosmetic fix). `tests/general/pio_decomp_tests_1d.F90.in`
+  confirmed untouched throughout (implementer self-checks, both task
+  reviewers, and the final whole-branch reviewer, via independent
+  `git diff --stat` checks).
