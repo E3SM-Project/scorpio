@@ -22,8 +22,8 @@
 const int VEC_LOCAL_SZ = 7;
 
 /* The number of frames (records) written out for the record variable
- * tests - used by the record/limited-record subroutines added in a
- * later task but declared here, at file scope, alongside VEC_LOCAL_SZ
+ * tests - used by the record/limited-record subroutines but declared
+ * here, at file scope, alongside VEC_LOCAL_SZ
  */
 const int NFRAMES = 3;
 
