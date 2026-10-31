@@ -60,7 +60,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_decomp_tests2_1d.F90.in` (354 lines)
 - [x] `pio_async_copy_tests.F90.in` (357 lines)
 - [x] `pio_iosystem_tests.F90.in` (372 lines)
-- [ ] `pio_decomp_tests_2d.F90.in` (391 lines)
+- [x] `pio_decomp_tests_2d.F90.in` (391 lines)
 - [ ] `pio_async_decomp_tests_1d.F90.in` (420 lines)
 - [ ] `pio_rearr_opts2.F90.in` (424 lines)
 - [ ] `pio_large_file_tests.F90.in` (433 lines)
@@ -1167,3 +1167,64 @@ range, any ruling made, final review verdict.)
 - Single-task plan: the task review doubled as the final whole-branch
   review. Final review verdict: **Approved with nits parked (no code
   changes needed)**. `tests/general` untouched throughout.
+
+### pio_decomp_tests_2d
+
+- Ported `tests/general/pio_decomp_tests_2d.F90.in` (391 lines) to
+  `tests/functional/pio_decomp_tests_2d.cpp` (582 lines), mirroring the
+  existing `pio_decomp_tests_3d.cpp` sibling with one fewer dimension. Two
+  decomposition helpers (`get_2d_col_decomp_info`, `get_2d_row_decomp_info`)
+  and two `template<typename T>` auto-tests (`nc_write_read_2d_col_decomp`,
+  `nc_write_read_2d_row_decomp`), each instantiated for int/float/double —
+  write using a forced-rearrangement layout, read back using a different
+  natural layout, verify the round-trip value.
+- Key fidelity point (Review Focus item 1): the col-decomp value formula
+  uses the *local* row count (`nrows`/`count[0]`), while the row-decomp
+  formula uses the *global* row count (`dims[0]`) plus the global row
+  offset (`start[0]`) — these look similar but are not interchangeable,
+  since rows are split unevenly across ranks only in the row decomposition.
+  The reviewer validated this by direct line-by-line comparison against
+  the exact Fortran source lines (F90:186/206 and F90:305/325), not by
+  test execution alone — see note below.
+- Review Focus (5 items, all independently verified PASS by the
+  reviewer): the col/row value-formula distinction above; the mirror-image
+  `force_rearrange`-gating between the two helpers (col gates
+  columns/`start[1]`/`count[1]`, row gates rows/`start[0]`/`count[0]`);
+  dimension-order reversal for the C API (`gdims = {dims[1], dims[0]}`,
+  `dimids = {col_dimid, row_dimid}`); the `rank + 1 < sz` trailing-
+  unpaired-even-rank edge case preserved verbatim in both helpers
+  (exercised at `sz` = 1, 2, 3, 4); the literal filename
+  `"test_pio_decomp_simple_tests.testfile"` reused verbatim across
+  iotype-loop iterations with a `PIOc_deletefile` each iteration (matches
+  the Fortran and the `pio_decomp_tests_3d.cpp`/`pio_decomp_tests.cpp`
+  siblings — intentional reuse, not a bug).
+- `VEC_ROW_SZ`/`VEC_COL_SZ` correctly kept at this file's own value of 7
+  (not copy-pasted from the 3D sibling's `= 2`). CMake knobs copied
+  verbatim from `tests/general/CMakeLists.txt:653-661`
+  (`MINNUMPROCS 1`, `MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}`,
+  `MINNUMIOPROCS 1`, `MAXNUMIOPROCS ${PIO_TF_C2_MAXNUMIOPROCS}`,
+  `MINSTRIDE 1`, `MAXSTRIDE ${PIO_TF_C2_MAXSTRIDE}`,
+  `TIMEOUT ${DEFAULT_TEST_TIMEOUT}`).
+- Build/test: `ctest -R pio_decomp_tests_2d_cxx` 10/10 passed; direct
+  `mpiexec -n 2` and `-n 3` runs both passed (6 auto-tests x 3 rearrangers
+  each), independently reproduced by the reviewer with identical numbers,
+  confirming non-vacuous exercise of both the "has a higher-ranked odd
+  partner" and "trailing unpaired even rank" branches.
+- Informational note from the reviewer (not a defect, no action taken):
+  a mutation check showed the test suite cannot actually distinguish a
+  local-vs-global row-count swap in the row-decomp formula at the process
+  counts exercised here, because the written value equals the global
+  index and the mutated index sets still cover each other within bounds.
+  This weakness is inherited verbatim from the Fortran original (not
+  introduced by the port) — recorded here so it isn't rediscovered as a
+  surprise by a future reviewer of a similar decomp-test file; the
+  reviewer compensated by validating the formula against the Fortran
+  source directly rather than relying on test execution to catch a
+  formula swap.
+- Zero findings (no blocking, no nits) — the cleanest review in this
+  series so far.
+- Single-task plan: the task review doubled as the final whole-branch
+  review. Final review verdict: **Approved, zero findings**.
+  `tests/general` untouched throughout (confirmed via
+  `git diff --stat master..HEAD -- tests/general/` being empty across the
+  whole branch, not just this one commit).
