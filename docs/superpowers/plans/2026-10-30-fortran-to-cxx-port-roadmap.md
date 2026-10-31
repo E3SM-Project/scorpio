@@ -61,7 +61,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_async_copy_tests.F90.in` (357 lines)
 - [x] `pio_iosystem_tests.F90.in` (372 lines)
 - [x] `pio_decomp_tests_2d.F90.in` (391 lines)
-- [ ] `pio_async_decomp_tests_1d.F90.in` (420 lines)
+- [x] `pio_async_decomp_tests_1d.F90.in` (420 lines)
 - [ ] `pio_rearr_opts2.F90.in` (424 lines)
 - [ ] `pio_large_file_tests.F90.in` (433 lines)
 - [ ] `pio_rearr_opts.F90.in` (487 lines)
@@ -1228,3 +1228,65 @@ range, any ruling made, final review verdict.)
   `tests/general` untouched throughout (confirmed via
   `git diff --stat master..HEAD -- tests/general/` being empty across the
   whole branch, not just this one commit).
+
+### `pio_async_decomp_tests_1d` -> `tests/functional/pio_async_decomp_tests_1d.cpp`
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-async-decomp-tests-1d-to-cxx.md`
+- Commit: `f4e109992d` on `jayeshkrishna/port_fortran_tests_to_cxx`
+  (`tests/functional/pio_async_decomp_tests_1d.cpp` new, 633 lines;
+  `tests/functional/CMakeLists.txt` +13).
+- Architecture: combines the async (intercomm) I/O lifecycle already
+  established in `pio_async_decomp_tests.cpp`/`pio_async_file_tests.cpp`/
+  `pio_async_copy_tests.cpp` (`split_world_ncomms()` splits `tf.get_comm()`
+  into 1 I/O + 2 compute sub-comms; `PIOc_init_intercomm()`/
+  `PIOc_finalize()` manage async iosystems directly, bypassing
+  `Test_framework::init_iosystem()`) with full decomposed file
+  write/read round-trip checks across every discovered iotype, in two
+  templated (`int`/`float`/`double`) auto-tests: an evenly-divided 1D
+  decomposition, and a "with holes" variant where even ranks (within
+  their own compute sub-comm) absorb the next odd rank's share, leaving
+  odd ranks with 0 local elements.
+- Key fidelity decisions (all confirmed correct by the reviewer):
+  the final per-rearrangement check uses `MPI_Comm_free()`'s own return
+  code via a dedicated `mpi_free_ret` variable, not `PIOc_finalize()`'s
+  — the Fortran overwrites `ret` with `MPI_Comm_free`'s result
+  immediately before its only reachable-by-all-ranks check, silently
+  discarding whatever `PIO_finalize` returned; `check_ret_over_comm()`
+  (Allreduce scoped to the compute sub-comm, copied verbatim from
+  `pio_async_file_tests.cpp`) used for every PIO-call check after I/O
+  role divergence to avoid deadlocking the I/O rank blocked inside
+  `PIOc_init_intercomm()`; `get_1d_bc_with_holes_info()` called
+  unconditionally for every compute rank, producing a legitimate
+  `count == 0` for odd ranks that is passed through to
+  `PIOc_InitDecomp`/`PIOc_write_darray`/`PIOc_read_darray` unguarded, never
+  special-cased; 1-based `gcomm_idx` (1=I/O, 2..3=compute) mapped to
+  0-based `comp_idx = gcomm_idx - 2`; the two test functions'
+  `wbuf` formulas kept distinct — the no-holes version is a *constant*
+  array (every element = this rank's *world* rank, matching Fortran's
+  scalar-broadcast `wbuf = pio_tf_world_rank_`), the with-holes version
+  varies per index (`wbuf[k] = start + k`) — with both "Got wrong val"
+  comparisons using plain local `nerrs++` accumulation (no Allreduce),
+  since the Fortran's `PIO_TF_ASSERT` performs no cross-rank
+  communication at all. `PIOc_sync()`/`PIOc_finalize()` returns checked
+  explicitly (a deliberate strengthening beyond the Fortran, which checks
+  neither) per established sibling precedent — confirmed deadlock-safe.
+  CMake knobs copied verbatim from `tests/general/CMakeLists.txt:636-648`.
+- Build/test: implementer built `pio_async_decomp_tests_1d_cxx` clean,
+  `ctest -R pio_async_decomp_tests_1d_cxx` passed (np3, np4), manual
+  `mpiexec -n 6` run passed all 6 functions. Reviewer independently
+  re-ran `ctest` (2/2 pass) and additionally ran `mpiexec -n 7` (not
+  covered by the implementer), exercising both the `count == 0`
+  odd-rank-hole branch and the `rank + 1 == sz` trailing-even-rank
+  half-count branch in the same run — all 6 functions passed.
+- Review findings: no CRITICAL/MAJOR. Several MINOR/NIT findings, all
+  either inherited precedent shared with the three already-merged
+  `pio_async_*` siblings (compute-side diagnostic logging is a no-op
+  since the logger only emits on rank 0 of `tf.get_comm()`, which the
+  I/O rank never reaches in the diverged region — flagged as a
+  cross-file follow-up candidate, out of scope for this single-file
+  port) or intentional, brief-sanctioned strengthenings
+  (`PIOc_sync`/`PIOc_finalize` checked where the Fortran checks
+  neither). No fixes applied; nits parked in the SDD ledger.
+- Single-task plan: the task review doubled as the final whole-branch
+  review. Final review verdict: **APPROVE_WITH_NITS**. `tests/general`
+  confirmed untouched (`pio_async_decomp_tests_1d.F90.in` has no diff
+  against `master`).
