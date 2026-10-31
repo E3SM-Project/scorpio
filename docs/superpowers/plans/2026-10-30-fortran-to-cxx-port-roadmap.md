@@ -64,7 +64,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_async_decomp_tests_1d.F90.in` (420 lines)
 - [x] `pio_rearr_opts2.F90.in` (424 lines)
 - [x] `pio_large_file_tests.F90.in` (433 lines)
-- [ ] `pio_rearr_opts.F90.in` (487 lines)
+- [x] `pio_rearr_opts.F90.in` (487 lines)
 - [ ] `pio_buf_lim_tests.F90.in` (506 lines)
 - [ ] `pio_decomp_fillval.F90.in` (540 lines)
 - [ ] `pio_iodesc_tests.F90.in` (634 lines)
@@ -1452,4 +1452,68 @@ range, any ruling made, final review verdict.)
 - Single-task plan: the task review doubled as the final whole-branch
   review. Final review verdict: **APPROVE_WITH_NITS**. `tests/general`
   confirmed untouched (`git diff f7df2cc61d..d3ee769038 -- tests/general/pio_large_file_tests.F90.in`
+  empty).
+
+### `pio_rearr_opts.F90.in` → `tests/functional/pio_rearr_opts.cpp`
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-rearr-opts-to-cxx.md`
+- Commit range: `5b33b3e948..d6fcf18c85` (initial port) + one fix-round
+  commit `2f83c754e1` on `jayeshkrishna/port_fortran_tests_to_cxx`.
+- Architecture: two test functions mirroring the Fortran's two
+  `PIO_TF_AUTO_TEST_SUB` blocks. `init_fin_with_rearr_opts` is a simple
+  init/finalize round-trip over 2 rearrangers. `write_with_rearr_opts` is
+  the main test: for every iotype, a file+var is created once on the
+  framework's main iosystem, then for every rearranger x flow-control
+  combination a **fresh, separate iosystem** is created, used for one
+  write/read round-trip, and torn down. This is architecturally distinct
+  from the sibling `pio_rearr_opts2.cpp`, which sets rearranger options on
+  one long-lived iosystem via `PIOc_set_rearr_opts()`. Fortran's
+  `PIO_init(..., rearr_opts=...)` has no single-call C API equivalent —
+  `PIOc_Init_Intracomm_from_F90_impl` (`src/clib/core/pioc.cpp:1570-1601`)
+  is literally `PIOc_Init_Intracomm(...)` followed by a conditional
+  `PIOc_set_rearr_opts(...)` — so the port replicates that exact two-call
+  sequence on a duplicated communicator each time via a shared helper
+  `init_dup_iosys_with_rearr_opts`.
+- `NUM_MAX_PEND_REQ_OPTS = 2` (`{PIO_REARR_COMM_UNLIMITED_PEND_REQ, 2}`),
+  deliberately not the sibling's 3-element array. CMake knobs mirror the
+  Fortran test's own registration (`MINNUMPROCS 4`, `MINNUMIOPROCS 2`,
+  `MINSTRIDE 2`), not the sibling's (`1`/`1`/`2`).
+- **Fix round 1 (load-bearing, caught by task review, not the
+  implementer):** the initial port and its plan both mis-read the
+  Fortran call
+  `PIO_init(pio_tf_world_rank_, dup_comm, pio_tf_world_sz_, 1, 1, rearrs(i), dup_iosys, base=0, rearr_opts=...)`,
+  treating the two literal `1`s as `num_iotasks`/`stride` and hardcoding
+  `PIOc_Init_Intracomm(dup_comm, 1, 1, ...)`. `pio_init_intracomm`'s real
+  signature (`src/flib/spio_init.F90:101-103`:
+  `(comm_rank, comm, nioprocs, naggprocs, ioprocs_stride, rearr, iosys, base, rearr_opts, ierr)`,
+  forwarding `nioprocs` to `PIOc_Init_Intracomm_from_F90`'s `num_iotasks`
+  at line 140) shows the 3rd positional arg `pio_tf_world_sz_` is
+  `nioprocs`/`num_iotasks`, not either literal `1` (the first is
+  `naggprocs`, dropped entirely by the C API; the second is
+  `ioprocs_stride`/`stride`). `pio_tf_world_sz_` =
+  `MPI_COMM_SIZE(pio_tf_comm_)` (`tests/general/util/pio_tutil.F90:147`)
+  and `dup_comm = MPI_Comm_dup(pio_tf_comm_)` in this test, so `dup_comm`'s
+  size always equals `pio_tf_world_sz_`. Coordinator independently
+  verified all three citations (the Fortran interface signature, its
+  forwarding call, and the `pio_tf_world_sz_`/`dup_comm` definitions)
+  before ruling and correcting the plan. Fix: derive `num_iotasks` via
+  `MPI_Comm_size(dup_comm, &nioprocs)` inside
+  `init_dup_iosys_with_rearr_opts` — a single-site change, since both
+  test functions route through this one helper. Fix dispatched to the
+  same implementer agent (round 1 of 5), independently verified by the
+  coordinator (single-site, 3 insertions/1 deletion, Fortran source
+  untouched), then confirmed ADDRESSED by a scoped re-review with no new
+  breakage; the re-reviewer also confirmed the 4-rank test run genuinely
+  exercises the changed path (`nioprocs` now resolves to 4, not a
+  no-op on an already-1-sized comm).
+- Other review findings, no action needed: a cosmetic dropped
+  per-rearranger log line; plan-sanctioned extra checks relative to
+  Fortran; cosmetic dropped unreachable `PIO_TF_ERROR` else-branches
+  matching the sibling's precedent.
+- Build/test: `ctest -R pio_rearr_opts_cxx` 1/1 passed both before
+  (`pio_rearr_opts_cxx_np4_nio2_st2`, 57.48s) and after the fix (86.85s).
+- Single-task plan: the task review + fix round + scoped re-review
+  doubled as the final whole-branch review. `tests/general` confirmed
+  untouched throughout by the implementer, coordinator, task reviewer,
+  and re-reviewer independently
+  (`git diff 5b33b3e948..2f83c754e1 -- tests/general/pio_rearr_opts.F90.in`
   empty).
