@@ -63,7 +63,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_decomp_tests_2d.F90.in` (391 lines)
 - [x] `pio_async_decomp_tests_1d.F90.in` (420 lines)
 - [x] `pio_rearr_opts2.F90.in` (424 lines)
-- [ ] `pio_large_file_tests.F90.in` (433 lines)
+- [x] `pio_large_file_tests.F90.in` (433 lines)
 - [ ] `pio_rearr_opts.F90.in` (487 lines)
 - [ ] `pio_buf_lim_tests.F90.in` (506 lines)
 - [ ] `pio_decomp_fillval.F90.in` (540 lines)
@@ -1379,3 +1379,77 @@ range, any ruling made, final review verdict.)
   confirmed untouched (`git diff f02418a46f..f1c6724b55 -- tests/general/pio_rearr_opts2.F90.in`
   empty; `git log --follow` shows its last commit, `fb8c15c7a4`, is far
   outside the port range).
+
+### `pio_large_file_tests.F90.in` → `tests/functional/pio_large_file_tests.cpp`
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-large-file-tests-to-cxx.md`
+- Commit range: `f7df2cc61d..d3ee769038` (port) + one follow-up fix commit
+  on `jayeshkrishna/port_fortran_tests_to_cxx`.
+- Architecture: templated over `int`/`float`/`double`, 3 functions mirroring
+  the Fortran's 3 `PIO_TF_AUTO_TEST_SUB` blocks, gated end-to-end by the
+  `PIO_ENABLE_LARGE_TESTS` CMake option (OFF by default, same as Fortran).
+- Scope ruling: `nc_wr_rd_large_1d_bc<T>` ported as a 2-line log+return
+  stub only, since the Fortran source disables this test via an
+  unconditional early `RETURN` (with a `! REMOVE THIS RETURN STMT...`
+  comment) — the ~95 lines of decomposition/write/read logic below it,
+  and its sole helper `get_1d_bc_info`, are unreachable dead code in
+  Fortran and were deliberately not ported. The unused `ONE_G` constant
+  in `init_file_fmts` was likewise omitted.
+- `nc_def_large_1d_bc<T>` and `nc_write_large_1d_fval<T>` ported in full,
+  preserving their deliberately divergent behavior: only the latter calls
+  `PIOc_deletefile` (the former's Fortran source leaves that call
+  commented out, relying on `PIO_CLOBBER` overwrite), and each uses its
+  own distinct filename (`test_pio_large_file_tests.testfile` vs.
+  `test_pio_decomp_fillval_tests.testfile`).
+- **Known pre-existing failure (not a porting defect):** with
+  `PIO_ENABLE_LARGE_TESTS=ON`, `nc_def_large_1d_bc_{int,float,double}`
+  FAIL on the CDF1+pnetcdf iotype combination with netCDF error -62
+  ("variable sizes violate format constraints") — 6 of 9 sub-tests pass,
+  no crash, `ctest` reports the 3 affected invocations as failed. Both
+  the implementer and the reviewer independently confirmed this is a
+  **pre-existing upstream fragility in the Fortran original**, not
+  something introduced by the port: (1) the exact comment "NetCDF
+  documentation says max_rec_sz should be 2**31 - 4, but it no longer
+  works... So trying out 2**31 - 2**10 instead" already exists verbatim
+  in `tests/general/pio_large_file_tests.F90.in:69-72`, i.e. the original
+  Fortran authors already knew this file-format sizing is fragile across
+  netCDF/PnetCDF library versions; (2) the reviewer built and ran the
+  actual Fortran `pio_large_file_tests` binary from the same checkout and
+  it fails identically (same -62 error, same stage, same 3 sub-tests,
+  `STOP 99`); (3) the reviewer independently re-derived every
+  `init_file_fmts()` constant (`ONE_K`/`TWO_G`/`FOUR_G`, all three
+  `Pio_file_fmt_info` entries, `pio_flag` bitwise-OR vs. Fortran's `IOR`)
+  byte-for-byte against the Fortran source and found no drift. This
+  should be filed as a separate upstream issue against the Fortran test;
+  it is explicitly out of scope for this porting task (`tests/general`
+  must never be modified).
+- Deviation from brief (accepted): added
+  `PIOc_set_iosystem_error_handling(tf.get_iosysid(), PIO_BCAST_ERROR, &old_handler)`
+  in `main()`, matching Fortran's `PIO_TF` driver default error handler
+  (`pio_tf_err_handler_` in `tests/general/util/pio_tutil.F90`, confirmed
+  set to `PIO_BCAST_ERROR`). Without it, the C++ port's default handler
+  (`PIO_INTERNAL_ERROR`) would `MPI_Abort()` the whole process on the
+  CDF1 failure above instead of returning a checkable error code — a
+  strictly worse-fidelity outcome than Fortran's actual (non-crashing,
+  but failing) behavior. Exact precedent already in this codebase:
+  `tests/functional/ncdf_fail.cpp:383-389` uses the identical idiom with
+  an identical justifying comment. Reviewer independently verified this
+  is non-masking: every `PIOc_*` call the Fortran checks via
+  `PIO_TF_CHECK_ERR` is checked here via `check_ret`, so a non-fatal
+  error still correctly becomes a reported sub-test failure, and BCAST's
+  identical-return-on-all-ranks property avoids a collective-call
+  deadlock/divergence risk.
+- Review findings: no CRITICAL/blocking. One fidelity nit fixed as a
+  follow-up: the `PIO_TEST_CLOSE_OPEN_FOR_SYNC` reopen branch used
+  `PIO_WRITE` where the Fortran uses `PIO_nowrite` (and the sibling port
+  `pio_decomp_tests2_1d.cpp` uses `PIO_NOWRITE` for the identical
+  pattern) — corrected to `PIO_NOWRITE`; this branch is not compiled in
+  the default build config (`PIO_TEST_CLOSE_OPEN_FOR_SYNC` is only forced
+  on for ADIOS/HDF5), so it was untested either way. Remaining nits
+  (stronger `check_ret`-wrapping of 3 calls the Fortran leaves unchecked;
+  a second standalone `if (PIO_ENABLE_LARGE_TESTS)` block in
+  `tests/functional/CMakeLists.txt` instead of folding into the existing
+  one) are cosmetic/benign, parked without action.
+- Single-task plan: the task review doubled as the final whole-branch
+  review. Final review verdict: **APPROVE_WITH_NITS**. `tests/general`
+  confirmed untouched (`git diff f7df2cc61d..d3ee769038 -- tests/general/pio_large_file_tests.F90.in`
+  empty).
