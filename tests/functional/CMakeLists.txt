@@ -237,3 +237,16 @@ add_pio_test(ncdf_inq_cxx
   MINSTRIDE 1
   MAXSTRIDE ${PIO_TF_C2_MAXSTRIDE}
   TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+
+add_spio_executable(pio_async_file_tests_cxx TRUE "" pio_async_file_tests.cpp ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
+
+# Async file tests don't use ioprocs/stride set by user
+add_pio_test(pio_async_file_tests_cxx
+  EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_async_file_tests_cxx
+  MINNUMPROCS 3
+  MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}
+  MINNUMIOPROCS 2
+  MAXNUMIOPROCS 2
+  MINSTRIDE 2
+  MAXSTRIDE 2
+  TIMEOUT ${DEFAULT_TEST_TIMEOUT})
