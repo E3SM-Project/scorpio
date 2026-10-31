@@ -142,6 +142,21 @@ if (PIO_ENABLE_LARGE_TESTS)
     TIMEOUT ${DEFAULT_TEST_TIMEOUT})
 endif ()
 
+if (PIO_ENABLE_LARGE_TESTS)
+  add_spio_executable(pio_large_file_tests_cxx TRUE "" pio_large_file_tests.cpp ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
+
+  # Costly test only test with 2 I/O procs
+  add_pio_test(pio_large_file_tests_cxx
+    EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_large_file_tests_cxx
+    MINNUMPROCS 2
+    MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}
+    MINNUMIOPROCS 2
+    MAXNUMIOPROCS 2
+    MINSTRIDE 1
+    MAXSTRIDE 1
+    TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+endif ()
+
 add_spio_executable(pio_init_finalize_cxx TRUE "" pio_init_finalize.cpp ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
 
 add_pio_test(pio_init_finalize_cxx
