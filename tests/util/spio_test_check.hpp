@@ -47,7 +47,8 @@ bool check_val(SPIO_TF::Test_framework &tf, const std::vector<T> &res,
   return (gpass_i != 0);
 }
 
-inline bool passert(SPIO_TF::Test_framework &tf, bool local_cond, const std::string &ctx_msg)
+inline bool passert(SPIO_TF::Test_framework &tf, MPI_Comm comm, bool local_cond,
+    const std::string &ctx_msg)
 {
   if(!local_cond){
     tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO, ctx_msg + "\n");
@@ -55,17 +56,27 @@ inline bool passert(SPIO_TF::Test_framework &tf, bool local_cond, const std::str
 
   int lpass_i = local_cond ? 1 : 0;
   int gpass_i = 0;
-  MPI_Allreduce(&lpass_i, &gpass_i, 1, MPI_INT, MPI_LAND, tf.get_comm());
+  MPI_Allreduce(&lpass_i, &gpass_i, 1, MPI_INT, MPI_LAND, comm);
 
   return (gpass_i != 0);
 }
 
-inline bool check_ret(SPIO_TF::Test_framework &tf, int ierr, const std::string &ctx_msg)
+inline bool passert(SPIO_TF::Test_framework &tf, bool local_cond, const std::string &ctx_msg)
+{
+  return passert(tf, tf.get_comm(), local_cond, ctx_msg);
+}
+
+inline bool check_ret(SPIO_TF::Test_framework &tf, MPI_Comm comm, int ierr, const std::string &ctx_msg)
 {
   if(ierr == PIO_NOERR){
-    return passert(tf, true, ctx_msg);
+    return passert(tf, comm, true, ctx_msg);
   }
-  return passert(tf, false, ctx_msg + " : ERROR: ret = " + std::to_string(ierr));
+  return passert(tf, comm, false, ctx_msg + " : ERROR: ret = " + std::to_string(ierr));
+}
+
+inline bool check_ret(SPIO_TF::Test_framework &tf, int ierr, const std::string &ctx_msg)
+{
+  return check_ret(tf, tf.get_comm(), ierr, ctx_msg);
 }
 
 #endif // __SPIO_TEST_CHECK__
