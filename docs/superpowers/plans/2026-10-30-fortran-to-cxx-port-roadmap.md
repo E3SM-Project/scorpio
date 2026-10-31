@@ -67,7 +67,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_rearr_opts.F90.in` (487 lines)
 - [x] `pio_buf_lim_tests.F90.in` (506 lines)
 - [x] `pio_decomp_fillval.F90.in` (540 lines)
-- [ ] `pio_iodesc_tests.F90.in` (634 lines)
+- [x] `pio_iodesc_tests.F90.in` (634 lines)
 - [ ] `pio_decomp_fillval2.F90.in` (645 lines)
 - [ ] `pio_decomp_frame_tests.F90.in` (661 lines)
 - [ ] `pio_decomp_tests_1d.F90.in` (727 lines)
@@ -1674,3 +1674,82 @@ range, any ruling made, final review verdict.)
   by the implementer, the coordinator (`git diff --stat
   7908138b5f..9b387d5e2d -- tests/general/pio_decomp_fillval.F90.in`
   empty), and the task reviewer independently.
+
+### `pio_iodesc_tests.F90.in` (634 lines) -> `tests/functional/pio_iodesc_tests.cpp` (706 lines)
+
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-iodesc-tests-to-cxx.md`,
+  single task (3 static helper functions + 4 templated subroutines, each
+  of the latter instantiated for `int`/`float`/`double`, 12 `rfuncs`
+  total).
+- Architecture: 3 free `static` helpers translate the Fortran's local
+  (non-auto-test) SUBROUTINEs that build block-cyclic decomposition
+  `start`/`count` arrays (`get_1d_bc_shift_decomp_info` — cyclic-left-shift
+  single/two-region split; `get_1d_bc_mureg_info` — uniform 3-region
+  decomp; `get_1d_bc_mnureg_info` — non-uniform odd/even-rank region
+  counts, 3 vs 2). The 4 templated test functions exercise
+  `PIOc_InitDecomp`/`PIOc_get_local_array_size` (`init_decomp_1d_get_loc_sz`,
+  no runtime type loop, just 3 instantiations), a two-decomposition
+  even/odd-frame record-variable write/read (`nc_wr_2d_two_iodescs`), and
+  two structurally identical multi-region two-variable write/read tests
+  differing only in which helper/var/dim names they use
+  (`nc_mureg_wr_rd_1d_bc`, `nc_mnureg_wr_rd_1d_bc`).
+- Two highest-risk translation points, both independently confirmed
+  correct by the coordinator before dispatch and again by the task
+  reviewer against the actual code: (1) `PIOc_setframe`'s 0-based frame
+  index inverts the even/odd parity used by the Fortran's 1-based `f` to
+  pick between the unshifted and left-shifted decomposition for writing —
+  correctly translated as `bool is_even_frame = (((cf + 1) % 2) == 0);`,
+  not the naive `(cf % 2) == 0`; (2) the C API's record/unlimited
+  dimension goes FIRST in the `dimids[]` array passed to `PIOc_def_var`
+  (`{time_dimid, row_dimid}`), the reverse of the Fortran's
+  row-then-time `pio_dims` order.
+- `exp_val` in `nc_wr_2d_two_iodescs` is computed only from the unshifted
+  compdof/dims formula for every frame — intentional (both decomps write
+  the same global value pattern via different local-to-global row
+  mappings), not a bug; preserved as specified, with no
+  `exp_val_shifted` introduced.
+- `get_1d_bc_mnureg_info`'s region loop preserved as two independent,
+  simultaneously-firing `if` statements (`i < NUM_REGIONS_ODD` and
+  `i < NUM_REGIONS_EVEN`, both can fire since `NUM_REGIONS_EVEN=2 <=
+  NUM_REGIONS_ODD=3`), never collapsed to `if`/`else`.
+- CMake registration copies the existing Fortran `pio_iodesc_tests`
+  entry's own "C2" tier knobs verbatim (`MINNUMPROCS 1`,
+  `MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}`, `MINNUMIOPROCS 1`,
+  `MAXNUMIOPROCS ${PIO_TF_C2_MAXNUMIOPROCS}`, `MINSTRIDE 1`,
+  `MAXSTRIDE ${PIO_TF_C2_MAXSTRIDE}`) rather than the heavier "C3" tier
+  used by `pio_decomp_fillval`/`pio_rearr_opts`.
+- Review: task reviewer (opus) found full spec compliance (PASS) after
+  comparing all 7 routines/helpers line-by-line against the actual
+  Fortran source (not just the brief), confirming both highest-risk
+  points above in the actual code, confirming the CMake knobs are
+  byte-identical to the existing Fortran registration, confirming diff
+  scope touched only the two intended files, confirming the Fortran
+  source byte-identical to master, and independently forcing a clean
+  rebuild (zero warnings) and re-running `ctest` itself
+  (10/10 passed, 86.03s) rather than trusting the implementer's report.
+  Code quality: APPROVED WITH MINOR FINDINGS (no Critical/Major) — (1)
+  `rbuf` wasn't re-zeroed per iotype-flavor iteration in
+  `nc_wr_2d_two_iodescs` (harmless since `PIOc_read_darray` overwrites
+  every element, but a test-strength gap vs. the Fortran and the file's
+  other two routines, which do re-zero); (2) `idx = i * count[i] + j` in
+  the two multi-region functions relies on an implicit
+  uniform-region-count invariant — reviewer verified it actually holds
+  in both callers (not a bug), suggested a guard comment; (3) a nit about
+  dropped worked-example diagrams in helper doc comments, left as-is.
+- Ruling: findings (1) and (2) were both cheap, mechanical, zero-risk
+  fixes (a buffer-reset loop; two one-line comments) — the coordinator
+  applied them directly rather than dispatching another
+  implementer+reviewer round trip for a single-digit-line follow-up,
+  then independently rebuilt (clean) and re-ran `ctest`
+  (10/10 passed, 64.24s) before committing. Finding (3) left unaddressed
+  (optional, no behavioral or review-scope impact).
+- Build/test: `ctest -R pio_iodesc_tests_cxx` passed at every
+  verification point — implementer (10/10, 56.96s), coordinator
+  pre-review (10/10, 54.14s), task reviewer post-forced-rebuild (10/10,
+  86.03s), coordinator post-fix (10/10, 64.24s).
+- Single-task plan: the task review doubled as the final whole-branch
+  review. `tests/general/pio_iodesc_tests.F90.in` confirmed untouched
+  throughout — by the implementer, by the coordinator
+  (`git diff --stat ee9485be60..37d566c56d --
+  tests/general/pio_iodesc_tests.F90.in` empty, and again against master
+  after the fix-up commit), and by the task reviewer independently.
