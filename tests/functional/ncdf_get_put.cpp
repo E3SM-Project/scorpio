@@ -5,6 +5,7 @@
 #include <utility>
 #include <sstream>
 #include <algorithm>
+#include <iomanip>
 
 #include "pio.h"
 
@@ -2569,6 +2570,644 @@ int test_put_get_2d_str_arr(SPIO_TF::Test_framework &tf)
   return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
 }
 
+/* Builds "Index is: <vname>(<idx1>[,<idx2>[,<idx3>]])" (or with '[',']' when
+ * requested), mirroring the Fortran VNAME_WITH_*_IDX_FMT1/FMT2 format strings
+ * used in tests/general/ncdf_get_put.F90.in (vname is always exactly 5
+ * chars, matching the A5 field; each index is right-justified in a width-5
+ * field, matching I5), then blank-pads (or truncates) the result to exactly
+ * len chars - matching a Fortran CHARACTER(LEN=len) assignment. */
+static std::string make_idx_str(const std::string &vname, char lbracket, char rbracket,
+    const std::vector<int> &idx, std::size_t len)
+{
+  std::ostringstream oss;
+  oss << "Index is: " << vname << lbracket;
+  for(std::size_t i = 0; i < idx.size(); i++){
+    if(i > 0){
+      oss << ",";
+    }
+    oss << std::setw(5) << idx[i];
+  }
+  oss << rbracket;
+
+  std::string res = oss.str();
+  res.resize(len, ' ');
+  return res;
+}
+
+/* Packs an array of (already length-padded) strings into a single flat char
+ * buffer, one chunk of chunk_sz bytes per string. Only the first fill_sz
+ * bytes of each chunk are copied from the string - the rest of the chunk is
+ * left as the buffer's initial (zero) content. This matches how the small-
+ * buffer put cases (svar0d/1d/2d) write a SHORT_STR_LEN-sized string into a
+ * STR_LEN-sized on-disk slot : only the written (SHORT_STR_LEN) prefix is
+ * meaningful, the rest of the slot is unspecified. */
+static std::vector<char> pack_text_buf(const std::vector<std::string> &strs,
+    std::size_t chunk_sz, std::size_t fill_sz)
+{
+  std::vector<char> buf(strs.size() * chunk_sz, '\0');
+  for(std::size_t i = 0; i < strs.size(); i++){
+    std::size_t n = std::min(fill_sz, strs[i].size());
+    for(std::size_t j = 0; j < n; j++){
+      buf[i * chunk_sz + j] = strs[i][j];
+    }
+  }
+  return buf;
+}
+
+/* Extracts nstrs strings, each extract_sz bytes, from a flat char buffer
+ * packed at chunk_sz byte strides. Used to pull the per-string content back
+ * out of a get buffer - extract_sz may be smaller than chunk_sz (e.g. when
+ * only the SHORT_STR_LEN-sized written prefix of a STR_LEN-sized on-disk
+ * slot is being checked). */
+static std::vector<std::string> unpack_text_buf(const std::vector<char> &buf,
+    std::size_t chunk_sz, std::size_t nstrs, std::size_t extract_sz)
+{
+  std::vector<std::string> res;
+  res.reserve(nstrs);
+  for(std::size_t i = 0; i < nstrs; i++){
+    res.push_back(std::string(buf.begin() + i * chunk_sz, buf.begin() + i * chunk_sz + extract_sz));
+  }
+  return res;
+}
+
+/* Misc scenarios for 0D-3D text (PIO_CHAR) variables : plain full-variable
+ * put/get, put with a buffer smaller than the on-disk variable (and get it
+ * back with a larger buffer), and put/get using an explicit hyperslab
+ * (start/count). Ported from tests/general/ncdf_get_put.F90.in
+ * (test_put_get_misc_str, L1811-2190). The three ADIOS/ADIOSC skip branches
+ * present in the Fortran source (around the 3D/4D-char var put and get) are
+ * dead code for this port (see the file-top comment) and are dropped
+ * entirely.
+ *
+ * Note: svar3d and hsvar0d are defined (to match the file layout in the
+ * Fortran source) but, as in the Fortran source, are never actually
+ * put/get tested. */
+static int test_put_get_misc_str_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const std::string FNAME_MISC_STR("test_pio_ncdf_get_put_misc_str.testfile");
+
+  const std::string VAR0D_NAME("var0d"), VAR1D_NAME("var1d"), VAR2D_NAME("var2d"), VAR3D_NAME("var3d");
+  const std::string SVAR0D_NAME("svr0d"), SVAR1D_NAME("svr1d"), SVAR2D_NAME("svr2d"), SVAR3D_NAME("svr3d");
+  const std::string HSVAR0D_NAME("hvr0d"), HSVAR1D_NAME("hvr1d"), HSVAR2D_NAME("hvr2d"), HSVAR3D_NAME("hvr3d");
+
+  const int STR_LEN = 64;
+  const int SHORT_STR_LEN = 32;
+  const int LONG_STR_LEN = 128;
+
+  const int NUM_ROWS = 4;
+  const int NUM_COLS = 8;
+  const int NUM_STEPS = 2;
+
+  const std::string DIM0_NAME("slen"), DIM1_NAME("row"), DIM2_NAME("col"), DIM3_NAME("step");
+
+  /* ===== Expected content (mirrors exp_str, exp_sstr and exp_hstr in the
+   * Fortran source) ===== */
+  std::string str0d_val(VAR0D_NAME);
+  str0d_val.resize(STR_LEN, ' ');
+  std::vector<std::string> exp_str0d(1, str0d_val);
+
+  std::vector<std::string> exp_str1d(NUM_ROWS);
+  for(int row = 0; row < NUM_ROWS; row++){
+    exp_str1d[row] = make_idx_str(VAR1D_NAME, '(', ')', {row + 1}, STR_LEN);
+  }
+
+  std::vector<std::string> exp_str2d(NUM_ROWS * NUM_COLS);
+  for(int col = 0; col < NUM_COLS; col++){
+    for(int row = 0; row < NUM_ROWS; row++){
+      exp_str2d[col * NUM_ROWS + row] = make_idx_str(VAR2D_NAME, '(', ')', {row + 1, col + 1}, STR_LEN);
+    }
+  }
+
+  /* Note: The Fortran source (L1895) uses var2d_name, not var3d_name, when
+   * generating exp_str3d's content - replicated verbatim here. This has no
+   * effect on the test's pass/fail outcome since the same (buggy) expected
+   * content is used for both the put and the later get-comparison. */
+  std::vector<std::string> exp_str3d(NUM_ROWS * NUM_COLS * NUM_STEPS);
+  for(int step = 0; step < NUM_STEPS; step++){
+    for(int col = 0; col < NUM_COLS; col++){
+      for(int row = 0; row < NUM_ROWS; row++){
+        std::size_t idx = (static_cast<std::size_t>(step) * NUM_COLS + col) * NUM_ROWS + row;
+        exp_str3d[idx] = make_idx_str(VAR2D_NAME, '(', ')', {row + 1, col + 1, step + 1}, STR_LEN);
+      }
+    }
+  }
+
+  /* Fortran L1902: exp_sstr0d = svar0d_name // "_" - the "_" suffix is
+   * part of the real expected content (unlike the documented var2d/var3d
+   * mixup elsewhere in this sub, this is not a bug to replicate). */
+  std::string sstr0d_val(SVAR0D_NAME);
+  sstr0d_val.append("_");
+  sstr0d_val.resize(SHORT_STR_LEN, ' ');
+  std::vector<std::string> exp_sstr0d(1, sstr0d_val);
+
+  std::vector<std::string> exp_sstr1d(NUM_ROWS);
+  for(int row = 0; row < NUM_ROWS; row++){
+    exp_sstr1d[row] = make_idx_str(SVAR1D_NAME, '[', ']', {row + 1}, SHORT_STR_LEN);
+  }
+
+  std::vector<std::string> exp_sstr2d(NUM_ROWS * NUM_COLS);
+  for(int col = 0; col < NUM_COLS; col++){
+    for(int row = 0; row < NUM_ROWS; row++){
+      exp_sstr2d[col * NUM_ROWS + row] = make_idx_str(SVAR2D_NAME, '[', ']', {row + 1, col + 1}, SHORT_STR_LEN);
+    }
+  }
+
+  std::vector<std::string> exp_hstr1d(NUM_ROWS);
+  for(int row = 0; row < NUM_ROWS; row++){
+    exp_hstr1d[row] = make_idx_str(HSVAR1D_NAME, '(', ')', {row + 1}, STR_LEN);
+  }
+
+  std::vector<std::string> exp_hstr2d(NUM_ROWS * NUM_COLS);
+  for(int col = 0; col < NUM_COLS; col++){
+    for(int row = 0; row < NUM_ROWS; row++){
+      exp_hstr2d[col * NUM_ROWS + row] = make_idx_str(HSVAR2D_NAME, '(', ')', {row + 1, col + 1}, STR_LEN);
+    }
+  }
+
+  std::vector<std::string> exp_hstr3d(NUM_ROWS * NUM_COLS * NUM_STEPS);
+  for(int step = 0; step < NUM_STEPS; step++){
+    for(int col = 0; col < NUM_COLS; col++){
+      for(int row = 0; row < NUM_ROWS; row++){
+        std::size_t idx = (static_cast<std::size_t>(step) * NUM_COLS + col) * NUM_ROWS + row;
+        exp_hstr3d[idx] = make_idx_str(HSVAR3D_NAME, '(', ')', {row + 1, col + 1, step + 1}, STR_LEN);
+      }
+    }
+  }
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, FNAME_MISC_STR.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + FNAME_MISC_STR)){
+    return PIO_EINTERNAL;
+  }
+
+  int dim_slen = -1, dim_row = -1, dim_col = -1, dim_step = -1;
+  ret = PIOc_def_dim(ncid, DIM0_NAME.c_str(), STR_LEN, &dim_slen);
+  if(!check_ret(tf, ret, "Failed to define dim 0:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, DIM1_NAME.c_str(), NUM_ROWS, &dim_row);
+  if(!check_ret(tf, ret, "Failed to define dim 1:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, DIM2_NAME.c_str(), NUM_COLS, &dim_col);
+  if(!check_ret(tf, ret, "Failed to define dim 2:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, DIM3_NAME.c_str(), NUM_STEPS, &dim_step);
+  if(!check_ret(tf, ret, "Failed to define dim 3:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  int dimids_0d[1] = {dim_slen};
+  int dimids_1d[2] = {dim_row, dim_slen};
+  int dimids_2d[3] = {dim_col, dim_row, dim_slen};
+  int dimids_3d[4] = {dim_step, dim_col, dim_row, dim_slen};
+
+  int pio_var0d = -1, pio_var1d = -1, pio_var2d = -1, pio_var3d = -1;
+  int pio_svar0d = -1, pio_svar1d = -1, pio_svar2d = -1, pio_svar3d = -1;
+  int pio_hsvar0d = -1, pio_hsvar1d = -1, pio_hsvar2d = -1, pio_hsvar3d = -1;
+
+  ret = PIOc_def_var(ncid, VAR0D_NAME.c_str(), PIO_CHAR, 1, dimids_0d, &pio_var0d);
+  if(!check_ret(tf, ret, "Failed to define 0d char var:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, VAR1D_NAME.c_str(), PIO_CHAR, 2, dimids_1d, &pio_var1d);
+  if(!check_ret(tf, ret, "Failed to define 1d char var:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, VAR2D_NAME.c_str(), PIO_CHAR, 3, dimids_2d, &pio_var2d);
+  if(!check_ret(tf, ret, "Failed to define 2d char var:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, VAR3D_NAME.c_str(), PIO_CHAR, 4, dimids_3d, &pio_var3d);
+  if(!check_ret(tf, ret, "Failed to define 3d char var:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, SVAR0D_NAME.c_str(), PIO_CHAR, 1, dimids_0d, &pio_svar0d);
+  if(!check_ret(tf, ret, "Failed to define 0d char var (small var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, SVAR1D_NAME.c_str(), PIO_CHAR, 2, dimids_1d, &pio_svar1d);
+  if(!check_ret(tf, ret, "Failed to define 1d char var (small var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, SVAR2D_NAME.c_str(), PIO_CHAR, 3, dimids_2d, &pio_svar2d);
+  if(!check_ret(tf, ret, "Failed to define 2d char var (small var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* svar3d is defined (to match the Fortran source's file layout) but, as in
+   * the Fortran source, is never actually put/get tested. */
+  ret = PIOc_def_var(ncid, SVAR3D_NAME.c_str(), PIO_CHAR, 4, dimids_3d, &pio_svar3d);
+  if(!check_ret(tf, ret, "Failed to define 3d char var (small var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* hsvar0d is defined (to match the Fortran source's file layout) but, as in
+   * the Fortran source, is never actually put/get tested. */
+  ret = PIOc_def_var(ncid, HSVAR0D_NAME.c_str(), PIO_CHAR, 1, dimids_0d, &pio_hsvar0d);
+  if(!check_ret(tf, ret, "Failed to define 0d char var (hyperslab var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, HSVAR1D_NAME.c_str(), PIO_CHAR, 2, dimids_1d, &pio_hsvar1d);
+  if(!check_ret(tf, ret, "Failed to define 1d char var (hyperslab var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, HSVAR2D_NAME.c_str(), PIO_CHAR, 3, dimids_2d, &pio_hsvar2d);
+  if(!check_ret(tf, ret, "Failed to define 2d char var (hyperslab var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, HSVAR3D_NAME.c_str(), PIO_CHAR, 4, dimids_3d, &pio_hsvar3d);
+  if(!check_ret(tf, ret, "Failed to define 3d char var (hyperslab var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  std::vector<char> pbuf0d = pack_text_buf(exp_str0d, STR_LEN, STR_LEN);
+  ret = PIOc_put_var(ncid, pio_var0d, pbuf0d.data());
+  if(!check_ret(tf, ret, "Failed to put 0d char var:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  std::vector<char> pbuf1d = pack_text_buf(exp_str1d, STR_LEN, STR_LEN);
+  ret = PIOc_put_var(ncid, pio_var1d, pbuf1d.data());
+  if(!check_ret(tf, ret, "Failed to put 1d char var:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  std::vector<char> pbuf2d = pack_text_buf(exp_str2d, STR_LEN, STR_LEN);
+  ret = PIOc_put_var(ncid, pio_var2d, pbuf2d.data());
+  if(!check_ret(tf, ret, "Failed to put 2d char var:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  std::vector<char> pbuf3d = pack_text_buf(exp_str3d, STR_LEN, STR_LEN);
+  ret = PIOc_put_var(ncid, pio_var3d, pbuf3d.data());
+  if(!check_ret(tf, ret, "Failed to put 3d char var:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* Write with content (SHORT_STR_LEN bytes per string) smaller than the
+   * variable's on-disk declared size (STR_LEN bytes per string). The put
+   * buffer below is still STR_LEN-sized per string since PIOc_put_var always
+   * writes the variable's full on-disk extent, but only the first
+   * SHORT_STR_LEN bytes of each string are meaningful; the rest of each
+   * on-disk string is left unspecified (not checked later). */
+  std::vector<char> spbuf0d = pack_text_buf(exp_sstr0d, STR_LEN, SHORT_STR_LEN);
+  ret = PIOc_put_var(ncid, pio_svar0d, spbuf0d.data());
+  if(!check_ret(tf, ret, "Failed to put 0d char var with small buf (small var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  std::vector<char> spbuf1d = pack_text_buf(exp_sstr1d, STR_LEN, SHORT_STR_LEN);
+  ret = PIOc_put_var(ncid, pio_svar1d, spbuf1d.data());
+  if(!check_ret(tf, ret, "Failed to put 1d char var with small buf (small var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  std::vector<char> spbuf2d = pack_text_buf(exp_sstr2d, STR_LEN, SHORT_STR_LEN);
+  ret = PIOc_put_var(ncid, pio_svar2d, spbuf2d.data());
+  if(!check_ret(tf, ret, "Failed to put 2d char var with small buf (small var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* Write using explicit hyperslabs (start/count covering the full extent of
+   * each variable). */
+  PIO_Offset hsstart_1d[2] = {0, 0};
+  PIO_Offset hscount_1d[2] = {static_cast<PIO_Offset>(NUM_ROWS), static_cast<PIO_Offset>(STR_LEN)};
+  std::vector<char> hspbuf1d = pack_text_buf(exp_hstr1d, STR_LEN, STR_LEN);
+  ret = PIOc_put_vara(ncid, pio_hsvar1d, hsstart_1d, hscount_1d, hspbuf1d.data());
+  if(!check_ret(tf, ret, "Failed to put hslab of 1d char var (hyperslab var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  PIO_Offset hsstart_2d[3] = {0, 0, 0};
+  PIO_Offset hscount_2d[3] = {static_cast<PIO_Offset>(NUM_COLS), static_cast<PIO_Offset>(NUM_ROWS),
+    static_cast<PIO_Offset>(STR_LEN)};
+  std::vector<char> hspbuf2d = pack_text_buf(exp_hstr2d, STR_LEN, STR_LEN);
+  ret = PIOc_put_vara(ncid, pio_hsvar2d, hsstart_2d, hscount_2d, hspbuf2d.data());
+  if(!check_ret(tf, ret, "Failed to put hslab of 2d char var (hyperslab var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  PIO_Offset hsstart_3d[4] = {0, 0, 0, 0};
+  PIO_Offset hscount_3d[4] = {static_cast<PIO_Offset>(NUM_STEPS), static_cast<PIO_Offset>(NUM_COLS),
+    static_cast<PIO_Offset>(NUM_ROWS), static_cast<PIO_Offset>(STR_LEN)};
+  std::vector<char> hspbuf3d = pack_text_buf(exp_hstr3d, STR_LEN, STR_LEN);
+  ret = PIOc_put_vara(ncid, pio_hsvar3d, hsstart_3d, hscount_3d, hspbuf3d.data());
+  if(!check_ret(tf, ret, "Failed to put hslab of 3d char var (hyperslab var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + FNAME_MISC_STR)){
+    PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, FNAME_MISC_STR.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + FNAME_MISC_STR)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR0D_NAME.c_str(), &pio_var0d);
+  if(!check_ret(tf, ret, "Failed to inq 0d char var:" + FNAME_MISC_STR)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR1D_NAME.c_str(), &pio_var1d);
+  if(!check_ret(tf, ret, "Failed to inq 1d char var:" + FNAME_MISC_STR)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR2D_NAME.c_str(), &pio_var2d);
+  if(!check_ret(tf, ret, "Failed to inq 2d char var:" + FNAME_MISC_STR)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR3D_NAME.c_str(), &pio_var3d);
+  if(!check_ret(tf, ret, "Failed to inq 3d char var:" + FNAME_MISC_STR)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, SVAR0D_NAME.c_str(), &pio_svar0d);
+  if(!check_ret(tf, ret, "Failed to inq 0d char var (small var):" + FNAME_MISC_STR)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, SVAR1D_NAME.c_str(), &pio_svar1d);
+  if(!check_ret(tf, ret, "Failed to inq 1d char var (small var):" + FNAME_MISC_STR)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, SVAR2D_NAME.c_str(), &pio_svar2d);
+  if(!check_ret(tf, ret, "Failed to inq 2d char var (small var):" + FNAME_MISC_STR)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, HSVAR1D_NAME.c_str(), &pio_hsvar1d);
+  if(!check_ret(tf, ret, "Failed to inq 1d char var (hyperslab var):" + FNAME_MISC_STR)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, HSVAR2D_NAME.c_str(), &pio_hsvar2d);
+  if(!check_ret(tf, ret, "Failed to inq 2d char var (hyperslab var):" + FNAME_MISC_STR)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, HSVAR3D_NAME.c_str(), &pio_hsvar3d);
+  if(!check_ret(tf, ret, "Failed to inq 3d char var (hyperslab var):" + FNAME_MISC_STR)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  bool ok = true;
+
+  std::vector<char> gbuf0d(static_cast<std::size_t>(STR_LEN), '\0');
+  ret = PIOc_get_var(ncid, pio_var0d, gbuf0d.data());
+  if(!check_ret(tf, ret, "Failed to get 0d char var:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  {
+    std::vector<std::string> res_str0d = unpack_text_buf(gbuf0d, STR_LEN, 1, STR_LEN);
+    for(std::size_t i = 0; i < exp_str0d.size(); i++){
+      ok = passert(tf, (res_str0d[i] == exp_str0d[i]), "Got wrong value for 0d char var") && ok;
+    }
+  }
+
+  std::vector<char> gbuf1d(static_cast<std::size_t>(NUM_ROWS) * STR_LEN, '\0');
+  ret = PIOc_get_var(ncid, pio_var1d, gbuf1d.data());
+  if(!check_ret(tf, ret, "Failed to get 1d char var:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  {
+    std::vector<std::string> res_str1d = unpack_text_buf(gbuf1d, STR_LEN, NUM_ROWS, STR_LEN);
+    for(std::size_t i = 0; i < exp_str1d.size(); i++){
+      ok = passert(tf, (res_str1d[i] == exp_str1d[i]), "Got wrong value for 1d char var") && ok;
+    }
+  }
+
+  std::vector<char> gbuf2d(static_cast<std::size_t>(NUM_ROWS) * NUM_COLS * STR_LEN, '\0');
+  ret = PIOc_get_var(ncid, pio_var2d, gbuf2d.data());
+  if(!check_ret(tf, ret, "Failed to get 2d char var:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  {
+    std::vector<std::string> res_str2d = unpack_text_buf(gbuf2d, STR_LEN, NUM_ROWS * NUM_COLS, STR_LEN);
+    for(std::size_t i = 0; i < exp_str2d.size(); i++){
+      ok = passert(tf, (res_str2d[i] == exp_str2d[i]), "Got wrong value for 2d char var") && ok;
+    }
+  }
+
+  std::vector<char> gbuf3d(static_cast<std::size_t>(NUM_ROWS) * NUM_COLS * NUM_STEPS * STR_LEN, '\0');
+  ret = PIOc_get_var(ncid, pio_var3d, gbuf3d.data());
+  if(!check_ret(tf, ret, "Failed to get 3d char var:" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  {
+    std::vector<std::string> res_str3d = unpack_text_buf(gbuf3d, STR_LEN, NUM_ROWS * NUM_COLS * NUM_STEPS, STR_LEN);
+    for(std::size_t i = 0; i < exp_str3d.size(); i++){
+      ok = passert(tf, (res_str3d[i] == exp_str3d[i]), "Got wrong value for 3d char var") && ok;
+    }
+  }
+
+  /* Read back with a buffer (LONG_STR_LEN bytes per string) larger than the
+   * variable's on-disk declared size (STR_LEN bytes per string). PIOc_get_var
+   * always reads (and overwrites) exactly the variable's on-disk extent -
+   * densely packed at STR_LEN-byte strides, not LONG_STR_LEN - so only the
+   * first (STR_LEN * nstrs) bytes of the buffers below are ever touched;
+   * only the SHORT_STR_LEN-byte written prefix of each STR_LEN-byte string is
+   * compared below (the rest of each string's on-disk content is
+   * unspecified, per the small-buffer put above). */
+  std::vector<char> glbuf0d(static_cast<std::size_t>(LONG_STR_LEN), '\0');
+  ret = PIOc_get_var(ncid, pio_svar0d, glbuf0d.data());
+  if(!check_ret(tf, ret, "Failed to get 0d char var with large buf (small var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  {
+    std::vector<std::string> res_sstr0d = unpack_text_buf(glbuf0d, STR_LEN, 1, SHORT_STR_LEN);
+    for(std::size_t i = 0; i < exp_sstr0d.size(); i++){
+      ok = passert(tf, (res_sstr0d[i] == exp_sstr0d[i]), "Got wrong value for 0d char var with large buf") && ok;
+    }
+  }
+
+  std::vector<char> glbuf1d(static_cast<std::size_t>(NUM_ROWS) * LONG_STR_LEN, '\0');
+  ret = PIOc_get_var(ncid, pio_svar1d, glbuf1d.data());
+  if(!check_ret(tf, ret, "Failed to get 1d char var with large buf (small var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  {
+    std::vector<std::string> res_sstr1d = unpack_text_buf(glbuf1d, STR_LEN, NUM_ROWS, SHORT_STR_LEN);
+    for(std::size_t i = 0; i < exp_sstr1d.size(); i++){
+      ok = passert(tf, (res_sstr1d[i] == exp_sstr1d[i]), "Got wrong value for 1d char var with large buf") && ok;
+    }
+  }
+
+  std::vector<char> glbuf2d(static_cast<std::size_t>(NUM_ROWS) * NUM_COLS * LONG_STR_LEN, '\0');
+  ret = PIOc_get_var(ncid, pio_svar2d, glbuf2d.data());
+  if(!check_ret(tf, ret, "Failed to get 2d char var with large buf (small var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  {
+    std::vector<std::string> res_sstr2d = unpack_text_buf(glbuf2d, STR_LEN, NUM_ROWS * NUM_COLS, SHORT_STR_LEN);
+    for(std::size_t i = 0; i < exp_sstr2d.size(); i++){
+      ok = passert(tf, (res_sstr2d[i] == exp_sstr2d[i]), "Got wrong value for 2d char var with large buf") && ok;
+    }
+  }
+
+  /* Hyperslab-written variables : verify with a plain (no start/count)
+   * full-var get. */
+  std::vector<char> hsgbuf1d(static_cast<std::size_t>(NUM_ROWS) * STR_LEN, '\0');
+  ret = PIOc_get_var(ncid, pio_hsvar1d, hsgbuf1d.data());
+  if(!check_ret(tf, ret, "Failed to get 1d char var (hyperslab var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  {
+    std::vector<std::string> res_hstr1d = unpack_text_buf(hsgbuf1d, STR_LEN, NUM_ROWS, STR_LEN);
+    for(std::size_t i = 0; i < exp_hstr1d.size(); i++){
+      ok = passert(tf, (res_hstr1d[i] == exp_hstr1d[i]),
+          "Got wrong value for 1d char var written with hslab put") && ok;
+    }
+  }
+
+  std::vector<char> hsgbuf2d(static_cast<std::size_t>(NUM_ROWS) * NUM_COLS * STR_LEN, '\0');
+  ret = PIOc_get_var(ncid, pio_hsvar2d, hsgbuf2d.data());
+  if(!check_ret(tf, ret, "Failed to get 2d char var (hyperslab var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  {
+    std::vector<std::string> res_hstr2d = unpack_text_buf(hsgbuf2d, STR_LEN, NUM_ROWS * NUM_COLS, STR_LEN);
+    for(std::size_t i = 0; i < exp_hstr2d.size(); i++){
+      ok = passert(tf, (res_hstr2d[i] == exp_hstr2d[i]),
+          "Got wrong value for 2d char var written with hslab put") && ok;
+    }
+  }
+
+  std::vector<char> hsgbuf3d(static_cast<std::size_t>(NUM_ROWS) * NUM_COLS * NUM_STEPS * STR_LEN, '\0');
+  ret = PIOc_get_var(ncid, pio_hsvar3d, hsgbuf3d.data());
+  if(!check_ret(tf, ret, "Failed to get 3d char var (hyperslab var):" + FNAME_MISC_STR)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  {
+    std::vector<std::string> res_hstr3d = unpack_text_buf(hsgbuf3d, STR_LEN, NUM_ROWS * NUM_COLS * NUM_STEPS, STR_LEN);
+    for(std::size_t i = 0; i < exp_hstr3d.size(); i++){
+      ok = passert(tf, (res_hstr3d[i] == exp_hstr3d[i]),
+          "Got wrong value for 3d char var written with hslab put") && ok;
+    }
+  }
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), FNAME_MISC_STR.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+int test_put_get_misc_str(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_misc_str : ") + iotype_name + "\n");
+
+    if(test_put_get_misc_str_one_iotype(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
 int main(int argc, char *argv[])
 {
   int ret = MPI_SUCCESS, nerrs = 0;
@@ -2622,7 +3261,8 @@ int main(int argc, char *argv[])
     {"test_put_get_time_scalar_rec_float", test_put_get_time_scalar_rec<float>},
     {"test_put_get_time_scalar_rec_double", test_put_get_time_scalar_rec<double>},
     {"test_put_get_1d_str_arr", test_put_get_1d_str_arr},
-    {"test_put_get_2d_str_arr", test_put_get_2d_str_arr}
+    {"test_put_get_2d_str_arr", test_put_get_2d_str_arr},
+    {"test_put_get_misc_str", test_put_get_misc_str}
   };
 
   SPIO_TF::Test_framework tf("ncdf_get_put_cxx", MPI_COMM_WORLD, rfuncs);
