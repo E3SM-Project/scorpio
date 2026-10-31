@@ -69,7 +69,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_decomp_fillval.F90.in` (540 lines)
 - [x] `pio_iodesc_tests.F90.in` (634 lines)
 - [x] `pio_decomp_fillval2.F90.in` (645 lines)
-- [ ] `pio_decomp_frame_tests.F90.in` (661 lines)
+- [x] `pio_decomp_frame_tests.F90.in` (661 lines)
 - [ ] `pio_decomp_tests_1d.F90.in` (727 lines)
 - [ ] `pio_sync_tests.F90.in` (802 lines)
 - [ ] `pio_decomp_extra_dims.F90.in` (896 lines)
@@ -1841,3 +1841,89 @@ range, any ruling made, final review verdict.)
   (`git diff --stat 151f4a1b22..8c366aa69d --
   tests/general/pio_decomp_fillval2.F90.in` empty), and by the task
   reviewer independently against the same base commit.
+
+### `pio_decomp_frame_tests.F90.in` (661 lines) -> `tests/functional/pio_decomp_frame_tests.cpp` (~865 lines)
+
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-decomp-frame-tests-to-cxx.md`,
+  2 tasks: Task 1 (non-decomposition vara-based 1d frame test + a
+  decomposition-based 2d frame test), Task 2 (a reusable 3D-column-decomp
+  helper + a 4d-frame darray test + a 3d/4d-decomposition-reuse test +
+  `main()` + CMake registration).
+- Architecture: 4 `PIO_TF_AUTO_TEST_SUB` subroutines ported 1:1 —
+  `nc_wr_rd_1d_unlim_dim` (no decomposition; per-frame
+  `PIOc_put_vara`/`PIOc_get_vara` against an unlimited dim), `nc_wr_rd_2d_unlim_dim`
+  (a row-dim decomposition with `PIOc_setframe` selecting an unlimited
+  time dim per frame), `nc_write_read_4d_col_decomp` (the existing 3D
+  column decomposition from `pio_decomp_tests_3d.cpp` extended with a
+  time/frame dimension, `NFRAMES=6`), and `nc_reuse_3d_decomp` (a single
+  `wr_iodesc`/`rd_iodesc` pair reused across a 3D var with no frame
+  dimension and a 4D var with `NFRAMES=3`, confirming decomposition reuse
+  works across variables with different ranks).
+- `get_3d_col_decomp_info` copied verbatim from the already-reviewed
+  `pio_decomp_tests_3d.cpp:34-89` — confirmed byte-identical via direct
+  `diff` both at Task 2 implementation time and again at final review.
+- **Real bug #1 (Task 1, found by task review, fixed):** `nc_wr_rd_1d_unlim_dim`'s
+  `PIOc_put_vara`/`PIOc_get_vara` calls used a 1-based `start[1] = {f+1}`,
+  following the plan's Global Constraint that dims/start/count are
+  1-based matching the Fortran — but `PIOc_put_vara`/`PIOc_get_vara`'s
+  `start` is 0-based in C (unlike `PIOc_InitDecomp`'s `compdof`, which
+  genuinely is 1-based). Confirmed independently against
+  `src/flib/spio_put_var.F90.in:225,347,349,477,479`
+  (`cstart(i) = INT(start(...) - 1, ...)`). Fixed to `start[1] = {f}`
+  (0-based loop variable). This is a project-wide gotcha worth flagging
+  forward to any future port that uses the vara API directly: the
+  plan-level "1-based, matching Fortran" convention applies to
+  `compdof`/`PIOc_InitDecomp`, not to `PIOc_put_vara`/`PIOc_get_vara`.
+- **Real bug #2 (Task 2, found by task review, fixed):** the read buffers
+  (`rbuf`, `rbuf3d`, `rbuf4d`) were zeroed once at declaration instead of
+  at the top of each iotype iteration, unlike the Fortran (F90.in:427,
+  624-625) and the sibling `pio_decomp_tests_3d.cpp:262-264`. Since every
+  iotype writes/expects identical values, a silent read failure that
+  didn't fill the buffer could have compared equal to `exp_val` on
+  iotypes 2..N — exactly the per-iotype read bug class this test exists
+  to catch. Fixed by adding a per-iotype-iteration zero-fill matching the
+  sibling idiom exactly. (Reviewer noted this specific fix is
+  unobservable in a pnetcdf-only build since `num_flavors == 1` there,
+  but is still correct and will matter in NetCDF-enabled builds.)
+- **Port-fidelity restoration (final whole-branch review, applied):**
+  `nc_wr_rd_2d_unlim_dim` originally consolidated the Fortran's two
+  identical decompositions (`wr_iodesc`/`rd_iodesc`, both built from the
+  same `compdof`/`dims`, F90.in:143/145/208-209) into one shared
+  `iodesc`, per the Task 1 brief's explicit instruction. The final
+  reviewer independently re-derived the Fortran and found the brief's
+  premise (that the Fortran "uses the same iodesc") was factually wrong
+  about the source; ruled to restore the literal two-iodesc structure
+  for full port fidelity (cheap, zero-risk, already-proven pattern used
+  by the other two functions in the same file) rather than keep the
+  documented deviation.
+- CMake registration uses the C2 tier (`MINNUMPROCS 1`,
+  `MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}`, `MINNUMIOPROCS 1`,
+  `MAXNUMIOPROCS ${PIO_TF_C2_MAXNUMIOPROCS}`, `MINSTRIDE 1`,
+  `MAXSTRIDE ${PIO_TF_C2_MAXSTRIDE}`), confirmed to match the Fortran
+  `pio_decomp_frame_tests` registration's own tier
+  (`tests/general/CMakeLists.txt:716-727`) field-for-field; the final
+  reviewer empirically confirmed `ctest -N` expands the C++ target to
+  the identical 10 `np*/nio*/st*` invocations as the Fortran target.
+- Review: Task 1 and Task 2 each went through one review round with a
+  confirmed bug, a fix round, and a scoped re-review before being marked
+  complete (see the two real bugs above). The final whole-branch review
+  (opus) independently re-derived every formula/filename/ordering/NFRAMES
+  value against the full 662-line Fortran source rather than trusting
+  either task's report or the ledger, confirmed single coherent `main()`
+  wiring (12 `rfuncs` entries, no dead code from Task 1's
+  deliberately-deferred `main()`), ran a REAL rebuild plus
+  `-Wall -Wextra -Wshadow` recompile (clean) plus REAL `ctest` (10/10),
+  and ran a **mutation test** (redirected one `PIOc_setframe` call to the
+  wrong frame and confirmed the test failed with a specific wrong-value
+  error) proving per-frame coverage is real rather than vacuous.
+  Verdict: APPROVED, with one additional fix round (the two-iodesc
+  restoration above plus two trivial consistency nits — a flavor-loop
+  variable rename `i`->`fl`, and making `vec_local_sz` `const`) applied
+  and re-reviewed clean before closing the plan.
+- Build/test: `ctest -R pio_decomp_frame_tests_cxx` passed 10/10 at every
+  verification checkpoint across both tasks and all three fix rounds
+  (coordinator-run, not implementer-self-reported, at each checkpoint).
+- Final commit: `97094f1d87`. `tests/general/pio_decomp_frame_tests.F90.in`
+  confirmed untouched at every checkpoint throughout (implementer,
+  coordinator, both task reviewers, and the final whole-branch reviewer,
+  via repeated independent `git diff --stat` checks).
