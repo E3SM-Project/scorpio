@@ -3,6 +3,8 @@
 #include <vector>
 #include <functional>
 #include <utility>
+#include <sstream>
+#include <algorithm>
 
 #include "pio.h"
 
@@ -2118,6 +2120,455 @@ int test_put_get_time_scalar_rec(SPIO_TF::Test_framework &tf)
   return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
 }
 
+/* Builds the fixed-length (str_len chars, blank padded) string
+ * "DUMMY_STRING, index = NN" matching the Fortran test's
+ * WRITE(exp_str, '(a, i2)') 'DUMMY_STRING, index = ', index
+ * (a 2-char-wide, right-justified index field, the rest of the
+ * str_len-character string padded with trailing blanks). */
+static std::string make_dummy_str(int index, std::size_t str_len)
+{
+  std::ostringstream oss;
+  oss << "DUMMY_STRING, index = ";
+  if(index < 10){
+    oss << ' ' << index;
+  }
+  else{
+    oss << index;
+  }
+  std::string s = oss.str();
+  s.resize(str_len, ' ');
+  return s;
+}
+
+static int test_put_get_1d_str_arr_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const int STR_LEN = 64;
+  const int NUM_STRS = 32;
+  const int StrKIND = 512;
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, FNAME.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  int strlen_dim = -1, nstrs_dim = -1;
+  ret = PIOc_def_dim(ncid, "StrLen", STR_LEN, &strlen_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, "nstrs", NUM_STRS, &nstrs_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* The dims passed to PIOc_def_var() are in "C order" (slowest to
+   * fastest varying) - the reverse of the Fortran order in which
+   * pio_dims (StrLen, nstrs) is declared in the Fortran test. */
+  const int dimids[2] = {nstrs_dim, strlen_dim};
+
+  int pio_str_arr_var1 = -1, pio_str_arr_var2 = -1;
+  ret = PIOc_def_var(ncid, "var1_1d_str_arr", PIO_CHAR, 2, dimids, &pio_str_arr_var1);
+  if(!check_ret(tf, ret, "Failed to define string array var:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, "var2_1d_str_arr", PIO_CHAR, 2, dimids, &pio_str_arr_var2);
+  if(!check_ret(tf, ret, "Failed to define string array var:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* A contiguous buffer of NUM_STRS strings, each STR_LEN chars (blank
+   * padded, no NUL terminators) - this is exactly the layout
+   * pio_put_var_1d_text()/pio_put_vara_1d_text() produce internally. */
+  std::vector<char> pbuf(static_cast<std::size_t>(NUM_STRS) * STR_LEN);
+  for(int index = 1; index <= NUM_STRS; index++){
+    std::string s = make_dummy_str(index, STR_LEN);
+    std::copy(s.begin(), s.end(), pbuf.begin() + static_cast<std::size_t>(index - 1) * STR_LEN);
+  }
+
+  /* This corresponds to the Fortran PIO_put_var(file, var, val), which
+   * calls put_var_1d_text() */
+  ret = PIOc_put_var(ncid, pio_str_arr_var1, pbuf.data());
+  if(!check_ret(tf, ret, "Failed to put string array var:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  const PIO_Offset full_start[2] = {0, 0};
+  const PIO_Offset full_count[2] = {NUM_STRS, STR_LEN};
+
+  /* This corresponds to the Fortran PIO_put_var(file, var, start, count, val),
+   * which calls put_vara_1d_text() - same data as above, hyperslab API path */
+  ret = PIOc_put_vara(ncid, pio_str_arr_var2, full_start, full_count, pbuf.data());
+  if(!check_ret(tf, ret, "Failed to put string array var:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + FNAME)){
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, FNAME.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, "var1_1d_str_arr", &pio_str_arr_var1);
+  if(!check_ret(tf, ret, "Failed to inq string array var:" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, "var2_1d_str_arr", &pio_str_arr_var2);
+  if(!check_ret(tf, ret, "Failed to inq string array var:" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  bool ok = true;
+
+  /* This corresponds to the Fortran PIO_get_var(file, var, val), which
+   * calls get_var_1d_text() */
+  std::vector<char> gbuf1(static_cast<std::size_t>(NUM_STRS) * STR_LEN, ' ');
+  ret = PIOc_get_var(ncid, pio_str_arr_var1, gbuf1.data());
+  if(!check_ret(tf, ret, "Failed to get string array var:" + FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+
+  for(int index = 1; index <= NUM_STRS; index++){
+    std::string exp_str = make_dummy_str(index, STR_LEN);
+    std::string res_str(gbuf1.begin() + static_cast<std::size_t>(index - 1) * STR_LEN,
+        gbuf1.begin() + static_cast<std::size_t>(index) * STR_LEN);
+    ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+  }
+
+  /* This corresponds to the Fortran PIO_get_var(file, var, start, count, val),
+   * which calls get_vara_1d_text() */
+  std::vector<char> gbuf2(static_cast<std::size_t>(NUM_STRS) * STR_LEN, ' ');
+  ret = PIOc_get_vara(ncid, pio_str_arr_var2, full_start, full_count, gbuf2.data());
+  if(!check_ret(tf, ret, "Failed to get string array var:" + FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+
+  for(int index = 1; index <= NUM_STRS; index++){
+    std::string exp_str = make_dummy_str(index, STR_LEN);
+    std::string res_str(gbuf2.begin() + static_cast<std::size_t>(index - 1) * STR_LEN,
+        gbuf2.begin() + static_cast<std::size_t>(index) * STR_LEN);
+    ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+  }
+
+  /* Read one string at a time, since the sizes differ (i.e. STR_LEN !=
+   * StrKIND) - this calls get_vara_1d_text() too, but with a user
+   * buffer (StrKIND chars) much larger than the on-disk string length
+   * (STR_LEN chars), to verify that only STR_LEN chars are copied and
+   * the rest of the buffer is left untouched (no overrun/mis-copy). */
+  const PIO_Offset single_count[2] = {1, STR_LEN};
+  for(int index = 1; index <= NUM_STRS; index++){
+    std::string exp_str = make_dummy_str(index, STR_LEN);
+    const PIO_Offset single_start[2] = {static_cast<PIO_Offset>(index - 1), 0};
+
+    std::vector<char> single_str_buf(static_cast<std::size_t>(StrKIND), ' ');
+    ret = PIOc_get_vara(ncid, pio_str_arr_var1, single_start, single_count, single_str_buf.data());
+    if(!check_ret(tf, ret, "Failed to get string array var:" + FNAME)){
+      PIOc_closefile(ncid);
+      return PIO_EINTERNAL;
+    }
+    std::string res_str(single_str_buf.begin(), single_str_buf.begin() + STR_LEN);
+    ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+
+    single_str_buf.assign(static_cast<std::size_t>(StrKIND), ' ');
+    ret = PIOc_get_vara(ncid, pio_str_arr_var2, single_start, single_count, single_str_buf.data());
+    if(!check_ret(tf, ret, "Failed to get string array var:" + FNAME)){
+      PIOc_closefile(ncid);
+      return PIO_EINTERNAL;
+    }
+    res_str.assign(single_str_buf.begin(), single_str_buf.begin() + STR_LEN);
+    ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+  }
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+int test_put_get_1d_str_arr(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_1d_str_arr : ") + iotype_name + "\n");
+
+    if(test_put_get_1d_str_arr_one_iotype(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+static int test_put_get_2d_str_arr_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const int STR_LEN = 64;
+  const int NUM_ROWS = 4;
+  const int NUM_COLS = 8;
+  const int StrKIND = 512;
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, FNAME.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  int strlen_dim = -1, col_dim = -1, row_dim = -1;
+  ret = PIOc_def_dim(ncid, "StrLen", STR_LEN, &strlen_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, "col", NUM_COLS, &col_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, "row", NUM_ROWS, &row_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* The dims passed to PIOc_def_var() are in "C order" (slowest to
+   * fastest varying) - the reverse of the Fortran order in which
+   * pio_dims (StrLen, col, row) is declared in the Fortran test. */
+  const int dimids[3] = {row_dim, col_dim, strlen_dim};
+
+  int pio_str_arr_var1 = -1, pio_str_arr_var2 = -1;
+  ret = PIOc_def_var(ncid, "var1_2d_str_arr", PIO_CHAR, 3, dimids, &pio_str_arr_var1);
+  if(!check_ret(tf, ret, "Failed to define string array var:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, "var2_2d_str_arr", PIO_CHAR, 3, dimids, &pio_str_arr_var2);
+  if(!check_ret(tf, ret, "Failed to define string array var:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* Fill the write buffer using Fortran-native column-major indexing -
+   * the Fortran test fills pstr_arr(row, col), a column-major (Fortran)
+   * array, and pio_put_var_2d_text()/pio_put_vara_2d_text() flatten it
+   * into a contiguous buffer in that same column-major (col outer, row
+   * inner) order. */
+  std::vector<char> pbuf(static_cast<std::size_t>(NUM_ROWS) * NUM_COLS * STR_LEN);
+  for(int col = 1; col <= NUM_COLS; col++){
+    for(int row = 1; row <= NUM_ROWS; row++){
+      /* Array storage in Fortran is column-major */
+      int index = (col - 1) * NUM_ROWS + row;
+      std::string s = make_dummy_str(index, STR_LEN);
+      std::size_t cstr_idx = static_cast<std::size_t>(col - 1) * NUM_ROWS + (row - 1);
+      std::copy(s.begin(), s.end(), pbuf.begin() + cstr_idx * STR_LEN);
+    }
+  }
+
+  /* This corresponds to the Fortran PIO_put_var(file, var, val), which
+   * calls put_var_2d_text() */
+  ret = PIOc_put_var(ncid, pio_str_arr_var1, pbuf.data());
+  if(!check_ret(tf, ret, "Failed to put string array var:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  const PIO_Offset full_start[3] = {0, 0, 0};
+  const PIO_Offset full_count[3] = {NUM_ROWS, NUM_COLS, STR_LEN};
+
+  /* This corresponds to the Fortran PIO_put_var(file, var, start, count, val),
+   * which calls put_vara_2d_text() - same data as above, hyperslab API path */
+  ret = PIOc_put_vara(ncid, pio_str_arr_var2, full_start, full_count, pbuf.data());
+  if(!check_ret(tf, ret, "Failed to put string array var:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + FNAME)){
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, FNAME.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, "var1_2d_str_arr", &pio_str_arr_var1);
+  if(!check_ret(tf, ret, "Failed to inq string array var:" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, "var2_2d_str_arr", &pio_str_arr_var2);
+  if(!check_ret(tf, ret, "Failed to inq string array var:" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  bool ok = true;
+
+  /* This corresponds to the Fortran PIO_get_var(file, var, val), which
+   * calls get_var_2d_text() */
+  std::vector<char> gbuf1(static_cast<std::size_t>(NUM_ROWS) * NUM_COLS * STR_LEN, ' ');
+  ret = PIOc_get_var(ncid, pio_str_arr_var1, gbuf1.data());
+  if(!check_ret(tf, ret, "Failed to get string array var:" + FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+
+  for(int col = 1; col <= NUM_COLS; col++){
+    for(int row = 1; row <= NUM_ROWS; row++){
+      int index = (col - 1) * NUM_ROWS + row;
+      std::string exp_str = make_dummy_str(index, STR_LEN);
+      std::size_t cstr_idx = static_cast<std::size_t>(col - 1) * NUM_ROWS + (row - 1);
+      std::string res_str(gbuf1.begin() + cstr_idx * STR_LEN, gbuf1.begin() + (cstr_idx + 1) * STR_LEN);
+      ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+    }
+  }
+
+  /* This corresponds to the Fortran PIO_get_var(file, var, start, count, val),
+   * which calls get_vara_2d_text() */
+  std::vector<char> gbuf2(static_cast<std::size_t>(NUM_ROWS) * NUM_COLS * STR_LEN, ' ');
+  ret = PIOc_get_vara(ncid, pio_str_arr_var2, full_start, full_count, gbuf2.data());
+  if(!check_ret(tf, ret, "Failed to get string array var:" + FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+
+  for(int col = 1; col <= NUM_COLS; col++){
+    for(int row = 1; row <= NUM_ROWS; row++){
+      int index = (col - 1) * NUM_ROWS + row;
+      std::string exp_str = make_dummy_str(index, STR_LEN);
+      std::size_t cstr_idx = static_cast<std::size_t>(col - 1) * NUM_ROWS + (row - 1);
+      std::string res_str(gbuf2.begin() + cstr_idx * STR_LEN, gbuf2.begin() + (cstr_idx + 1) * STR_LEN);
+      ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+    }
+  }
+
+  /* Read one string at a time, since the sizes differ (i.e. STR_LEN !=
+   * StrKIND) - this calls get_vara_1d_text() too (a single string is a
+   * 1d hyperslab of the 2d string array), but with a user buffer
+   * (StrKIND chars) much larger than the on-disk string length (STR_LEN
+   * chars), to verify that only STR_LEN chars are copied and the rest
+   * of the buffer is left untouched (no overrun/mis-copy). */
+  const PIO_Offset single_count[3] = {1, 1, STR_LEN};
+  for(int row = 1; row <= NUM_ROWS; row++){
+    for(int col = 1; col <= NUM_COLS; col++){
+      /* NetCDF uses C row-major convention */
+      int index = (row - 1) * NUM_COLS + col;
+      std::string exp_str = make_dummy_str(index, STR_LEN);
+      const PIO_Offset single_start[3] = {static_cast<PIO_Offset>(row - 1),
+          static_cast<PIO_Offset>(col - 1), 0};
+
+      std::vector<char> single_str_buf(static_cast<std::size_t>(StrKIND), ' ');
+      ret = PIOc_get_vara(ncid, pio_str_arr_var1, single_start, single_count, single_str_buf.data());
+      if(!check_ret(tf, ret, "Failed to get string array var:" + FNAME)){
+        PIOc_closefile(ncid);
+        return PIO_EINTERNAL;
+      }
+      std::string res_str(single_str_buf.begin(), single_str_buf.begin() + STR_LEN);
+      ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+
+      single_str_buf.assign(static_cast<std::size_t>(StrKIND), ' ');
+      ret = PIOc_get_vara(ncid, pio_str_arr_var2, single_start, single_count, single_str_buf.data());
+      if(!check_ret(tf, ret, "Failed to get string array var:" + FNAME)){
+        PIOc_closefile(ncid);
+        return PIO_EINTERNAL;
+      }
+      res_str.assign(single_str_buf.begin(), single_str_buf.begin() + STR_LEN);
+      ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+    }
+  }
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+int test_put_get_2d_str_arr(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_2d_str_arr : ") + iotype_name + "\n");
+
+    if(test_put_get_2d_str_arr_one_iotype(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
 int main(int argc, char *argv[])
 {
   int ret = MPI_SUCCESS, nerrs = 0;
@@ -2169,7 +2620,9 @@ int main(int argc, char *argv[])
     {"test_put_get_time_scalar_double", test_put_get_time_scalar<double>},
     {"test_put_get_time_scalar_rec_int", test_put_get_time_scalar_rec<int>},
     {"test_put_get_time_scalar_rec_float", test_put_get_time_scalar_rec<float>},
-    {"test_put_get_time_scalar_rec_double", test_put_get_time_scalar_rec<double>}
+    {"test_put_get_time_scalar_rec_double", test_put_get_time_scalar_rec<double>},
+    {"test_put_get_1d_str_arr", test_put_get_1d_str_arr},
+    {"test_put_get_2d_str_arr", test_put_get_2d_str_arr}
   };
 
   SPIO_TF::Test_framework tf("ncdf_get_put_cxx", MPI_COMM_WORLD, rfuncs);
