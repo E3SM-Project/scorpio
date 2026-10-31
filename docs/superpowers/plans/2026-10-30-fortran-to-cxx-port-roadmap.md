@@ -72,7 +72,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_decomp_frame_tests.F90.in` (661 lines)
 - [x] `pio_decomp_tests_1d.F90.in` (727 lines)
 - [x] `pio_sync_tests.F90.in` (802 lines)
-- [ ] `pio_decomp_extra_dims.F90.in` (896 lines)
+- [x] `pio_decomp_extra_dims.F90.in` (896 lines)
 - [ ] `ncdf_get_put.F90.in` (3283 lines)
 
 ## Already done (before this roadmap)
@@ -2091,3 +2091,93 @@ range, any ruling made, final review verdict.)
   confirmed untouched throughout (implementer self-checks, both task
   reviewers, and the final whole-branch reviewer, via independent
   `git diff --stat` checks).
+
+### `pio_decomp_extra_dims.F90.in` (896 lines) -> `tests/functional/pio_decomp_extra_dims.cpp` (~476 lines)
+
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-decomp-extra-dims-to-cxx.md`,
+  2 tasks: Task 1 (non-record group — `get_extra_dims_decomp_info` helper,
+  `nc_wr_rd_1d_extra_dims_impl<T>`, 3 named wrappers, `main()`/CMake
+  registration with a 9-entry `rfuncs`), Task 2 (record groups —
+  `nc_wr_rd_1d_extra_dims_rec_impl<T>`, 6 named wrappers, extending
+  `rfuncs` to 27 entries total).
+- Architecture: 2 shared templated `_impl` functions (one for the 3
+  non-record subroutines, one for the 6 record-group subroutines) plus 9
+  thin named wrapper functions, one per Fortran subroutine, to preserve
+  the project's 1:1 Fortran-subroutine-to-C++-function naming convention
+  used by the `rfuncs` table (no lambda ever used in this codebase's
+  `rfuncs`, confirmed via grep across 33+ prior ported files) while
+  sharing the actual test logic once per group. Each group covers
+  `num_extra_dims` = 0, 1, 2 leading size-1 dimensions baked into the
+  decomposition; the netCDF variable's own dimensionality never grows
+  with `num_extra_dims` (always 1 dim non-record, 2 dims record — time +
+  row).
+- **gdims-reversal convention:** extra size-1 dims are the *leading*
+  (outermost) entries of `gdims`, with the real size as the *last*
+  (innermost) entry — the reverse of Fortran's `dims(:)` convention,
+  confirmed directly from `src/flib/spio_decomp.F90.in:142-143`
+  (`cgdims(i) = INT(gdims(ndims - i + 1), C_INT)`) and independently
+  re-verified by the final whole-branch reviewer.
+- **Deliberate, documented test-fidelity deviation:** the non-record
+  `wbuf` uses per-element `compdof[i]` values instead of the Fortran's
+  actual uniform per-rank value (`wbuf = pio_tf_world_rank_`,
+  `F90.in:29/112/196`) — a strictly stronger roundtrip check. This arose
+  from a false claim in the plan's own Task 1 Step 2 text (asserting the
+  Fortran used the `compdof(i)` formula, which only applies to the
+  record-group subroutines), caught by Task 1's reviewer, not by the
+  plan's self-review. Ruling: keep the stronger test logic, add a code
+  comment documenting the deviation (done in the Task 1 fix round) rather
+  than weaken the port to match the Fortran's original formula. The
+  record-group `wbuf` formula (`compdof[i] + f*(VEC_LOCAL_SZ*world_size)`,
+  0-based `f`) genuinely matches the Fortran's actual record formula
+  (`wbuf(i,f) = int(compdof(i) + (f-1)*dims(1))`, 1-based `f`) — no
+  divergence there.
+- **Plan-text CMake macro defect, self-corrected by the implementer:** the
+  plan's own Task 1 Step 5 snippet specified `add_spio_test_executable`
+  (the Fortran-only macro) instead of `add_spio_executable` (the
+  universal C++ macro used by all 35 entries in
+  `tests/functional/CMakeLists.txt`). The Task 1 implementer caught this
+  itself, used the correct macro, and both the task reviewer and the
+  final whole-branch reviewer independently confirmed the correction via
+  `grep` against the file's established convention.
+- Record-dimension length parameterization confirmed not swapped: `_rec`
+  subroutines pass `PIO_UNLIMITED`, `_lim_rec` subroutines pass `NFRAMES`
+  (3) — cross-checked by both the Task 2 reviewer and the final reviewer
+  directly against `tests/general/pio_decomp_extra_dims.F90.in` line by
+  line (`:304/412/521` vs. `:628/736/845`).
+- CMake registration reuses the `pio_sync_tests_cxx`/`pio_rearr_opts_cxx`
+  C3-tier precedent exactly (`MINNUMPROCS 4`, `MAXNUMPROCS
+  ${PIO_TF_MAXNUMPROCS}`, `MINNUMIOPROCS 2`, `MAXNUMIOPROCS
+  ${PIO_TF_C3_MAXNUMIOPROCS}`, `MINSTRIDE 2`, `MAXSTRIDE
+  ${PIO_TF_C3_MAXSTRIDE}`), matching `tests/general/CMakeLists.txt:755-768`'s
+  own tier for this test.
+- Review: Task 1 reviewed with 1 Important finding (the plan-text wbuf
+  defect above, resolved in a 1-commit fix round adding a documentation
+  comment only) + 5 Minor (all deferred). Task 2 reviewed clean (0
+  Critical/Important, 4 Minor deferred). The final whole-branch review
+  (opus) independently re-verified all 7 Review Focus items against the
+  Fortran source and `src/flib/spio_decomp.F90.in`/`spio_def_var.F90`
+  directly (gdims ordering, stable netCDF variable dimensionality, no
+  write/read iodesc split, `PIO_UNLIMITED`/`NFRAMES` not swapped,
+  per-frame formula centralized in the shared impl, CMake field-for-field
+  match, `tests/general/*` untouched). 0 Critical, 0 Important, 11 Minor
+  total after triage: 1 fixed (a stale comment claiming the record
+  subroutines were "added in a later task", now false and carrying SDD
+  process vocabulary into committed source — corrected post-review in
+  commit `9ed7fdaa00`), 1 explicitly reclassified as not-a-fix (an
+  earlier Minor had suggested removing a `static_cast<std::size_t>` that
+  the final reviewer determined is load-bearing against `-Wsign-compare`),
+  1 reclassified as a non-finding (a flagged line-length concern measured
+  at 120 chars, inside the existing precedent of 122 chars in
+  `pio_rearr_opts.cpp`), and the remaining 8 left as-is, each matching a
+  verified existing series-wide convention. Assessment: **Ready to merge:
+  Yes** (after the one comment fix).
+- Build/test: `ctest -R pio_decomp_extra_dims_cxx` passed 1/1 at every
+  verification checkpoint (Task 1 initial, Task 1 fix round, Task 2, and
+  the post-final-review comment fix — each covering all configured
+  `rfuncs` entries, 27 total at completion, across `np4`/`nio2`/`st2`).
+- Final commits: `74fa8aba69` (Task 1, incl. fix round), `515badf08f`
+  (Task 2), `9ed7fdaa00` (post-final-review comment fix).
+  `tests/general/pio_decomp_extra_dims.F90.in` and
+  `tests/general/CMakeLists.txt` confirmed untouched throughout
+  (implementer self-checks, both task reviewers, and the final
+  whole-branch reviewer, via independent `git diff --stat` checks).
