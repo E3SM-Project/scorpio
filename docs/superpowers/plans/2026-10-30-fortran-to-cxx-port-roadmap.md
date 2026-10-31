@@ -71,7 +71,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_decomp_fillval2.F90.in` (645 lines)
 - [x] `pio_decomp_frame_tests.F90.in` (661 lines)
 - [x] `pio_decomp_tests_1d.F90.in` (727 lines)
-- [ ] `pio_sync_tests.F90.in` (802 lines)
+- [x] `pio_sync_tests.F90.in` (802 lines)
 - [ ] `pio_decomp_extra_dims.F90.in` (896 lines)
 - [ ] `ncdf_get_put.F90.in` (3283 lines)
 
@@ -2014,6 +2014,80 @@ range, any ruling made, final review verdict.)
   configurations).
 - Final commits: `77226d9c4d` (Task 1), `cbfbe67b94` (Task 2), `22ecfe5676`
   (post-final-review cosmetic fix). `tests/general/pio_decomp_tests_1d.F90.in`
+  confirmed untouched throughout (implementer self-checks, both task
+  reviewers, and the final whole-branch reviewer, via independent
+  `git diff --stat` checks).
+
+### `pio_sync_tests.F90.in` (802 lines) -> `tests/functional/pio_sync_tests.cpp` (1251 lines)
+
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-sync-tests-to-cxx.md`,
+  2 tasks: Task 1 (2 helpers — `get_1d_bc_info`, `get_1d_bc_mreg_info` —
+  plus 2 templated test functions — `nc_mvar_wr_rd_1d_bc`,
+  `nc_mvar_msync_1d_bc` — plus `main()`/CMake registration with a 6-entry
+  `rfuncs`), Task 2 (2 more templated test functions —
+  `nc_mvar_mreg_wr_rd_1d_bc`, `nc_rd_while_pend_wr_1d` — extending
+  `rfuncs` to 12 entries total).
+- Architecture: 4 templated test functions (× int/float/double = 12
+  `rfuncs` entries) covering `PIOc_sync`'s interaction with multi-variable
+  writes: a baseline multi-var write/sync/read-back
+  (`nc_mvar_wr_rd_1d_bc`), a triangular sync-stride sweep across 8
+  variables with a catch-up block for variables the triangular stride
+  doesn't reach (`nc_mvar_msync_1d_bc`), a 4-variable test mixing a
+  multi-region decomposition with a plain one sharing a single sync call
+  (`nc_mvar_mreg_wr_rd_1d_bc`), and a test proving reads only observe
+  prior synced writes, not pending unsynced ones
+  (`nc_rd_while_pend_wr_1d`).
+- **Plan-text factual correction (not a code defect):** the plan's Global
+  Constraints claimed `get_1d_bc_mreg_info` in this file uses "a
+  different formula" from the same-named helper in
+  `pio_decomp_tests_1d.cpp`. Both Task 1's and Task 2's reviewers
+  independently found the two helpers to be character-for-character
+  identical (`VEC_LOCAL_SZ = 7`, `NUM_REGIONS = 3`, same `start[i]`
+  formula). This did not change any required code — the mreg
+  running-counter requirement for compdof-flattening
+  (see `pio_decomp_tests_1d.cpp:885-893`'s pattern, reused here at
+  `pio_sync_tests.cpp:649-657`) still fully applies regardless — but the
+  claim should not be repeated as fact in future plans.
+- **Pre-existing Fortran source typo, not a porting defect:**
+  `tests/general/pio_sync_tests.F90.in:594` mislabels the var3 read-back
+  check message as `"(var2)"` (copy-paste from the preceding var2 check).
+  The C++ port correctly uses `"(var3)"`, confirmed by Task 2's reviewer
+  and the final whole-branch reviewer to be a cosmetic improvement over
+  the source, not a deviation from spec requiring any fix.
+- CMake registration reuses the `pio_rearr_opts_cxx` C3-tier precedent
+  exactly (`MINNUMPROCS 4`, `MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}`,
+  `MINNUMIOPROCS 2`, `MAXNUMIOPROCS ${PIO_TF_C3_MAXNUMIOPROCS}`,
+  `MINSTRIDE 2`, `MAXSTRIDE ${PIO_TF_C3_MAXSTRIDE}`), cross-verified by
+  Task 1's reviewer against the Fortran test's own tier at
+  `tests/general/CMakeLists.txt:677-688` — exact match. Task 2 added no
+  new test functions requiring a different tier and did not touch this
+  file.
+- Review: Task 1 and Task 2 were each reviewed clean on the first pass (0
+  Critical, 0 Important findings both times; no fix rounds needed). The
+  final whole-branch review (opus) independently verified all 4 Fortran
+  `PIO_TF_AUTO_TEST_SUB_BEGIN/END` subroutines were ported, all 12
+  `rfuncs` entries present with no duplicates, the triangular sync stride
+  and its vars-7/8 catch-up block live and correct, all six alternating
+  `PIO_WRITE`/`PIO_NOWRITE` reopen modes, the pending-write read
+  ordering, the 0-based/1-based compdof convention across eight sites,
+  the mreg running counter, no wr_/rd_ decomposition cross-contamination,
+  the CMake tier match, and `tests/general/` untouched at branch level.
+  0 Critical, 0 Important, 4 Minor (all no-action): `PIO_TEST_CLOSE_OPEN_FOR_SYNC`
+  compiled only in a follow-up confirmation build (see below) since it's
+  off by default; the var2/var3 label fix noted above; two dead stores
+  carried for fidelity with `F90.in:483/508` per the plan; a stale
+  "NVARS = 10" illustrative comment copied verbatim from the Fortran
+  (flagged once already by Task 1's reviewer). Assessment:
+  **Ready to merge: Yes**.
+- Build/test: `ctest -R pio_sync_tests_cxx` passed 1/1 at every
+  verification checkpoint (Task 1, Task 2, both covering all rfuncs ×
+  3 rearrangers). Per the final reviewer's one recommendation, a
+  confirmation build was additionally run with
+  `-DPIO_TEST_CLOSE_OPEN_FOR_SYNC=ON` (the only code path never
+  compiled/exercised by the default build) — `ctest -R pio_sync_tests_cxx`
+  passed 1/1 (15.68s), then the build config was restored to `OFF`.
+- Final commits: `609bda5cf3` (Task 1), `999c60955c` (Task 2).
+  `tests/general/pio_sync_tests.F90.in` and `tests/general/CMakeLists.txt`
   confirmed untouched throughout (implementer self-checks, both task
   reviewers, and the final whole-branch reviewer, via independent
   `git diff --stat` checks).
