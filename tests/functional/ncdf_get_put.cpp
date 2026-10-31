@@ -33,6 +33,14 @@
 const std::string FNAME("test_pio_ncdf_get_put.testfile");
 const std::string FNAME_SLICE("test_pio_ncdf_get_put_slice.testfile");
 
+/* Wrapper around passert() for string/scalar value comparisons - on failure
+ * this reports the actual and expected values (unlike a bare passert()),
+ * which makes debugging failures in this large file easier */
+static bool check_str(SPIO_TF::Test_framework &tf, const std::string &res, const std::string &exp, const std::string &ctx)
+{
+  return passert(tf, (res == exp), ctx + " : got \"" + res + "\", expected \"" + exp + "\"");
+}
+
 template<typename T>
 static int test_put_1datt_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
 {
@@ -244,7 +252,7 @@ static int test_put_get_1datt_one_iotype(SPIO_TF::Test_framework &tf, int iotype
     PIOc_closefile(ncid);
     return PIO_EINTERNAL;
   }
-  ok = passert(tf, (std::string(gcval.begin(), gcval.end()) == pcval), "Got wrong value") && ok;
+  ok = check_str(tf, std::string(gcval.begin(), gcval.end()), pcval, "Got wrong value") && ok;
 
   PIOc_closefile(ncid);
   PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
@@ -361,14 +369,14 @@ static int test_put_get_0dvar_one_iotype(SPIO_TF::Test_framework &tf, int iotype
     PIOc_closefile(ncid);
     return PIO_EINTERNAL;
   }
-  ok = passert(tf, (gval == pval), "Got wrong value") && ok;
+  ok = check_str(tf, std::to_string(gval), std::to_string(pval), "Got wrong value") && ok;
 
   ret = PIOc_get_var(ncid, pio_cvar, &gcval);
   if(!check_ret(tf, ret, "Failed to get scalar char var:" + FNAME)){
     PIOc_closefile(ncid);
     return PIO_EINTERNAL;
   }
-  ok = passert(tf, (gcval == pcval), "Got wrong value") && ok;
+  ok = check_str(tf, std::string(1, gcval), std::string(1, pcval), "Got wrong value") && ok;
 
   PIOc_closefile(ncid);
   PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
@@ -507,7 +515,7 @@ static int test_put_get_1dvar_one_iotype(SPIO_TF::Test_framework &tf, int iotype
     PIOc_closefile(ncid);
     return PIO_EINTERNAL;
   }
-  ok = passert(tf, (std::string(gcval.begin(), gcval.end()) == pcval), "Got wrong value") && ok;
+  ok = check_str(tf, std::string(gcval.begin(), gcval.end()), pcval, "Got wrong value") && ok;
 
   PIOc_closefile(ncid);
   PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
@@ -787,6 +795,7 @@ template<typename T>
 static int test_put_get_1dvar_ls_buf_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
 {
   const int DIM_LEN = 200;
+  const int DIM_LARGE_LEN = DIM_LEN + 100;
   const int DIM_SMALL_LEN = DIM_LEN - 100;
   const std::string DIM_NAME("dummy_dim_put_val");
   const std::string SVAR_NAME("dummy_svar_put_val");
@@ -795,12 +804,17 @@ static int test_put_get_1dvar_ls_buf_one_iotype(SPIO_TF::Test_framework &tf, int
   const std::string LCVAR_NAME("dummy_lvar_put_cval");
 
   /* Buffer used to write svar/scvar (larger than the DIM_LEN-sized variable -
-   * only the first DIM_LEN elements are ever written out) */
-  std::vector<T> pval_large(DIM_LEN);
+   * only the first DIM_LEN elements are ever written out, so only those are
+   * initialized meaningfully; the tail, indices DIM_LEN..DIM_LARGE_LEN-1, is
+   * filled with a filler value that is never written out or compared, matching
+   * tests/general/ncdf_get_put.F90.in's lpval/lpcval DIM_LARGE_LEN buffers) */
+  std::vector<T> pval_large(DIM_LARGE_LEN);
   for(std::size_t i = 0; i < pval_large.size(); i++){
-    pval_large[i] = static_cast<T>(i + 1);
+    pval_large[i] = (i < static_cast<std::size_t>(DIM_LEN)) ?
+        static_cast<T>(i + 1) : static_cast<T>(tf.get_comm_size());
   }
-  const std::string pcval_large(DIM_LEN, 'l');
+  std::string pcval_large(DIM_LEN, 'l');
+  pcval_large.append(static_cast<std::size_t>(DIM_LARGE_LEN - DIM_LEN), ' ');
 
   /* Buffer used to write lvar/lcvar (smaller than the DIM_LEN-sized variable -
    * only a DIM_SMALL_LEN prefix of the variable is written out) */
@@ -941,7 +955,11 @@ static int test_put_get_1dvar_ls_buf_one_iotype(SPIO_TF::Test_framework &tf, int
     PIOc_closefile(ncid);
     return PIO_EINTERNAL;
   }
-  ok = check_val(tf, gval_full, pval_large,
+  /* Only the first DIM_LEN elements of pval_large/pcval_large were ever
+   * written out (the rest of the larger source buffer was never read by
+   * PIOc_put_vara), so only compare that written prefix */
+  std::vector<T> pval_large_written(pval_large.begin(), pval_large.begin() + DIM_LEN);
+  ok = check_val(tf, gval_full, pval_large_written,
       "Get variable written with large user buffer : Got wrong value") && ok;
 
   std::vector<char> gcval_full(DIM_LEN, '\0');
@@ -950,7 +968,7 @@ static int test_put_get_1dvar_ls_buf_one_iotype(SPIO_TF::Test_framework &tf, int
     PIOc_closefile(ncid);
     return PIO_EINTERNAL;
   }
-  ok = passert(tf, (std::string(gcval_full.begin(), gcval_full.end()) == pcval_large),
+  ok = check_str(tf, std::string(gcval_full.begin(), gcval_full.end()), pcval_large.substr(0, DIM_LEN),
       "Get variable written with large user buffer : Got wrong value") && ok;
 
   /* lvar/lcvar were written with a buffer smaller than the variable - only
@@ -971,7 +989,7 @@ static int test_put_get_1dvar_ls_buf_one_iotype(SPIO_TF::Test_framework &tf, int
     PIOc_closefile(ncid);
     return PIO_EINTERNAL;
   }
-  ok = passert(tf, (std::string(gcval_small.begin(), gcval_small.end()) == pcval_small),
+  ok = check_str(tf, std::string(gcval_small.begin(), gcval_small.end()), pcval_small,
       "Get variable written with small user buffer : Got wrong value") && ok;
 
   PIOc_closefile(ncid);
@@ -2268,7 +2286,7 @@ static int test_put_get_1d_str_arr_one_iotype(SPIO_TF::Test_framework &tf, int i
     std::string exp_str = make_dummy_str(index, STR_LEN);
     std::string res_str(gbuf1.begin() + static_cast<std::size_t>(index - 1) * STR_LEN,
         gbuf1.begin() + static_cast<std::size_t>(index) * STR_LEN);
-    ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+    ok = check_str(tf, res_str, exp_str, "Got wrong value") && ok;
   }
 
   /* This corresponds to the Fortran PIO_get_var(file, var, start, count, val),
@@ -2284,7 +2302,7 @@ static int test_put_get_1d_str_arr_one_iotype(SPIO_TF::Test_framework &tf, int i
     std::string exp_str = make_dummy_str(index, STR_LEN);
     std::string res_str(gbuf2.begin() + static_cast<std::size_t>(index - 1) * STR_LEN,
         gbuf2.begin() + static_cast<std::size_t>(index) * STR_LEN);
-    ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+    ok = check_str(tf, res_str, exp_str, "Got wrong value") && ok;
   }
 
   /* Read one string at a time, since the sizes differ (i.e. STR_LEN !=
@@ -2304,7 +2322,7 @@ static int test_put_get_1d_str_arr_one_iotype(SPIO_TF::Test_framework &tf, int i
       return PIO_EINTERNAL;
     }
     std::string res_str(single_str_buf.begin(), single_str_buf.begin() + STR_LEN);
-    ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+    ok = check_str(tf, res_str, exp_str, "Got wrong value") && ok;
 
     single_str_buf.assign(static_cast<std::size_t>(StrKIND), ' ');
     ret = PIOc_get_vara(ncid, pio_str_arr_var2, single_start, single_count, single_str_buf.data());
@@ -2313,7 +2331,7 @@ static int test_put_get_1d_str_arr_one_iotype(SPIO_TF::Test_framework &tf, int i
       return PIO_EINTERNAL;
     }
     res_str.assign(single_str_buf.begin(), single_str_buf.begin() + STR_LEN);
-    ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+    ok = check_str(tf, res_str, exp_str, "Got wrong value") && ok;
   }
 
   PIOc_closefile(ncid);
@@ -2486,7 +2504,7 @@ static int test_put_get_2d_str_arr_one_iotype(SPIO_TF::Test_framework &tf, int i
       std::string exp_str = make_dummy_str(index, STR_LEN);
       std::size_t cstr_idx = static_cast<std::size_t>(col - 1) * NUM_ROWS + (row - 1);
       std::string res_str(gbuf1.begin() + cstr_idx * STR_LEN, gbuf1.begin() + (cstr_idx + 1) * STR_LEN);
-      ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+      ok = check_str(tf, res_str, exp_str, "Got wrong value") && ok;
     }
   }
 
@@ -2505,7 +2523,7 @@ static int test_put_get_2d_str_arr_one_iotype(SPIO_TF::Test_framework &tf, int i
       std::string exp_str = make_dummy_str(index, STR_LEN);
       std::size_t cstr_idx = static_cast<std::size_t>(col - 1) * NUM_ROWS + (row - 1);
       std::string res_str(gbuf2.begin() + cstr_idx * STR_LEN, gbuf2.begin() + (cstr_idx + 1) * STR_LEN);
-      ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+      ok = check_str(tf, res_str, exp_str, "Got wrong value") && ok;
     }
   }
 
@@ -2531,7 +2549,7 @@ static int test_put_get_2d_str_arr_one_iotype(SPIO_TF::Test_framework &tf, int i
         return PIO_EINTERNAL;
       }
       std::string res_str(single_str_buf.begin(), single_str_buf.begin() + STR_LEN);
-      ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+      ok = check_str(tf, res_str, exp_str, "Got wrong value") && ok;
 
       single_str_buf.assign(static_cast<std::size_t>(StrKIND), ' ');
       ret = PIOc_get_vara(ncid, pio_str_arr_var2, single_start, single_count, single_str_buf.data());
@@ -2540,7 +2558,7 @@ static int test_put_get_2d_str_arr_one_iotype(SPIO_TF::Test_framework &tf, int i
         return PIO_EINTERNAL;
       }
       res_str.assign(single_str_buf.begin(), single_str_buf.begin() + STR_LEN);
-      ok = passert(tf, (res_str == exp_str), "Got wrong value") && ok;
+      ok = check_str(tf, res_str, exp_str, "Got wrong value") && ok;
     }
   }
 
@@ -2636,7 +2654,7 @@ static std::vector<std::string> unpack_text_buf(const std::vector<char> &buf,
  * put/get, put with a buffer smaller than the on-disk variable (and get it
  * back with a larger buffer), and put/get using an explicit hyperslab
  * (start/count). Ported from tests/general/ncdf_get_put.F90.in
- * (test_put_get_misc_str, L1811-2190). The three ADIOS/ADIOSC skip branches
+ * (test_put_get_misc_str, L1811-2190). The four ADIOS/ADIOSC skip branches
  * present in the Fortran source (around the 3D/4D-char var put and get) are
  * dead code for this port (see the file-top comment) and are dropped
  * entirely.
@@ -3048,7 +3066,7 @@ static int test_put_get_misc_str_one_iotype(SPIO_TF::Test_framework &tf, int iot
   {
     std::vector<std::string> res_str0d = unpack_text_buf(gbuf0d, STR_LEN, 1, STR_LEN);
     for(std::size_t i = 0; i < exp_str0d.size(); i++){
-      ok = passert(tf, (res_str0d[i] == exp_str0d[i]), "Got wrong value for 0d char var") && ok;
+      ok = check_str(tf, res_str0d[i], exp_str0d[i], "Got wrong value for 0d char var") && ok;
     }
   }
 
@@ -3061,7 +3079,7 @@ static int test_put_get_misc_str_one_iotype(SPIO_TF::Test_framework &tf, int iot
   {
     std::vector<std::string> res_str1d = unpack_text_buf(gbuf1d, STR_LEN, NUM_ROWS, STR_LEN);
     for(std::size_t i = 0; i < exp_str1d.size(); i++){
-      ok = passert(tf, (res_str1d[i] == exp_str1d[i]), "Got wrong value for 1d char var") && ok;
+      ok = check_str(tf, res_str1d[i], exp_str1d[i], "Got wrong value for 1d char var") && ok;
     }
   }
 
@@ -3074,7 +3092,7 @@ static int test_put_get_misc_str_one_iotype(SPIO_TF::Test_framework &tf, int iot
   {
     std::vector<std::string> res_str2d = unpack_text_buf(gbuf2d, STR_LEN, NUM_ROWS * NUM_COLS, STR_LEN);
     for(std::size_t i = 0; i < exp_str2d.size(); i++){
-      ok = passert(tf, (res_str2d[i] == exp_str2d[i]), "Got wrong value for 2d char var") && ok;
+      ok = check_str(tf, res_str2d[i], exp_str2d[i], "Got wrong value for 2d char var") && ok;
     }
   }
 
@@ -3087,7 +3105,7 @@ static int test_put_get_misc_str_one_iotype(SPIO_TF::Test_framework &tf, int iot
   {
     std::vector<std::string> res_str3d = unpack_text_buf(gbuf3d, STR_LEN, NUM_ROWS * NUM_COLS * NUM_STEPS, STR_LEN);
     for(std::size_t i = 0; i < exp_str3d.size(); i++){
-      ok = passert(tf, (res_str3d[i] == exp_str3d[i]), "Got wrong value for 3d char var") && ok;
+      ok = check_str(tf, res_str3d[i], exp_str3d[i], "Got wrong value for 3d char var") && ok;
     }
   }
 
@@ -3108,7 +3126,7 @@ static int test_put_get_misc_str_one_iotype(SPIO_TF::Test_framework &tf, int iot
   {
     std::vector<std::string> res_sstr0d = unpack_text_buf(glbuf0d, STR_LEN, 1, SHORT_STR_LEN);
     for(std::size_t i = 0; i < exp_sstr0d.size(); i++){
-      ok = passert(tf, (res_sstr0d[i] == exp_sstr0d[i]), "Got wrong value for 0d char var with large buf") && ok;
+      ok = check_str(tf, res_sstr0d[i], exp_sstr0d[i], "Got wrong value for 0d char var with large buf") && ok;
     }
   }
 
@@ -3121,7 +3139,7 @@ static int test_put_get_misc_str_one_iotype(SPIO_TF::Test_framework &tf, int iot
   {
     std::vector<std::string> res_sstr1d = unpack_text_buf(glbuf1d, STR_LEN, NUM_ROWS, SHORT_STR_LEN);
     for(std::size_t i = 0; i < exp_sstr1d.size(); i++){
-      ok = passert(tf, (res_sstr1d[i] == exp_sstr1d[i]), "Got wrong value for 1d char var with large buf") && ok;
+      ok = check_str(tf, res_sstr1d[i], exp_sstr1d[i], "Got wrong value for 1d char var with large buf") && ok;
     }
   }
 
@@ -3134,7 +3152,7 @@ static int test_put_get_misc_str_one_iotype(SPIO_TF::Test_framework &tf, int iot
   {
     std::vector<std::string> res_sstr2d = unpack_text_buf(glbuf2d, STR_LEN, NUM_ROWS * NUM_COLS, SHORT_STR_LEN);
     for(std::size_t i = 0; i < exp_sstr2d.size(); i++){
-      ok = passert(tf, (res_sstr2d[i] == exp_sstr2d[i]), "Got wrong value for 2d char var with large buf") && ok;
+      ok = check_str(tf, res_sstr2d[i], exp_sstr2d[i], "Got wrong value for 2d char var with large buf") && ok;
     }
   }
 
@@ -3149,7 +3167,7 @@ static int test_put_get_misc_str_one_iotype(SPIO_TF::Test_framework &tf, int iot
   {
     std::vector<std::string> res_hstr1d = unpack_text_buf(hsgbuf1d, STR_LEN, NUM_ROWS, STR_LEN);
     for(std::size_t i = 0; i < exp_hstr1d.size(); i++){
-      ok = passert(tf, (res_hstr1d[i] == exp_hstr1d[i]),
+      ok = check_str(tf, res_hstr1d[i], exp_hstr1d[i],
           "Got wrong value for 1d char var written with hslab put") && ok;
     }
   }
@@ -3163,7 +3181,7 @@ static int test_put_get_misc_str_one_iotype(SPIO_TF::Test_framework &tf, int iot
   {
     std::vector<std::string> res_hstr2d = unpack_text_buf(hsgbuf2d, STR_LEN, NUM_ROWS * NUM_COLS, STR_LEN);
     for(std::size_t i = 0; i < exp_hstr2d.size(); i++){
-      ok = passert(tf, (res_hstr2d[i] == exp_hstr2d[i]),
+      ok = check_str(tf, res_hstr2d[i], exp_hstr2d[i],
           "Got wrong value for 2d char var written with hslab put") && ok;
     }
   }
@@ -3177,7 +3195,7 @@ static int test_put_get_misc_str_one_iotype(SPIO_TF::Test_framework &tf, int iot
   {
     std::vector<std::string> res_hstr3d = unpack_text_buf(hsgbuf3d, STR_LEN, NUM_ROWS * NUM_COLS * NUM_STEPS, STR_LEN);
     for(std::size_t i = 0; i < exp_hstr3d.size(); i++){
-      ok = passert(tf, (res_hstr3d[i] == exp_hstr3d[i]),
+      ok = check_str(tf, res_hstr3d[i], exp_hstr3d[i],
           "Got wrong value for 3d char var written with hslab put") && ok;
     }
   }
@@ -3438,7 +3456,7 @@ static int test_put_get_str_frames_one_iotype(SPIO_TF::Test_framework &tf, int i
     std::string exp = spio_pad_str(spio_fmt_idx_str1(VAR2D_NAME, row + 1), STR_LEN);
     std::string res(gstr1d.begin() + static_cast<std::size_t>(row) * STR_LEN,
         gstr1d.begin() + static_cast<std::size_t>(row + 1) * STR_LEN);
-    ok = passert(tf, (res == exp), "Got wrong value for 1d char var") && ok;
+    ok = check_str(tf, res, exp, "Got wrong value for 1d char var") && ok;
   }
 
   std::vector<char> gstr2d(static_cast<std::size_t>(NUM_COLS) * NUM_ROWS * STR_LEN);
@@ -3452,7 +3470,7 @@ static int test_put_get_str_frames_one_iotype(SPIO_TF::Test_framework &tf, int i
       std::string exp = spio_pad_str(spio_fmt_idx_str2(VAR2D_NAME, row + 1, col + 1), STR_LEN);
       std::size_t off = (static_cast<std::size_t>(col) * NUM_ROWS + row) * STR_LEN;
       std::string res(gstr2d.begin() + off, gstr2d.begin() + off + STR_LEN);
-      ok = passert(tf, (res == exp), "Got wrong value for 2d char var") && ok;
+      ok = check_str(tf, res, exp, "Got wrong value for 2d char var") && ok;
     }
   }
 
@@ -3468,7 +3486,7 @@ static int test_put_get_str_frames_one_iotype(SPIO_TF::Test_framework &tf, int i
         std::string exp = spio_pad_str(spio_fmt_idx_str3(VAR3D_NAME, row + 1, col + 1, step + 1), STR_LEN);
         std::size_t off = ((static_cast<std::size_t>(step) * NUM_COLS + col) * NUM_ROWS + row) * STR_LEN;
         std::string res(gstr3d.begin() + off, gstr3d.begin() + off + STR_LEN);
-        ok = passert(tf, (res == exp), "Got wrong value for 3d char var") && ok;
+        ok = check_str(tf, res, exp, "Got wrong value for 3d char var") && ok;
       }
     }
   }
@@ -3643,6 +3661,7 @@ static int test_put_get_str_idx_one_iotype(SPIO_TF::Test_framework &tf, int ioty
     }
   }
 
+  /* Note: Fortran's pio_put_var1_text() writes only MIN(count, LEN_TRIM(str)) chars and leaves the rest as C_NULL_CHAR (not blank-padded), while spio_put_text_var1_row() below writes real blank padding for the remainder - both are self-consistent since the C API has no LEN_TRIM equivalent, so don't "fix" this to match. */
   /* The string written out is shorter than the declared string-length
    * dimension of the variable - only SHORT_STR_LEN chars are written,
    * leaving the rest of the row's string-length dimension untouched. */
@@ -3799,7 +3818,7 @@ static int test_put_get_str_idx_one_iotype(SPIO_TF::Test_framework &tf, int ioty
       PIOc_closefile(ncid);
       return PIO_EINTERNAL;
     }
-    ok = passert(tf, (res == exp), "Got wrong value for 1d char var") && ok;
+    ok = check_str(tf, res, exp, "Got wrong value for 1d char var") && ok;
   }
 
   for(int row = 0; row < NUM_ROWS; row++){
@@ -3810,7 +3829,7 @@ static int test_put_get_str_idx_one_iotype(SPIO_TF::Test_framework &tf, int ioty
       PIOc_closefile(ncid);
       return PIO_EINTERNAL;
     }
-    ok = passert(tf, (res == exp), "Got wrong value for short 1d char var") && ok;
+    ok = check_str(tf, res, exp, "Got wrong value for short 1d char var") && ok;
   }
 
   for(int row = 0; row < NUM_ROWS; row++){
@@ -3821,7 +3840,7 @@ static int test_put_get_str_idx_one_iotype(SPIO_TF::Test_framework &tf, int ioty
       PIOc_closefile(ncid);
       return PIO_EINTERNAL;
     }
-    ok = passert(tf, (res == exp), "Got wrong value for long 1d char var") && ok;
+    ok = check_str(tf, res, exp, "Got wrong value for long 1d char var") && ok;
   }
 
   for(int row = 0; row < NUM_ROWS; row++){
@@ -3837,7 +3856,7 @@ static int test_put_get_str_idx_one_iotype(SPIO_TF::Test_framework &tf, int ioty
       PIOc_closefile(ncid);
       return PIO_EINTERNAL;
     }
-    ok = passert(tf, (res == exp), "Got wrong value for truncatable 1d char var") && ok;
+    ok = check_str(tf, res, exp, "Got wrong value for truncatable 1d char var") && ok;
   }
 
   for(int row = 0; row < NUM_ROWS; row++){
@@ -3848,7 +3867,7 @@ static int test_put_get_str_idx_one_iotype(SPIO_TF::Test_framework &tf, int ioty
       PIOc_closefile(ncid);
       return PIO_EINTERNAL;
     }
-    ok = passert(tf, (res == exp), "Got wrong value for index write of 1d char var") && ok;
+    ok = check_str(tf, res, exp, "Got wrong value for index write of 1d char var") && ok;
   }
 
   PIOc_closefile(ncid);
@@ -4216,8 +4235,8 @@ static int test_put_get_str_hslabs_one_iotype(SPIO_TF::Test_framework &tf, int i
     PIOc_closefile(ncid);
     return PIO_EINTERNAL;
   }
-  ok = passert(tf, (std::string(gstr1d.begin(), gstr1d.end()) ==
-      std::string(exp_str1d.begin(), exp_str1d.end())),
+  ok = check_str(tf, std::string(gstr1d.begin(), gstr1d.end()),
+      std::string(exp_str1d.begin(), exp_str1d.end()),
       "Got wrong value for 1d char var with modified prefix") && ok;
 
   std::vector<char> gstr2d(exp_str2d.size(), '\0');
@@ -4226,8 +4245,8 @@ static int test_put_get_str_hslabs_one_iotype(SPIO_TF::Test_framework &tf, int i
     PIOc_closefile(ncid);
     return PIO_EINTERNAL;
   }
-  ok = passert(tf, (std::string(gstr2d.begin(), gstr2d.end()) ==
-      std::string(exp_str2d.begin(), exp_str2d.end())),
+  ok = check_str(tf, std::string(gstr2d.begin(), gstr2d.end()),
+      std::string(exp_str2d.begin(), exp_str2d.end()),
       "Got wrong value for 2d char var with modified prefix") && ok;
 
   std::vector<char> gstr3d(exp_str3d.size(), '\0');
@@ -4236,8 +4255,8 @@ static int test_put_get_str_hslabs_one_iotype(SPIO_TF::Test_framework &tf, int i
     PIOc_closefile(ncid);
     return PIO_EINTERNAL;
   }
-  ok = passert(tf, (std::string(gstr3d.begin(), gstr3d.end()) ==
-      std::string(exp_str3d.begin(), exp_str3d.end())),
+  ok = check_str(tf, std::string(gstr3d.begin(), gstr3d.end()),
+      std::string(exp_str3d.begin(), exp_str3d.end()),
       "Got wrong value for 3d char var with modified prefix") && ok;
 
   /* --- Phase 2 : rewrite the suffix of each stored string
@@ -4352,8 +4371,8 @@ static int test_put_get_str_hslabs_one_iotype(SPIO_TF::Test_framework &tf, int i
     PIOc_closefile(ncid);
     return PIO_EINTERNAL;
   }
-  ok = passert(tf, (std::string(gstr1d.begin(), gstr1d.end()) ==
-      std::string(exp_str1d.begin(), exp_str1d.end())),
+  ok = check_str(tf, std::string(gstr1d.begin(), gstr1d.end()),
+      std::string(exp_str1d.begin(), exp_str1d.end()),
       "Got wrong value for 1d char var with modified suffixes") && ok;
 
   ret = PIOc_get_var(ncid, var2d, gstr2d.data());
@@ -4361,8 +4380,8 @@ static int test_put_get_str_hslabs_one_iotype(SPIO_TF::Test_framework &tf, int i
     PIOc_closefile(ncid);
     return PIO_EINTERNAL;
   }
-  ok = passert(tf, (std::string(gstr2d.begin(), gstr2d.end()) ==
-      std::string(exp_str2d.begin(), exp_str2d.end())),
+  ok = check_str(tf, std::string(gstr2d.begin(), gstr2d.end()),
+      std::string(exp_str2d.begin(), exp_str2d.end()),
       "Got wrong value for 2d char var with modified suffixes") && ok;
 
   ret = PIOc_get_var(ncid, var3d, gstr3d.data());
@@ -4370,8 +4389,8 @@ static int test_put_get_str_hslabs_one_iotype(SPIO_TF::Test_framework &tf, int i
     PIOc_closefile(ncid);
     return PIO_EINTERNAL;
   }
-  ok = passert(tf, (std::string(gstr3d.begin(), gstr3d.end()) ==
-      std::string(exp_str3d.begin(), exp_str3d.end())),
+  ok = check_str(tf, std::string(gstr3d.begin(), gstr3d.end()),
+      std::string(exp_str3d.begin(), exp_str3d.end()),
       "Got wrong value for 3d char var with modified suffixes") && ok;
 
   PIOc_closefile(ncid);
