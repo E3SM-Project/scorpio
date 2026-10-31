@@ -133,6 +133,26 @@ void get_1d_rev_info(int rank, int sz, int &dim, PIO_Offset &start, int &count)
   start = num_even_procs_aftr_rank * VEC_LOCAL_SZ + num_odd_procs_aftr_rank * (VEC_LOCAL_SZ + 1) + 1;
 }
 
+/* Get a block cyclic decomposition with multiple regions to write
+ * from a single proc
+ * # All procs have VEC_LOCAL_SZ elements starting at offset rank+1
+ *   and also starting at offset (size * VEC_LOCAL_SZ)
+ * e.g. For VEC_LOCAL_SZ = 2, NUM_REGIONS=2
+ * e.g. 1)    [1,2,7,8] [3,4,9,10] [5,6,11,12]
+ */
+void get_1d_bc_mreg_info(int rank, int sz, int &dim, std::vector<PIO_Offset> &start, std::vector<int> &count)
+{
+  const int VEC_LOCAL_SZ = 7;
+  const int NUM_REGIONS = 3;
+  dim = sz * VEC_LOCAL_SZ * NUM_REGIONS;
+  start.resize(NUM_REGIONS);
+  count.resize(NUM_REGIONS);
+  for(int i = 0; i < NUM_REGIONS; i++){
+    count[i] = VEC_LOCAL_SZ;
+    start[i] = rank * VEC_LOCAL_SZ + i * (sz * VEC_LOCAL_SZ) + 1;
+  }
+}
+
 /* Test block cyclic interface
  * Write with one decomp and read with another
  * Test all combs
@@ -637,6 +657,370 @@ int nc_wr_1d_rev(SPIO_TF::Test_framework &tf)
   return PIO_NOERR;
 }
 
+/* Test PIOc_InitDecomp_bc() using start and count
+ * Write with one decomp and read with another
+ * Test all combs
+ * - no rearrage read + no rearrange write
+ * - rearrage read + no rearrange write
+ * - no rearrage read + rearrange write
+ * - rearrage read + rearrange write
+ */
+template<typename T>
+int nc_wr_rd_1d_bc_start_count(SPIO_TF::Test_framework &tf)
+{
+  SPIO_Util::Logger::MPI_logger<std::ofstream> logger = tf.get_logger();
+  int ret = PIO_NOERR;
+  bool enable_rd_rearr[2] = {false, true};
+  bool enable_wr_rearr[2] = {false, true};
+
+  for(int rd_rearr_opt_idx = 0; rd_rearr_opt_idx < 2; rd_rearr_opt_idx++){
+    for(int wr_rearr_opt_idx = 0; wr_rearr_opt_idx < 2; wr_rearr_opt_idx++){
+      bool rd_rearr = enable_rd_rearr[rd_rearr_opt_idx];
+      bool wr_rearr = enable_wr_rearr[wr_rearr_opt_idx];
+
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          std::string("Testing Rd rearr = ") + (rd_rearr ? "true" : "false") +
+          ", Write rearr = " + (wr_rearr ? "true" : "false") + "\n");
+
+      /* Set the decomposition for writing data */
+      PIO_Offset wr_start = 0;
+      int wr_count = 0, dim = 0;
+      get_1d_bc_info(tf.get_comm_rank(), tf.get_comm_size(), dim, wr_start, wr_count, wr_rearr);
+
+      std::vector<T> wbuf(wr_count);
+      for(int i = 0; i < wr_count; i++){
+        wbuf[i] = static_cast<T>(wr_start + i);
+      }
+
+      /* PIOc_InitDecomp_bc() expects a 0-based start, unlike the 1-based
+       * start returned by get_1d_bc_info() (used elsewhere to build 1-based
+       * compdof arrays for PIOc_InitDecomp()) */
+      long int wr_compstart = static_cast<long int>(wr_start) - 1;
+      long int wr_compcount = static_cast<long int>(wr_count);
+
+      int wr_iodesc = -1;
+      ret = PIOc_InitDecomp_bc(tf.get_iosysid(), Pio_type_map<T>::value, 1, &dim,
+              &wr_compstart, &wr_compcount, &wr_iodesc);
+      if(ret != PIO_NOERR){
+        logger.log(SPIO_Util::Logger::Log_level::INFO,
+            "ERROR: PIOc_InitDecomp_bc() FAILED (wr decomp), ret = " + std::to_string(ret) + "\n");
+        return PIO_EINTERNAL;
+      }
+
+      /* Set the decomposition for reading data - different from the write decomp */
+      PIO_Offset rd_start = 0;
+      int rd_count = 0;
+      get_1d_bc_info(tf.get_comm_rank(), tf.get_comm_size(), dim, rd_start, rd_count, rd_rearr);
+
+      std::vector<T> rbuf(rd_count, 0);
+      std::vector<T> exp_val(rd_count);
+      for(int i = 0; i < rd_count; i++){
+        /* Expected value, after reading, is the same as the compdof */
+        exp_val[i] = static_cast<T>(rd_start + i);
+      }
+
+      long int rd_compstart = static_cast<long int>(rd_start) - 1;
+      long int rd_compcount = static_cast<long int>(rd_count);
+
+      int rd_iodesc = -1;
+      ret = PIOc_InitDecomp_bc(tf.get_iosysid(), Pio_type_map<T>::value, 1, &dim,
+              &rd_compstart, &rd_compcount, &rd_iodesc);
+      if(ret != PIO_NOERR){
+        logger.log(SPIO_Util::Logger::Log_level::INFO,
+            "ERROR: PIOc_InitDecomp_bc() FAILED (rd decomp), ret = " + std::to_string(ret) + "\n");
+        return PIO_EINTERNAL;
+      }
+
+      /* Define/write/read data */
+      int num_flavors = 0;
+      int flavors[SPIO_TEST_NUM_FLAVORS];
+      get_iotypes(&num_flavors, flavors);
+
+      const std::string filename("test_pio_decomp_simple_tests.testfile");
+      const std::string PIO_VAR_NAME("PIO_TF_test_var");
+      for(int i = 0; i < num_flavors; i++){
+        int ncid = -1, dimid = -1, varid = -1;
+        char iotype_name[PIO_MAX_NAME + 1];
+
+        get_iotype_name(flavors[i], iotype_name);
+        logger.log(SPIO_Util::Logger::Log_level::INFO,
+            std::string("Testing : nc_wr_rd_1d_bc_start_count : ") + iotype_name + "\n");
+
+        ret = PIOc_createfile(tf.get_iosysid(), &ncid, &(flavors[i]), filename.c_str(), PIO_CLOBBER);
+        if(ret != PIO_NOERR){
+          logger.log(SPIO_Util::Logger::Log_level::INFO,
+              "ERROR: Could not create file " + filename + "\n");
+          return PIO_EINTERNAL;
+        }
+
+        ret = PIOc_def_dim(ncid, "PIO_TF_test_dim", dim, &dimid);
+        if(ret != PIO_NOERR){
+          logger.log(SPIO_Util::Logger::Log_level::INFO,
+              "ERROR: Failed to define a dim : " + filename + "\n");
+          return PIO_EINTERNAL;
+        }
+
+        ret = PIOc_def_var(ncid, PIO_VAR_NAME.c_str(), Pio_type_map<T>::value, 1, &dimid, &varid);
+        if(ret != PIO_NOERR){
+          logger.log(SPIO_Util::Logger::Log_level::INFO,
+              "ERROR: Failed to define a var : " + filename + "\n");
+          return PIO_EINTERNAL;
+        }
+
+        ret = PIOc_enddef(ncid);
+        if(ret != PIO_NOERR){
+          logger.log(SPIO_Util::Logger::Log_level::INFO,
+              "ERROR: Failed to end redef mode : " + filename + "\n");
+          return PIO_EINTERNAL;
+        }
+
+        /* Write the variable out */
+        ret = PIOc_write_darray(ncid, varid, wr_iodesc, wr_count, wbuf.data(), NULL);
+        if(ret != PIO_NOERR){
+          logger.log(SPIO_Util::Logger::Log_level::INFO,
+              "ERROR: Failed to write darray : " + filename + "\n");
+          return PIO_EINTERNAL;
+        }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+        ret = PIOc_closefile(ncid);
+        if(ret != PIO_NOERR){
+          logger.log(SPIO_Util::Logger::Log_level::INFO,
+              "ERROR: Failed to close file : " + filename + "\n");
+          return PIO_EINTERNAL;
+        }
+
+        ret = PIOc_openfile(tf.get_iosysid(), &ncid, &(flavors[i]), filename.c_str(), PIO_NOWRITE);
+        if(ret != PIO_NOERR){
+          logger.log(SPIO_Util::Logger::Log_level::INFO,
+              "ERROR: Could not reopen file : " + filename + "\n");
+          return PIO_EINTERNAL;
+        }
+
+        ret = PIOc_inq_varid(ncid, PIO_VAR_NAME.c_str(), &varid);
+        if(ret != PIO_NOERR){
+          logger.log(SPIO_Util::Logger::Log_level::INFO,
+              "ERROR: Could not inq var : " + filename + "\n");
+          return PIO_EINTERNAL;
+        }
+#else
+        ret = PIOc_sync(ncid);
+        if(ret != PIO_NOERR){
+          logger.log(SPIO_Util::Logger::Log_level::INFO,
+              "ERROR: Failed to sync file : " + filename + "\n");
+          return PIO_EINTERNAL;
+        }
+#endif
+
+        for(std::size_t j = 0; j < rbuf.size(); j++){
+          rbuf[j] = 0;
+        }
+        ret = PIOc_read_darray(ncid, varid, rd_iodesc, rd_count, rbuf.data());
+        if(ret != PIO_NOERR){
+          logger.log(SPIO_Util::Logger::Log_level::INFO,
+              "ERROR: Failed to read darray : " + filename + "\n");
+          return PIO_EINTERNAL;
+        }
+
+        if(!check_val(tf, rbuf, exp_val, "Got wrong val")){
+          return PIO_EINTERNAL;
+        }
+
+        ret = PIOc_closefile(ncid);
+        if(ret != PIO_NOERR){
+          logger.log(SPIO_Util::Logger::Log_level::INFO,
+              "ERROR: Failed to close file : " + filename + "\n");
+          return PIO_EINTERNAL;
+        }
+
+        ret = PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+        if(ret != PIO_NOERR){
+          logger.log(SPIO_Util::Logger::Log_level::INFO,
+              "ERROR: Failed to delete file : " + filename + "\n");
+          return PIO_EINTERNAL;
+        }
+      }
+
+      ret = PIOc_freedecomp(tf.get_iosysid(), rd_iodesc);
+      if(ret != PIO_NOERR){
+        logger.log(SPIO_Util::Logger::Log_level::INFO,
+            "ERROR: PIOc_freedecomp() FAILED (rd decomp), ret = " + std::to_string(ret) + "\n");
+        return PIO_EINTERNAL;
+      }
+
+      ret = PIOc_freedecomp(tf.get_iosysid(), wr_iodesc);
+      if(ret != PIO_NOERR){
+        logger.log(SPIO_Util::Logger::Log_level::INFO,
+            "ERROR: PIOc_freedecomp() FAILED (wr decomp), ret = " + std::to_string(ret) + "\n");
+        return PIO_EINTERNAL;
+      }
+    } /* wr_rearr_opt_idx */
+  } /* rd_rearr_opt_idx */
+
+  return PIO_NOERR;
+}
+
+/* Test write/read of a variable where each proc writes/reads multiple
+ * regions of the data
+ */
+template<typename T>
+int nc_wr_rd_mreg_1d_bc(SPIO_TF::Test_framework &tf)
+{
+  SPIO_Util::Logger::MPI_logger<std::ofstream> logger = tf.get_logger();
+  int ret = PIO_NOERR;
+  int dim = 0;
+  std::vector<PIO_Offset> start;
+  std::vector<int> count;
+
+  get_1d_bc_mreg_info(tf.get_comm_rank(), tf.get_comm_size(), dim, start, count);
+
+  int total_count = 0;
+  for(std::size_t i = 0; i < count.size(); i++){
+    total_count += count[i];
+  }
+
+  std::vector<T> wbuf(total_count);
+  std::vector<T> rbuf(total_count);
+  std::vector<PIO_Offset> compdof(total_count);
+  int idx = 0;
+  for(std::size_t i = 0; i < count.size(); i++){
+    for(int j = 0; j < count[i]; j++){
+      compdof[idx] = static_cast<PIO_Offset>(start[i] + j);
+      wbuf[idx] = static_cast<T>(compdof[idx]);
+      rbuf[idx] = static_cast<T>(compdof[idx]);
+      idx++;
+    }
+  }
+
+  int iodesc = -1;
+  ret = PIOc_InitDecomp(tf.get_iosysid(), Pio_type_map<T>::value, 1, &dim,
+          total_count, compdof.data(), &iodesc, NULL, NULL, NULL);
+  if(ret != PIO_NOERR){
+    logger.log(SPIO_Util::Logger::Log_level::INFO,
+        "ERROR: PIOc_InitDecomp() FAILED, ret = " + std::to_string(ret) + "\n");
+    return PIO_EINTERNAL;
+  }
+
+  /* Define/write/read data */
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  const std::string filename("test_pio_decomp_simple_tests.testfile");
+  const std::string PIO_VAR_NAME("PIO_TF_test_var");
+  for(int i = 0; i < num_flavors; i++){
+    int ncid = -1, dimid = -1, varid = -1;
+    char iotype_name[PIO_MAX_NAME + 1];
+
+    get_iotype_name(flavors[i], iotype_name);
+    logger.log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : nc_wr_rd_mreg_1d_bc : ") + iotype_name + "\n");
+
+    ret = PIOc_createfile(tf.get_iosysid(), &ncid, &(flavors[i]), filename.c_str(), PIO_CLOBBER);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Could not create file " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_def_dim(ncid, "PIO_TF_test_dim", dim, &dimid);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to define a dim : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_def_var(ncid, PIO_VAR_NAME.c_str(), Pio_type_map<T>::value, 1, &dimid, &varid);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to define a var : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_enddef(ncid);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to end redef mode : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    /* Write the variable out */
+    ret = PIOc_write_darray(ncid, varid, iodesc, total_count, wbuf.data(), NULL);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to write darray : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+    ret = PIOc_closefile(ncid);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to close file : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_openfile(tf.get_iosysid(), &ncid, &(flavors[i]), filename.c_str(), PIO_NOWRITE);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Could not reopen file : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_inq_varid(ncid, PIO_VAR_NAME.c_str(), &varid);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Could not inq var : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+#else
+    ret = PIOc_sync(ncid);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to sync file : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+#endif
+
+    for(std::size_t j = 0; j < rbuf.size(); j++){
+      rbuf[j] = 0;
+    }
+    ret = PIOc_read_darray(ncid, varid, iodesc, total_count, rbuf.data());
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to read darray : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    if(!check_val(tf, rbuf, wbuf, "Got wrong val")){
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_closefile(ncid);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to close file : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+
+    ret = PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO,
+          "ERROR: Failed to delete file : " + filename + "\n");
+      return PIO_EINTERNAL;
+    }
+  }
+
+  ret = PIOc_freedecomp(tf.get_iosysid(), iodesc);
+  if(ret != PIO_NOERR){
+    logger.log(SPIO_Util::Logger::Log_level::INFO,
+        "ERROR: PIOc_freedecomp() FAILED, ret = " + std::to_string(ret) + "\n");
+    return PIO_EINTERNAL;
+  }
+
+  return PIO_NOERR;
+}
+
 int main(int argc, char *argv[])
 {
   int ret = MPI_SUCCESS, nerrs = 0;
@@ -655,7 +1039,13 @@ int main(int argc, char *argv[])
     {"nc_wr_1d_bc_with_holes_double", nc_wr_1d_bc_with_holes<double>},
     {"nc_wr_1d_rev_int", nc_wr_1d_rev<int>},
     {"nc_wr_1d_rev_float", nc_wr_1d_rev<float>},
-    {"nc_wr_1d_rev_double", nc_wr_1d_rev<double>}
+    {"nc_wr_1d_rev_double", nc_wr_1d_rev<double>},
+    {"nc_wr_rd_1d_bc_start_count_int", nc_wr_rd_1d_bc_start_count<int>},
+    {"nc_wr_rd_1d_bc_start_count_float", nc_wr_rd_1d_bc_start_count<float>},
+    {"nc_wr_rd_1d_bc_start_count_double", nc_wr_rd_1d_bc_start_count<double>},
+    {"nc_wr_rd_mreg_1d_bc_int", nc_wr_rd_mreg_1d_bc<int>},
+    {"nc_wr_rd_mreg_1d_bc_float", nc_wr_rd_mreg_1d_bc<float>},
+    {"nc_wr_rd_mreg_1d_bc_double", nc_wr_rd_mreg_1d_bc<double>}
   };
 
   SPIO_TF::Test_framework tf("pio_decomp_tests_1d_cxx", MPI_COMM_WORLD, rfuncs);
