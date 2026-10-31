@@ -225,3 +225,15 @@ add_pio_test(pio_async_decomp_tests_cxx
   MINSTRIDE 1
   MAXSTRIDE 1
   TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+
+add_spio_executable(ncdf_inq_cxx TRUE "" ncdf_inq.cpp ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
+
+add_pio_test(ncdf_inq_cxx
+  EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/ncdf_inq_cxx
+  MINNUMPROCS 4
+  MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}
+  MINNUMIOPROCS 2
+  MAXNUMIOPROCS ${PIO_TF_C2_MAXNUMIOPROCS}
+  MINSTRIDE 1
+  MAXSTRIDE ${PIO_TF_C2_MAXSTRIDE}
+  TIMEOUT ${DEFAULT_TEST_TIMEOUT})
