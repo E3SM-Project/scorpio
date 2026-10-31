@@ -256,7 +256,7 @@ int nc_write_large_1d_fval(SPIO_TF::Test_framework &tf)
       return PIO_EINTERNAL;
     }
 
-    ret = PIOc_openfile(tf.get_iosysid(), &ncid, &(flavors[i]), filename.c_str(), PIO_WRITE);
+    ret = PIOc_openfile(tf.get_iosysid(), &ncid, &(flavors[i]), filename.c_str(), PIO_NOWRITE);
     if(!check_ret(tf, ret, "Could not reopen file : " + filename)){
       return PIO_EINTERNAL;
     }
