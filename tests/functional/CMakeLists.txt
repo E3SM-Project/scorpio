@@ -213,3 +213,15 @@ add_pio_test(pio_copy_cxx
   MINSTRIDE 1
   MAXSTRIDE ${PIO_TF_C1_MAXSTRIDE}
   TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+
+add_spio_executable(pio_async_decomp_tests_cxx TRUE "" pio_async_decomp_tests.cpp ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
+
+add_pio_test(pio_async_decomp_tests_cxx
+  EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_async_decomp_tests_cxx
+  MINNUMPROCS 3
+  MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}
+  MINNUMIOPROCS 1
+  MAXNUMIOPROCS 1
+  MINSTRIDE 1
+  MAXSTRIDE 1
+  TIMEOUT ${DEFAULT_TEST_TIMEOUT})
