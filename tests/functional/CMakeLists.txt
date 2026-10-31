@@ -335,3 +335,15 @@ add_pio_test(pio_async_init_finalize_cxx
   MINSTRIDE 1
   MAXSTRIDE 1
   TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+
+add_spio_executable(pio_decomp_tests2_1d_cxx TRUE "" pio_decomp_tests2_1d.cpp ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
+
+add_pio_test(pio_decomp_tests2_1d_cxx
+  EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_decomp_tests2_1d_cxx
+  MINNUMPROCS 1
+  MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}
+  MINNUMIOPROCS 1
+  MAXNUMIOPROCS ${PIO_TF_C2_MAXNUMIOPROCS}
+  MINSTRIDE 1
+  MAXSTRIDE ${PIO_TF_C2_MAXSTRIDE}
+  TIMEOUT ${DEFAULT_TEST_TIMEOUT})
