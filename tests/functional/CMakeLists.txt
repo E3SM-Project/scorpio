@@ -189,3 +189,15 @@ add_pio_test(ncdf_eh_one_test_cxx
   MINSTRIDE 1
   MAXSTRIDE ${PIO_TF_C2_MAXSTRIDE}
   TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+
+add_spio_executable(pio_set_hint_cxx TRUE "" pio_set_hint.cpp ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
+
+add_pio_test(pio_set_hint_cxx
+  EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_set_hint_cxx
+  MINNUMPROCS 1
+  MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}
+  MINNUMIOPROCS 1
+  MAXNUMIOPROCS ${PIO_TF_C1_MAXNUMIOPROCS}
+  MINSTRIDE 1
+  MAXSTRIDE ${PIO_TF_C1_MAXSTRIDE}
+  TIMEOUT ${DEFAULT_TEST_TIMEOUT})
