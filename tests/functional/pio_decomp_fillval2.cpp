@@ -270,12 +270,12 @@ int nc_wr_1d_mreg_imp_fval(SPIO_TF::Test_framework &tf)
   int flavors[SPIO_TEST_NUM_FLAVORS];
   get_iotypes(&num_flavors, flavors);
 
-  const std::string filename("test_pio_decomp_fillval_tests.testfile");
   const std::string PIO_VAR1_NAME("PIO_TF_test_var1");
   const std::string PIO_VAR2_NAME("PIO_TF_test_var2");
   for(int i = 0; i < num_flavors; i++){
     int ncid = -1, dimid = -1, varid1 = -1, varid2 = -1;
     char iotype_name[PIO_MAX_NAME + 1];
+    std::string filename("test_pio_decomp_fillval_tests.testfile" + std::to_string(i + 1));
 
     get_iotype_name(flavors[i], iotype_name);
     tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
