@@ -1,0 +1,1100 @@
+# Fortran -> C++ test port roadmap
+
+Tracks the ongoing effort to port all Fortran tests in `tests/general` to
+C++ functional tests in `tests/functional`, one file (or small bundle of
+tiny files) at a time, each via `superpowers:writing-plans` +
+`superpowers:subagent-driven-development`, following the pattern
+established by `2026-10-30-port-pio-decomp-tests-to-cxx.md`.
+
+**Non-negotiable constraints (apply to every file below, carried from the
+first plan):**
+- Fortran tests in `tests/general` are NEVER removed or modified, only read.
+- 1:1 file naming: `tests/general/X.F90.in` -> `tests/functional/X.cpp`
+  (for bundles, name the bundle's `.cpp` after the cluster, see below).
+- Reuse `tests/util/spio_test_framework.hpp`, `spio_test_common.hpp`
+  (`get_iotypes`/`get_iotype_name`), `spio_test_check.hpp` (`check_val`,
+  `Pio_type_map`) — extend them only when a new file needs something they
+  don't yet provide, never duplicate.
+- C++ style pinned to `tests/cunit/test_spio_rearr_contig.cpp`'s
+  conventions (2-space indent, no space before `(` after keywords,
+  same-line opening braces, `std::size_t` for vector-index loops,
+  `PIO_NOERR`/`PIO_EINTERNAL` + `logger.log(...)`, no `std::cerr`/exceptions,
+  `const int` not `#define`), as established and reviewed in the first plan.
+- No external `.in`-to-`.cpp` generation scripts.
+- Each file's CMake target name gets a `_cxx` suffix if it would otherwise
+  collide with the existing Fortran target of the same name (per the
+  Task-1 ruling in the first plan) — check for collisions before naming.
+
+**Ordering:** smallest-first by line count. **Batching:** files under
+~100 lines are bundled into one plan/SDD run each; everything else gets
+its own plan. **Check-ins:** a brief status message after each file/bundle's
+SDD run (including final review + any fix round) completes and the branch
+is green — the user asked for this (not continuous silent execution).
+
+## Status legend
+`[ ]` pending · `[~]` in progress · `[x]` done
+
+## Roadmap (smallest-first, as inventoried 2026-10-30)
+
+### Bundle 1: tiny files (~100 lines or less), one shared plan
+- [x] `pio_decomp_large_tests.F90.in` (23 lines)
+- [x] `pio_fail.F90.in` (25 lines)
+- [x] `pio_init_finalize.F90.in` (40 lines)
+- [x] `pio_file_fail.F90.in` (51 lines)
+- [x] `pio_file_simple_tests.F90.in` (68 lines)
+- [x] `ncdf_eh_one_test.F90.in` (100 lines)
+
+### Individual files, smallest to largest
+- [x] `pio_set_hint.F90.in` (117 lines)
+- [x] `pio_copy.F90.in` (146 lines)
+- [x] `pio_async_decomp_tests.F90.in` (155 lines)
+- [x] `ncdf_inq.F90.in` (191 lines)
+- [x] `pio_async_file_tests.F90.in` (193 lines)
+- [x] `ncdf_fail.F90.in` (221 lines)
+- [x] `pio_decomp_tests_3d.F90.in` (221 lines)
+- [x] `pio_iosystem_tests2.F90.in` (246 lines)
+- [x] `pio_rearr.F90.in` (260 lines)
+- [x] `pio_iosystem_tests3.F90.in` (292 lines)
+- [x] `ncdf_simple_tests.F90.in` (310 lines)
+- [x] `pio_async_init_finalize.F90.in` (334 lines)
+- [x] `pio_decomp_tests2_1d.F90.in` (354 lines)
+- [x] `pio_async_copy_tests.F90.in` (357 lines)
+- [ ] `pio_iosystem_tests.F90.in` (372 lines)
+- [ ] `pio_decomp_tests_2d.F90.in` (391 lines)
+- [ ] `pio_async_decomp_tests_1d.F90.in` (420 lines)
+- [ ] `pio_rearr_opts2.F90.in` (424 lines)
+- [ ] `pio_large_file_tests.F90.in` (433 lines)
+- [ ] `pio_rearr_opts.F90.in` (487 lines)
+- [ ] `pio_buf_lim_tests.F90.in` (506 lines)
+- [ ] `pio_decomp_fillval.F90.in` (540 lines)
+- [ ] `pio_iodesc_tests.F90.in` (634 lines)
+- [ ] `pio_decomp_fillval2.F90.in` (645 lines)
+- [ ] `pio_decomp_frame_tests.F90.in` (661 lines)
+- [ ] `pio_decomp_tests_1d.F90.in` (727 lines)
+- [ ] `pio_sync_tests.F90.in` (802 lines)
+- [ ] `pio_decomp_extra_dims.F90.in` (896 lines)
+- [ ] `ncdf_get_put.F90.in` (3283 lines)
+
+## Already done (before this roadmap)
+- [x] `pio_decomp_tests.F90.in` (539 lines) -> `tests/functional/pio_decomp_tests.cpp`
+  — see `2026-10-30-port-pio-decomp-tests-to-cxx.md`.
+
+## Per-file log
+
+(Append one entry per completed file/bundle: plan file path, commit
+range, any ruling made, final review verdict.)
+
+### Bundle 1 — `pio_decomp_large_tests`, `pio_fail`, `pio_init_finalize`, `pio_file_fail`, `pio_file_simple_tests`, `ncdf_eh_one_test`
+- Plan: `docs/superpowers/plans/2026-10-30-port-fortran-bundle1-to-cxx.md`
+- Commit range: `c3c0e0ba0e..f71b3e3eff` on `jayeshkrishna/port_fortran_tests_to_cxx`
+- Task 2 (`pio_fail.cpp`) ruling: plan text itself had a bug (`tf.run();`
+  instead of `nerrs += tf.run();`), causing all 9 WILLFAIL ctest entries
+  to pass vacuously (exit 0 always). Fixed at the plan-text source and
+  one fix round on the same implementer; re-review confirmed 9/9 correct
+  (binary now exits nonzero as intended).
+- Task 5 (`pio_file_fail.cpp`) ruling: implementer added
+  `PIOc_set_iosystem_error_handling(..., PIO_BCAST_ERROR, &old_handler)`
+  in `main()`, not in the brief's literal snippet but verified necessary
+  — `Test_framework::init_iosystem()` doesn't default to `PIO_BCAST_ERROR`
+  the way the Fortran framework does, so the C library's real default
+  (`PIO_INTERNAL_ERROR`) would abort on the first undefined-iotype call.
+  Judged correct and file-local; not pushed into shared `tests/util`.
+- Task 6 (`ncdf_eh_one_test.cpp`) scope ruling: ported only the 3
+  non-aborting error handlers (`PIO_BCAST_ERROR`, `PIO_REDUCE_ERROR`,
+  `PIO_RETURN_ERROR`), looped internally across all iotypes in one
+  binary. The 5 Fortran `WILLFAIL`/`PIO_INTERNAL_ERROR`-per-iotype ctest
+  variants are **not ported** — would need generic `--pio-tf-targ-*` CLI
+  passthrough added to `Test_framework` (doesn't exist today) plus a way
+  to mark one iotype's run as an expected-abort inside a multi-iotype
+  loop. Recorded here as an explicit, known gap for a future bundle, not
+  silently dropped.
+- Final whole-branch review found 2 real pre-existing defects (both
+  invisible in this PnetCDF-only dev build, so missed by every per-task
+  review): (1) Critical — `get_undef_iotypes()` classified
+  ADIOS/ADIOSC/HDF5/HDF5C via `PIOc_iotype_available()`, which has no
+  case for any of the four and always reports them unavailable; the real
+  gate `PIOc_createfile` uses is `iotype_is_valid()`
+  (`src/clib/core/pioc_support.cpp`), gating ADIOS/ADIOSC under
+  `_ADIOS2` and HDF5/HDF5C under `_HDF5` (HDF5C additionally needs
+  `_SPIO_HDF5_USE_COMPRESSION`); (2) Important — `pio_file_simple_tests`'s
+  netcdf-family `enddef` guard was inverted relative to the Fortran
+  `PIO_TF_Is_netcdf` semantics. Plus 2 minor hardening items (file handle
+  leak, uninitialized buffer). Fixed in one round (commit `0c9e5a7fa9`).
+  A scoped re-review of that fix caught a second-order defect
+  self-introduced in the fix brief (ADIOSC given an incorrect compression
+  sub-guard that doesn't match `iotype_is_valid()`'s real logic, and
+  which also mirrors a latent quirk in the Fortran reference itself,
+  not something to blindly copy) — corrected in a second fix round
+  (commit `f71b3e3eff`), independently re-verified against
+  `iotype_is_valid()` directly rather than trusting either prior report.
+- Final review verdict: **Approved**. `tests/general` untouched
+  throughout (zero diff lines in that directory across the whole bundle).
+
+### `pio_set_hint`
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-set-hint-to-cxx.md`
+- Commit: `30d30b6149` on `jayeshkrishna/port_fortran_tests_to_cxx`
+  (base `f71b3e3eff`).
+- Scope ruling: the Fortran reference's `PIO_TF_Get_nc_iotypes` is, despite
+  its name, not limited to the netcdf family (includes adios/adiosc/hdf5/
+  hdf5c too). This port uses the existing `get_iotypes()` 5-flavor helper
+  instead, consistent with the rest of `tests/functional`, rather than add
+  a new helper replicating that broader scope. Documented as low-cost if
+  wrong — a future file can add a dedicated helper if it genuinely needs
+  the wider set.
+- One deviation reported and verified: implementer added the standard GPTL
+  header-guard block (missing from the plan's code block, present in every
+  other ported file) — required for the build; task reviewer confirmed it
+  byte-for-byte matches `pio_file_fail.cpp`/`pio_file_simple_tests.cpp`/
+  `ncdf_eh_one_test.cpp`.
+- Single-task plan: the task review doubled as the whole-branch final
+  review (ruling recorded in this plan's now-deleted SDD ledger).
+- Final review verdict: **Approved**. `tests/general` untouched.
+
+### `pio_copy`
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-copy-to-cxx.md`
+- Commit: `aa7f1ca6b8` on `jayeshkrishna/port_fortran_tests_to_cxx`
+  (base `30d30b6149`).
+- Templated-type pattern: `template<typename T> test_copy_att<T>`, explicitly
+  instantiated for int/float/double and registered as 3 named `rfuncs`
+  entries, mirroring `pio_decomp_tests.cpp`'s precedent for the Fortran
+  `PIO_TF_TEMPLATE` 3-way expansion. Uses generic (non-type-suffixed)
+  `PIOc_put_att`/`PIOc_get_att` to keep the template uniform over `T`.
+- One deviation reported and verified: the plan's own draft had the GPTL
+  guard block placed after the `spio_test_framework.hpp` include (a plan
+  defect, not an implementer error); implementer reordered it to match
+  `pio_set_hint.cpp`'s real, working order.
+- Task reviewer independently verified every Review Focus item (per-type
+  numeric round-trip, independent char-attribute round-trip, all 4
+  global+variable `PIOc_copy_att` calls, complete error-path ncid cleanup
+  across 22 branches, consistent iotype for input/output). Two Minor,
+  non-blocking notes parked (missing explicit `<algorithm>` include for
+  `std::fill`; reused test filenames across iotype/type combos, safe due
+  to `PIO_CLOBBER`, matching sibling-file convention).
+- Single-task plan: the task review doubled as the whole-branch final
+  review.
+- Final review verdict: **Approved**. `tests/general` untouched.
+
+### `pio_async_decomp_tests`
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-async-decomp-tests-to-cxx.md`
+- Commit: `a990c5000f` on `jayeshkrishna/port_fortran_tests_to_cxx`
+  (base `aa7f1ca6b8`).
+- First C++ port of SCORPIO's asynchronous (multi-component intercomm) I/O
+  mode — architecturally different from every prior ported file. Confirmed
+  via reading `PIOc_init_intercomm_impl()`
+  (`src/clib/core/pioc.cpp:2620-3171`) that it's collective over the full
+  `peer_comm` for every component index regardless of local ownership, and
+  that `iosysidps[i]` is populated with a valid id for every index on
+  every process — so every compute rank correctly finalizes all
+  `NUM_COMPONENTS` iosysids, not just its own, matching the Fortran
+  reference.
+- Architectural ruling: `Test_framework::init_iosystem()`/`get_iosysid()`/
+  `finalize_iosystem()` only support the single synchronous iosystem case
+  and have no intercomm support, so this file bypasses them entirely —
+  `main()` uses only `tf.init()`/`tf.run()`/`tf.finalize()`, and the
+  registered test function manages its own comm-split + per-component
+  `PIOc_init_intercomm`/`PIOc_finalize` lifecycle directly. This pattern
+  is expected to be reused by the other `pio_async_*` files later in the
+  roadmap.
+- Critical safety ruling: `check_ret()`/`passert()`/`check_val()`
+  (`tests/util/spio_test_check.hpp`) do an `MPI_Allreduce` over the full
+  world comm, but once ranks diverge into I/O vs. compute role, the I/O
+  rank is blocked inside its own `PIOc_init_intercomm()` call until every
+  compute rank finalizes — so any of those helpers reaching the diverged
+  region would deadlock. The port uses purely local `nerrs`/
+  `tf.get_logger().log()` (confirmed non-collective) in that region
+  instead, relying on `Test_framework::run()`'s own post-return
+  `MPI_Reduce` for the final tally.
+- Task reviewer independently re-verified the no-deadlock property from
+  source (not from the implementer's report), re-ran ctest (2/2 pass) plus
+  direct `mpirun` at np=1..6 (all exit 0, no hang), and confirmed
+  `tests/general` untouched branch-wide, `_cxx` target naming, both
+  rearrangers, and all 3 type instantiations.
+- 4 Minor findings parked, none blocking: unreachable compute-rank error
+  logs (only rank 0, always the I/O rank, emits logger output — a
+  `Test_framework`-level limitation, out of this task's scope);
+  unchecked `MPI_Comm_split`/`size`/`rank`/`free` return codes (small
+  fidelity gap vs. the Fortran, which checks `MPI_Comm_free`'s `ierr`);
+  latent OOB `comp_comms[-2]` if `split_world_ncomms()`'s early-return
+  path were ever reachable (unreachable today since `MIN_NUM_PROCS ==
+  NCOMMS`); theoretical hang if `PIOc_init_intercomm()` failed on a
+  compute rank only (same shape as the Fortran reference, which checks
+  even less). All judged low-cost-if-wrong, pre-existing-shape, not
+  regressions introduced by this port.
+- Single-task plan: the task review doubled as the whole-branch final
+  review.
+- Final review verdict: **Approved**. `tests/general` untouched.
+
+### `pio_async_file_tests`
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-async-file-tests-to-cxx.md`
+- Commit: `dd39ac9f64` on `jayeshkrishna/port_fortran_tests_to_cxx`
+  (base `7234868e80`).
+- Reuses the async-I/O architecture established in
+  `pio_async_decomp_tests.cpp` (2 compute components + 1 I/O comm,
+  `PIOc_init_intercomm`/`PIOc_finalize`, `init_iosystem()`/
+  `finalize_iosystem()` bypassed), but goes further: the Fortran reference
+  actually performs real file I/O (metadata only, no data payload) inside
+  the diverged compute-only region and checks return codes there via the
+  3-argument `PIO_TF_CHECK_ERR(ret, new_comm, msg)` form — confirmed via
+  `tests/general/util/pio_tf_f90gen.pl:415-427` to be a genuine
+  `MPI_Allreduce`-style reduction scoped to the passed-in comm (not a
+  no-op, not the full test comm). The port reproduces this faithfully with
+  a new local helper, `check_ret_over_comm()`, doing a real
+  `MPI_Allreduce(MPI_LAND)` over the compute component's own `new_comm`
+  (which structurally excludes the blocked I/O rank, so no deadlock risk)
+  — a stronger, more faithful check than the predecessor file's
+  local-only accumulation, since here the Fortran itself performs a real
+  collective check, not a vacuous/absent one.
+- Faithfulness ruling: the Fortran's `PIO_TF_ASSERT` (used for the
+  var name/type/ndims inquiry checks) was confirmed via
+  `tests/general/util/pio_tf_f90gen.pl:404-413` to perform **no**
+  cross-rank communication at all (a pure local `IF (.NOT. (cond)) THEN
+  ... RETURN`) — so the port's corresponding checks are local-only
+  (`nerrs++`), not routed through any collective. The Fortran's literal,
+  apparently copy-pasted file names (`pio_async_decomp_tests_file_comp1
+  /2.nc`, reused from the sibling test rather than this file's own name)
+  are preserved verbatim rather than "fixed." No data write/read
+  (`PIOc_put_var`/`PIOc_get_var`) appears anywhere, matching the Fortran's
+  metadata-only reference.
+- Task reviewer independently re-verified every Global Constraint and
+  Review Focus item against the diff (not the implementer's report):
+  confirmed byte-identical transcription against the brief, re-ran a
+  forced clean rebuild (0 warnings) and `ctest` itself (2/2 pass,
+  covering all 3 type instantiations x 2 rearrangers), and additionally
+  verified (beyond what the implementer's own report established) that
+  neither `MPI_logger::log()` nor `get_iotypes()` make any blocking MPI
+  calls that could interact with the diverged I/O rank.
+- 1 Important finding, non-blocking: all compute-side diagnostic log
+  lines are silently swallowed, since `MPI_logger` only emits on world
+  rank 0, which is always the I/O rank in this test and never calls the
+  logging helper — pass/fail correctness is unaffected (`nerrs` still
+  propagates to a framework-level FAILED), and this is the identical
+  pre-existing pattern already accepted in the sibling
+  `pio_async_decomp_tests.cpp`, not a regression introduced by this port.
+  Logged as a known limitation of the whole `pio_async_*` family; a
+  proper fix (enabling logging on a compute-component root, or falling
+  back to `std::cerr` on the failure path) is left as a future
+  whole-family follow-up, out of scope for a single-file port.
+- 6 Minor findings parked, none blocking: (M1) a latent
+  `gcomm_idx == 0` out-of-bounds risk in `comp_idx = gcomm_idx - 2`,
+  identical to a latent bug already present in the Fortran, currently
+  unreachable given the `MIN_NUM_PROCS`/`NCOMMS` coupling; (M2) the
+  Fortran's trailing post-`MPI_Comm_free` `PIO_TF_CHECK_ERR` not
+  transcribed, confirmed harmless; (M3) a deliberate, reviewer-endorsed
+  control-flow deviation (`continue`/`nerrs++` instead of the Fortran's
+  `RETURN`), since copying the Fortran's `RETURN` here would actually
+  deadlock this async test (an early-returning rank would skip
+  `PIOc_finalize()` while the I/O rank waits forever); (M4) the port
+  correctly declines to copy a Fortran logging-only indexing bug
+  (`iotype_descs(i)` instead of `(j)`), log-text only; (M5) an unused
+  `new_rank` variable, mirroring the Fortran exactly; (M6)
+  `split_world_ncomms()` duplicated verbatim from
+  `pio_async_decomp_tests.cpp` rather than shared, mirroring the
+  Fortran's own precedent of duplicating this subroutine across 5
+  `.F90.in` files — hoisting to `tests/util` is a reasonable future
+  whole-family follow-up, not required now.
+- Single-task plan: the task review doubled as the whole-branch final
+  review.
+- Final review verdict: **Approved**. `tests/general` untouched.
+
+### `ncdf_inq`
+- Plan: `docs/superpowers/plans/2026-10-30-port-ncdf-inq-to-cxx.md`
+- Commit: `7234868e80` on `jayeshkrishna/port_fortran_tests_to_cxx`
+  (base `a990c5000f`).
+- Not templated over a data type (the Fortran reference is a plain
+  `PIO_TF_AUTO_TEST_SUB_BEGIN` block, not `PIO_TF_TEMPLATE`), so the port
+  registers exactly one driver function, unlike `pio_copy.cpp`/
+  `pio_decomp_tests.cpp`'s 3-way int/float/double pattern. Confirmed via
+  reading `pio_api.h:140,149` — `PIOc_inq_dimname` takes no `namelen` arg
+  while `PIOc_inq_varname` does.
+- Faithfulness ruling: the character attribute's length is asserted using
+  the trimmed string length (9, i.e. `strlen("DUMMY_STR")`) rather than
+  the Fortran's 100-byte fixed-length buffer, since the Fortran's own
+  `PIO_put_att` wrapper trims trailing blanks before the underlying write
+  — confirmed by the Fortran reference's own assertion,
+  `att_len == len(trim(tgv_catt_val))`. The integer attribute's length is
+  inquired but deliberately never asserted (only `check_ret` on the
+  return code), matching the Fortran reference's own dead, commented-out
+  `PIO_TF_PASSERT` for that value (which referenced an undeclared
+  variable) — the port does not "fix" this by adding an assertion the
+  Fortran never enabled.
+- Task reviewer independently re-verified every Global Constraint and
+  Review Focus item against the diff (not the implementer's report),
+  re-ran the build and `ctest` itself (3/3 pass), and confirmed
+  `tests/general` untouched.
+- 3 Minor findings parked, none blocking: (1) the port reuses `DIM_LEN`
+  (100) as the int-attribute's element count where the Fortran has a
+  separate (coincidentally also 100-valued) constant — originates in the
+  plan's own mandated code, not an implementer deviation; ruled
+  acceptable since the values are numerically identical in the spec, pure
+  naming/coupling nit, 2-line fix if it ever needs to diverge; (2) and (3)
+  were explicitly "no change recommended" observations (file-scope
+  constants; leaving a test file on disk on an open failure, mirroring
+  the Fortran exactly).
+- Single-task plan: the task review doubled as the whole-branch final
+  review.
+- Final review verdict: **Approved**. `tests/general` untouched.
+
+### `ncdf_fail`
+- Plan: `docs/superpowers/plans/2026-10-30-port-ncdf-fail-to-cxx.md`
+- Commit: `3575d5612a` on `jayeshkrishna/port_fortran_tests_to_cxx`
+  (base `dd39ac9f64`).
+- Not templated over a data type; registers 5 non-templated rfuncs, one
+  per `PIO_TF_AUTO_TEST_SUB_BEGIN` block in the Fortran reference
+  (`test_clob_then_no_clob`, `test_redef_with_no_write`,
+  `test_redef_twice`, `test_inq_missing`, `test_get_missing`), following
+  the same "one rfunc per non-templated sub-test block" precedent
+  established by `pio_decomp_tests.cpp`'s `free_before_close`.
+- NC4-iotype filtering: the Fortran's `PIO_TF_Get_nc4_iotypes` (confirmed
+  via `tests/general/util/pio_tutil.F90:428-448` to return exactly the
+  netcdf4p/netcdf4c/netcdf4p_nczarr subset) has no equivalent helper in
+  `tests/util/spio_test_common.hpp`. Resolved with a small file-local
+  `static bool is_nc4_iotype(int)` comparing against
+  `PIO_IOTYPE_NETCDF4C`/`PIO_IOTYPE_NETCDF4P`/
+  `PIO_IOTYPE_NETCDF4P_NCZARR` — no change to shared headers.
+- **Error-handler-matrix scope ruling**: the Fortran registers 3
+  `add_pio_test` ctest variants for one executable
+  (`tests/general/CMakeLists.txt:343-374`) — default (BCAST),
+  `--pio-tf-err-handler=PIO_REDUCE_ERROR`, and
+  `--pio-tf-err-handler=PIO_INTERNAL_ERROR` (`WILLFAIL`) — driven by a
+  global CLI flag (`pio_tutil.F90:1526-1528`) with no equivalent in
+  `tests/util/spio_test_framework.hpp`. Ruled out of scope for this port:
+  adding CLI/iosystem-wide-error-handler infrastructure to the shared
+  C++ framework would be new shared-infra work no other ported file has
+  needed, and handler-matrix coverage (BCAST/REDUCE/RETURN) already
+  exists independently via the already-ported
+  `tests/functional/ncdf_eh_one_test.cpp`, which loops over all three
+  handlers internally for its own sub-test. The C++ port therefore
+  registers exactly one `ncdf_fail_cxx` ctest target, dropping the
+  REDUCE/INTERNAL variants as an accepted, documented scope reduction.
+- **Error-handler-default correction**: discovered that the SCORPIO C
+  library's actual runtime default iosystem error handler is
+  `PIO_INTERNAL_ERROR` (`src/clib/core/pioc.cpp:48`, copied into every
+  iosystem-init path), not `PIO_BCAST_ERROR` as this port's plan
+  incorrectly assumed in its Global Constraints — the Fortran framework
+  only appears to default to BCAST because `pio_tutil.F90` sets it
+  itself, independent of the C library default. Without an explicit
+  override, every intentional-failure call in this file would abort via
+  `MPI_Abort` instead of returning an error code. Fixed by adding
+  `PIOc_set_iosystem_error_handling(tf.get_iosysid(), PIO_BCAST_ERROR,
+  &old_handler)` immediately after `init_iosystem()` succeeds in
+  `main()` — the identical, pre-existing pattern already used in
+  `tests/functional/pio_file_fail.cpp:81` and
+  `tests/functional/ncdf_eh_one_test.cpp:28-30`. This is now the third
+  ported file needing this exact override; a future refactor could hoist
+  it into `Test_framework::init_iosystem()` itself, but that is left as
+  a follow-up, not actioned here.
+- Independent per-function file provisioning: since the C++ framework has
+  no equivalent to the Fortran driver's shared cross-sub-test state
+  (`tgv_fname` created once per iotype, reused by multiple sub-tests),
+  `test_redef_with_no_write` and `test_redef_twice` each independently
+  create, use, and delete their own copy of `TGV_FNAME =
+  "pio_ncdf_test_file.nc"` per iotype iteration.
+- Faithfulness ruling: `test_clob_then_no_clob`'s `PIOc_strerror` log
+  line is only reached when `PIOc_strerror` itself succeeds (gated via
+  `check_ret`), mirroring the Fortran's `PIO_TF_CHECK_ERR`-induced
+  `RETURN` before reaching the equivalent log line on failure — confirmed
+  correct via cross-reference to `pio_tf_f90gen.pl:388`.
+- Task reviewer independently re-verified every Global Constraint and
+  Review Focus item against the diff (not the implementer's report);
+  independently confirmed the `PIO_INTERNAL_ERROR` default and the
+  `WILLFAIL` marker on the Fortran's `ncdf_fail_intrnl` variant as
+  corroborating evidence for the error-handler-default fix; re-ran a
+  clean build (0 warnings) and `ctest -R ncdf_fail_cxx` (3/3 Passed);
+  confirmed `tests/general` untouched.
+- 1 Important finding, non-blocking: this roadmap entry and checkbox were
+  not yet updated at review time — pure bookkeeping, not implementer
+  rework; actioned by this very log entry.
+- 4 Minor findings parked, none blocking: narrower iotype coverage vs.
+  the Fortran (pre-existing repo-wide via `get_iotypes()`); `old_handler`
+  captured but never restored (matches `pio_file_fail.cpp`'s existing
+  pattern); two dead initializers at `ncdf_fail.cpp:239`; `passert` not
+  early-returning like the Fortran macro (intentional repo-wide design).
+- Single-task plan: the task review doubled as the whole-branch final
+  review.
+- Final review verdict: **Approved**. `tests/general` untouched.
+
+### `pio_decomp_tests_3d`
+
+- Commit `74284f7061` (base `3575d5612a`). Created
+  `tests/functional/pio_decomp_tests_3d.cpp`; appended a
+  `pio_decomp_tests_3d_cxx` block to `tests/functional/CMakeLists.txt`
+  (knobs copied verbatim from `tests/general/CMakeLists.txt:666-674`).
+- Architecture: one non-templated helper `get_3d_col_decomp_info` (ported
+  line-for-line from the Fortran subroutine, 1-based arithmetic preserved)
+  computing a 3D column decomposition in two modes (`force_rearrange`
+  true/false); one function template `nc_write_read_3d_col_decomp<T>`
+  (instantiated for `int`/`float`/`double`) that writes with the
+  forced-rearrange decomp and reads back with the natural decomp over
+  every registered iotype, verifying via `check_val`; `main()` follows
+  `pio_decomp_tests.cpp`'s exact rearranger-loop precedent
+  (`PIO_REARR_BOX`/`SUBSET`/`CONTIG`).
+- **Fortran-to-C dimension-order reversal** (the key new pattern this
+  file introduces, reusable by every later multi-dimensional-decomposition
+  port): confirmed via direct inspection of `src/flib/spio_decomp.F90.in`
+  (`cgdims(i) = gdims(ndims-i+1)` before `PIOc_InitDecomp`) and
+  `src/flib/spio_def_var.F90` (`cvdimids(i) = vdimids(ndims-i+1) - 1`
+  before `PIOc_def_var`), cross-checked against
+  `src/clib/core/rearr/pio_rearrange.cpp`'s `idx_to_dim_list` (confirming
+  the C API's own offset-decoding treats the last `gdimlen` entry as
+  fastest-varying). Since this port calls the raw C API directly, it
+  reproduces both reversals itself: `wr_gdims`/`rd_gdims = {dims[2],
+  dims[1], dims[0]}` passed to `PIOc_InitDecomp`, and `dimids =
+  {hgt_dimid, col_dimid, row_dimid}` passed to `PIOc_def_var`, while
+  `dims[]`/`start[]`/`count[]` and the compdof/value arithmetic keep the
+  Fortran's own (unreversed) order and 1-based values throughout.
+- Task reviewer independently re-derived the reversal rule from the same
+  three source files (not just trusting the plan's claim) and closed the
+  loop arithmetically: showed the compdof formula reduces exactly to the
+  1-based rightmost-fastest linear index that `idx_to_dim_list` consumes.
+  Also independently verified: `dims[]` is mode-independent between the
+  two `get_3d_col_decomp_info` calls (only `start`/`count` for the column
+  dimension vary) per the Fortran source; the `wbuf`/`compdof` and
+  `rbuf`/`exp_val`/`compdof` flattening loops are each internally
+  self-consistent (buffer index `n` <-> `compdof[n]`); the write-value and
+  expected-value formulas are character-identical (mirroring the
+  Fortran's duplicated formula); `get_iotypes()` is queried fresh inside
+  the templated function (not hoisted/shared); both `PIOc_freedecomp`
+  calls happen once, after the iotype loop, in `rd`-then-`wr` order
+  (matching the Fortran). Also confirmed the brief's code block was
+  committed byte-for-byte unmodified, and that `check_val` is
+  `MPI_Allreduce`-backed so early-return-on-mismatch cannot desync ranks.
+- 0 Critical, 0 Important, 3 Minor findings parked, none blocking:
+  error paths inside the iotype loop leak `ncid`/`wr_iodesc`/`rd_iodesc`
+  on an already-failing test (matches `pio_decomp_tests.cpp`'s existing
+  convention and the Fortran `PIO_TF_CHECK_ERR` semantics being ported —
+  explicitly "no change recommended"); `get_iotypes()`'s return value is
+  discarded (matches every existing caller repo-wide); the shared literal
+  test filename `"test_pio_decomp_simple_tests.testfile"` is reused
+  across ~8 Fortran decomp tests (plan-mandated verbatim preservation,
+  pre-existing property, not introduced by this task).
+- Single-task plan: the task review doubled as the final review — no
+  separate final review dispatch needed.
+- Final review verdict: **Approved**. `tests/general` untouched.
+
+### pio_iosystem_tests2
+
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-iosystem-tests2-to-cxx.md`.
+  Commit `e22dfe08ea7084bf93376dd49a9666a54a3efefe` (base `74284f7061`).
+- Architecture: `tests/functional/pio_iosystem_tests2.cpp` creates and manages
+  a SECOND, independent PIO iosystem on an odd/even-split MPI sub-communicator
+  (raw C API `PIOc_Init_Intracomm`), alongside the test framework's own
+  (primary) iosystem — the first port in this series to do so. Helper
+  functions: `split_world_odd_even` (both parities get a valid, non-null
+  comm via distinct colors, unlike `MPI_UNDEFINED`-based splitting),
+  `create_file`/`check_file`/`open_and_check_file` (text-attribute
+  write/read, no `PIOc_enddef`, following `pio_copy.cpp`'s precedent). No
+  custom driver block in the Fortran source, so `main()` loops over all 3
+  rearrangers for the primary iosystem (established convention).
+- Deliberate, documented design ruling: the Fortran file defines
+  `split_world_only_even` but never calls it in this file (confirmed via
+  grep — its only call site and only other definition live in the
+  still-unported `pio_iosystem_tests.F90.in`, which carries its own
+  duplicate copy). Ruled to OMIT a C++ equivalent here; the real port is
+  deferred to when `pio_iosystem_tests.F90.in` is itself ported. Task
+  reviewer independently re-examined (not rubber-stamped) and agreed:
+  omitting it is additive-only (no behavior lost, Fortran file untouched),
+  and a ported unused `static` function would have triggered
+  `-Wunused-function`, conflicting with the branch's zero-warning goal.
+- Collective-safety argument for reusing `check_ret`/`passert`/`check_val`
+  (which hardcode `tf.get_comm()`, the full world comm, for their internal
+  `MPI_Allreduce`) without a new comm-scoped helper: every world rank calls
+  every checked operation in this test exactly once, regardless of which
+  iosystem/parity group is logically involved, so the full-world reduction
+  is safe. Task reviewer independently re-derived this and noted it is
+  actually *safer* than the Fortran original, which reduces over the
+  sub-comm for second-iosystem checks and would deadlock on a
+  single-parity failure.
+- `PIOc_Init_Intracomm` parameter mapping independently re-derived by the
+  reviewer against `src/clib/pio_api.h` and `src/flib/spio_init.F90`'s
+  `pio_init_intracomm` wrapper: `num_iotasks` is the sub-comm's own size
+  (`odd_even_size`, from `MPI_Comm_size` on the split comm), not any
+  world-scoped value; `naggprocs` has no raw-C-API equivalent and is
+  correctly dropped. Per-parity file selection (`is_even ? fname1 :
+  fname2`) verified to match the Fortran's *code* (the Fortran source's
+  own adjacent comment is backwards/stale; the C++ correctly follows the
+  code, not the misleading comment). Open/close and
+  `PIOc_finalize`/`MPI_Comm_free` ordering verified balanced across all 3
+  rearranger iterations.
+- CMake target uses `_C1_` knobs (`PIO_TF_C1_MAXNUMIOPROCS`/
+  `PIO_TF_C1_MAXSTRIDE`) and `MINNUMPROCS 4`, copied verbatim from this
+  file's own Fortran registration — confirmed to correctly diverge from
+  sibling files' `_C2_` knobs (per-file, not a fixed repo-wide pattern).
+- Implementer self-identified and fixed one brief gap: the plan's code
+  block omitted the standard `#ifdef SPIO_ENABLE_GPTL_TIMING` guard present
+  in all 14 prior `tests/functional/*.cpp` files; a hard build break
+  without it (this build has GPTL enabled). Added the identical guard in
+  the identical position. Task reviewer confirmed this was a plan-writing
+  oversight (not implementer error), verified it is byte-identical to all
+  13 prior files, and recommended future plan/brief templates in this
+  series bake the guard in directly.
+- 4/4 ctest variants passing (np4 × nio{1,2,2,4} × st{1,1,2,1}), build
+  clean, 0 warnings. Reviewer independently corroborated via
+  `ctest -R pio_iosystem_tests2_cxx`.
+- 0 Critical, 0 Important, 3 Minor findings parked, none blocking: a code
+  comment referencing "this task's plan" that is untracked and dangles for
+  future readers (suggest self-contained wording next time); `odd_even_rank`
+  written but never read (harmless, mirrors the Fortran helper's signature,
+  address-taken so no `-Wunused`); error-path resource leaks
+  (`odd_even_iosysid`/`odd_even_comm`/open ncids) on early-return paths,
+  matching the established convention from `pio_decomp_tests_3d`/
+  `ncdf_fail` (the harness aborts the whole process on a check failure, so
+  inert in practice).
+- Single-task plan: the task review doubled as the final review — no
+  separate final review dispatch needed.
+- Final review verdict: **Approved**. `tests/general` untouched.
+
+### pio_rearr
+
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-rearr-to-cxx.md`.
+  Commit `8bc0afb550dc026ddc89f2d1bb4069fbdabf47dd` (base `e22dfe08ea`).
+- Architecture: `tests/functional/pio_rearr.cpp` ports two
+  `PIO_TF_AUTO_TEST_SUB` tests (`test_rearrs_base`, `test_rearrs_combs`)
+  and their two shared file-scope helpers (`create_file`,
+  `open_and_check_rdwr`), 1:1 with the Fortran source. Each test creates a
+  file via the primary (tf-managed) iosystem, then repeatedly builds a
+  SECOND iosystem on an `MPI_Comm_dup`'d copy of the world comm (not a
+  split — first port in this series to vary `base` across 0..comm_sz-1)
+  to exercise read/write through that second iosystem. No custom driver
+  block in the Fortran source, so `main()` loops over all 3 rearrangers for
+  the primary iosystem (established convention).
+- Non-templated, `float`/`PIO_REAL`-only (the Fortran source only ever uses
+  `real`), diverging from the templated `pio_decomp_tests.cpp`/
+  `pio_decomp_tests_3d.cpp` siblings — correct 1:1 fidelity choice, not an
+  oversight.
+- Error-handling style deliberately chosen as the ad-hoc
+  `if(ret != PIO_NOERR){ logger.log(...); return PIO_EINTERNAL; }` +
+  `check_val` pattern (matching `pio_decomp_tests.cpp`/
+  `pio_decomp_tests_3d.cpp`), not `check_ret`/`passert`. Confirmed during
+  planning that the AGENTS.md-cited style exemplar
+  (`tests/cunit/test_spio_rearr_contig.cpp`) actually uses neither helper
+  (zero grep hits) — there is no single repo-wide error-handling style, so
+  style was matched to the closest architectural sibling instead.
+- `rearrs_perms` 4x2 table: task reviewer independently re-decoded the
+  Fortran's actual column-major `reshape` call (not its stale/backwards
+  comment) and confirmed the C++ `[MAX_PERMS][NUM_REARRANGERS]` row-major
+  table, indexed `[k][j]`, reproduces it exactly — the implementer followed
+  the Fortran's code, correctly ignoring its misleading comment (same
+  stale-comment pattern as `pio_iosystem_tests2`'s `split_world` helpers).
+- `base` parameter: `test_rearrs_base` varies `base = k` for
+  `k = 0..dup_comm_sz-1` (0-based, matching the Fortran's 1-based `k-1`);
+  `test_rearrs_combs` always passes `base = 0`. Both independently verified
+  by the reviewer against the Fortran source line numbers.
+- `PIOc_Init_Intracomm`'s `base` parameter confirmed (via
+  `src/clib/api/spio_io_sys_api.cpp` and reviewer's independent read of
+  `src/clib/core/pioc.cpp`'s validation) to pass straight through with
+  range validation `base ∈ [0, num_comptasks)` — no clamping surprises.
+- CMake target uses `_C3_` knobs (`PIO_TF_C3_MAXNUMIOPROCS`/
+  `PIO_TF_C3_MAXSTRIDE`) and `MINNUMPROCS 4`, copied verbatim from this
+  file's own Fortran registration — a new variant vs. prior ports' `_C1_`/
+  `_C2_` knobs (per-file, not a fixed repo-wide pattern). The per-test
+  Fortran CMake comment `# Costly test` was NOT carried forward (reviewer
+  separately noted that comment actually belongs to `pio_rearr_opts2` in
+  the Fortran CMakeLists, not `pio_rearr` — a pre-existing misattribution
+  in the Fortran file, irrelevant to this port either way).
+- Implementer hit a local build-environment issue unrelated to the new
+  code: an earlier interrupted build attempt corrupted the pre-existing
+  `build/src/clib/libpioc.a` (truncated to an empty archive), breaking
+  linking of every target depending on it. Fixed by removing the corrupted
+  (untracked, git-ignored) archive and rebuilding the `pioc` target; no
+  repository source was touched. Reviewer independently confirmed via
+  `git diff --name-only` that the diff touches only
+  `tests/functional/pio_rearr.cpp` and `tests/functional/CMakeLists.txt`,
+  and that `build/` is untracked, so none of this bled into the commit.
+- 2/2 ctest variants passing (`pio_rearr_cxx_np4_nio2_st1`,
+  `_st2`), build clean. Reviewer independently re-ran `ctest -R
+  pio_rearr_cxx` (2/2 passed) and additionally ran the binary directly on 4
+  ranks, counting log lines to confirm every nested loop iteration actually
+  executes as designed (36 `Base =` lines; rearranger counts matching the
+  perm table's prediction).
+- 0 Critical, 0 Important, 6 Minor findings parked, none blocking: a
+  128-char vs. actual-length attribute write (benign, attribute never read
+  back); unused `dup_comm_rank` in `test_rearrs_base` (faithful to the
+  Fortran, which is equally unused; address-taken so no `-Wunused`);
+  `check_val`'s internal `MPI_Allreduce` uses `tf.get_comm()` rather than
+  the `comm` argument threaded through `open_and_check_rdwr` (harmless here
+  since `dup_comm` is a dup with an identical rank set — worth knowing if
+  this helper is ever reused with a genuinely different communicator);
+  unused `old_handler` initializer (matches Fortran, never restored); only
+  the `pnetcdf` iotype was exercised in the local build environment (same
+  limitation as every prior port); the stale `# Costly test` CMake
+  attribution noted above.
+- Single-task plan: the task review doubled as the final review — no
+  separate final review dispatch needed.
+- Final review verdict: **Approved**. `tests/general` untouched.
+
+### pio_iosystem_tests3
+
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-iosystem-tests3-to-cxx.md`.
+  Two-task plan — Task 1 commit `2bbcd96186` (base `8bc0afb550`), Task 2
+  commit `901602f487` (base `2bbcd96186`).
+- Architecture: `tests/functional/pio_iosystem_tests3.cpp` ports the single
+  `PIO_TF_AUTO_TEST_SUB` `three_files_two_iosystems_with_overlap` plus its
+  4 shared helpers (`split_world_two_with_overlap`, `create_file`,
+  `check_file`, `open_and_check_file`). Unlike `pio_iosystem_tests2`'s
+  disjoint odd/even split, this file splits world into 2 sub-communicators
+  built via `MPI_Group_range_incl` that **overlap** at rank 0 and are
+  otherwise disjoint — a real correctness hazard, not just an API
+  difference: checking a per-sub-comm code path with a world-scoped
+  `MPI_Allreduce` would mismatch collective-call counts across ranks
+  (hang), since non-rank-0 world ranks only ever enter one of the two
+  sub-comm paths.
+- Task 1 added backward-compatible comm-scoped overloads
+  `passert(tf, MPI_Comm, bool, string)` / `check_ret(tf, MPI_Comm, int,
+  string)` to the shared `tests/util/spio_test_check.hpp`, with the
+  existing 3-arg overloads rewritten as one-line delegations via
+  `tf.get_comm()`. Verified (both task review and final review) that all
+  13 real call sites across the test suite (not just the 4 originally
+  named in the plan) resolve correctly by arity alone — including under
+  MPICH 4.1.2, where `MPI_Comm` is an `int` typedef, so overload
+  resolution could not rely on a distinct handle type. `check_val<T>()`
+  deliberately left untouched (unused by this port, out of scope per the
+  plan — no scope creep).
+- Task 2 ported `split_world_two_with_overlap`'s two-pass
+  `MPI_Group_range_incl` group-building exactly, including the Fortran's
+  array-layout translation (column-major `dimension(3,NUM_GROUP_RANGES)`
+  → row-major `int[NUM_GROUP_RANGES][3]`, both contiguous-triple layouts
+  that `MPI_Group_range_incl` expects identically) and its asymmetric
+  `pio_base_rank`/`pio_num_iotasks` computation (`base=1,
+  iotasks=size-1` when a sub-comm's size > 1, since rank 0 is always
+  shared; else `base=0, iotasks=size`). Both task and final reviewers
+  independently hand-traced the group arithmetic for world_sz=4 and
+  world_sz=6 against the Fortran and confirmed exact membership match
+  (evens vs. `{0}` ∪ odds, overlapping only at rank 0).
+- The Fortran's pointer-swap-before-use filename selection (1-based `j=1`
+  → `fname2`, `j=2` → `fname1`) was ported as a 0-based pointer toggle
+  (`j=0` → `fname2`, `j=1` → `fname1`) — confirmed correct both by hand
+  and empirically via a direct 4-rank `mpiexec` run showing the expected
+  per-`j` file sequence in the log output.
+- Every check inside a per-overlapped-comm code path uses the new 4-arg
+  comm-scoped `check_ret`/`passert` with the correct sub-communicator
+  (`overlapped_comms[i]`/`[j]`); only genuinely all-rank operations (the
+  three `create_file` calls, the world-visible `ncid0` open/close) use the
+  pre-existing 2-arg world-scoped form. No world-scoped collective was
+  found on any partial-participation path.
+- Cleanup (`PIOc_finalize` + `MPI_Comm_free`) happens once per non-null
+  `overlapped_comms[i]`, in a loop after the full iotype loop completes,
+  matching the Fortran; `MPI_COMM_NULL` comms are correctly skipped.
+- CMake registration uses the `_C1_` knob family and `MINNUMPROCS 4`,
+  copied verbatim from this file's own Fortran registration; no "Costly
+  test" comment (none exists on the Fortran side — that comment belongs to
+  `pio_rearr_opts2`, per the `pio_rearr` log entry above). Empirically
+  confirmed the C++ target expands to the same 4 ctest variants as the
+  Fortran one.
+- Test verification: `ctest -R pio_iosystem_tests3_cxx` 4/4 passed. Final
+  review additionally forced fresh rebuilds (not cached) of
+  `pio_iosystem_tests3_cxx` and the 4 other `spio_test_check.hpp` consumers
+  (`pio_iosystem_tests2_cxx`, `ncdf_fail_cxx`, `pio_copy_cxx`,
+  `pio_file_fail_cxx` — 18/18 passed), ran the full ported-C++-suite
+  regression (`ctest -R '_cxx_'`, 80/80 passed), and re-ran the original
+  unmodified Fortran `pio_iosystem_tests3` ctest variants (4/4 passed) for
+  a behavioral cross-check. Only `pnetcdf` iotype was exercised (same
+  local-environment limitation as every prior port).
+- 0 Critical, 0 Important findings across both task reviews and the final
+  review. Minor findings parked, none blocking: a cosmetic line-length
+  asymmetry at the Task 1/Task 2 seam (threading `MPI_Comm comm` through
+  helper signatures widened a couple of lines past this port series'
+  usual width, though within existing codebase precedent); unused
+  `overlapped_comm_ranks[]` output (faithful to the Fortran helper's
+  signature, harmless); an inherited (not introduced) partial-failure hang
+  risk identical to the Fortran macro's own semantics; one fewer redundant
+  allreduce than the Fortran performs (safe, matches the `pio_iosystem_tests2`
+  convention); rank-0-only vs. all-ranks failure logging (cosmetic,
+  established convention across this port series); `pio_iosystem_tests3_cxx`
+  shares output file basenames with `pio_iosystem_tests2_cxx` (inherited
+  verbatim from the Fortran originals, harmless under serial ctest, means
+  the two targets can't run concurrently).
+- Two-task plan: the final whole-branch review was a separate dispatch,
+  not folded into Task 2's own review, since cross-task interface
+  integration (Task 2 against Task 1's new overloads, in the combined
+  tree, from a forced-fresh build) genuinely needed its own check.
+
+### ncdf_simple_tests
+
+- Single-task plan: one new file, `tests/functional/ncdf_simple_tests.cpp`
+  (674 lines), plus one appended `tests/functional/CMakeLists.txt` block.
+  No shared header changed.
+- Architecture: the Fortran file's custom `PIO_TF_TEST_DRIVER_BEGIN/END`
+  block (looping `PIO_TF_Get_nc_iotypes()`, pre-creating a shared probe
+  file `tgv_fname` per iotype, running every auto-test against it) was
+  flattened using the exact pattern already established and approved in
+  `ncdf_fail.cpp`: each of the 7 Fortran sub-tests became a self-contained
+  C++ function that loops `get_iotypes()` itself and delegates to a
+  `static <name>_one_iotype` helper. The three sub-tests that depend on
+  the driver's pre-created `tgv_fname` (`test_redef_enddef`, `test_def_dim`,
+  `test_def_var`) each create, use, and delete that file themselves per
+  iotype iteration, matching `ncdf_fail.cpp`'s `test_redef_with_no_write`
+  precedent.
+- The one `PIO_TF_TEMPLATE`-templated sub-test, `test_data_conversion`
+  (confirmed via the generated `build/tests/general/ncdf_simple_tests.F90`
+  to instantiate exactly 3 times: int/real/double), was ported as
+  `template<typename T> test_data_conversion(...)` using the existing
+  `Pio_type_map<T>` struct and `check_val<T>()` helper from
+  `tests/util/spio_test_check.hpp` — the exact pattern already established
+  in `pio_decomp_tests.cpp`'s `nc_write_1d_darray<T>`. Registered as 3
+  separate `rfuncs` entries (`test_data_conversion_int`/`_float`/`_double`).
+- Pre-plan research resolved three open questions before any code was
+  written:
+  1. **Iotype set ruling**: Fortran's `PIO_TF_Get_nc_iotypes` (full read of
+     `tests/general/util/pio_tutil.F90:315-417`) actually enumerates ALL
+     defined iotypes (pnetcdf, adios/adiosc, hdf5/hdf5c, netcdf family) —
+     not just the "nc" family its name implies. The already-approved
+     `ncdf_fail.cpp` (same driver macro) had already deliberately narrowed
+     this to the existing `get_iotypes()` helper's 5 NC-family flavors.
+     This port followed that established precedent for architectural
+     consistency with its direct sibling file, explicitly documenting the
+     fidelity gap as inherited from `ncdf_fail.cpp`'s prior, separate port
+     rather than a new regression — fixing it would mean touching a
+     different, already-merged file, out of this task's scope.
+  2. **`#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC` reachability**: confirmed via
+     `CMakeLists.txt:71-80` and `tests/functional/CMakeLists.txt:14-16`
+     that this is a real, reachable build option (forced `ON` under
+     `WITH_HDF5`) already propagated to the C++ functional-test directory
+     — both branches are live code and were both ported verbatim, not
+     collapsed to one.
+  3. **`test_redef_twice` cleanup**: confirmed by reading the Fortran sub
+     body that it creates `pio_test_create_redef_twice.nc` but never
+     deletes it — the port intentionally matches this (no added delete
+     call), documented inline with a comment.
+- The task brief itself had one bug, caught by the implementer at compile
+  time: its `test_data_conversion` pseudocode called a nonexistent
+  `PIOc_syncfile`. Fixed to `PIOc_sync` (the correct API, confirmed by the
+  reviewer three independent ways: `src/clib/pio_api.h:123`'s actual
+  declaration, a repo-wide zero-hit grep for `PIOc_syncfile`, and 8 other
+  `tests/functional/*.cpp` files already using `PIOc_sync` in the same
+  post-write position).
+- The implementer also self-caught and non-destructively corrected a git
+  hygiene slip: the first commit attempt swept in an unrelated,
+  pre-staged file (this roadmap doc) because the brief's commit command
+  had no pathspec. Fixed via `git reset --soft HEAD~1` +
+  `git restore --staged <file>` and recommitted with only the 2 intended
+  files — verified by the reviewer via `git show --stat` and `git reflog`
+  (abandoned commit still recoverable, nothing force-pushed or discarded).
+- Build/test: `ncdf_simple_tests_cxx` builds with zero warnings; both the
+  new C++ binary and the original (untouched) Fortran `ncdf_simple_tests`
+  binary exit 0 under `mpiexec -n 4`, all 9 registered sub-tests PASSED.
+  The reviewer independently re-ran the binary rather than trusting the
+  report (binary mtime matched source mtime, confirming the artifact
+  genuinely corresponds to the committed source). Only `pnetcdf` iotype
+  was exercised (same local-environment limitation as every prior port).
+  `tests/general/ncdf_simple_tests.F90.in` confirmed untouched
+  (`git diff` empty, no commit on this branch touches it).
+- CMake block verified copied verbatim from the Fortran file's own block
+  (`tests/general/CMakeLists.txt:317-325`: `MINNUMPROCS 4`,
+  `MINNUMIOPROCS 2`/`MAXNUMIOPROCS ${PIO_TF_C2_MAXNUMIOPROCS}`,
+  `MINSTRIDE 2`/`MAXSTRIDE ${PIO_TF_C2_MAXSTRIDE}`), explicitly NOT
+  inheriting `ncdf_fail_cxx`'s different `MINSTRIDE 1` values.
+- Single-task plan: the task review doubled as the final whole-branch
+  review (0 Critical, 0 Important findings). 3 Minor findings parked, none
+  blocking: the roadmap doc ended up re-stageable-but-unstaged after the
+  implementer's git-hygiene fix (re-staged as part of this close-out);
+  a few `int` loop counters over vector indices where house style prefers
+  `std::size_t` (cosmetic, no warning risk since the loop bound is a
+  `const int`); and an internally-inconsistent error-path cleanup inside
+  `test_data_conversion_one_iotype` (some failure paths free the two
+  iodescs, most don't) — confirmed to match the identical bare-return
+  style already present in `pio_decomp_tests.cpp`, so not a new deviation.
+
+### pio_async_init_finalize
+
+- Single-task plan: one new file,
+  `tests/functional/pio_async_init_finalize.cpp` (369 lines), plus one
+  appended `tests/functional/CMakeLists.txt` block. Commit:
+  `b7de52232010a56aa3588269dd63fd8f5f427305` (base
+  `98db39da4a810c70d654f41b6c5bf187d66378a9`).
+- No file I/O, no decompositions — this file exercises only the
+  asynchronous (multi-component intercomm) I/O initialization/finalization
+  lifecycle. Reused the async-I/O architecture already established in
+  `pio_async_decomp_tests.cpp`/`pio_async_file_tests.cpp`: `main()`
+  bypasses `init_iosystem()`/`finalize_iosystem()` entirely, and each of
+  the 4 registered functions manages its own comm-split +
+  `PIOc_init_intercomm()`/`PIOc_finalize()` lifecycle directly. Two helper
+  subroutines were duplicated as file-local `static` functions rather than
+  shared via `tests/util`, mirroring both the C++ precedent
+  (`split_world_ncomms` already duplicated per-file across the
+  `pio_async_*` family) and the Fortran's own precedent
+  (`split_world_odd_even` is independently defined in 3 separate
+  `tests/general/*.F90.in` files, confirmed via grep).
+- Not templated — no `PIO_TF_TEMPLATE` anywhere in the Fortran reference —
+  so each of the 4 `PIO_TF_AUTO_TEST_SUB_BEGIN/END` blocks became exactly
+  one plain (non-templated) function: `async_1comp_init_finalize`,
+  `async_1comp_init_finalize_v2`, `async_loop_init_finalize`,
+  `async_2comp_init_finalize`.
+- Two rulings made and documented in the plan before dispatch, both
+  independently re-verified by the task reviewer from the diff itself
+  (not taken on faith from the implementer's report):
+  1. **`PIO_init`/`PIO_init_v2` C++ identity**: confirmed by reading
+     `src/flib/spio_init.F90:45-49,219-271` that both Fortran overloads
+     (`pio_init_intercomm`, `pio_init_intercomm_v2`) call the exact same
+     underlying C function, and the C API (`src/clib/pio_api.h:58-60`)
+     exposes only one entry point, `PIOc_init_intercomm()`. Both
+     `async_1comp_init_finalize` and `_v2` were ported as separate
+     functions (preserving 1:1 Fortran test-name coverage) but are
+     structurally identical C++ code — confirmed byte-identical by the
+     reviewer via a direct diff of the two function bodies.
+  2. **Collective-check safety**: unlike the sibling async files (where
+     error checks happen *during* active I/O-vs-compute divergence,
+     forcing local-only `nerrs` accumulation), every `PIO_TF_CHECK_ERR` in
+     this Fortran file appears *after* the unconditional
+     `MPI_Comm_free(<comm>, ret)` that every rank reaches at the end of
+     each iteration — by which point the I/O rank has already returned
+     from its blocking `PIO_init()` call. Confirmed via
+     `tests/general/util/pio_tf_f90gen.pl:429-441` that the plain 2-arg
+     `PIO_TF_CHECK_ERR` form itself reduces over the full `pio_tf_comm_`.
+     The port therefore uses `check_ret()`/`passert()`
+     (`tests/util/spio_test_check.hpp`, full-comm `MPI_Allreduce`)
+     directly at all 4 check sites, rather than the sibling files' local
+     `nerrs` pattern. The reviewer independently verified, line-by-line
+     from the diff, that every one of the 4 `check_ret()` call sites
+     strictly follows that iteration's unconditional `MPI_Comm_free`, and
+     traced the no-deadlock argument from source rather than trusting the
+     report.
+- Review Focus items (world_sz>1 guard in the 1-component tests;
+  odd/even role *inversion* across `async_loop_init_finalize`'s 5
+  iterations; `async_2comp_init_finalize`'s `>= MIN_NUM_PROCS` guard
+  — not `>` — and its 0-based `comp_idx = gcomm_idx - 2` indexing;
+  unconditional `MPI_Comm_free` on every path) were each independently
+  re-derived and verified by the reviewer against the Fortran source,
+  including hand-tracing the 2-component rank-to-component mapping at
+  np=3, 4, and 7, and confirming (by running `mpiexec` directly at np=1
+  and np=2) that the size guards silently no-op rather than fail.
+- The implementer again self-caught and non-destructively corrected the
+  same git-hygiene slip seen in the prior task (`ncdf_simple_tests`): a
+  first commit attempt swept in the pre-staged roadmap doc because the
+  `git commit` call carried no pathspec; fixed via `git reset --soft
+  HEAD~1` + `git restore --staged`, recommitted with only the 2 intended
+  files. Verified clean by the reviewer via `git show --stat` (exactly 2
+  files, 382 insertions, 0 deletions). Unlike the prior task, the
+  roadmap doc's staging state was actually preserved this time (reviewer
+  found it still `A`-staged, correcting a minor inaccuracy in the
+  implementer's own concern note).
+- Build/test: zero warnings on a forced clean rebuild; `ctest -R
+  pio_async_init_finalize_cxx -V` 3/3 pass (np=2,3,4); reviewer also ran
+  direct `mpiexec` at np=1, 2, 5, 7, all exiting 0 with every sub-test
+  PASSED. `tests/general/pio_async_init_finalize.F90.in` confirmed
+  untouched (`git diff --stat` empty for `tests/general`).
+- CMake block verified copied verbatim from this file's own Fortran block
+  (`tests/general/CMakeLists.txt:246-254`: `MINNUMPROCS 2`,
+  `MINNUMIOPROCS 1`/`MAXNUMIOPROCS 1`, `MINSTRIDE 1`/`MAXSTRIDE 1`),
+  target/test named `pio_async_init_finalize_cxx` per the established
+  `_cxx` convention — deliberately NOT copying the Fortran's own
+  inconsistent `add_pio_test` shortname (`async_init_finalize`, dropping
+  the `pio_` prefix), which is unique to this one Fortran block and not
+  followed by any prior C++ port.
+- Single-task plan: the task review doubled as the final whole-branch
+  review (0 Critical, 0 Important findings). 6 Minor findings parked, all
+  cosmetic or spec-conformant-as-written, none blocking: (1) the C++
+  check validates `PIOc_init_intercomm`/`PIOc_finalize`'s return rather
+  than the Fortran's literal `ret` (which the Fortran's own
+  `MPI_Comm_free(..., ret)` clobbers before the check) — a strictly
+  stronger check, explicitly what the brief directed; (2) uninitialized
+  `iosysids[]`/`comp_comms[]` plain arrays in the 3 one-component
+  functions (vs. `async_2comp_init_finalize`'s initialized
+  `std::vector`s) — brief-prescribed, harmless since both branches always
+  assign the live slots; (3) `split_world_odd_even` discards MPI return
+  codes, matching both the brief's mandated `void` signature and the
+  Fortran's own discarded `ierr`; (4) the CMake comment drops the
+  Fortran's "Note: " prefix — the plan's own code block already dropped
+  it, so the implementer correctly followed the plan text as written;
+  (5) dead `rank`/`sz`/`new_rank`/`new_size` locals, mirroring the
+  Fortran's own unused variables; (6) a report-accuracy-only note (not a
+  code issue) that the roadmap doc's staging state was actually preserved
+  through the implementer's git-hygiene fix, contrary to what the
+  implementer's own concern note claimed.
+
+### pio_decomp_tests2_1d
+
+- Single-task plan: one new file, `tests/functional/pio_decomp_tests2_1d.cpp`
+  (~460 lines), plus one appended `tests/functional/CMakeLists.txt` block.
+  Commit: `35fef55fc8695dc24c7967fd50ab6837ddc79394` (base
+  `b7de52232010a56aa3588269dd63fd8f5f427305`).
+- No async behavior — this file uses the standard synchronous-iosystem
+  `main()` pattern (`init_iosystem()`/`run()`/`finalize_iosystem()` over the
+  3 rearrangers), modeled directly on `tests/functional/pio_decomp_tests.cpp`
+  (closest sibling: templated `Pio_type_map<T>`-based write/read-darray
+  tests, `get_iotypes()`/`get_iotype_name()` iotype enumeration,
+  `check_val<T>()` verification, both `PIO_TEST_CLOSE_OPEN_FOR_SYNC`
+  branches live).
+- Two file-local helpers (`get_1d_a2a_info`, `get_1d_bc_info`, both with
+  `VEC_BLOCK_SZ = 7`) and two templated test functions (`nc_wr_rd_a2a<T>`,
+  `nc_wr_rev_rd<T>`), each instantiated for int/float/double (6 total
+  `rfuncs` registrations), matching the Fortran's 2 `PIO_TF_TEMPLATE`
+  auto-tests.
+- **Ruling made and documented in the plan before dispatch**: the Fortran's
+  explicit per-iotype skip of `PIO_IOTYPE_ADIOS`/`PIO_IOTYPE_ADIOSC`
+  ("Read/Writes with different I/O decomps is not supported") is omitted
+  entirely in the C++ port, since `get_iotypes()` (the established iotype
+  helper used by every prior port) never returns those two flavors in the
+  first place — confirmed via grep that no prior `.cpp` port has ever
+  needed to replicate this skip. The reviewer independently re-verified
+  `get_iotypes()` usage at both call sites and confirmed no coverage
+  regression beyond the already-established precedent.
+- Review Focus items, all independently re-verified by the reviewer against
+  the Fortran source rather than trusted from the implementer's report:
+  1. `get_1d_a2a_info`'s `force_all2all=true` branch (write decomposition:
+     `sz` discontiguous `VEC_BLOCK_SZ`-sized regions strided by `lsz`) is
+     structurally distinct from the `force_all2all=false` branch (read
+     decomposition: one contiguous region of size `lsz`) — exact 1-based
+     Fortran→0-based C++ arithmetic conversion confirmed
+     (`start[i] = (rank*VEC_BLOCK_SZ + 1) + i*lsz`).
+  2. `nc_wr_rev_rd`'s read decomposition is a cyclic LEFT-SHIFT by 1 of the
+     block (`[start+1, start+2, ..., start+count-1, start]`), not a second
+     reversal of the write buffer — verified element-by-element against the
+     Fortran's `exp_val(i-1) = start(1) + i - 1` (`i=2..count(1)`) plus
+     `exp_val(count(1)) = start(1)`.
+  3. Both `PIO_TEST_CLOSE_OPEN_FOR_SYNC`/`#else` branches present and
+     reachable in both templated functions (4 occurrences total).
+  4. `tot_count` in `nc_wr_rd_a2a` confirmed to be the SUM over all
+     `count[i]` entries, not a single region's count.
+  5. 1-based Fortran index arithmetic preserved throughout (no "fix" to
+     0-based global positions) — every `compdof` entry derives from
+     `wbuf`/`exp_val` via `static_cast<PIO_Offset>`, mirroring the
+     Fortran's `int(wbuf(k))` round-trip.
+- CMake block deviated from the plan's literal placeholder snippet: the
+  implementer used the real repo convention found in all 19 existing
+  `tests/functional/CMakeLists.txt` sibling blocks
+  (`add_spio_executable(<name> TRUE "" <file>.cpp
+  ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)`) instead of the brief's
+  `FALSE ${PIO_LINKER_LANGUAGE}` snippet (which was actually the Fortran
+  block's own style, `tests/general/CMakeLists.txt:624`, mistakenly carried
+  into the plan's example). This was explicitly sanctioned by the plan's
+  own instruction to confirm against sibling blocks and not invent new
+  macro arguments; the reviewer independently read the file and confirmed
+  the match against all 19 siblings. `add_pio_test` knobs
+  (`MINNUMPROCS 1`, `MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}`,
+  `MINNUMIOPROCS 1`, `MAXNUMIOPROCS ${PIO_TF_C2_MAXNUMIOPROCS}`,
+  `MINSTRIDE 1`, `MAXSTRIDE ${PIO_TF_C2_MAXSTRIDE}`,
+  `TIMEOUT ${DEFAULT_TEST_TIMEOUT}`) copied verbatim from
+  `tests/general/CMakeLists.txt:626-634`, target/test named
+  `pio_decomp_tests2_1d_cxx` per the established `_cxx` convention.
+- Build/test: `ctest -R pio_decomp_tests2_1d_cxx -V` 10/10 sub-cases pass
+  (np1-4, various nio/stride combos, all 3 rearrangers, all 6 `rfuncs`);
+  reviewer independently re-ran a np1/np3 subset (100% pass) and a direct
+  `mpiexec -n 3` run, confirming via output that the iotype loop body is
+  actually entered (non-vacuous test). Only the pnetcdf iotype was
+  available in this build environment (same limitation as
+  `pio_decomp_tests.cpp`), so the `PIO_TEST_CLOSE_OPEN_FOR_SYNC` branch
+  wasn't runtime-exercised, though both branches are present as reachable
+  code. `tests/general/pio_decomp_tests2_1d.F90.in` confirmed untouched
+  (`git diff --stat` empty for `tests/general`).
+- Single-task plan: the task review doubled as the final whole-branch
+  review (0 Critical, 0 Important findings). 4 Minor findings parked, all
+  cosmetic, none blocking: (1) iodesc leak on early-return error paths (no
+  `PIOc_freedecomp` before `return PIO_EINTERNAL`) — identical to the
+  established pattern in `pio_decomp_tests.cpp`, fixing here alone would
+  break consistency; (2) `int k` used as a flattened vector index rather
+  than `std::size_t` in `nc_wr_rd_a2a`, mirroring the Fortran's own
+  `integer :: k`, no correctness impact; (3) the plan's suggested CMake
+  comment header (`#===== pio_decomp_tests2_1d_cxx =====`) was correctly
+  omitted since no existing block in `tests/functional/CMakeLists.txt` has
+  one (those headers live only in `tests/general/CMakeLists.txt`); (4)
+  `compdof` vectors held for the whole function rather than freed
+  immediately after `PIOc_InitDecomp` (the Fortran deallocates eagerly) —
+  trivial memory, matches sibling pattern.
+- Final review verdict: **Approved**. `tests/general` untouched.
+
+### pio_async_copy_tests
+
+- Single-task plan: one new file, `tests/functional/pio_async_copy_tests.cpp`
+  (455 lines, +1 line in a follow-up fix), plus one appended
+  `tests/functional/CMakeLists.txt` block. Commits:
+  `d9990e5f4dc5e51a4cdbf4210b5dd2bff1d7f6fe` (base
+  `35fef55fc8695dc24c7967fd50ab6837ddc79394`) and a follow-up fix
+  `09cbf6fb26e972bb887e32807e573943c089c283`.
+- Architecture: reuses the async-I/O (multi-component intercomm) pattern
+  from `pio_async_decomp_tests.cpp`/`pio_async_file_tests.cpp` (2 compute
+  components + 1 I/O comm, `main()` bypassing `init_iosystem()`/
+  `finalize_iosystem()`). Adds one new helper, `create_ucomm` (a faithful
+  port of the Fortran's `MPI_Allgather`+`MPI_Comm_group`+`MPI_Group_incl`+
+  `MPI_Comm_create`+`MPI_Group_free`×2 sequence, `MPI_LOGICAL`→`MPI_INT`),
+  building a union communicator of all non-I/O world ranks once per
+  rearranger iteration; `split_world_ncomms` reused verbatim from
+  `pio_async_file_tests.cpp`. One `template<typename T>` auto-test,
+  `test_async_copy_att<T>` (int/float/double), copies 4 attributes
+  (global scalar, global char, var scalar, var char) from an input file to
+  an output file via `PIOc_copy_att` in the compute branch, then
+  cross-verifies them by having each compute component reopen the *other*
+  component's output file (`vidx = NUM_COMPONENTS - comp_idx - 1`,
+  confirmed algebraically equivalent to the Fortran's 1-based
+  `ofnames(NUM_COMPONENTS - gcomp_idx + 1)`).
+- **Key ruling, resolved during planning, before any code was written**:
+  `tests/util/spio_test_check.hpp` already gained comm-scoped
+  `check_ret(tf, comm, ...)`/`passert(tf, comm, ...)` overloads in commit
+  `2bbcd96186` (the `pio_iosystem_tests3` Task 1 work), which postdates
+  `pio_async_file_tests.cpp` — that older sibling had to duplicate a
+  file-local `check_ret_over_comm()` helper because the shared overloads
+  didn't exist yet. This port uses the shared overloads directly instead
+  of duplicating that now-superseded helper; confirmed during planning by
+  reading the header in full and cross-checking that `pio_iosystem_tests3.cpp`
+  already relies on them directly.
+- **Check-scope ruling**: comm-scoped `check_ret(tf, new_comm, ...)`/
+  `passert(tf, new_comm, ...)` used for every check made while ranks are
+  diverged into I/O vs. compute roles; the single check after both
+  branches rejoin (post `MPI_Comm_free(comp_ucomm)`/`MPI_Comm_free(new_comm)`)
+  uses the default full-comm `check_ret(tf, ...)` — independently
+  re-verified by the reviewer: 24 comm-scoped calls inside the diverged
+  region, exactly one full-comm call at `pio_async_copy_tests.cpp:421`,
+  correctly placed after both frees.
+- **Documented, inherited (not introduced) deadlock-risk note**: the
+  Fortran's `PIO_TF_CHECK_ERR` macro actually expands to an immediate
+  `RETURN` from the whole subroutine on failure (confirmed via
+  `tests/general/util/pio_tf_f90gen.pl:415-437`), not a loop `continue` —
+  meaning a single compute component's check failure causes that
+  component's ranks to skip the remaining `comp_ucomm` barriers while the
+  other, healthy component's ranks still reach them and hang. The C++ port
+  uses the established house `nerrs++; continue;` convention instead
+  (closing any already-open files first), which carries the identical
+  hazard shape as the Fortran original — not a porting defect, accepted as
+  inherited spec behavior and documented in the plan's Review Focus so the
+  reviewer wouldn't mistake it for a new regression.
+- CMake block matches the real `add_spio_executable(... TRUE "" ...
+  argparser.cxx)` convention and all 7 knobs verbatim from
+  `tests/general/CMakeLists.txt:540-552` (`MINNUMPROCS 3`,
+  `MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}`, `MINNUMIOPROCS 2`,
+  `MAXNUMIOPROCS 2`, `MINSTRIDE 2`, `MAXSTRIDE 2`,
+  `TIMEOUT ${DEFAULT_TEST_TIMEOUT}`), placed immediately after the
+  `pio_decomp_tests2_1d_cxx` block.
+- Task reviewer independently verified (not trusting the implementer's
+  report): `create_ucomm` is a correct translation with both groups freed
+  and no comm leak; all 3 barriers use `comp_ucomm` (zero occurrences of
+  `MPI_Barrier(new_comm)`); all 15 early-exit `continue` paths in the
+  iotype loop close every already-open handle; the finalize loop covers
+  all `NUM_COMPONENTS` entries, not just the caller's own; no file-local
+  `check_ret_over_comm` duplicate was introduced. Forced a clean rebuild
+  (zero warnings) and re-ran `ctest -R pio_async_copy_tests_cxx` (2/2
+  passed) plus `mpiexec -n 6` directly (exit 0, all 3 type instantiations
+  × 2 rearrangers PASSED). Proved non-vacuity empirically (per-iotype log
+  lines never print, since rank 0 is always the I/O rank and never enters
+  the compute branch — same as every prior async port) by polling the CWD
+  during a live run and catching `pio_async_copy_ifile_comp1.nc`
+  materialize and then get cleaned up, confirming the compute branch
+  genuinely executes.
+- The implementer self-caught and non-destructively corrected the same
+  git-hygiene slip seen in `ncdf_simple_tests`/`pio_async_init_finalize`: a
+  first commit attempt (run without a pathspec, per the brief's literal
+  Step 10 command) swept in two unrelated pre-staged files (this roadmap
+  doc and `2026-10-30-port-pio-async-init-finalize-to-cxx.md`). Fixed via
+  `git reset --soft HEAD~1` + recommit with explicit pathspecs, verified
+  via `git log -1 --stat` that only the 2 intended files landed. The same
+  slip recurred once more during this close-out while committing the
+  review's one fix (an untargeted `git commit` again swept in the same two
+  staged docs) and was caught and fixed the identical way before
+  finalizing.
+- 1 Minor finding, fixed immediately (not parked): missing
+  `#include <algorithm>` for `std::fill` at
+  `pio_async_copy_tests.cpp:383` — compiled today only via transitive
+  libstdc++ inclusion, not standard-guaranteed. Fixed in a follow-up
+  commit (`09cbf6fb26`), rebuilt clean, `ctest` re-confirmed 2/2 pass.
+- 2 further Minor/informational findings parked, non-blocking: the brief's
+  claim that 0-based `i + 1` filename numbering "reproduces the same
+  literal filenames" as the Fortran is inaccurate (Fortran zero-pads to
+  4 digits via `I4.4`; the C++ emits unpadded `comp1.nc` — harmless, purely
+  test-internal, and the divergence avoids a filename collision with the
+  Fortran test under parallel `ctest -j`; noted so the discrepancy isn't
+  copy-pasted into a future brief); `nerrs` double-counted when
+  `PIOc_init_intercomm()` fails (checked once at the point of failure, once
+  more at the post-rejoin check) — inert since `nerrs` is only ever
+  compared against zero, present in the brief's own reference code and
+  sibling ports.
+- Single-task plan: the task review doubled as the final whole-branch
+  review. Final review verdict: **Approved with one fixed nit**.
+  `tests/general` untouched throughout.
