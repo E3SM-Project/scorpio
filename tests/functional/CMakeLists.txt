@@ -363,6 +363,19 @@ add_pio_test(pio_decomp_tests2_1d_cxx
   MAXSTRIDE ${PIO_TF_C2_MAXSTRIDE}
   TIMEOUT ${DEFAULT_TEST_TIMEOUT})
 
+add_spio_executable(pio_decomp_tests_1d_cxx TRUE "" pio_decomp_tests_1d.cpp ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
+
+# Costly test
+add_pio_test(pio_decomp_tests_1d_cxx
+  EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_decomp_tests_1d_cxx
+  MINNUMPROCS 1
+  MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}
+  MINNUMIOPROCS 1
+  MAXNUMIOPROCS ${PIO_TF_C3_MAXNUMIOPROCS}
+  MINSTRIDE 1
+  MAXSTRIDE ${PIO_TF_C3_MAXSTRIDE}
+  TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+
 add_spio_executable(pio_async_copy_tests_cxx TRUE "" pio_async_copy_tests.cpp ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
 
 # Async tests don't use ioprocs/stride specified by user
