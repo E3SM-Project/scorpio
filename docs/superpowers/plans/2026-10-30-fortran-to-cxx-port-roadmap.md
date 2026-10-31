@@ -62,7 +62,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_iosystem_tests.F90.in` (372 lines)
 - [x] `pio_decomp_tests_2d.F90.in` (391 lines)
 - [x] `pio_async_decomp_tests_1d.F90.in` (420 lines)
-- [ ] `pio_rearr_opts2.F90.in` (424 lines)
+- [x] `pio_rearr_opts2.F90.in` (424 lines)
 - [ ] `pio_large_file_tests.F90.in` (433 lines)
 - [ ] `pio_rearr_opts.F90.in` (487 lines)
 - [ ] `pio_buf_lim_tests.F90.in` (506 lines)
@@ -1290,3 +1290,92 @@ range, any ruling made, final review verdict.)
   review. Final review verdict: **APPROVE_WITH_NITS**. `tests/general`
   confirmed untouched (`pio_async_decomp_tests_1d.F90.in` has no diff
   against `master`).
+
+### `pio_rearr_opts2.F90.in` → `tests/functional/pio_rearr_opts2.cpp`
+
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-rearr-opts2-to-cxx.md`.
+  Commit: `f1c6724b55` ("test: port pio_rearr_opts2 to
+  tests/functional/pio_rearr_opts2.cpp").
+- Architecture: synchronous (non-async) test, unlike the four
+  recently-ported `pio_async_*` files — uses the existing shared
+  `tests/util/spio_test_check.hpp` helpers (`check_val`, `check_ret`,
+  `passert`) directly, no new file-local helper. Confirmed via
+  `tests/general/util/pio_tf_f90gen.pl`'s macro expansions
+  (`PIO_TF_CHECK_ERR`/`PIO_TF_CHECK_VAL`/`PIO_TF_ASSERT` all expand to
+  Fortran `RETURN`) that the correct C++ control flow is
+  `return PIO_EINTERNAL;` immediately on any check failure — a materially
+  different pattern from the async files' "nerrs++; continue to next
+  combo." Reviewer confirmed (grep for `nerrs`/`continue;`) no leftover
+  async-style pattern leaked in from the recent async-file work.
+- `get_1d_bc_info(rank, sz, dim, start, count, force_rearrange)` ported
+  with full fidelity, including the `force_rearrange == false` branch,
+  which is dead code in this file (both call sites pass `true`) but kept
+  per house convention. This was the plan's highest flagged risk (a
+  sign/branch error could pass at small process counts and fail only at
+  larger ones); reviewer independently re-derived both the Fortran and
+  C++ formulas and exhaustively verified them equal for every rank at
+  every `sz = 1..32`, for both `force_rearrange` values (zero mismatches),
+  additionally confirming `[start, start+count)` tiles `1..dim` exactly
+  (no gaps/overlaps) in all 64 configurations.
+- `set_rearr_opts_and_write`: single, non-templated `float`/`PIO_REAL`
+  test function (matches the Fortran's `real`/`PIO_real`-only usage, no
+  `Pio_type_map` template left over). 8-level nested loop exercises
+  `PIOc_set_rearr_opts()` across `comm_type` (`PIO_REARR_COMM_P2P`/
+  `_COLL`) × `fcd` (`FC_2D_DISABLE`/`FC_1D_COMP2IO`/`FC_1D_IO2COMP`/
+  `FC_2D_ENABLE`, exact Fortran array order) × the 6 flow-control axes
+  (`enable_hs`/`enable_isend`/`max_pend_req`, separately for c2i and
+  i2c). `comm_type == COLL` correctly restricts the fcd loop to 1 value
+  (`FC_2D_DISABLE`); the 6 inner axes' iteration counts are correctly
+  gated by the current `fcd` (full counts only on the axes that `fcd`
+  enables, forced to a single default value otherwise) — 170 combos per
+  iotype for `P2P` (1+12+12+144), 1 for `COLL`, matching the Fortran.
+  File is created/opened once per iotype and stays open across the whole
+  nested loop, closed+deleted once at the end of that iotype's
+  processing; the only in-loop close/reopen is the
+  `#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC` branch, which legitimately
+  mirrors the Fortran's own `#ifdef` (default path uses `PIOc_sync`
+  instead). `main()` registers this single function via the same
+  `rfuncs`/`tf.run()` idiom as sibling files, with one
+  `tf.init_iosystem(PIO_REARR_BOX)` call (no rearranger loop — the
+  Fortran source has none), per Global Constraints.
+- Implementer deviated from the brief in three places, all judged
+  reasonable by the reviewer: used the real
+  `get_iotype_name(int, char *)` signature (the brief's description of a
+  `std::string`-returning helper was simply wrong) — matches
+  `pio_decomp_tests2_1d.cpp`'s idiom, with an added `iotype_name_buf[0] =
+  '\0'` safety init not present in the sibling; interpreted the brief's
+  otherwise-unused `iotype_name` parameter on `create_file_and_var` as
+  the source of a "Testing : <iotype>" log line (matches the Fortran's
+  log content/order, though siblings log at the call site instead of in
+  the callee — cosmetic); single-rfunc/single-rearranger reconciliation
+  as above, explicitly mandated by the plan text.
+- CMake block appended after `pio_async_decomp_tests_1d_cxx`, knobs
+  copied verbatim from `tests/general/CMakeLists.txt:568-580`
+  (`MINNUMPROCS 1`, `MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}`,
+  `MINNUMIOPROCS 1`, `MAXNUMIOPROCS ${PIO_TF_C3_MAXNUMIOPROCS}`,
+  `MINSTRIDE 2`, `MAXSTRIDE ${PIO_TF_C3_MAXSTRIDE}`, including the
+  "# This is a costly test" comment). `_C3_` tier variables confirmed
+  already defined locally in `tests/functional/CMakeLists.txt`.
+- Build/test: implementer built `pio_rearr_opts2_cxx` clean, `ctest -R
+  pio_rearr_opts2_cxx` 2/2 passed (np3/np4, ~11-35s). Reviewer
+  independently re-ran the same ctest target (2/2 passed, ~15-45s) rather
+  than trusting the report.
+- Review findings: no CRITICAL/blocking. Nits: `PIOc_sync`'s return is
+  checked though the Fortran ignores it (benign strengthening);
+  `create_decomp_and_init_buf`'s `PIOc_InitDecomp` failure path uses a
+  bare `if`+return rather than the collective `check_ret`/`passert`
+  helpers used everywhere else in the file — as prescribed by the brief,
+  not an implementer error, but a latent non-collective-failure deadlock
+  risk if `PIOc_InitDecomp` ever failed on a strict subset of ranks
+  (flagged as a follow-up candidate, out of scope for this port); the
+  Fortran's explicit `else`/`PIO_TF_ERROR("Unexpected ...")` fallbacks for
+  unrecognized `fcd`/`comm_type` values were dropped in favor of relying
+  on the local `const` option arrays making those branches provably
+  unreachable (readability preference only); "Testing : <iotype>" logged
+  by the callee rather than the call site (cosmetic, see deviation above).
+  No fixes applied; nits parked in the ledger.
+- Single-task plan: the task review doubled as the final whole-branch
+  review. Final review verdict: **APPROVE_WITH_NITS**. `tests/general`
+  confirmed untouched (`git diff f02418a46f..f1c6724b55 -- tests/general/pio_rearr_opts2.F90.in`
+  empty; `git log --follow` shows its last commit, `fb8c15c7a4`, is far
+  outside the port range).
