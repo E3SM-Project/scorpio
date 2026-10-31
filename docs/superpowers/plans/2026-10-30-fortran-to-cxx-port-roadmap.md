@@ -66,7 +66,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_large_file_tests.F90.in` (433 lines)
 - [x] `pio_rearr_opts.F90.in` (487 lines)
 - [x] `pio_buf_lim_tests.F90.in` (506 lines)
-- [ ] `pio_decomp_fillval.F90.in` (540 lines)
+- [x] `pio_decomp_fillval.F90.in` (540 lines)
 - [ ] `pio_iodesc_tests.F90.in` (634 lines)
 - [ ] `pio_decomp_fillval2.F90.in` (645 lines)
 - [ ] `pio_decomp_frame_tests.F90.in` (661 lines)
@@ -1588,3 +1588,89 @@ range, any ruling made, final review verdict.)
   (`git diff --stat 236c2fbd50..c932803c7a --
   tests/general/pio_buf_lim_tests.F90.in` empty), and the task reviewer
   independently.
+
+### `pio_decomp_fillval.F90.in` (540 lines) -> `tests/functional/pio_decomp_fillval.cpp` (864 lines)
+
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-decomp-fillval-to-cxx.md`,
+  single task (5 templated subroutines, each instantiated for
+  `int`/`float`/`double`, 15 `rfuncs` total).
+- Architecture: 4 decomposition-based functions
+  (`nc_write_1d_explicit_fval`, `nc_write_1d_implicit_fval`,
+  `nc_read_1d_explicit_fval`, `nc_read_1d_implicit_fval`) exercising
+  `PIOc_InitDecomp`/`PIOc_write_darray`/`PIOc_read_darray` with
+  caller-supplied fill values, plus one non-decomposition function
+  (`test_set_fill`) exercising `PIOc_set_fill`/`PIOc_redef`/`PIOc_put_var`/
+  `PIOc_get_var` directly on whole numeric and `PIO_CHAR` variables.
+- Two genuinely different hole-creation mechanisms, both preserved exactly:
+  "explicit" variants keep full-length compdof/buffers and mark holes with
+  a `PIO_COMPDOF_FILLVAL = 0` compdof sentinel (odd 1-based Fortran
+  positions = 0-based C++ indices 0,2,4,6 — the parity flip was the single
+  highest-risk translation point and was gotten right); "implicit"
+  variants instead allocate a genuinely shorter, rank-dependent-length
+  compdof/buffer (`wcompdof_sz = min(rank+1, VEC_LOCAL_SZ)`) and never
+  reference the remaining global indices at all, from either side.
+- `nc_read_1d_implicit_fval` has two deliberate deviations from its three
+  siblings, both preserved and called out in a code comment: `BUF_FILLVAL`
+  is declared `const int` (the Fortran source declares it as a plain
+  `integer`, not the templated `PIO_TF_FC_DATA_TYPE` used everywhere else
+  in this file), and its `PIOc_write_darray` call passes `NULL` for the
+  fillvalue argument (the Fortran's corresponding `PIO_write_darray` call
+  omits the fillvalue actual argument entirely, unlike the other three
+  decomposition functions).
+- `test_set_fill`'s fillmode ordering preserved exactly: define all 4 vars
+  (2 numeric via `Pio_type_map<T>::value`, 2 `PIO_CHAR` regardless of
+  `T`) -> `PIOc_set_fill(PIO_NOFILL)` -> `enddef` -> put the two "nofill"
+  vars -> `PIOc_redef` -> `PIOc_set_fill(PIO_FILL)` -> `enddef` -> put the
+  two "fill" vars. Char-variable buffers use `std::string::resize(DIM_LEN,
+  ' ')` to reproduce Fortran's blank-padded fixed-length character
+  assignment (`CHARACTER(len=100)` pads with spaces, not null bytes) so
+  the round-trip comparison is faithful.
+- One plan-authoring slip, self-corrected by the implementer: the plan
+  text named the sync-branch API `PIOc_syncfile` (an incorrect
+  back-formation from the Fortran's `PIO_syncfile`); the implementer
+  recognized the real C API is `PIOc_sync` (`src/clib/pio_api.h:123`,
+  also the name used throughout the `pio_buf_lim_tests.cpp` precedent) and
+  used it correctly without flagging it as a deviation requiring a
+  ruling — confirmed correct by both the coordinator and the task
+  reviewer independently.
+- `#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC` / `#else PIOc_sync` branches
+  preserved verbatim in all 5 functions; decomposition bracketing
+  (`PIOc_InitDecomp`/`PIOc_freedecomp` once per function, outside the
+  iotype loop) preserved in all 4 decomposition functions.
+- Filename patterns preserved exactly: `nc_write_1d_explicit_fval` uses a
+  per-iotype-numbered suffix (`"test_pio_decomp_fillval_tests.testfile" +
+  std::to_string(i+1)`, matching the Fortran's `write(filename,'(a,i1)')`
+  with a 1-based iotype index); the other three decomposition functions
+  use a fixed filename; `test_set_fill` reuses
+  `"test_pio_ncdf_get_put.testfile"` verbatim from the Fortran (that name
+  belongs to the not-yet-ported `ncdf_get_put` test — safe since files are
+  deleted via `PIOc_deletefile` at the end of every iotype iteration).
+- Review: task reviewer (opus) found full spec compliance against the
+  actual Fortran source (read in full, not just the brief), verified
+  line-by-line against every risk area called out in the plan's Review
+  Focus section (explicit/implicit hole semantics not conflated, correct
+  side punched in each of the 4 explicit/implicit variants, index-parity
+  translation, per-function `rbuf` pre-read initialization value —
+  `0` vs `BUF_FILLVAL` — correct in each of the 4 decomposition
+  functions, both `nc_read_1d_implicit_fval` deviations preserved,
+  `test_set_fill` fillmode ordering and char blank-padding, `#ifdef`
+  branches, decomposition bracketing, filename patterns). Also
+  independently verified every `PIOc_*` signature used against
+  `src/clib/pio_api.h`, forced a clean rebuild, and re-ran `ctest`
+  independently. No Critical or Important findings. 3 Minor notes (`gcval`
+  buffers null-filled rather than blank-filled before the char-var read —
+  no behavioral difference since `PIOc_get_var` overwrites every byte
+  before the comparison; `wcompdof_sz`/`rcompdof_sz` could be `const int`;
+  two `PIOc_def_var` lines in `test_set_fill` exceed 100 columns, within
+  existing practice for this port series) — all accepted as-is, no fix
+  round needed.
+- Build/test: `ctest -R pio_decomp_fillval_cxx` passed, both by the
+  implementer and independently re-run by the coordinator (13.17s) and
+  again by the task reviewer after a forced clean rebuild (17.02s, all 15
+  rfuncs x 3 rearrangers PASSED).
+- Single-task plan: the task review doubled as the final whole-branch
+  review (no findings to fix, so no fix round or re-review was needed).
+  `tests/general/pio_decomp_fillval.F90.in` confirmed untouched throughout
+  by the implementer, the coordinator (`git diff --stat
+  7908138b5f..9b387d5e2d -- tests/general/pio_decomp_fillval.F90.in`
+  empty), and the task reviewer independently.
