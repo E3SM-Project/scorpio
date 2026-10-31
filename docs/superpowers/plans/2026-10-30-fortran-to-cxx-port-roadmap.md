@@ -65,7 +65,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_rearr_opts2.F90.in` (424 lines)
 - [x] `pio_large_file_tests.F90.in` (433 lines)
 - [x] `pio_rearr_opts.F90.in` (487 lines)
-- [ ] `pio_buf_lim_tests.F90.in` (506 lines)
+- [x] `pio_buf_lim_tests.F90.in` (506 lines)
 - [ ] `pio_decomp_fillval.F90.in` (540 lines)
 - [ ] `pio_iodesc_tests.F90.in` (634 lines)
 - [ ] `pio_decomp_fillval2.F90.in` (645 lines)
@@ -1517,3 +1517,74 @@ range, any ruling made, final review verdict.)
   and re-reviewer independently
   (`git diff 5b33b3e948..2f83c754e1 -- tests/general/pio_rearr_opts.F90.in`
   empty).
+
+### `pio_buf_lim_tests.F90.in` → `tests/functional/pio_buf_lim_tests.cpp`
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-buf-lim-tests-to-cxx.md`
+- Commit: `c932803c7a` on `jayeshkrishna/port_fortran_tests_to_cxx` (single
+  commit, no fix round needed).
+- Architecture: a free `get_iobuf_sz()` helper (literal transcription of
+  the Fortran's `iobuf_sz = lbuf_sz*lbuf_type_sz*nbufs - 1`, clamped to 0)
+  plus three templated test functions, each instantiated for
+  `int`/`float`/`double` (9 total `rfuncs` registrations):
+  `nc_wr_buf_limit_zero<T>` (one var, forces the write-buffer limit to 0
+  via `PIOc_set_buffer_size_limit(0)` then queries it back with a negative
+  value — a direct single-call substitution for the Fortran's two-call
+  `pio_set_buffer_size_limit` query trick, unlike `pio_rearr_opts`'s
+  two-call pattern), `nc_wr_mvar_impl_flush<T>` (four vars, three
+  increasing-flush-threshold scenarios run in sequence, each with its own
+  immediate write→sync/reopen→read+check block), and
+  `nc_wr_after_impl_flush<T>` (three vars, one scenario demonstrating that
+  data written after an implicit flush is only guaranteed visible after an
+  explicit sync/close). Decomposition reuses the `VEC_LOCAL_SZ=7` /
+  `dims[0] = VEC_LOCAL_SZ * comm_size` / `compdof[i] = VEC_LOCAL_SZ *
+  comm_rank + (i+1)` pattern already established in
+  `tests/functional/pio_decomp_large_tests.cpp`; `PIOc_InitDecomp`/
+  `PIOc_freedecomp` bracket the iotype loop once per function (matching
+  the Fortran exactly), not once per iotype.
+- One self-corrected deviation from the plan's literal code snippet (not a
+  fix round — caught and fixed by the implementer during implementation,
+  confirmed correct by the coordinator and the reviewer): the brief showed
+  `PIO_Offset dims[1]`, but `PIOc_InitDecomp`'s `gdimlen` parameter is
+  `const int *` (`src/clib/pio_api.h:16`), so `int dims[1]` was used
+  instead in all three functions, matching the actual precedent file
+  `pio_decomp_large_tests.cpp`.
+- The plan's Global Constraints deliberately preserved three verbatim
+  Fortran inconsistencies rather than "fixing" them, all confirmed present
+  in the diff by both the coordinator and the task reviewer: (1) sub 1
+  reopens with `PIO_NOWRITE`, subs 2/3 reopen with `PIO_WRITE`; (2) subs 1
+  and 2 share the filename `"test_pio_decomp_simple_tests.testfile"`, sub
+  3 uses `"test_pio_wr_aftr_impl_flush_tests.testfile"`; (3) in
+  `nc_wr_mvar_impl_flush`'s first scenario (flush-every-1-var), the
+  `PIO_TEST_CLOSE_OPEN_FOR_SYNC` reopen path calls `PIOc_inq_varid` for
+  `var1`, `var2`, AND `var3`, even though `var3` isn't written or read
+  back until the next scenario — an asymmetry present in the original
+  Fortran (`tests/general/pio_buf_lim_tests.F90.in:218-225`) and preserved
+  exactly, not normalized away.
+- Review: task reviewer (opus) found full spec compliance against the
+  Fortran source, verified line-by-line for all 8 called-out risk areas
+  (decomp bracketing, per-scenario immediate read-and-check ordering, the
+  scenario-1 `var3`-inq asymmetry, the NOWRITE/WRITE reopen split, the
+  filename reuse, the `get_iobuf_sz` clamp across `sizeof(int)=4`/
+  `sizeof(float)=4`/`sizeof(double)=8`, the 9 rfuncs registrations, and the
+  CMake knobs). Also independently cross-checked PIO API call counts
+  between the Fortran and the port (`PIOc_inq_varid` 15, `PIOc_write_darray`
+  13, `PIOc_read_darray` 13, `PIOc_set_buffer_size_limit` 6 — all matching).
+  No Critical or Important findings. Minor notes (a dropped
+  unreachable-in-practice log line on the `get_iobuf_sz` clamp branch;
+  inherited ~700-line duplication across the three functions, accepted
+  because the Fortran itself has this shape and every sibling
+  `tests/functional` port follows the same 1:1-diffable verbose style;
+  inherited leaked-`ncid`/`ioid`-on-error-abort pattern, identical to the
+  precedent file; inherited filename-collision risk with
+  `pio_decomp_tests2_1d.cpp` if ever run concurrently) — all accepted
+  as-is, no fix round needed.
+- Build/test: `ctest -R pio_buf_lim_tests_cxx` 6/6 passed, both by the
+  implementer (77.40s) and independently re-run by the coordinator
+  (66.21s) before dispatching the task reviewer.
+- Single-task plan: the task review doubled as the final whole-branch
+  review (no findings to fix, so no fix round or re-review was needed).
+  `tests/general/pio_buf_lim_tests.F90.in` confirmed untouched throughout
+  by the implementer, the coordinator
+  (`git diff --stat 236c2fbd50..c932803c7a --
+  tests/general/pio_buf_lim_tests.F90.in` empty), and the task reviewer
+  independently.
