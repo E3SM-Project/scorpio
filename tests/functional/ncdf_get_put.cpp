@@ -222,7 +222,17 @@ static int test_put_get_1datt_one_iotype(SPIO_TF::Test_framework &tf, int iotype
   }
   ok = check_val(tf, gval, pval, "Got wrong value") && ok;
 
-  std::vector<char> gcval(pcval.size(), '\0');
+  PIO_Offset cattlen = 0;
+  ret = PIOc_inq_attlen(ncid, pio_cvar, "dummy_att_cval", &cattlen);
+  if(!check_ret(tf, ret, "Failed to inquire attribute length:" + FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+
+  /* Size the get buffer from the real on-disk attribute length (not from
+   * pcval's length) - spio_get_att_tc() copies attlen bytes verbatim without
+   * null-terminating or bounds-checking against the caller's buffer. */
+  std::vector<char> gcval(static_cast<std::size_t>(cattlen), '\0');
   ret = PIOc_get_att(ncid, pio_cvar, "dummy_att_cval", gcval.data());
   if(!check_ret(tf, ret, "Failed to get attribute:" + FNAME)){
     PIOc_closefile(ncid);
