@@ -26,6 +26,7 @@
  * port and is not carried over. */
 
 const std::string FNAME("test_pio_ncdf_get_put.testfile");
+const std::string FNAME_SLICE("test_pio_ncdf_get_put_slice.testfile");
 
 template<typename T>
 static int test_put_1datt_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
@@ -769,6 +770,479 @@ int test_put_get_1d_coord_mvars(SPIO_TF::Test_framework &tf)
   return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
 }
 
+/* Put and get a 1d variable using a user buffer whose size does not match
+ * the variable's declared size. "svar"/"scvar" are variables written using a
+ * user buffer *larger* than the variable (so the write is truncated to the
+ * variable's declared length, DIM_LEN, and the full variable is compared on
+ * read-back). "lvar"/"lcvar" are variables written using a user buffer
+ * *smaller* than the variable (so only a DIM_SMALL_LEN prefix of the
+ * variable is written, and only that written prefix is compared on
+ * read-back - the untouched tail of the variable is unspecified). */
+template<typename T>
+static int test_put_get_1dvar_ls_buf_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const int DIM_LEN = 200;
+  const int DIM_SMALL_LEN = DIM_LEN - 100;
+  const std::string DIM_NAME("dummy_dim_put_val");
+  const std::string SVAR_NAME("dummy_svar_put_val");
+  const std::string LVAR_NAME("dummy_lvar_put_val");
+  const std::string SCVAR_NAME("dummy_svar_put_cval");
+  const std::string LCVAR_NAME("dummy_lvar_put_cval");
+
+  /* Buffer used to write svar/scvar (larger than the DIM_LEN-sized variable -
+   * only the first DIM_LEN elements are ever written out) */
+  std::vector<T> pval_large(DIM_LEN);
+  for(std::size_t i = 0; i < pval_large.size(); i++){
+    pval_large[i] = static_cast<T>(i + 1);
+  }
+  const std::string pcval_large(DIM_LEN, 'l');
+
+  /* Buffer used to write lvar/lcvar (smaller than the DIM_LEN-sized variable -
+   * only a DIM_SMALL_LEN prefix of the variable is written out) */
+  std::vector<T> pval_small(DIM_SMALL_LEN);
+  for(std::size_t i = 0; i < pval_small.size(); i++){
+    pval_small[i] = static_cast<T>(i + 1);
+  }
+  const std::string pcval_small(DIM_SMALL_LEN, 's');
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, FNAME.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  int pio_dim = -1;
+  ret = PIOc_def_dim(ncid, DIM_NAME.c_str(), DIM_LEN, &pio_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  int pio_svar = -1, pio_lvar = -1, pio_scvar = -1, pio_lcvar = -1;
+  ret = PIOc_def_var(ncid, SVAR_NAME.c_str(), Pio_type_map<T>::value, 1, &pio_dim, &pio_svar);
+  if(!check_ret(tf, ret, "Failed to define var (smaller than user buffer):" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, LVAR_NAME.c_str(), Pio_type_map<T>::value, 1, &pio_dim, &pio_lvar);
+  if(!check_ret(tf, ret, "Failed to define var (larger than user buffer):" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, SCVAR_NAME.c_str(), PIO_CHAR, 1, &pio_dim, &pio_scvar);
+  if(!check_ret(tf, ret, "Failed to define char var (smaller than user buffer):" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, LCVAR_NAME.c_str(), PIO_CHAR, 1, &pio_dim, &pio_lcvar);
+  if(!check_ret(tf, ret, "Failed to define char var (larger than user buffer):" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  PIO_Offset start[1] = { 0 };
+  PIO_Offset count_full[1] = { DIM_LEN };
+  PIO_Offset count_small[1] = { DIM_SMALL_LEN };
+
+  /* Put the values using a user buffer that is larger than the variable */
+  ret = PIOc_put_vara(ncid, pio_svar, start, count_full, pval_large.data());
+  if(!check_ret(tf, ret, "Failed to put var (smaller than user buffer)):" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_put_vara(ncid, pio_scvar, start, count_full, pcval_large.c_str());
+  if(!check_ret(tf, ret, "Failed to put char var (smaller than user buffer):" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* Put the values using a user buffer that is smaller than the variable */
+  ret = PIOc_put_vara(ncid, pio_lvar, start, count_small, pval_small.data());
+  if(!check_ret(tf, ret, "Failed to put var (larger than user buffer):" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_put_vara(ncid, pio_lcvar, start, count_small, pcval_small.c_str());
+  if(!check_ret(tf, ret, "Failed to put char var (larger than user buffer):" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + FNAME)){
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, FNAME.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, SVAR_NAME.c_str(), &pio_svar);
+  if(!check_ret(tf, ret, "Failed to get var (smaller than user buffer):" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, LVAR_NAME.c_str(), &pio_lvar);
+  if(!check_ret(tf, ret, "Failed to get var (larger than user buffer):" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, SCVAR_NAME.c_str(), &pio_scvar);
+  if(!check_ret(tf, ret, "Failed to get char var (smaller than user buffer):" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, LCVAR_NAME.c_str(), &pio_lcvar);
+  if(!check_ret(tf, ret, "Failed to get char var (larger than user buffer):" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  bool ok = true;
+
+  /* svar/scvar were written with a buffer larger than the variable - the
+   * full DIM_LEN-sized variable was written (truncated), so compare it in
+   * full */
+  std::vector<T> gval_full(DIM_LEN, static_cast<T>(0));
+  ret = PIOc_get_var(ncid, pio_svar, gval_full.data());
+  if(!check_ret(tf, ret, "Failed to get var (smaller than user buffer):" + FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  ok = check_val(tf, gval_full, pval_large,
+      "Get variable written with large user buffer : Got wrong value") && ok;
+
+  std::vector<char> gcval_full(DIM_LEN, '\0');
+  ret = PIOc_get_var(ncid, pio_scvar, gcval_full.data());
+  if(!check_ret(tf, ret, "Failed to get char var (smaller than user buffer):" + FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  ok = passert(tf, (std::string(gcval_full.begin(), gcval_full.end()) == pcval_large),
+      "Get variable written with large user buffer : Got wrong value") && ok;
+
+  /* lvar/lcvar were written with a buffer smaller than the variable - only
+   * the DIM_SMALL_LEN prefix of the variable was written, so only read back
+   * and compare that prefix; the untouched tail is unspecified */
+  std::vector<T> gval_small(DIM_SMALL_LEN, static_cast<T>(0));
+  ret = PIOc_get_vara(ncid, pio_lvar, start, count_small, gval_small.data());
+  if(!check_ret(tf, ret, "Failed to get var (larger than user buffer):" + FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  ok = check_val(tf, gval_small, pval_small,
+      "Get variable written with small user buffer : Got wrong value") && ok;
+
+  std::vector<char> gcval_small(DIM_SMALL_LEN, '\0');
+  ret = PIOc_get_vara(ncid, pio_lcvar, start, count_small, gcval_small.data());
+  if(!check_ret(tf, ret, "Failed to get char var (larger than user buffer):" + FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  ok = passert(tf, (std::string(gcval_small.begin(), gcval_small.end()) == pcval_small),
+      "Get variable written with small user buffer : Got wrong value") && ok;
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+template<typename T>
+int test_put_get_1dvar_ls_buf(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_1dvar_ls_buf : ") + iotype_name + "\n");
+
+    if(test_put_get_1dvar_ls_buf_one_iotype<T>(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* Write out a 1d var slice from a conceptual 2d (MAX_ROW_DIM_LEN x
+ * MAX_COL_DIM_LEN) write buffer, stored column-major (as in the Fortran
+ * source) so that a single column is a contiguous run of MAX_ROW_DIM_LEN
+ * elements that can be handed directly to PIOc_put_vara. */
+template<typename T>
+static int test_put_get_1dvar_slice_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const std::string DIM_NAME("dummy_dim_put_val");
+  const std::string VAR_NAME("dummy_var_put_val");
+  const int MAX_ROW_DIM_LEN = 100;
+  const int MAX_COL_DIM_LEN = 4;
+  const int COL_WRITE_DIM = 2;
+
+  std::vector<T> pval(static_cast<std::size_t>(MAX_ROW_DIM_LEN) * MAX_COL_DIM_LEN, static_cast<T>(-1));
+  const T write_val = static_cast<T>(tf.get_comm_size());
+  const std::size_t col_off = static_cast<std::size_t>(COL_WRITE_DIM - 1) * MAX_ROW_DIM_LEN;
+  for(std::size_t i = 0; i < static_cast<std::size_t>(MAX_ROW_DIM_LEN); i++){
+    pval[col_off + i] = write_val;
+  }
+
+  std::vector<T> exp_val(MAX_ROW_DIM_LEN, write_val);
+  std::vector<T> gval(MAX_ROW_DIM_LEN, static_cast<T>(0));
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, FNAME_SLICE.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + FNAME_SLICE)){
+    return PIO_EINTERNAL;
+  }
+
+  int pio_dim = -1;
+  ret = PIOc_def_dim(ncid, DIM_NAME.c_str(), MAX_ROW_DIM_LEN, &pio_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + FNAME_SLICE)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_SLICE.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  int pio_var = -1;
+  ret = PIOc_def_var(ncid, VAR_NAME.c_str(), Pio_type_map<T>::value, 1, &pio_dim, &pio_var);
+  if(!check_ret(tf, ret, "Failed to define var:" + FNAME_SLICE)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_SLICE.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + FNAME_SLICE)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_SLICE.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  PIO_Offset start[1] = { 0 };
+  PIO_Offset count[1] = { MAX_ROW_DIM_LEN };
+  ret = PIOc_put_vara(ncid, pio_var, start, count, &pval[col_off]);
+  if(!check_ret(tf, ret, "Failed to put var:" + FNAME_SLICE)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_SLICE.c_str());
+    return PIO_EINTERNAL;
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + FNAME_SLICE)){
+    PIOc_deletefile(tf.get_iosysid(), FNAME_SLICE.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, FNAME_SLICE.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + FNAME_SLICE)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR_NAME.c_str(), &pio_var);
+  if(!check_ret(tf, ret, "Failed to get scalar var:" + FNAME_SLICE)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  ret = PIOc_get_var(ncid, pio_var, gval.data());
+  if(!check_ret(tf, ret, "Failed to get var:" + FNAME_SLICE)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  bool ok = check_val(tf, gval, exp_val, "Got wrong value");
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), FNAME_SLICE.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+template<typename T>
+int test_put_get_1dvar_slice(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_1dvar_slice : ") + iotype_name + "\n");
+
+    if(test_put_get_1dvar_slice_one_iotype<T>(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* Write a 1d var in 4 sequential hyperslab parts (forward order), then read
+ * it back in 4 separate hyperslab parts in reverse order (4th part first),
+ * checking each part as soon as it is read. */
+template<typename T>
+static int test_put_get_1dvar_4parts_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const std::string DIM_NAME("dummy_dim_put_val");
+  const std::string VAR_NAME("dummy_var_put_val");
+  const int DIM_LEN = 16;
+  const int PART_LEN = DIM_LEN / 4;
+  static const char *part_ctx[4] = { "1st", "2nd", "3rd", "4th" };
+
+  std::vector<T> pval(DIM_LEN);
+  for(std::size_t i = 0; i < pval.size(); i++){
+    pval[i] = static_cast<T>(i + 1);
+  }
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, FNAME.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  int pio_dim = -1;
+  ret = PIOc_def_dim(ncid, DIM_NAME.c_str(), DIM_LEN, &pio_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  int pio_var = -1;
+  ret = PIOc_def_var(ncid, VAR_NAME.c_str(), Pio_type_map<T>::value, 1, &pio_dim, &pio_var);
+  if(!check_ret(tf, ret, "Failed to define var:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  PIO_Offset count[1] = { PART_LEN };
+
+  for(int p = 0; p < 4; p++){
+    PIO_Offset start[1] = { static_cast<PIO_Offset>(p * PART_LEN) };
+    ret = PIOc_put_vara(ncid, pio_var, start, count,
+        &pval[static_cast<std::size_t>(p) * PART_LEN]);
+    if(!check_ret(tf, ret, std::string("Failed to put var (") + part_ctx[p] + " part):" + FNAME)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + FNAME)){
+    PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, FNAME.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR_NAME.c_str(), &pio_var);
+  if(!check_ret(tf, ret, "Failed to get scalar var:" + FNAME)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  bool ok = true;
+
+  /* Read back in reverse order (4th part first), checking each part as soon
+   * as it is read */
+  for(int p = 3; p >= 0; p--){
+    PIO_Offset start[1] = { static_cast<PIO_Offset>(p * PART_LEN) };
+    std::vector<T> gpart(PART_LEN, static_cast<T>(0));
+    ret = PIOc_get_vara(ncid, pio_var, start, count, gpart.data());
+    if(!check_ret(tf, ret, std::string("Failed to get var (") + part_ctx[p] + " part):" + FNAME)){
+      PIOc_closefile(ncid);
+      return PIO_EINTERNAL;
+    }
+
+    std::vector<T> exp_part(pval.begin() + static_cast<std::size_t>(p) * PART_LEN,
+        pval.begin() + static_cast<std::size_t>(p + 1) * PART_LEN);
+    ok = check_val(tf, gpart, exp_part, "Got wrong value") && ok;
+  }
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), FNAME.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+template<typename T>
+int test_put_get_1dvar_4parts(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_1dvar_4parts : ") + iotype_name + "\n");
+
+    if(test_put_get_1dvar_4parts_one_iotype<T>(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
 int main(int argc, char *argv[])
 {
   int ret = MPI_SUCCESS, nerrs = 0;
@@ -796,7 +1270,16 @@ int main(int argc, char *argv[])
     {"test_put_get_1d_coord_var_double", test_put_get_1d_coord_var<double>},
     {"test_put_get_1d_coord_mvars_int", test_put_get_1d_coord_mvars<int>},
     {"test_put_get_1d_coord_mvars_float", test_put_get_1d_coord_mvars<float>},
-    {"test_put_get_1d_coord_mvars_double", test_put_get_1d_coord_mvars<double>}
+    {"test_put_get_1d_coord_mvars_double", test_put_get_1d_coord_mvars<double>},
+    {"test_put_get_1dvar_ls_buf_int", test_put_get_1dvar_ls_buf<int>},
+    {"test_put_get_1dvar_ls_buf_float", test_put_get_1dvar_ls_buf<float>},
+    {"test_put_get_1dvar_ls_buf_double", test_put_get_1dvar_ls_buf<double>},
+    {"test_put_get_1dvar_slice_int", test_put_get_1dvar_slice<int>},
+    {"test_put_get_1dvar_slice_float", test_put_get_1dvar_slice<float>},
+    {"test_put_get_1dvar_slice_double", test_put_get_1dvar_slice<double>},
+    {"test_put_get_1dvar_4parts_int", test_put_get_1dvar_4parts<int>},
+    {"test_put_get_1dvar_4parts_float", test_put_get_1dvar_4parts<float>},
+    {"test_put_get_1dvar_4parts_double", test_put_get_1dvar_4parts<double>}
   };
 
   SPIO_TF::Test_framework tf("ncdf_get_put_cxx", MPI_COMM_WORLD, rfuncs);
