@@ -68,7 +68,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_buf_lim_tests.F90.in` (506 lines)
 - [x] `pio_decomp_fillval.F90.in` (540 lines)
 - [x] `pio_iodesc_tests.F90.in` (634 lines)
-- [ ] `pio_decomp_fillval2.F90.in` (645 lines)
+- [x] `pio_decomp_fillval2.F90.in` (645 lines)
 - [ ] `pio_decomp_frame_tests.F90.in` (661 lines)
 - [ ] `pio_decomp_tests_1d.F90.in` (727 lines)
 - [ ] `pio_sync_tests.F90.in` (802 lines)
@@ -1753,3 +1753,91 @@ range, any ruling made, final review verdict.)
   (`git diff --stat ee9485be60..37d566c56d --
   tests/general/pio_iodesc_tests.F90.in` empty, and again against master
   after the fix-up commit), and by the task reviewer independently.
+
+### `pio_decomp_fillval2.F90.in` (645 lines) -> `tests/functional/pio_decomp_fillval2.cpp` (954 lines)
+
+- Plan: `docs/superpowers/plans/2026-10-30-port-pio-decomp-fillval2-to-cxx.md`,
+  single task (5 templated test subroutines, each instantiated for
+  `int`/`float`/`double`, 15 `rfuncs` total).
+- Architecture: 5 fillvalue-hole variants on the 1D write/read-darray
+  pattern already established by the sibling `pio_decomp_fillval.cpp`:
+  `nc_wr_1d_mreg_exp_fval` (dynamically-sized decomposition, explicit
+  `PIO_COMPDOF_FILLVAL=0` sentinel holes strided by `HSTRIDE`, two vars
+  written from the same buffer), `nc_wr_1d_mreg_imp_fval` (implicit holes
+  via a genuinely shorter write-compdof array built from a two-loop
+  construction with a single running output index, full-size read
+  decomposition), `nc_wr_1d_one_val` (every rank punches all slots, only
+  the last global rank restores one real value), `nc_wr_1d_odd_fval`
+  (odd-ranked processes punch all slots, even ranks keep full valid data),
+  and `test_data_conv_with_fval` (single `T`-typed decomposition driving
+  three fixed-type `PIO_INT`/`PIO_REAL`/`PIO_DOUBLE` variables, exercising
+  PIO's internal I/O type conversion regardless of `T`).
+- Five Review Focus items, all independently confirmed correct by both the
+  coordinator and the task reviewer against the actual Fortran source
+  line-by-line: (1) `nc_wr_1d_mreg_exp_fval`'s 1-based
+  `(i-1)*HSTRIDE+1` -> 0-based `i*HSTRIDE` hole-index translation; (2)
+  `nc_wr_1d_mreg_imp_fval`'s two-loop implicit write-compdof construction
+  preserved exactly (not collapsed into one formula) — verified the
+  element count closes exactly at `vec_local_wsz`; (3)
+  `nc_wr_1d_one_val`'s `is_last_proc = (rank == size - 1)` branch,
+  including the nprocs=1 case where rank 0 is also the last rank; (4)
+  `test_data_conv_with_fval`'s fixed `PIO_INT`/`PIO_REAL`/`PIO_DOUBLE` var
+  types never "corrected" to match the templated `T`, preserving the
+  forced-conversion intent; (5) every one of the file's 8
+  `PIOc_write_darray` calls passes a non-NULL `&BUF_FILLVAL` (unlike the
+  sibling file's `nc_read_1d_implicit_fval`, which passes `NULL`).
+- `PIOc_freedecomp` call order preserved per function exactly as in the
+  Fortran: read-then-write in 4 of the 5 functions, but reversed to
+  write-then-read in `test_data_conv_with_fval` specifically — confirmed
+  via direct grep against the Fortran source by both the coordinator and
+  the reviewer.
+- One brief-vs-C-API spelling deviation, flagged by the implementer and
+  confirmed by the reviewer as purely cosmetic: the brief used the
+  Fortran-style `PIO_int`/`PIO_real`/`PIO_double`, but the C API only
+  exposes `PIO_INT`/`PIO_REAL`/`PIO_DOUBLE` (uppercase); reviewer checked
+  both `src/flib/pio_types.F90:246-248` and `src/clib/pio.h:180-183` and
+  confirmed identical underlying NetCDF type codes, no semantic change.
+- CMake registration copies the existing Fortran `pio_decomp_fillval2`
+  entry's own "C3" tier knobs verbatim (`MINNUMPROCS 4`,
+  `MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}`, `MINNUMIOPROCS 2`,
+  `MAXNUMIOPROCS ${PIO_TF_C3_MAXNUMIOPROCS}`, `MINSTRIDE 2`,
+  `MAXSTRIDE ${PIO_TF_C3_MAXSTRIDE}`) — the same tier
+  `pio_decomp_fillval_cxx` already uses.
+- Review: task reviewer (opus) found full spec compliance (PASS) after
+  tracing all 5 subroutines line-by-line against the actual 645-line
+  Fortran source (not just the brief), confirming all 5 Review Focus
+  items in the actual code, confirming the `PIOc_freedecomp`
+  ordering per function, confirming the CMake knobs are byte-identical to
+  the existing Fortran registration, confirming the Fortran source
+  untouched, and independently forcing a clean rebuild (zero warnings)
+  and re-running `ctest` itself (1/1 passed, 12.84s) rather than trusting
+  the implementer's report. Code quality: APPROVED WITH MINOR FINDINGS
+  (no Critical/Major) — (A) `nc_wr_1d_mreg_imp_fval` used a fixed
+  filename where the Fortran numbers it per-iotype, identical to the
+  other 3 numbered functions in this file; root-caused to an incorrect
+  claim in the plan's Step 3 (copied from the sibling file's pattern,
+  which doesn't apply to this Fortran source); behaviorally benign
+  (create+delete within each iotype iteration) but an internal
+  inconsistency vs. the file's other 3 numbered functions; (B) roadmap
+  not yet updated at review time — expected follow-up, not a plan
+  violation; (C) nit, no action — the C3 tier's `MINNUMPROCS=4` means the
+  nprocs=1 "rank 0 is also the last rank" case in Review Focus item 3 is
+  never exercised by CI, inherited from the verbatim-copied Fortran tier.
+- Ruling: finding (A) was a cheap, mechanical, zero-risk one-line fix
+  (moved the filename construction inside the iotype loop, numbered via
+  `std::to_string(i + 1)`, matching the other 3 functions) — the
+  coordinator applied it directly rather than dispatching another
+  implementer+reviewer round trip, then independently rebuilt (clean) and
+  re-ran `ctest` (1/1 passed, 23.62s) before committing as `e4f6f56639`.
+  Finding (B) addressed by this roadmap update. Finding (C) left as-is
+  per the reviewer's own no-action recommendation.
+- Build/test: `ctest -R pio_decomp_fillval2_cxx` passed at every
+  verification point — implementer (1/1, 17.93s), coordinator pre-review
+  (1/1, 14.84s), task reviewer post-forced-rebuild (1/1, 12.84s),
+  coordinator post-fix (1/1, 23.62s).
+- Single-task plan: the task review doubled as the final whole-branch
+  review. `tests/general/pio_decomp_fillval2.F90.in` confirmed untouched
+  throughout — by the implementer, by the coordinator
+  (`git diff --stat 151f4a1b22..8c366aa69d --
+  tests/general/pio_decomp_fillval2.F90.in` empty), and by the task
+  reviewer independently against the same base commit.
