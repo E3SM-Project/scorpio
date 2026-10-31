@@ -274,3 +274,15 @@ add_pio_test(pio_decomp_tests_3d_cxx
   MINSTRIDE 1
   MAXSTRIDE ${PIO_TF_C2_MAXSTRIDE}
   TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+
+add_spio_executable(pio_iosystem_tests2_cxx TRUE "" pio_iosystem_tests2.cpp ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
+
+add_pio_test(pio_iosystem_tests2_cxx
+  EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pio_iosystem_tests2_cxx
+  MINNUMPROCS 4
+  MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}
+  MINNUMIOPROCS 1
+  MAXNUMIOPROCS ${PIO_TF_C1_MAXNUMIOPROCS}
+  MINSTRIDE 1
+  MAXSTRIDE ${PIO_TF_C1_MAXSTRIDE}
+  TIMEOUT ${DEFAULT_TEST_TIMEOUT})
