@@ -143,7 +143,9 @@ int init_dup_iosys_with_rearr_opts(MPI_Comm dup_comm, int rearr, int comm_type, 
     bool enable_hs_i2c, bool enable_isend_i2c, int max_pend_req_i2c,
     int &iosysid)
 {
-  PIOc_Init_Intracomm(dup_comm, 1, 1, /*base=*/0, rearr, &iosysid);
+  int nioprocs = 0;
+  MPI_Comm_size(dup_comm, &nioprocs);
+  PIOc_Init_Intracomm(dup_comm, nioprocs, 1, /*base=*/0, rearr, &iosysid);
   return PIOc_set_rearr_opts(iosysid, comm_type, fcd, enable_hs_c2i, enable_isend_c2i, max_pend_req_c2i,
       enable_hs_i2c, enable_isend_i2c, max_pend_req_i2c);
 }
