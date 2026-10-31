@@ -296,6 +296,12 @@ int nc_wr_2d_two_iodescs(SPIO_TF::Test_framework &tf)
 
     /* Read data - with no shift */
     for(int cf = 0; cf < NFRAMES; cf++){
+      for(int j = 0; j < nrows; j++){
+        rbuf[cf][j] = static_cast<T>(0);
+      }
+    }
+
+    for(int cf = 0; cf < NFRAMES; cf++){
       ret = PIOc_setframe(ncid, varid, cf);
       if(!check_ret(tf, ret, "Failed to set frame : " + filename)){
         return PIO_EINTERNAL;
@@ -366,6 +372,7 @@ int nc_mureg_wr_rd_1d_bc(SPIO_TF::Test_framework &tf)
   std::vector<PIO_Offset> compdof(total_count);
   for(std::size_t i = 0; i < count.size(); i++){
     for(int j = 0; j < count[i]; j++){
+      /* Valid only because every region has the same count (VEC_LOCAL_SZ) */
       std::size_t idx = i * count[i] + j;
       compdof[idx] = start[i] + j;
       wbuf_mureg[idx] = static_cast<T>(compdof[idx]);
@@ -523,6 +530,7 @@ int nc_mnureg_wr_rd_1d_bc(SPIO_TF::Test_framework &tf)
   std::vector<PIO_Offset> compdof(total_count);
   for(std::size_t i = 0; i < count.size(); i++){
     for(int j = 0; j < count[i]; j++){
+      /* Valid only because every region has the same count (VEC_LOCAL_SZ) */
       std::size_t idx = i * count[i] + j;
       compdof[idx] = start[i] + j;
       wbuf_mnureg[idx] = static_cast<T>(compdof[idx]);
