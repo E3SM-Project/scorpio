@@ -1243,6 +1243,657 @@ int test_put_get_1dvar_4parts(SPIO_TF::Test_framework &tf)
   return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
 }
 
+/* Put and get 2d/3d/4d vars, one (fixed-size) time slice at a time */
+template<typename T>
+static int test_put_get_md2mdplus1_var_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const std::string MD_SLICE_FNAME("test_pio_ncdf_get_put_md_slice.testfile");
+  const std::string PIO_2DVAR_NAME("2d_val");
+  const std::string PIO_3DVAR_NAME("3d_val");
+  const std::string PIO_4DVAR_NAME("4d_val");
+  const int MAX_ROWS = 10;
+  const int MAX_COLS = 10;
+  const int MAX_LEVS = 3;
+  const int MAX_TIMES = 3;
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, MD_SLICE_FNAME.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + MD_SLICE_FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  int row_dim = -1, col_dim = -1, lev_dim = -1, time_dim = -1;
+  ret = PIOc_def_dim(ncid, "nrows", MAX_ROWS, &row_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + MD_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, "ncols", MAX_COLS, &col_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + MD_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, "nlevs", MAX_LEVS, &lev_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + MD_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, "timesteps", MAX_TIMES, &time_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + MD_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  int dimids_2d[2] = {time_dim, row_dim};
+  int dimids_3d[3] = {time_dim, col_dim, row_dim};
+  int dimids_4d[4] = {time_dim, lev_dim, col_dim, row_dim};
+
+  int pio_2dvar = -1, pio_3dvar = -1, pio_4dvar = -1;
+  ret = PIOc_def_var(ncid, PIO_2DVAR_NAME.c_str(), Pio_type_map<T>::value, 2, dimids_2d, &pio_2dvar);
+  if(!check_ret(tf, ret, "Failed to define var:" + MD_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, PIO_3DVAR_NAME.c_str(), Pio_type_map<T>::value, 3, dimids_3d, &pio_3dvar);
+  if(!check_ret(tf, ret, "Failed to define var:" + MD_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, PIO_4DVAR_NAME.c_str(), Pio_type_map<T>::value, 4, dimids_4d, &pio_4dvar);
+  if(!check_ret(tf, ret, "Failed to define var:" + MD_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + MD_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* Values are a simple sequential count (1, 2, 3, ...) over the flattened
+   * (time, ..., col, row) index space, with row the fastest-varying index -
+   * i.e. the expected value at flat index i (0-based) is i + 1. This mirrors
+   * the Fortran source's per-timestep offset values (pval_1d/pval_2d/pval_3d
+   * plus a per-timestep pval_start) while keeping the C++ port simple. */
+  const std::size_t slice_2d = static_cast<std::size_t>(MAX_ROWS);
+  const std::size_t slice_3d = static_cast<std::size_t>(MAX_ROWS) * MAX_COLS;
+  const std::size_t slice_4d = static_cast<std::size_t>(MAX_ROWS) * MAX_COLS * MAX_LEVS;
+
+  /* Put 2d/3d/4d vals, one timestep at a time */
+  for(int tstep = 0; tstep < MAX_TIMES; tstep++){
+    std::vector<T> pval_2d(slice_2d);
+    for(std::size_t i = 0; i < slice_2d; i++){
+      pval_2d[i] = static_cast<T>(static_cast<std::size_t>(tstep) * slice_2d + i + 1);
+    }
+    PIO_Offset start_2d[2] = {tstep, 0};
+    PIO_Offset count_2d[2] = {1, MAX_ROWS};
+    ret = PIOc_put_vara(ncid, pio_2dvar, start_2d, count_2d, pval_2d.data());
+    if(!check_ret(tf, ret, "Failed to put 2d var:" + MD_SLICE_FNAME)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), MD_SLICE_FNAME.c_str());
+      return PIO_EINTERNAL;
+    }
+
+    std::vector<T> pval_3d(slice_3d);
+    for(std::size_t i = 0; i < slice_3d; i++){
+      pval_3d[i] = static_cast<T>(static_cast<std::size_t>(tstep) * slice_3d + i + 1);
+    }
+    PIO_Offset start_3d[3] = {tstep, 0, 0};
+    PIO_Offset count_3d[3] = {1, MAX_COLS, MAX_ROWS};
+    ret = PIOc_put_vara(ncid, pio_3dvar, start_3d, count_3d, pval_3d.data());
+    if(!check_ret(tf, ret, "Failed to put 3d var:" + MD_SLICE_FNAME)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), MD_SLICE_FNAME.c_str());
+      return PIO_EINTERNAL;
+    }
+
+    std::vector<T> pval_4d(slice_4d);
+    for(std::size_t i = 0; i < slice_4d; i++){
+      pval_4d[i] = static_cast<T>(static_cast<std::size_t>(tstep) * slice_4d + i + 1);
+    }
+    PIO_Offset start_4d[4] = {tstep, 0, 0, 0};
+    PIO_Offset count_4d[4] = {1, MAX_LEVS, MAX_COLS, MAX_ROWS};
+    ret = PIOc_put_vara(ncid, pio_4dvar, start_4d, count_4d, pval_4d.data());
+    if(!check_ret(tf, ret, "Failed to put 4d var:" + MD_SLICE_FNAME)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), MD_SLICE_FNAME.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + MD_SLICE_FNAME)){
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, MD_SLICE_FNAME.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + MD_SLICE_FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, PIO_2DVAR_NAME.c_str(), &pio_2dvar);
+  if(!check_ret(tf, ret, "Failed to inq 2d var:" + MD_SLICE_FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, PIO_3DVAR_NAME.c_str(), &pio_3dvar);
+  if(!check_ret(tf, ret, "Failed to inq 3d var:" + MD_SLICE_FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, PIO_4DVAR_NAME.c_str(), &pio_4dvar);
+  if(!check_ret(tf, ret, "Failed to inq 4d var:" + MD_SLICE_FNAME)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  bool ok = true;
+
+  std::vector<T> gval_2d(slice_2d * MAX_TIMES, static_cast<T>(0));
+  ret = PIOc_get_var(ncid, pio_2dvar, gval_2d.data());
+  if(!check_ret(tf, ret, "Failed to get 2d var:" + MD_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  std::vector<T> exp_val_2d(slice_2d * MAX_TIMES);
+  for(std::size_t i = 0; i < exp_val_2d.size(); i++){
+    exp_val_2d[i] = static_cast<T>(i + 1);
+  }
+  ok = check_val(tf, gval_2d, exp_val_2d, "Got wrong value (2d var)") && ok;
+
+  std::vector<T> gval_3d(slice_3d * MAX_TIMES, static_cast<T>(0));
+  ret = PIOc_get_var(ncid, pio_3dvar, gval_3d.data());
+  if(!check_ret(tf, ret, "Failed to get 3d var:" + MD_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  std::vector<T> exp_val_3d(slice_3d * MAX_TIMES);
+  for(std::size_t i = 0; i < exp_val_3d.size(); i++){
+    exp_val_3d[i] = static_cast<T>(i + 1);
+  }
+  ok = check_val(tf, gval_3d, exp_val_3d, "Got wrong value (3d var)") && ok;
+
+  std::vector<T> gval_4d(slice_4d * MAX_TIMES, static_cast<T>(0));
+  ret = PIOc_get_var(ncid, pio_4dvar, gval_4d.data());
+  if(!check_ret(tf, ret, "Failed to get 4d var:" + MD_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+
+  /* check_val() compares flat vectors - compare the 4d var one timestep (one
+   * flattened (lev, col, row) slice) at a time rather than building a single
+   * rank-4-aware comparison, since a single flat comparison across all 4
+   * dims is unnecessarily complex to build here; this mirrors how the
+   * Fortran source itself must special-case the 4d comparison. */
+  for(int tstep = 0; tstep < MAX_TIMES; tstep++){
+    std::vector<T> gval_4d_slice(gval_4d.begin() + static_cast<std::size_t>(tstep) * slice_4d,
+        gval_4d.begin() + static_cast<std::size_t>(tstep + 1) * slice_4d);
+    std::vector<T> exp_val_4d_slice(slice_4d);
+    for(std::size_t i = 0; i < slice_4d; i++){
+      exp_val_4d_slice[i] = static_cast<T>(static_cast<std::size_t>(tstep) * slice_4d + i + 1);
+    }
+    ok = check_val(tf, gval_4d_slice, exp_val_4d_slice, "Got wrong value (4d var)") && ok;
+  }
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), MD_SLICE_FNAME.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+template<typename T>
+int test_put_get_md2mdplus1_var(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_md2mdplus1_var : ") + iotype_name + "\n");
+
+    if(test_put_get_md2mdplus1_var_one_iotype<T>(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* Put and get a 6d var, one time slice at a time (ne4pg2 + EAMXX write out
+ * similar 6d vars) */
+template<typename T>
+static int test_put_get_6d_var_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const std::string SIX_D_SLICE_FNAME("test_pio_ncdf_get_put_6d_slice.testfile");
+  const std::string PIO_6DVAR_NAME("6d_val");
+  /* There are 6 dims in the variable, but only 5 unique dims - the gp dim
+   * (gp_dim below) is reused, as the SAME dimension id, for both of the
+   * variable's two "gp" axes (not two distinct dims that happen to share a
+   * length). */
+  const int MAX_LEVS = 9;
+  const int MAX_GP = 4;
+  const int MAX_DIM2 = 2;
+  const int MAX_ELEMS = 6;
+  const int MAX_TIMES = 3;
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, SIX_D_SLICE_FNAME.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + SIX_D_SLICE_FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  int lev_dim = -1, gp_dim = -1, dim2_dim = -1, elems_dim = -1, time_dim = -1;
+  ret = PIOc_def_dim(ncid, "nlevs", MAX_LEVS, &lev_dim);
+  if(!check_ret(tf, ret, "Failed to define nlevs dim:" + SIX_D_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), SIX_D_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, "gp", MAX_GP, &gp_dim);
+  if(!check_ret(tf, ret, "Failed to define gp dim:" + SIX_D_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), SIX_D_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, "dim2", MAX_DIM2, &dim2_dim);
+  if(!check_ret(tf, ret, "Failed to define dim2 dim:" + SIX_D_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), SIX_D_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, "elems", MAX_ELEMS, &elems_dim);
+  if(!check_ret(tf, ret, "Failed to define elems dim:" + SIX_D_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), SIX_D_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, "time", PIO_UNLIMITED, &time_dim);
+  if(!check_ret(tf, ret, "Failed to define time dim:" + SIX_D_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), SIX_D_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* gp_dim is reused for both "gp" axes of the 6d var - see comment above. */
+  int dimids_6d[6] = {time_dim, elems_dim, dim2_dim, gp_dim, gp_dim, lev_dim};
+  int pio_6dvar = -1;
+  ret = PIOc_def_var(ncid, PIO_6DVAR_NAME.c_str(), Pio_type_map<T>::value, 6, dimids_6d, &pio_6dvar);
+  if(!check_ret(tf, ret, "Failed to define 6d var:" + SIX_D_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), SIX_D_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + SIX_D_SLICE_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), SIX_D_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  const std::size_t slice_6d = static_cast<std::size_t>(MAX_LEVS) * MAX_GP * MAX_GP * MAX_DIM2 * MAX_ELEMS;
+
+  /* The Fortran source computes exp_val_6d(:,:,:,:,:,tstep) inside a 5-level
+   * nested loop over (i,j,k,l,m), but assigns the RHS - a scalar expression
+   * in i,j,k,l,m,tstep - to the *entire* slice (colon subscripts) on every
+   * iteration, so the slice ends up uniformly filled with the value from the
+   * loops' final iteration (i=MAX_LEVS, j=MAX_GP, k=MAX_GP, l=MAX_DIM2,
+   * m=MAX_ELEMS). This port reproduces that same per-timestep constant value
+   * directly instead of re-running the (self-overwriting) nested loop. */
+  const PIO_Offset base = MAX_LEVS + MAX_GP * MAX_LEVS + MAX_GP * (MAX_GP * MAX_LEVS)
+      + MAX_DIM2 * (MAX_GP * MAX_GP * MAX_LEVS)
+      + MAX_ELEMS * (MAX_DIM2 * MAX_GP * MAX_GP * MAX_LEVS);
+  const PIO_Offset tstep_coeff = MAX_ELEMS * MAX_DIM2 * MAX_GP * MAX_GP * MAX_LEVS;
+
+  /* Put the 6d val, one timestep at a time */
+  for(int tstep = 0; tstep < MAX_TIMES; tstep++){
+    T pval = static_cast<T>(base + static_cast<PIO_Offset>(tstep + 1) * tstep_coeff);
+    std::vector<T> pval_6d(slice_6d, pval);
+
+    PIO_Offset start[6] = {tstep, 0, 0, 0, 0, 0};
+    PIO_Offset count[6] = {1, MAX_ELEMS, MAX_DIM2, MAX_GP, MAX_GP, MAX_LEVS};
+    ret = PIOc_put_vara(ncid, pio_6dvar, start, count, pval_6d.data());
+    if(!check_ret(tf, ret, "Failed to put 6d var:" + SIX_D_SLICE_FNAME)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), SIX_D_SLICE_FNAME.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + SIX_D_SLICE_FNAME)){
+    PIOc_deletefile(tf.get_iosysid(), SIX_D_SLICE_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, SIX_D_SLICE_FNAME.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + SIX_D_SLICE_FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, PIO_6DVAR_NAME.c_str(), &pio_6dvar);
+  if(!check_ret(tf, ret, "Failed to inq 6d var:" + SIX_D_SLICE_FNAME)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  bool ok = true;
+
+  /* Get the 6d val back, one timestep at a time (hyperslab), matching the
+   * Fortran source's per-timestep PIO_get_var() calls for this sub. */
+  for(int tstep = 0; tstep < MAX_TIMES; tstep++){
+    PIO_Offset start[6] = {tstep, 0, 0, 0, 0, 0};
+    PIO_Offset count[6] = {1, MAX_ELEMS, MAX_DIM2, MAX_GP, MAX_GP, MAX_LEVS};
+    std::vector<T> gval_6d(slice_6d, static_cast<T>(0));
+    ret = PIOc_get_vara(ncid, pio_6dvar, start, count, gval_6d.data());
+    if(!check_ret(tf, ret, "Failed to get 6d var time slice:" + SIX_D_SLICE_FNAME)){
+      PIOc_closefile(ncid);
+      return PIO_EINTERNAL;
+    }
+
+    T pval = static_cast<T>(base + static_cast<PIO_Offset>(tstep + 1) * tstep_coeff);
+    std::vector<T> exp_val_6d(slice_6d, pval);
+    ok = check_val(tf, gval_6d, exp_val_6d, "Got wrong value (6d var)") && ok;
+  }
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), SIX_D_SLICE_FNAME.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+template<typename T>
+int test_put_get_6d_var(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_6d_var : ") + iotype_name + "\n");
+
+    if(test_put_get_6d_var_one_iotype<T>(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* Similar to test_put_get_md2mdplus1_var, but uses an unlimited time
+ * dimension instead of a fixed-size one */
+template<typename T>
+static int test_put_get_md2mdplus1_rec_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const std::string MD_SLICE_REC_FNAME("test_pio_ncdf_get_put_md_slice_rec.testfile");
+  const std::string PIO_2DVAR_NAME("2d_val");
+  const std::string PIO_3DVAR_NAME("3d_val");
+  const std::string PIO_4DVAR_NAME("4d_val");
+  const int MAX_ROWS = 10;
+  const int MAX_COLS = 10;
+  const int MAX_LEVS = 3;
+  const int MAX_TIMES = 3;
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, MD_SLICE_REC_FNAME.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + MD_SLICE_REC_FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  int row_dim = -1, col_dim = -1, lev_dim = -1, time_dim = -1;
+  ret = PIOc_def_dim(ncid, "nrows", MAX_ROWS, &row_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + MD_SLICE_REC_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_REC_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, "ncols", MAX_COLS, &col_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + MD_SLICE_REC_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_REC_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, "nlevs", MAX_LEVS, &lev_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + MD_SLICE_REC_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_REC_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, "timesteps", PIO_UNLIMITED, &time_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + MD_SLICE_REC_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_REC_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  int dimids_2d[2] = {time_dim, row_dim};
+  int dimids_3d[3] = {time_dim, col_dim, row_dim};
+  int dimids_4d[4] = {time_dim, lev_dim, col_dim, row_dim};
+
+  int pio_2dvar = -1, pio_3dvar = -1, pio_4dvar = -1;
+  ret = PIOc_def_var(ncid, PIO_2DVAR_NAME.c_str(), Pio_type_map<T>::value, 2, dimids_2d, &pio_2dvar);
+  if(!check_ret(tf, ret, "Failed to define var:" + MD_SLICE_REC_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_REC_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, PIO_3DVAR_NAME.c_str(), Pio_type_map<T>::value, 3, dimids_3d, &pio_3dvar);
+  if(!check_ret(tf, ret, "Failed to define var:" + MD_SLICE_REC_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_REC_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, PIO_4DVAR_NAME.c_str(), Pio_type_map<T>::value, 4, dimids_4d, &pio_4dvar);
+  if(!check_ret(tf, ret, "Failed to define var:" + MD_SLICE_REC_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_REC_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + MD_SLICE_REC_FNAME)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_REC_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* See test_put_get_md2mdplus1_var_one_iotype() above - values are a simple
+   * sequential count (1, 2, 3, ...) over the flattened (time, ..., col, row)
+   * index space, with row the fastest-varying index. */
+  const std::size_t slice_2d = static_cast<std::size_t>(MAX_ROWS);
+  const std::size_t slice_3d = static_cast<std::size_t>(MAX_ROWS) * MAX_COLS;
+  const std::size_t slice_4d = static_cast<std::size_t>(MAX_ROWS) * MAX_COLS * MAX_LEVS;
+
+  /* Put 2d/3d/4d vals, one timestep at a time */
+  for(int tstep = 0; tstep < MAX_TIMES; tstep++){
+    std::vector<T> pval_2d(slice_2d);
+    for(std::size_t i = 0; i < slice_2d; i++){
+      pval_2d[i] = static_cast<T>(static_cast<std::size_t>(tstep) * slice_2d + i + 1);
+    }
+    PIO_Offset start_2d[2] = {tstep, 0};
+    PIO_Offset count_2d[2] = {1, MAX_ROWS};
+    ret = PIOc_put_vara(ncid, pio_2dvar, start_2d, count_2d, pval_2d.data());
+    if(!check_ret(tf, ret, "Failed to put 2d var:" + MD_SLICE_REC_FNAME)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), MD_SLICE_REC_FNAME.c_str());
+      return PIO_EINTERNAL;
+    }
+
+    std::vector<T> pval_3d(slice_3d);
+    for(std::size_t i = 0; i < slice_3d; i++){
+      pval_3d[i] = static_cast<T>(static_cast<std::size_t>(tstep) * slice_3d + i + 1);
+    }
+    PIO_Offset start_3d[3] = {tstep, 0, 0};
+    PIO_Offset count_3d[3] = {1, MAX_COLS, MAX_ROWS};
+    ret = PIOc_put_vara(ncid, pio_3dvar, start_3d, count_3d, pval_3d.data());
+    if(!check_ret(tf, ret, "Failed to put 3d var:" + MD_SLICE_REC_FNAME)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), MD_SLICE_REC_FNAME.c_str());
+      return PIO_EINTERNAL;
+    }
+
+    std::vector<T> pval_4d(slice_4d);
+    for(std::size_t i = 0; i < slice_4d; i++){
+      pval_4d[i] = static_cast<T>(static_cast<std::size_t>(tstep) * slice_4d + i + 1);
+    }
+    PIO_Offset start_4d[4] = {tstep, 0, 0, 0};
+    PIO_Offset count_4d[4] = {1, MAX_LEVS, MAX_COLS, MAX_ROWS};
+    ret = PIOc_put_vara(ncid, pio_4dvar, start_4d, count_4d, pval_4d.data());
+    if(!check_ret(tf, ret, "Failed to put 4d var:" + MD_SLICE_REC_FNAME)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), MD_SLICE_REC_FNAME.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + MD_SLICE_REC_FNAME)){
+    PIOc_deletefile(tf.get_iosysid(), MD_SLICE_REC_FNAME.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, MD_SLICE_REC_FNAME.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + MD_SLICE_REC_FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, PIO_2DVAR_NAME.c_str(), &pio_2dvar);
+  if(!check_ret(tf, ret, "Failed to inq 2d var:" + MD_SLICE_REC_FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, PIO_3DVAR_NAME.c_str(), &pio_3dvar);
+  if(!check_ret(tf, ret, "Failed to inq 3d var:" + MD_SLICE_REC_FNAME)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, PIO_4DVAR_NAME.c_str(), &pio_4dvar);
+  if(!check_ret(tf, ret, "Failed to inq 4d var:" + MD_SLICE_REC_FNAME)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  bool ok = true;
+
+  std::vector<T> gval_2d(slice_2d * MAX_TIMES, static_cast<T>(0));
+  ret = PIOc_get_var(ncid, pio_2dvar, gval_2d.data());
+  if(!check_ret(tf, ret, "Failed to get 2d var:" + MD_SLICE_REC_FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  std::vector<T> exp_val_2d(slice_2d * MAX_TIMES);
+  for(std::size_t i = 0; i < exp_val_2d.size(); i++){
+    exp_val_2d[i] = static_cast<T>(i + 1);
+  }
+  ok = check_val(tf, gval_2d, exp_val_2d, "Got wrong value (2d var)") && ok;
+
+  std::vector<T> gval_3d(slice_3d * MAX_TIMES, static_cast<T>(0));
+  ret = PIOc_get_var(ncid, pio_3dvar, gval_3d.data());
+  if(!check_ret(tf, ret, "Failed to get 3d var:" + MD_SLICE_REC_FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  std::vector<T> exp_val_3d(slice_3d * MAX_TIMES);
+  for(std::size_t i = 0; i < exp_val_3d.size(); i++){
+    exp_val_3d[i] = static_cast<T>(i + 1);
+  }
+  ok = check_val(tf, gval_3d, exp_val_3d, "Got wrong value (3d var)") && ok;
+
+  std::vector<T> gval_4d(slice_4d * MAX_TIMES, static_cast<T>(0));
+  ret = PIOc_get_var(ncid, pio_4dvar, gval_4d.data());
+  if(!check_ret(tf, ret, "Failed to get 4d var:" + MD_SLICE_REC_FNAME)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+
+  /* See test_put_get_md2mdplus1_var_one_iotype() above for why the 4d var
+   * comparison is done one timestep (one flattened (lev, col, row) slice) at
+   * a time. */
+  for(int tstep = 0; tstep < MAX_TIMES; tstep++){
+    std::vector<T> gval_4d_slice(gval_4d.begin() + static_cast<std::size_t>(tstep) * slice_4d,
+        gval_4d.begin() + static_cast<std::size_t>(tstep + 1) * slice_4d);
+    std::vector<T> exp_val_4d_slice(slice_4d);
+    for(std::size_t i = 0; i < slice_4d; i++){
+      exp_val_4d_slice[i] = static_cast<T>(static_cast<std::size_t>(tstep) * slice_4d + i + 1);
+    }
+    ok = check_val(tf, gval_4d_slice, exp_val_4d_slice, "Got wrong value (4d var)") && ok;
+  }
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), MD_SLICE_REC_FNAME.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+template<typename T>
+int test_put_get_md2mdplus1_rec(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_md2mdplus1_rec : ") + iotype_name + "\n");
+
+    if(test_put_get_md2mdplus1_rec_one_iotype<T>(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
 int main(int argc, char *argv[])
 {
   int ret = MPI_SUCCESS, nerrs = 0;
@@ -1279,7 +1930,16 @@ int main(int argc, char *argv[])
     {"test_put_get_1dvar_slice_double", test_put_get_1dvar_slice<double>},
     {"test_put_get_1dvar_4parts_int", test_put_get_1dvar_4parts<int>},
     {"test_put_get_1dvar_4parts_float", test_put_get_1dvar_4parts<float>},
-    {"test_put_get_1dvar_4parts_double", test_put_get_1dvar_4parts<double>}
+    {"test_put_get_1dvar_4parts_double", test_put_get_1dvar_4parts<double>},
+    {"test_put_get_md2mdplus1_var_int", test_put_get_md2mdplus1_var<int>},
+    {"test_put_get_md2mdplus1_var_float", test_put_get_md2mdplus1_var<float>},
+    {"test_put_get_md2mdplus1_var_double", test_put_get_md2mdplus1_var<double>},
+    {"test_put_get_6d_var_int", test_put_get_6d_var<int>},
+    {"test_put_get_6d_var_float", test_put_get_6d_var<float>},
+    {"test_put_get_6d_var_double", test_put_get_6d_var<double>},
+    {"test_put_get_md2mdplus1_rec_int", test_put_get_md2mdplus1_rec<int>},
+    {"test_put_get_md2mdplus1_rec_float", test_put_get_md2mdplus1_rec<float>},
+    {"test_put_get_md2mdplus1_rec_double", test_put_get_md2mdplus1_rec<double>}
   };
 
   SPIO_TF::Test_framework tf("ncdf_get_put_cxx", MPI_COMM_WORLD, rfuncs);
