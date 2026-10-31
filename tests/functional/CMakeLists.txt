@@ -538,3 +538,17 @@ add_pio_test(pio_decomp_extra_dims_cxx
   MINSTRIDE 2
   MAXSTRIDE ${PIO_TF_C3_MAXSTRIDE}
   TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+
+#===== ncdf_get_put_cxx =====
+add_spio_executable(ncdf_get_put_cxx TRUE "" ncdf_get_put.cpp ${SCORPIO_SOURCE_DIR}/util/argparser.cxx)
+
+# This is a costly test
+add_pio_test(ncdf_get_put_cxx
+  EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/ncdf_get_put_cxx
+  MINNUMPROCS 4
+  MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}
+  MINNUMIOPROCS 2
+  MAXNUMIOPROCS ${PIO_TF_C3_MAXNUMIOPROCS}
+  MINSTRIDE 2
+  MAXSTRIDE ${PIO_TF_C3_MAXSTRIDE}
+  TIMEOUT ${DEFAULT_TEST_TIMEOUT})
