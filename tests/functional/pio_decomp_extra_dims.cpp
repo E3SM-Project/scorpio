@@ -66,6 +66,13 @@ int nc_wr_rd_1d_extra_dims_impl(SPIO_TF::Test_framework &tf, int num_extra_dims,
   get_extra_dims_decomp_info(tf.get_comm_rank(), tf.get_comm_size(), num_extra_dims,
       gdims, compdof);
 
+  /* NOTE: The Fortran source (pio_decomp_extra_dims.F90.in) writes a uniform
+   * per-rank value here (wbuf = pio_tf_world_rank_). We deliberately write
+   * per-element compdof values instead - a strictly stronger roundtrip check
+   * (it also catches intra-rank permutation bugs that a uniform buffer
+   * cannot), and it keeps this function consistent with the record-group
+   * functions' compdof-based formula.
+   */
   std::vector<T> wbuf(VEC_LOCAL_SZ);
   for(std::size_t i = 0; i < wbuf.size(); i++){
     wbuf[i] = static_cast<T>(compdof[i]);
