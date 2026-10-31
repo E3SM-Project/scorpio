@@ -55,14 +55,11 @@ const int SPIO_TEST_NUM_ALL_IOTYPES = 9;
 inline bool is_iotype_available_for_tests(int iotype)
 {
   switch(iotype){
+    // ADIOSC needs only _ADIOS2, unlike HDF5C -- see iotype_is_valid() in
+    // pioc_support.cpp, which has no compression sub-guard for ADIOSC.
     case PIO_IOTYPE_ADIOS:
-#ifdef _ADIOS2
-      return true;
-#else
-      return false;
-#endif
     case PIO_IOTYPE_ADIOSC:
-#if defined(_ADIOS2) && defined(_SPIO_ADIOS_USE_COMPRESSION)
+#ifdef _ADIOS2
       return true;
 #else
       return false;
