@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <cstdio>
+#include <cstring>
 
 #include "pio.h"
 
@@ -3878,6 +3879,762 @@ int test_put_get_str_idx(SPIO_TF::Test_framework &tf)
   return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
 }
 
+/* Put and get hyperslabs of 1D/2D/3D text variables - progressively
+ * rewrites parts (first the prefix, then the suffix) of already-written
+ * strings using fine-grained, single-character PIOc_put_vara() hyperslabs,
+ * verifying the final string contents after each rewrite phase. */
+static int test_put_get_str_hslabs_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const std::string filename("test_pio_ncdf_get_str_hslabs.testfile");
+
+  const int STR_LEN = 64;
+  const int NUM_ROWS = 4;
+  const int NUM_COLS = 8;
+  const int NUM_STEPS = 6;
+
+  const std::string VAR_NAME_PREFIX1("var");
+  const std::string VAR_NAME_PREFIX2("v__");
+  const std::string VAR_NAME_SUFFIX1("d");
+  const std::string VAR_NAME_SUFFIX2("_");
+  const int VAR1D_ID = 1;
+  const int VAR2D_ID = 2;
+  const int VAR3D_ID = 3;
+  /* VAR1D_ID/VAR2D_ID/VAR3D_ID are always rendered as a single digit */
+  const int ID_LEN = 1;
+
+  const std::string dim0_name("slen");
+  const std::string dim1_name("row");
+  const std::string dim2_name("col");
+  const std::string dim3_name("step");
+
+  /* var*_name = VAR_NAME_PREFIX1 + VAR*D_ID + VAR_NAME_SUFFIX1 : the
+   * NetCDF variable names themselves never change for the lifetime of this
+   * sub - only the *contents* of the string variables are rewritten below
+   * (first the prefix, then the suffix of each stored string) */
+  const std::string var1d_name = VAR_NAME_PREFIX1 + std::to_string(VAR1D_ID) + VAR_NAME_SUFFIX1;
+  const std::string var2d_name = VAR_NAME_PREFIX1 + std::to_string(VAR2D_ID) + VAR_NAME_SUFFIX1;
+  const std::string var3d_name = VAR_NAME_PREFIX1 + std::to_string(VAR3D_ID) + VAR_NAME_SUFFIX1;
+
+  /* Builds "name5(idx1[,idx2[,idx3]])", space-padded out to STR_LEN chars,
+   * e.g. make_elem_str("var1d", {1}) => "var1d(    1)" (then space-padded) */
+  auto make_elem_str = [STR_LEN](const std::string &name5, const std::vector<int> &idxs) -> std::string {
+    std::string s = name5 + "(";
+    for(std::size_t k = 0; k < idxs.size(); k++){
+      if(k > 0){
+        s += ",";
+      }
+      char ibuf[16];
+      std::snprintf(ibuf, sizeof(ibuf), "%5d", idxs[k]);
+      s += ibuf;
+    }
+    s += ")";
+    s.resize(static_cast<std::size_t>(STR_LEN), ' ');
+    return s;
+  };
+
+  /* Builds the full flat char buffer for var1d, in C (row-major) dim order,
+   * slowest to fastest : [row][slen] */
+  auto build_str1d = [&](const std::string &name5) -> std::vector<char> {
+    std::vector<char> buf(static_cast<std::size_t>(NUM_ROWS) * STR_LEN);
+    for(int row = 1; row <= NUM_ROWS; row++){
+      std::string s = make_elem_str(name5, std::vector<int>{row});
+      std::memcpy(buf.data() + static_cast<std::size_t>(row - 1) * STR_LEN, s.data(),
+          static_cast<std::size_t>(STR_LEN));
+    }
+    return buf;
+  };
+
+  /* dim order, slowest to fastest : [col][row][slen] */
+  auto build_str2d = [&](const std::string &name5) -> std::vector<char> {
+    std::vector<char> buf(static_cast<std::size_t>(NUM_COLS) * NUM_ROWS * STR_LEN);
+    for(int col = 1; col <= NUM_COLS; col++){
+      for(int row = 1; row <= NUM_ROWS; row++){
+        std::string s = make_elem_str(name5, std::vector<int>{row, col});
+        std::size_t off = (static_cast<std::size_t>(col - 1) * NUM_ROWS +
+            static_cast<std::size_t>(row - 1)) * STR_LEN;
+        std::memcpy(buf.data() + off, s.data(), static_cast<std::size_t>(STR_LEN));
+      }
+    }
+    return buf;
+  };
+
+  /* dim order, slowest to fastest : [step][col][row][slen] */
+  auto build_str3d = [&](const std::string &name5) -> std::vector<char> {
+    std::vector<char> buf(static_cast<std::size_t>(NUM_STEPS) * NUM_COLS * NUM_ROWS * STR_LEN);
+    for(int step = 1; step <= NUM_STEPS; step++){
+      for(int col = 1; col <= NUM_COLS; col++){
+        for(int row = 1; row <= NUM_ROWS; row++){
+          std::string s = make_elem_str(name5, std::vector<int>{row, col, step});
+          std::size_t off = ((static_cast<std::size_t>(step - 1) * NUM_COLS +
+              static_cast<std::size_t>(col - 1)) * NUM_ROWS +
+              static_cast<std::size_t>(row - 1)) * STR_LEN;
+          std::memcpy(buf.data() + off, s.data(), static_cast<std::size_t>(STR_LEN));
+        }
+      }
+    }
+    return buf;
+  };
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, filename.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + filename)){
+    return PIO_EINTERNAL;
+  }
+
+  int dim_slen = -1, dim_row = -1, dim_col = -1, dim_step = -1;
+  ret = PIOc_def_dim(ncid, dim0_name.c_str(), STR_LEN, &dim_slen);
+  if(!check_ret(tf, ret, "Failed to define dim 0:" + filename)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, dim1_name.c_str(), NUM_ROWS, &dim_row);
+  if(!check_ret(tf, ret, "Failed to define dim 1:" + filename)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, dim2_name.c_str(), NUM_COLS, &dim_col);
+  if(!check_ret(tf, ret, "Failed to define dim 2:" + filename)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_dim(ncid, dim3_name.c_str(), NUM_STEPS, &dim_step);
+  if(!check_ret(tf, ret, "Failed to define dim 3:" + filename)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  int var1d_dimids[2] = {dim_row, dim_slen};
+  int var2d_dimids[3] = {dim_col, dim_row, dim_slen};
+  int var3d_dimids[4] = {dim_step, dim_col, dim_row, dim_slen};
+
+  int var1d = -1, var2d = -1, var3d = -1;
+  ret = PIOc_def_var(ncid, var1d_name.c_str(), PIO_CHAR, 2, var1d_dimids, &var1d);
+  if(!check_ret(tf, ret, "Failed to define 1 dim char array or 1d array of strings in file " + filename)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, var2d_name.c_str(), PIO_CHAR, 3, var2d_dimids, &var2d);
+  if(!check_ret(tf, ret, "Failed to define 2 dim char array or 2d array of strings in file " + filename)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, var3d_name.c_str(), PIO_CHAR, 4, var3d_dimids, &var3d);
+  if(!check_ret(tf, ret, "Failed to define 3 dim char array or 3d array of strings in file " + filename)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + filename)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* Write the entire contents of the strings, e.g. var1d(row) = "var1d(row)" */
+  std::string name1d = var1d_name, name2d = var2d_name, name3d = var3d_name;
+  std::vector<char> exp_str1d = build_str1d(name1d);
+  std::vector<char> exp_str2d = build_str2d(name2d);
+  std::vector<char> exp_str3d = build_str3d(name3d);
+
+  ret = PIOc_put_var(ncid, var1d, exp_str1d.data());
+  if(!check_ret(tf, ret, "Failed to put 1d array of strings in file " + filename)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_put_var(ncid, var2d, exp_str2d.data());
+  if(!check_ret(tf, ret, "Failed to put 2d array of strings in file " + filename)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_put_var(ncid, var3d, exp_str3d.data());
+  if(!check_ret(tf, ret, "Failed to put 3d array of strings in file " + filename)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + filename)){
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, filename.c_str(), PIO_WRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + filename)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, var1d_name.c_str(), &var1d);
+  if(!check_ret(tf, ret, "Failed to inquire 1d array of strings var in file " + filename)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, var2d_name.c_str(), &var2d);
+  if(!check_ret(tf, ret, "Failed to inquire 2d array of strings var in file " + filename)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, var3d_name.c_str(), &var3d);
+  if(!check_ret(tf, ret, "Failed to inquire 3d array of strings var in file " + filename)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  /* --- Phase 1 : rewrite the prefix of each stored string
+   * (VAR_NAME_PREFIX1 => VAR_NAME_PREFIX2), one character at a time, via
+   * PIOc_put_vara() hyperslabs --- */
+  name1d = VAR_NAME_PREFIX2 + std::to_string(VAR1D_ID) + VAR_NAME_SUFFIX1;
+  name2d = VAR_NAME_PREFIX2 + std::to_string(VAR2D_ID) + VAR_NAME_SUFFIX1;
+  name3d = VAR_NAME_PREFIX2 + std::to_string(VAR3D_ID) + VAR_NAME_SUFFIX1;
+  exp_str1d = build_str1d(name1d);
+  exp_str2d = build_str2d(name2d);
+  exp_str3d = build_str3d(name3d);
+
+  const int prefix_len = static_cast<int>(VAR_NAME_PREFIX2.size());
+
+  /* 1d var : rewrite the prefix of 1 row (string) at a time */
+  for(int row = 1; row <= NUM_ROWS; row++){
+    PIO_Offset start[2] = {static_cast<PIO_Offset>(row - 1), 0};
+    PIO_Offset count[2] = {1, static_cast<PIO_Offset>(prefix_len)};
+
+    /* Pack the data written out into a buffer of single chars, one
+     * character at a time, e.g. tmp_str = ['v', '_', '_'] */
+    std::vector<char> tmp_str(static_cast<std::size_t>(prefix_len));
+    for(int k = 0; k < prefix_len; k++){
+      tmp_str[static_cast<std::size_t>(k)] = VAR_NAME_PREFIX2[static_cast<std::size_t>(k)];
+    }
+
+    ret = PIOc_put_vara(ncid, var1d, start, count, tmp_str.data());
+    if(!check_ret(tf, ret, "Failed to put string prefixes in file " + filename)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+  /* 2d var : rewrite the prefixes of 1 column (1d array of strings) at a time */
+  for(int col = 1; col <= NUM_COLS; col++){
+    PIO_Offset start[3] = {static_cast<PIO_Offset>(col - 1), 0, 0};
+    PIO_Offset count[3] = {1, static_cast<PIO_Offset>(NUM_ROWS), static_cast<PIO_Offset>(prefix_len)};
+
+    std::vector<char> tmp_str(static_cast<std::size_t>(NUM_ROWS) * prefix_len);
+    for(int j = 0; j < NUM_ROWS; j++){
+      for(int k = 0; k < prefix_len; k++){
+        tmp_str[static_cast<std::size_t>(j) * prefix_len + k] = VAR_NAME_PREFIX2[static_cast<std::size_t>(k)];
+      }
+    }
+
+    ret = PIOc_put_vara(ncid, var2d, start, count, tmp_str.data());
+    if(!check_ret(tf, ret, "Failed to put 1d array of string prefixes in file " + filename)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+  /* 3d var : rewrite the prefixes of 1 step (2d array of strings) at a time */
+  for(int step = 1; step <= NUM_STEPS; step++){
+    PIO_Offset start[4] = {static_cast<PIO_Offset>(step - 1), 0, 0, 0};
+    PIO_Offset count[4] = {1, static_cast<PIO_Offset>(NUM_COLS), static_cast<PIO_Offset>(NUM_ROWS),
+        static_cast<PIO_Offset>(prefix_len)};
+
+    std::vector<char> tmp_str(static_cast<std::size_t>(NUM_COLS) * NUM_ROWS * prefix_len);
+    for(int l = 0; l < NUM_COLS; l++){
+      for(int j = 0; j < NUM_ROWS; j++){
+        for(int k = 0; k < prefix_len; k++){
+          tmp_str[(static_cast<std::size_t>(l) * NUM_ROWS + j) * prefix_len + k] =
+              VAR_NAME_PREFIX2[static_cast<std::size_t>(k)];
+        }
+      }
+    }
+
+    ret = PIOc_put_vara(ncid, var3d, start, count, tmp_str.data());
+    if(!check_ret(tf, ret, "Failed to put 2d array of string prefixes in file " + filename)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + filename)){
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, filename.c_str(), PIO_WRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + filename)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, var1d_name.c_str(), &var1d);
+  if(!check_ret(tf, ret, "Failed to inquire 1d array of strings var in file " + filename)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, var2d_name.c_str(), &var2d);
+  if(!check_ret(tf, ret, "Failed to inquire 2d array of strings var in file " + filename)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, var3d_name.c_str(), &var3d);
+  if(!check_ret(tf, ret, "Failed to inquire 3d array of strings var in file " + filename)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  bool ok = true;
+
+  std::vector<char> gstr1d(exp_str1d.size(), '\0');
+  ret = PIOc_get_var(ncid, var1d, gstr1d.data());
+  if(!check_ret(tf, ret, "Failed to get 1d char var in file " + filename)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  ok = passert(tf, (std::string(gstr1d.begin(), gstr1d.end()) ==
+      std::string(exp_str1d.begin(), exp_str1d.end())),
+      "Got wrong value for 1d char var with modified prefix") && ok;
+
+  std::vector<char> gstr2d(exp_str2d.size(), '\0');
+  ret = PIOc_get_var(ncid, var2d, gstr2d.data());
+  if(!check_ret(tf, ret, "Failed to get 2d char var in file " + filename)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  ok = passert(tf, (std::string(gstr2d.begin(), gstr2d.end()) ==
+      std::string(exp_str2d.begin(), exp_str2d.end())),
+      "Got wrong value for 2d char var with modified prefix") && ok;
+
+  std::vector<char> gstr3d(exp_str3d.size(), '\0');
+  ret = PIOc_get_var(ncid, var3d, gstr3d.data());
+  if(!check_ret(tf, ret, "Failed to get 3d char var in file " + filename)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  ok = passert(tf, (std::string(gstr3d.begin(), gstr3d.end()) ==
+      std::string(exp_str3d.begin(), exp_str3d.end())),
+      "Got wrong value for 3d char var with modified prefix") && ok;
+
+  /* --- Phase 2 : rewrite the suffix of each stored string
+   * (VAR_NAME_SUFFIX1 => VAR_NAME_SUFFIX2), one character at a time, via
+   * PIOc_put_vara() hyperslabs --- */
+  name1d = VAR_NAME_PREFIX2 + std::to_string(VAR1D_ID) + VAR_NAME_SUFFIX2;
+  name2d = VAR_NAME_PREFIX2 + std::to_string(VAR2D_ID) + VAR_NAME_SUFFIX2;
+  name3d = VAR_NAME_PREFIX2 + std::to_string(VAR3D_ID) + VAR_NAME_SUFFIX2;
+  exp_str1d = build_str1d(name1d);
+  exp_str2d = build_str2d(name2d);
+  exp_str3d = build_str3d(name3d);
+
+  const int suffix_len = static_cast<int>(VAR_NAME_SUFFIX2.size());
+  /* Skip VAR_NAME_PREFIX2 and VAR*D_ID */
+  const int suffix_start = prefix_len + ID_LEN;
+
+  /* 1d var : rewrite the suffix of 1 row (string) at a time */
+  for(int row = 1; row <= NUM_ROWS; row++){
+    PIO_Offset start[2] = {static_cast<PIO_Offset>(row - 1), static_cast<PIO_Offset>(suffix_start)};
+    PIO_Offset count[2] = {1, static_cast<PIO_Offset>(suffix_len)};
+
+    std::vector<char> tmp_str(static_cast<std::size_t>(suffix_len));
+    for(int k = 0; k < suffix_len; k++){
+      tmp_str[static_cast<std::size_t>(k)] = VAR_NAME_SUFFIX2[static_cast<std::size_t>(k)];
+    }
+
+    ret = PIOc_put_vara(ncid, var1d, start, count, tmp_str.data());
+    if(!check_ret(tf, ret, "Failed to put string suffixes in file " + filename)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+  /* 2d var : rewrite the suffixes of 1 column (1d array of strings) at a time */
+  for(int col = 1; col <= NUM_COLS; col++){
+    PIO_Offset start[3] = {static_cast<PIO_Offset>(col - 1), 0, static_cast<PIO_Offset>(suffix_start)};
+    PIO_Offset count[3] = {1, static_cast<PIO_Offset>(NUM_ROWS), static_cast<PIO_Offset>(suffix_len)};
+
+    std::vector<char> tmp_str(static_cast<std::size_t>(NUM_ROWS) * suffix_len);
+    for(int j = 0; j < NUM_ROWS; j++){
+      for(int k = 0; k < suffix_len; k++){
+        tmp_str[static_cast<std::size_t>(j) * suffix_len + k] = VAR_NAME_SUFFIX2[static_cast<std::size_t>(k)];
+      }
+    }
+
+    ret = PIOc_put_vara(ncid, var2d, start, count, tmp_str.data());
+    if(!check_ret(tf, ret, "Failed to put 1d array of string suffixes in file " + filename)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+  /* 3d var : rewrite the suffixes of 1 step (2d array of strings) at a time */
+  for(int step = 1; step <= NUM_STEPS; step++){
+    PIO_Offset start[4] = {static_cast<PIO_Offset>(step - 1), 0, 0, static_cast<PIO_Offset>(suffix_start)};
+    PIO_Offset count[4] = {1, static_cast<PIO_Offset>(NUM_COLS), static_cast<PIO_Offset>(NUM_ROWS),
+        static_cast<PIO_Offset>(suffix_len)};
+
+    std::vector<char> tmp_str(static_cast<std::size_t>(NUM_COLS) * NUM_ROWS * suffix_len);
+    for(int l = 0; l < NUM_COLS; l++){
+      for(int j = 0; j < NUM_ROWS; j++){
+        for(int k = 0; k < suffix_len; k++){
+          tmp_str[(static_cast<std::size_t>(l) * NUM_ROWS + j) * suffix_len + k] =
+              VAR_NAME_SUFFIX2[static_cast<std::size_t>(k)];
+        }
+      }
+    }
+
+    ret = PIOc_put_vara(ncid, var3d, start, count, tmp_str.data());
+    if(!check_ret(tf, ret, "Failed to put 2d array of string suffixes in file " + filename)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + filename)){
+    PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, filename.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + filename)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, var1d_name.c_str(), &var1d);
+  if(!check_ret(tf, ret, "Failed to inquire 1d array of strings var in file " + filename)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, var2d_name.c_str(), &var2d);
+  if(!check_ret(tf, ret, "Failed to inquire 2d array of strings var in file " + filename)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, var3d_name.c_str(), &var3d);
+  if(!check_ret(tf, ret, "Failed to inquire 3d array of strings var in file " + filename)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  ret = PIOc_get_var(ncid, var1d, gstr1d.data());
+  if(!check_ret(tf, ret, "Failed to get 1d char var in file " + filename)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  ok = passert(tf, (std::string(gstr1d.begin(), gstr1d.end()) ==
+      std::string(exp_str1d.begin(), exp_str1d.end())),
+      "Got wrong value for 1d char var with modified suffixes") && ok;
+
+  ret = PIOc_get_var(ncid, var2d, gstr2d.data());
+  if(!check_ret(tf, ret, "Failed to get 2d char var in file " + filename)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  ok = passert(tf, (std::string(gstr2d.begin(), gstr2d.end()) ==
+      std::string(exp_str2d.begin(), exp_str2d.end())),
+      "Got wrong value for 2d char var with modified suffixes") && ok;
+
+  ret = PIOc_get_var(ncid, var3d, gstr3d.data());
+  if(!check_ret(tf, ret, "Failed to get 3d char var in file " + filename)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  ok = passert(tf, (std::string(gstr3d.begin(), gstr3d.end()) ==
+      std::string(exp_str3d.begin(), exp_str3d.end())),
+      "Got wrong value for 3d char var with modified suffixes") && ok;
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), filename.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+int test_put_get_str_hslabs(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_str_hslabs : ") + iotype_name + "\n");
+
+    if(test_put_get_str_hslabs_one_iotype(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* Typed put/get dispatch : PIOc_put_var()/PIOc_get_var() (the untyped, void *
+ * buffer, variants) use PIO_NAT as the memory type, i.e. they assume that the
+ * buffer's type matches the variable's on-disk type exactly - no conversion
+ * is done, and using them with a buffer type that does not match the
+ * variable's type (e.g. a buffer of ints for a PIO_DOUBLE variable) can
+ * overrun the buffer. The typed variants (PIOc_put_var_int/_float/_double and
+ * PIOc_get_var_int/_float/_double) pass the buffer's actual memory type
+ * explicitly, so the library performs a real on-the-fly type conversion
+ * to/from the variable's on-disk type - this is required to exercise the
+ * implicit type conversion behavior below. */
+template<typename T>
+static int put_var_typed(int ncid, int varid, const T *buf);
+
+template<>
+int put_var_typed<int>(int ncid, int varid, const int *buf)
+{
+  return PIOc_put_var_int(ncid, varid, buf);
+}
+
+template<>
+int put_var_typed<float>(int ncid, int varid, const float *buf)
+{
+  return PIOc_put_var_float(ncid, varid, buf);
+}
+
+template<>
+int put_var_typed<double>(int ncid, int varid, const double *buf)
+{
+  return PIOc_put_var_double(ncid, varid, buf);
+}
+
+template<typename T>
+static int get_var_typed(int ncid, int varid, T *buf);
+
+template<>
+int get_var_typed<int>(int ncid, int varid, int *buf)
+{
+  return PIOc_get_var_int(ncid, varid, buf);
+}
+
+template<>
+int get_var_typed<float>(int ncid, int varid, float *buf)
+{
+  return PIOc_get_var_float(ncid, varid, buf);
+}
+
+template<>
+int get_var_typed<double>(int ncid, int varid, double *buf)
+{
+  return PIOc_get_var_double(ncid, varid, buf);
+}
+
+/* Put and get variables that can involve implicit type conversion : int,
+ * real and double variables are all written from, and read back into, the
+ * same buffer (of the templated type T), exercising on-the-fly type
+ * conversion in PIOc_put_var_<T>()/PIOc_get_var_<T>(). No decomposition is
+ * involved (unlike test_data_conversion<T>() in ncdf_simple_tests.cpp) - the
+ * Fortran source for this sub uses PIO_put_var()/PIO_get_var() without a
+ * decomp. */
+template<typename T>
+static int test_put_get_type_conversion_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const int DIM_LEN = 100;
+  const std::string data_fname("pio_test_put_get_type_conversion.nc");
+  const std::string PIO_VAR_INT_NAME("PIO_TF_test_var_int");
+  const std::string PIO_VAR_REAL_NAME("PIO_TF_test_var_real");
+  const std::string PIO_VAR_DBL_NAME("PIO_TF_test_var_dbl");
+
+  std::vector<T> pval(DIM_LEN, static_cast<T>(tf.get_comm_size()));
+  std::vector<T> gval(DIM_LEN, static_cast<T>(0));
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, data_fname.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Could not create file " + data_fname)){
+    return PIO_EINTERNAL;
+  }
+
+  int pio_dim = -1;
+  ret = PIOc_def_dim(ncid, "PIO_TF_test_dim", DIM_LEN, &pio_dim);
+  if(!check_ret(tf, ret, "Failed to define a dim : " + data_fname)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), data_fname.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  int varid_int = -1, varid_real = -1, varid_dbl = -1;
+  ret = PIOc_def_var(ncid, PIO_VAR_INT_NAME.c_str(), PIO_INT, 1, &pio_dim, &varid_int);
+  if(!check_ret(tf, ret, "Failed to define a var of int type : " + data_fname)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), data_fname.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, PIO_VAR_REAL_NAME.c_str(), PIO_REAL, 1, &pio_dim, &varid_real);
+  if(!check_ret(tf, ret, "Failed to define a var of real type : " + data_fname)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), data_fname.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_def_var(ncid, PIO_VAR_DBL_NAME.c_str(), PIO_DOUBLE, 1, &pio_dim, &varid_dbl);
+  if(!check_ret(tf, ret, "Failed to define a var of double type : " + data_fname)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), data_fname.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to end redef mode : " + data_fname)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), data_fname.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* Put the int type variable out (data conversion might occur: real => int, double => int) */
+  ret = put_var_typed<T>(ncid, varid_int, pval.data());
+  if(!check_ret(tf, ret, "Failed to put a var of int type : " + data_fname)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), data_fname.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* Put the real type variable out (data conversion might occur: int => real, double => real) */
+  ret = put_var_typed<T>(ncid, varid_real, pval.data());
+  if(!check_ret(tf, ret, "Failed to put a var of real type : " + data_fname)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), data_fname.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* Put the double type variable out (data conversion might occur: int => double, real => double) */
+  ret = put_var_typed<T>(ncid, varid_dbl, pval.data());
+  if(!check_ret(tf, ret, "Failed to put a var of double type : " + data_fname)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), data_fname.c_str());
+    return PIO_EINTERNAL;
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close file " + data_fname)){
+    PIOc_deletefile(tf.get_iosysid(), data_fname.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, data_fname.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Could not reopen file " + data_fname)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, PIO_VAR_INT_NAME.c_str(), &varid_int);
+  if(!check_ret(tf, ret, "Cannot inq int var " + data_fname)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, PIO_VAR_REAL_NAME.c_str(), &varid_real);
+  if(!check_ret(tf, ret, "Cannot inq real var " + data_fname)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, PIO_VAR_DBL_NAME.c_str(), &varid_dbl);
+  if(!check_ret(tf, ret, "Cannot inq double var " + data_fname)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  bool ok = true;
+
+  /* Get the int type variable back (data conversion might occur: int => real, int => double) */
+  for(std::size_t j = 0; j < gval.size(); j++){
+    gval[j] = static_cast<T>(0);
+  }
+  ret = get_var_typed<T>(ncid, varid_int, gval.data());
+  if(!check_ret(tf, ret, "Failed to get a var of int type : " + data_fname)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  ok = check_val(tf, gval, pval, "Got wrong val") && ok;
+
+  /* Get the real type variable back (data conversion might occur: real => int, real => double) */
+  for(std::size_t j = 0; j < gval.size(); j++){
+    gval[j] = static_cast<T>(0);
+  }
+  ret = get_var_typed<T>(ncid, varid_real, gval.data());
+  if(!check_ret(tf, ret, "Failed to get a var of real type : " + data_fname)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  ok = check_val(tf, gval, pval, "Got wrong val") && ok;
+
+  /* Get the double type variable back (data conversion might occur: double => int, double => real) */
+  for(std::size_t j = 0; j < gval.size(); j++){
+    gval[j] = static_cast<T>(0);
+  }
+  ret = get_var_typed<T>(ncid, varid_dbl, gval.data());
+  if(!check_ret(tf, ret, "Failed to get a var of double type : " + data_fname)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  ok = check_val(tf, gval, pval, "Got wrong val") && ok;
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), data_fname.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+template<typename T>
+int test_put_get_type_conversion(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_type_conversion : ") + iotype_name + "\n");
+
+    if(test_put_get_type_conversion_one_iotype<T>(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
 int main(int argc, char *argv[])
 {
   int ret = MPI_SUCCESS, nerrs = 0;
@@ -3934,7 +4691,11 @@ int main(int argc, char *argv[])
     {"test_put_get_2d_str_arr", test_put_get_2d_str_arr},
     {"test_put_get_misc_str", test_put_get_misc_str},
     {"test_put_get_str_frames", test_put_get_str_frames},
-    {"test_put_get_str_idx", test_put_get_str_idx}
+    {"test_put_get_str_idx", test_put_get_str_idx},
+    {"test_put_get_str_hslabs", test_put_get_str_hslabs},
+    {"test_put_get_type_conversion_int", test_put_get_type_conversion<int>},
+    {"test_put_get_type_conversion_float", test_put_get_type_conversion<float>},
+    {"test_put_get_type_conversion_double", test_put_get_type_conversion<double>}
   };
 
   SPIO_TF::Test_framework tf("ncdf_get_put_cxx", MPI_COMM_WORLD, rfuncs);
