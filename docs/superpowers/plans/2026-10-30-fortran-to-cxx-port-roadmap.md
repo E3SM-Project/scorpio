@@ -73,7 +73,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_decomp_tests_1d.F90.in` (727 lines)
 - [x] `pio_sync_tests.F90.in` (802 lines)
 - [x] `pio_decomp_extra_dims.F90.in` (896 lines)
-- [ ] `ncdf_get_put.F90.in` (3283 lines)
+- [x] `ncdf_get_put.F90.in` (3283 lines)
 
 ## Already done (before this roadmap)
 - [x] `pio_decomp_tests.F90.in` (539 lines) -> `tests/functional/pio_decomp_tests.cpp`
@@ -2181,3 +2181,113 @@ range, any ruling made, final review verdict.)
   `tests/general/CMakeLists.txt` confirmed untouched throughout
   (implementer self-checks, both task reviewers, and the final
   whole-branch reviewer, via independent `git diff --stat` checks).
+
+### ncdf_get_put
+
+- Plan: `docs/superpowers/plans/2026-10-30-port-ncdf-get-put-to-cxx.md`.
+  The largest file in the roadmap (3283 lines, 21 Fortran sub-tests) —
+  deliberately saved for last. Base `84241fd305`.
+- **Parallel-execution mode**: per explicit user instruction, Tasks 2-8
+  were implemented concurrently by independent subagents, each in its own
+  git worktree branched from Task 1's commit (`605f227627`), each built,
+  tested, and reviewed standalone. The controller then integrated all 8
+  tasks serially (commit order 2→3→4→5→6→7→8) into the real branch via
+  direct diff-hunk extraction and text splicing (not `git merge`/
+  `cherry-pick`, which would have failed on shifting context since every
+  worktree shared the same base commit rather than chaining off each
+  other), rebuilding and `ctest`-ing after every single integration step.
+  Commits: `a68860b578`..`605f227627` (Task 1 + 1 fix round), `5216482c5c`
+  (2/8), `da9fba1e36` (3/8), `ad0c02e3d0` (4/8), `58e58f8cf3` (5/8),
+  `bd548e21e1` (6/8, 1 fix round), `33f72e8c7f` (7/8), `35475c851a` (8/8).
+- Architecture: narrows iotype coverage from the Fortran's full set (up to
+  9, including ADIOS/ADIOSC/HDF5/HDF5C) down to the 5 "standard" flavors
+  via `get_iotypes()`, matching precedent in `ncdf_simple_tests.cpp`/
+  `ncdf_fail.cpp` — every ADIOS/ADIOSC-conditional branch in the Fortran
+  becomes dead code and was dropped, documented in one top-of-file
+  comment. 15 templated subs (int/float/double, 3 `rfuncs` entries each)
+  + 6 non-templated subs = 51 `rfuncs` entries total, confirmed by direct
+  count after integration and again by the final reviewer.
+- Task 6 (`test_put_get_misc_str`) failed its task review on first pass:
+  used `check_val<std::string>` instead of `passert` directly for a
+  string-array comparison (a real defect, not a documented Fortran
+  quirk — the convention established across this whole port series is
+  that all string/string-array comparisons must use `passert` directly,
+  since `check_val<T>` in `tests/util/spio_test_check.hpp` is a template
+  reserved for numeric `std::vector<T>` comparisons). Fixed in 1 fix
+  round; scoped re-review passed.
+- Faithful-port-of-Fortran-quirks convention (reaffirmed repeatedly across
+  this file): the self-overwriting 6-d loop in `test_put_get_6d_var`, the
+  copy-pasted `var2d_name` used where `var3d_name`/`var1d` was meant in
+  `test_put_get_misc_str` and `test_put_get_str_frames`, were all
+  replicated literally with an explanatory comment rather than "fixed".
+- Buffer-size-mismatch convention (reaffirmed): when written/read buffers
+  differ in size from the declared variable size, only the
+  actually-written/specified portion needs mutual write/read consistency
+  — governed several per-task rulings (Task 2's `ls_buf` prefix-only
+  read-back, Task 7's narrowed `var1d_shrt` tail-byte compare).
+- Cross-task integration risk (no helper-name collisions between Tasks
+  6/7/8's independently-developed, string-heavy `static` local helpers,
+  unverifiable from within any single isolated worktree) was explicitly
+  flagged by two task reviewers and confirmed clean, by name-enumeration
+  and by a fresh integrated build, at integration time and again,
+  independently, by the final whole-branch reviewer.
+- **Final whole-branch review** (opus): verdict **With fixes** (not a
+  clean first pass) — 0 Critical, 2 Important, 6 Minor. Important #1:
+  `DIM_LARGE_LEN` (Fortran's 300-element "larger than the variable"
+  buffer) had been dropped from `test_put_get_1dvar_ls_buf`, leaving
+  buffers sized exactly `DIM_LEN` (200) and the function's own comments
+  factually false (no assertion was wrong, purely misleading
+  documentation). Important #2: all 38 string/scalar `passert`
+  comparisons in the file reported no actual-vs-expected content on
+  failure (a Task-1-era parked Minor that, by final-review time, had
+  grown to cover 100% of the file's string comparisons and was promoted
+  to Important). Fixed in one final-review fix round (commit
+  `4f231e7978`): restored `DIM_LARGE_LEN`, added a file-local `check_str`
+  helper (not touching `spio_test_check.hpp`, not a
+  `check_val<std::string>` overload) applied at all 38 sites, plus two
+  one-line Minor comment fixes bundled in at the reviewer's suggestion.
+  Scoped re-review confirmed all 4 items fixed with no regressions; two
+  non-blocking nits parked (a `std::to_string`-based scalar comparison is
+  a strictly weaker predicate than `==` for the float/double
+  instantiations of `test_put_get_0dvar`, harmless for this test's actual
+  data; one new comment line exceeds the file's usual width).
+- Minor findings parked (all re-confirmed at whole-file level by the
+  final reviewer, not just task-level): 21x duplicated per-iotype driver
+  loop (mandated 1:1 convention, matches `ncdf_simple_tests.cpp`); ~80
+  sites with no `PIOc_closefile`/`PIOc_deletefile` on early-return error
+  paths after a successful open (every site already on a failing-test
+  path, same shape as `ncdf_simple_tests.cpp`'s existing precedent —
+  flagged as a good candidate for a separate whole-`tests/functional`-
+  family follow-up, not actioned on this branch); `PIOc_get_vara`/
+  `PIOc_put_vara` used with explicit start/count where the Fortran passes
+  neither (correct per the Fortran's own comment that a full-size buffer
+  is required for a variable larger than any default/implicit extent);
+  a per-character `PIOc_put_var1_text`/`PIOc_get_var1_text` loop instead
+  of a single `vara` call in `test_put_get_str_idx` (the plan's own
+  "index, no count -> `PIOc_put_var1`" Global Constraint doesn't hold for
+  the text variants specifically — recorded so a future port in this
+  series doesn't "fix" it the wrong way); `FNAME_SLICE` left at file
+  scope rather than function-local (cosmetic, inherited from Task 2).
+- Build/test: `ctest -R ncdf_get_put_cxx` passed at every checkpoint —
+  every one of the 8 integration steps, the final-review build (also
+  independently recompiled with `-Wall -Wextra` by hand, since the
+  project's own test `CXX_FLAGS` lack `-Wall`: zero warnings), the
+  final-review fix commit, and the scoped re-review (35.23s).
+- Final commits: `a68860b578`..`605f227627` (Task 1), `5216482c5c`
+  through `35475c851a` (Tasks 2-8 integration), `4f231e7978`
+  (final-review fix round). `tests/general/ncdf_get_put.F90.in`,
+  `tests/general/CMakeLists.txt`, and `tests/util/spio_test_check.hpp`
+  confirmed untouched throughout (every task implementer, every task and
+  scoped re-reviewer, and the final whole-branch reviewer, via
+  independent `git diff --stat` checks spanning the full `84241fd305`..
+  `4f231e7978` range).
+- Final review verdict: **Approved** (with fixes applied and re-reviewed
+  clean). `tests/general` untouched.
+
+## Roadmap complete
+
+All 36 inventoried `tests/general/*.F90.in` files (35 individually-tracked
+above + `pio_decomp_tests.F90.in`, already done before this roadmap) are
+now ported to `tests/functional`. See `superpowers:finishing-a-development-branch`
+for next steps on the `jayeshkrishna/port_fortran_tests_to_cxx` branch as a
+whole.
