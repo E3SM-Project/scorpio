@@ -59,7 +59,7 @@ is green — the user asked for this (not continuous silent execution).
 - [x] `pio_async_init_finalize.F90.in` (334 lines)
 - [x] `pio_decomp_tests2_1d.F90.in` (354 lines)
 - [x] `pio_async_copy_tests.F90.in` (357 lines)
-- [ ] `pio_iosystem_tests.F90.in` (372 lines)
+- [x] `pio_iosystem_tests.F90.in` (372 lines)
 - [ ] `pio_decomp_tests_2d.F90.in` (391 lines)
 - [ ] `pio_async_decomp_tests_1d.F90.in` (420 lines)
 - [ ] `pio_rearr_opts2.F90.in` (424 lines)
@@ -1098,3 +1098,72 @@ range, any ruling made, final review verdict.)
 - Single-task plan: the task review doubled as the final whole-branch
   review. Final review verdict: **Approved with one fixed nit**.
   `tests/general` untouched throughout.
+
+### pio_iosystem_tests
+
+- Ported `tests/general/pio_iosystem_tests.F90.in` (373 lines) to
+  `tests/functional/pio_iosystem_tests.cpp` (514 lines). Three auto-tests
+  (`two_iosystems_odd_even`, `two_iosystems_even_all`,
+  `one_iosystem_odd_even`), each managing its own second
+  `PIOc_Init_Intracomm` iosystem lifecycle on an odd/even (or even-only)
+  sub-communicator alongside the primary framework-managed iosystem; two
+  split helpers (`split_world_odd_even` reused verbatim from
+  `pio_iosystem_tests2.cpp`, `split_world_only_even` new — an
+  `MPI_UNDEFINED`-based variant producing `MPI_COMM_NULL` for excluded
+  odd ranks).
+- Key architectural ruling: `create_file`/`check_file`/
+  `open_and_check_file` take an explicit `MPI_Comm comm` parameter and use
+  the comm-scoped `check_ret(tf, comm, ...)`/`passert(tf, comm, ...)`
+  overloads throughout, diverging from `pio_iosystem_tests2.cpp`'s simpler
+  hardcoded-full-comm helpers — required because `two_iosystems_even_all`
+  and `one_iosystem_odd_even` have `is_even`-gated call sites where only a
+  subset of world ranks reach the helper; a hardcoded full-comm reduction
+  there would deadlock/collective-mismatch.
+- `ret`-initialization ruling for `two_iosystems_even_all`: gave the C++
+  local a safe `PIO_NOERR` default (the Fortran leaves it uninitialized)
+  to avoid true C++ UB. The reviewer independently traced that this is
+  not just safe but exactly faithful — the Fortran's `ret` is in fact
+  always written by `create_file` before the first unconditional check
+  on every rank, so the port's behavior is unchanged, not
+  tightened/loosened.
+- Review Focus (5 items, all independently verified PASS by the
+  reviewer): comm-scope correctness at every call site across all three
+  tests; `split_world_only_even`'s `MPI_COMM_NULL` branch never touched
+  by `PIOc_Init_Intracomm`/`PIOc_finalize`/`MPI_Comm_free` (stays
+  `is_even`-gated); the `ret`-initialization ruling above; no handle
+  leak across an iotype-loop `continue`; the cross-iosystem
+  `PIOc_deletefile` call in `one_iosystem_odd_even` — issued via the
+  *primary* iosystem even though the file was created/opened via the
+  secondary odd/even iosystem, unconditional, and deliberately
+  **unchecked**, exactly matching the Fortran's own unchecked call (no
+  check was added).
+- CMake knobs copied verbatim from `tests/general/CMakeLists.txt:773-781`
+  (`MINNUMPROCS 4`, `MAXNUMPROCS ${PIO_TF_MAXNUMPROCS}`, `MINNUMIOPROCS 1`,
+  `MAXNUMIOPROCS ${PIO_TF_C2_MAXNUMIOPROCS}`, `MINSTRIDE 1`,
+  `MAXSTRIDE ${PIO_TF_C2_MAXSTRIDE}`, `TIMEOUT ${DEFAULT_TEST_TIMEOUT}`).
+- Build/test: `ctest -R pio_iosystem_tests_cxx` 4/4 passed; direct
+  `mpiexec -n 4` and `-n 5` runs both 12/12 passed (3 tests x 3
+  rearrangers), independently reproduced by the reviewer with identical
+  numbers. The `-n 5` run (3 even / 2 odd) is a non-vacuous exercise of
+  the odd-rank and `MPI_UNDEFINED` code paths.
+- Git-staging mishap recurred a third time in this series (bare
+  `git commit -m` after `git add` sweeping in an unrelated pre-staged
+  file) — but for the first time, the implementer itself caught and
+  fixed it via `git reset --soft HEAD~1` + pathspec'd recommit before
+  ever reporting back, rather than it surfacing at review or controller
+  level. Final commit (`ed652cd71b3bc1ce97ced585c1a1ee598d2f5920`)
+  verified clean by both the controller and the reviewer.
+- 3 Minor/cosmetic findings parked, non-blocking, no code changes made:
+  `PIO_WRITE` used instead of the Fortran's `PIO_nowrite` in
+  `open_and_check_file` (matches explicit brief instruction and
+  `pio_iosystem_tests2.cpp` precedent, behaviorally inert here);
+  `ncid1`/`ncid2` in `two_iosystems_even_all` not reset to `-1` after
+  close with unguarded `PIOc_closefile` calls on error paths (verified no
+  actual double-close risk — both are always freshly reassigned by
+  `open_and_check_file` before any subsequent close; error-path-only, no
+  collective-mismatch risk); `odd_even_rank` written but never read in
+  all three tests (matches existing convention in the sibling
+  `pio_iosystem_tests2.cpp`, cosmetic).
+- Single-task plan: the task review doubled as the final whole-branch
+  review. Final review verdict: **Approved with nits parked (no code
+  changes needed)**. `tests/general` untouched throughout.
