@@ -1894,6 +1894,230 @@ int test_put_get_md2mdplus1_rec(SPIO_TF::Test_framework &tf)
   return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
 }
 
+template<typename T>
+static int test_put_get_time_scalar_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const std::string FNAME_TS("test_pio_ncdf_get_put_time_scalar.testfile");
+  const std::string DIM_NAME("timesteps");
+  const std::string VAR_NAME("dummy_scalar_var_over_time");
+  const int MAX_TIMES = 3;
+
+  std::vector<T> gval(MAX_TIMES, static_cast<T>(0));
+  std::vector<T> exp_val(MAX_TIMES, static_cast<T>(0));
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, FNAME_TS.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + FNAME_TS)){
+    return PIO_EINTERNAL;
+  }
+
+  int pio_dim = -1;
+  ret = PIOc_def_dim(ncid, DIM_NAME.c_str(), MAX_TIMES, &pio_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + FNAME_TS)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_TS.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  int pio_var = -1;
+  ret = PIOc_def_var(ncid, VAR_NAME.c_str(), Pio_type_map<T>::value, 1, &pio_dim, &pio_var);
+  if(!check_ret(tf, ret, "Failed to define var:" + FNAME_TS)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_TS.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + FNAME_TS)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_TS.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* Put scalar vals, one timestep at a time */
+  for(int tstep = 0; tstep < MAX_TIMES; tstep++){
+    const PIO_Offset start[1] = {static_cast<PIO_Offset>(tstep)};
+    const PIO_Offset count[1] = {1};
+    exp_val[tstep] = static_cast<T>(tstep);
+    T pval = static_cast<T>(tstep);
+    ret = PIOc_put_vara(ncid, pio_var, start, count, &pval);
+    if(!check_ret(tf, ret, "Failed to put scalar var over time:" + FNAME_TS)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), FNAME_TS.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + FNAME_TS)){
+    PIOc_deletefile(tf.get_iosysid(), FNAME_TS.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, FNAME_TS.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + FNAME_TS)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR_NAME.c_str(), &pio_var);
+  if(!check_ret(tf, ret, "Failed to inq scalar var over time" + FNAME_TS)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  ret = PIOc_get_var(ncid, pio_var, gval.data());
+  if(!check_ret(tf, ret, "Failed to get scalar var over time:" + FNAME_TS)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  bool ok = check_val(tf, gval, exp_val, "Got wrong value (scalar var over time)");
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), FNAME_TS.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+template<typename T>
+int test_put_get_time_scalar(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_time_scalar : ") + iotype_name + "\n");
+
+    if(test_put_get_time_scalar_one_iotype<T>(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* Similar to test_put_get_time_scalar, but uses an unlimited time dimension
+ * instead */
+template<typename T>
+static int test_put_get_time_scalar_rec_one_iotype(SPIO_TF::Test_framework &tf, int iotype)
+{
+  const std::string FNAME_TS("test_pio_ncdf_get_put_time_scalar_rec.testfile");
+  const std::string DIM_NAME("timesteps");
+  const std::string VAR_NAME("dummy_scalar_var_over_time");
+  const int MAX_TIMES = 3;
+
+  std::vector<T> gval(MAX_TIMES, static_cast<T>(0));
+  std::vector<T> exp_val(MAX_TIMES, static_cast<T>(0));
+
+  int ncid = -1;
+  int ret = PIOc_createfile(tf.get_iosysid(), &ncid, &iotype, FNAME_TS.c_str(), PIO_CLOBBER);
+  if(!check_ret(tf, ret, "Failed to open:" + FNAME_TS)){
+    return PIO_EINTERNAL;
+  }
+
+  int pio_dim = -1;
+  ret = PIOc_def_dim(ncid, DIM_NAME.c_str(), PIO_UNLIMITED, &pio_dim);
+  if(!check_ret(tf, ret, "Failed to define dim:" + FNAME_TS)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_TS.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  int pio_var = -1;
+  ret = PIOc_def_var(ncid, VAR_NAME.c_str(), Pio_type_map<T>::value, 1, &pio_dim, &pio_var);
+  if(!check_ret(tf, ret, "Failed to define var:" + FNAME_TS)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_TS.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_enddef(ncid);
+  if(!check_ret(tf, ret, "Failed to enddef:" + FNAME_TS)){
+    PIOc_closefile(ncid);
+    PIOc_deletefile(tf.get_iosysid(), FNAME_TS.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  /* Put scalar vals, one timestep at a time */
+  for(int tstep = 0; tstep < MAX_TIMES; tstep++){
+    const PIO_Offset start[1] = {static_cast<PIO_Offset>(tstep)};
+    const PIO_Offset count[1] = {1};
+    exp_val[tstep] = static_cast<T>(tstep);
+    T pval = static_cast<T>(tstep);
+    ret = PIOc_put_vara(ncid, pio_var, start, count, &pval);
+    if(!check_ret(tf, ret, "Failed to put scalar var over time:" + FNAME_TS)){
+      PIOc_closefile(ncid);
+      PIOc_deletefile(tf.get_iosysid(), FNAME_TS.c_str());
+      return PIO_EINTERNAL;
+    }
+  }
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+  ret = PIOc_closefile(ncid);
+  if(!check_ret(tf, ret, "Failed to close:" + FNAME_TS)){
+    PIOc_deletefile(tf.get_iosysid(), FNAME_TS.c_str());
+    return PIO_EINTERNAL;
+  }
+
+  ncid = -1;
+  ret = PIOc_openfile(tf.get_iosysid(), &ncid, &iotype, FNAME_TS.c_str(), PIO_NOWRITE);
+  if(!check_ret(tf, ret, "Failed to reopen:" + FNAME_TS)){
+    return PIO_EINTERNAL;
+  }
+
+  ret = PIOc_inq_varid(ncid, VAR_NAME.c_str(), &pio_var);
+  if(!check_ret(tf, ret, "Failed to inq scalar var over time" + FNAME_TS)){
+    return PIO_EINTERNAL;
+  }
+#else
+  PIOc_sync(ncid);
+#endif
+
+  ret = PIOc_get_var(ncid, pio_var, gval.data());
+  if(!check_ret(tf, ret, "Failed to get scalar var over time:" + FNAME_TS)){
+    PIOc_closefile(ncid);
+    return PIO_EINTERNAL;
+  }
+  bool ok = check_val(tf, gval, exp_val, "Got wrong value (scalar var over time)");
+
+  PIOc_closefile(ncid);
+  PIOc_deletefile(tf.get_iosysid(), FNAME_TS.c_str());
+
+  return ok ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+template<typename T>
+int test_put_get_time_scalar_rec(SPIO_TF::Test_framework &tf)
+{
+  int num_flavors = 0;
+  int flavors[SPIO_TEST_NUM_FLAVORS];
+  get_iotypes(&num_flavors, flavors);
+
+  int nerrs = 0;
+  for(int i = 0; i < num_flavors; i++){
+    char iotype_name[PIO_MAX_NAME + 1];
+    iotype_name[0] = '\0';
+    get_iotype_name(flavors[i], iotype_name);
+    tf.get_logger().log(SPIO_Util::Logger::Log_level::INFO,
+        std::string("Testing : test_put_get_time_scalar_rec : ") + iotype_name + "\n");
+
+    if(test_put_get_time_scalar_rec_one_iotype<T>(tf, flavors[i]) != PIO_NOERR){
+      nerrs++;
+    }
+  }
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
 int main(int argc, char *argv[])
 {
   int ret = MPI_SUCCESS, nerrs = 0;
@@ -1939,7 +2163,13 @@ int main(int argc, char *argv[])
     {"test_put_get_6d_var_double", test_put_get_6d_var<double>},
     {"test_put_get_md2mdplus1_rec_int", test_put_get_md2mdplus1_rec<int>},
     {"test_put_get_md2mdplus1_rec_float", test_put_get_md2mdplus1_rec<float>},
-    {"test_put_get_md2mdplus1_rec_double", test_put_get_md2mdplus1_rec<double>}
+    {"test_put_get_md2mdplus1_rec_double", test_put_get_md2mdplus1_rec<double>},
+    {"test_put_get_time_scalar_int", test_put_get_time_scalar<int>},
+    {"test_put_get_time_scalar_float", test_put_get_time_scalar<float>},
+    {"test_put_get_time_scalar_double", test_put_get_time_scalar<double>},
+    {"test_put_get_time_scalar_rec_int", test_put_get_time_scalar_rec<int>},
+    {"test_put_get_time_scalar_rec_float", test_put_get_time_scalar_rec<float>},
+    {"test_put_get_time_scalar_rec_double", test_put_get_time_scalar_rec<double>}
   };
 
   SPIO_TF::Test_framework tf("ncdf_get_put_cxx", MPI_COMM_WORLD, rfuncs);
