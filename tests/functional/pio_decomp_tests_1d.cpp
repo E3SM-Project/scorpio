@@ -715,7 +715,7 @@ int nc_wr_rd_1d_bc_start_count(SPIO_TF::Test_framework &tf)
       std::vector<T> rbuf(rd_count, 0);
       std::vector<T> exp_val(rd_count);
       for(int i = 0; i < rd_count; i++){
-        /* Expected value, after reading, is the same as the compdof */
+        /* Expected value, after reading */
         exp_val[i] = static_cast<T>(rd_start + i);
       }
 
