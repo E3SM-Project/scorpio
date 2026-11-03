@@ -438,7 +438,7 @@ static int cache_or_print_stats(iosystem_desc_t *ios, int root_proc,
    */
   if((niosys == 1) && (cached_ios_gio_sstats.size() > 0)){
     const std::string model_name = "Scorpio";
-    const std::string spio_stats_version = "1.0.0";
+    const std::string spio_stats_version = "1.1.0";
     const std::size_t ONE_MB = 1024 * 1024;
     long long int pid = static_cast<long long int>(getpid());
     /* The summary file name is : "io_perf_summary_<PID>.[txt|json]" */
