@@ -29,6 +29,7 @@
       "tot_time(s)" : 0.54
     "FileIOStatistics":
       "name" : "file1.nc",
+      "iotype" : "PIO_IOTYPE_PNETCDF, PIO_IOTYPE_NETCDF",
       "model_component_name" : "COMP_CPL: CPL",
       "avg_wtput(MB/s)" : 2.5,
       "avg_rtput(MB/s)" : 1.5,
@@ -39,6 +40,7 @@
       "tot_time(s)" : 0.54
     "FileIOStatistics":
       "name" : "file2.nc",
+      "iotype" : "PIO_IOTYPE_PNETCDF",
       "model_component_name" : "COMP_ATM: EAM",
       "avg_wtput(MB/s)" : 2.5,
       "avg_rtput(MB/s)" : 1.5,
