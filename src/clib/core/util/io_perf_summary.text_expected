@@ -1,49 +1,51 @@
   "ScorpioIOSummaryStatistics":
     "OverallModelIOStatistics":
-      "name" : "E3SM",
-      "spio_stats_version" : "1.0.0",
-      "avg_wtput(MB/s)" : 2.5,
-      "avg_rtput(MB/s)" : 1.5,
-      "tot_wb(bytes)" : 1024,
-      "tot_rb(bytes)" : 1024,
-      "tot_wtime(s)" : 0.4,
-      "tot_rtime(s)" : 0.67,
+      "name" : "E3SM"
+      "spio_stats_version" : "1.0.0"
+      "avg_wtput(MB/s)" : 2.5
+      "avg_rtput(MB/s)" : 1.5
+      "tot_wb(bytes)" : 1024
+      "tot_rb(bytes)" : 1024
+      "tot_wtime(s)" : 0.4
+      "tot_rtime(s)" : 0.67
       "tot_time(s)" : 1.07
     "ModelComponentIOStatistics":
-      "name" : "COMP_CPL: CPL",
-      "avg_wtput(MB/s)" : 2.5,
-      "avg_rtput(MB/s)" : 1.5,
-      "tot_wb(bytes)" : 512,
-      "tot_rb(bytes)" : 512,
-      "tot_wtime(s)" : 0.2,
-      "tot_rtime(s)" : 0.34,
+      "name" : "COMP_CPL: CPL"
+      "avg_wtput(MB/s)" : 2.5
+      "avg_rtput(MB/s)" : 1.5
+      "tot_wb(bytes)" : 512
+      "tot_rb(bytes)" : 512
+      "tot_wtime(s)" : 0.2
+      "tot_rtime(s)" : 0.34
       "tot_time(s)" : 0.54
     "ModelComponentIOStatistics":
-      "name" : "COMP_ATM: EAM",
-      "avg_wtput(MB/s)" : 2.5,
-      "avg_rtput(MB/s)" : 1.5,
-      "tot_wb(bytes)" : 512,
-      "tot_rb(bytes)" : 512,
-      "tot_wtime(s)" : 0.2,
-      "tot_rtime(s)" : 0.34,
+      "name" : "COMP_ATM: EAM"
+      "avg_wtput(MB/s)" : 2.5
+      "avg_rtput(MB/s)" : 1.5
+      "tot_wb(bytes)" : 512
+      "tot_rb(bytes)" : 512
+      "tot_wtime(s)" : 0.2
+      "tot_rtime(s)" : 0.34
       "tot_time(s)" : 0.54
     "FileIOStatistics":
-      "name" : "file1.nc",
-      "model_component_name" : "COMP_CPL: CPL",
-      "avg_wtput(MB/s)" : 2.5,
-      "avg_rtput(MB/s)" : 1.5,
-      "tot_wb(bytes)" : 512,
-      "tot_rb(bytes)" : 512,
-      "tot_wtime(s)" : 0.2,
-      "tot_rtime(s)" : 0.34,
+      "name" : "file1.nc"
+      "iotype" : "PIO_IOTYPE_PNETCDF, PIO_IOTYPE_NETCDF"
+      "model_component_name" : "COMP_CPL: CPL"
+      "avg_wtput(MB/s)" : 2.5
+      "avg_rtput(MB/s)" : 1.5
+      "tot_wb(bytes)" : 512
+      "tot_rb(bytes)" : 512
+      "tot_wtime(s)" : 0.2
+      "tot_rtime(s)" : 0.34
       "tot_time(s)" : 0.54
     "FileIOStatistics":
-      "name" : "file2.nc",
-      "model_component_name" : "COMP_ATM: EAM",
-      "avg_wtput(MB/s)" : 2.5,
-      "avg_rtput(MB/s)" : 1.5,
-      "tot_wb(bytes)" : 512,
-      "tot_rb(bytes)" : 512,
-      "tot_wtime(s)" : 0.2,
-      "tot_rtime(s)" : 0.34,
+      "name" : "file2.nc"
+      "iotype" : "PIO_IOTYPE_PNETCDF"
+      "model_component_name" : "COMP_ATM: EAM"
+      "avg_wtput(MB/s)" : 2.5
+      "avg_rtput(MB/s)" : 1.5
+      "tot_wb(bytes)" : 512
+      "tot_rb(bytes)" : 512
+      "tot_wtime(s)" : 0.2
+      "tot_rtime(s)" : 0.34
       "tot_time(s)" : 0.54
