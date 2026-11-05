@@ -29,6 +29,8 @@ extern "C"{
 #include "spio_dbg_utils.hpp"
 #include "spio_dt_converter.hpp"
 #include "spio_hdf5_utils.hpp"
+#include "spio_async_tcomm.hpp"
+#include "spio_iosys_utils.hpp"
 
 struct Hdf5_create_info{
   file_desc_t *file;
@@ -82,6 +84,19 @@ struct Hdf5_wcache{
   std::shared_ptr<io_desc_t> iodesc;
   std::vector<int> frame;
 
+  /* FIXME: Since wcache is only used by async write ops we can
+   * directly use the async I/O desc info from iodesc, without
+   * caching io_desc_info from the caller
+   */
+  /* Cache the io_desc_info from the caller, i.e., sync/async I/O desc
+   * info returned by  iodesc->select_io_desc_info(), to determine if
+   * the call is sync/async. The async write with async I/O desc is
+   * currently only implemented for HDF5[C] + PIO_REARR_CONTIG
+   *
+   * io_desc_info is not owned by wcache
+   */
+  io_desc_info_t *io_desc_info;
+
   bool wr_fillbuf;
   void *iobuf;
   std::size_t iobuf_sz;
@@ -96,6 +111,7 @@ struct Hdf5_wcache{
 Hdf5_wcache::Hdf5_wcache(file_desc_t *file, int nvars, int fndims,
   const int *varids, std::shared_ptr<io_desc_t> iodesc, bool wr_fillbuf, const int *frame):
     file(file), nvars(nvars), fndims(fndims), iodesc(iodesc),
+    io_desc_info(NULL),
     wr_fillbuf(wr_fillbuf), iobuf(NULL), iobuf_sz(0),
     fillbuf(NULL), fillbuf_sz(0)
 {
@@ -158,6 +174,7 @@ static inline void update_reg_infos_start_frame(std::vector<Util::RInfo> &reg_in
 
 void spio_iosys_async_op_hdf5_create_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
   if(pdata){
     delete(static_cast<Hdf5_create_info *>(pdata));
   }
@@ -170,6 +187,7 @@ int spio_iosys_async_op_hdf5_create(void *pdata)
   Hdf5_create_info *cinfo = static_cast<Hdf5_create_info *>(pdata);
 
   assert(cinfo && cinfo->file && cinfo->file->iosystem);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + cinfo->fname);
 
   ret = spio_hdf5_create(cinfo->file->iosystem, cinfo->file, cinfo->fname.c_str());
 
@@ -187,7 +205,7 @@ int spio_iosys_async_hdf5_create_op_add(file_desc_t *file, const char *filename)
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->ioproc){
+  if(!SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
     return PIO_NOERR;
   }
 
@@ -217,6 +235,7 @@ int spio_iosys_async_hdf5_create_op_add(file_desc_t *file, const char *filename)
 
 void spio_iosys_async_op_hdf5_def_var_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
   if(pdata){
     delete(static_cast<Hdf5_def_var_info *>(pdata));
   }
@@ -227,6 +246,7 @@ int spio_iosys_async_op_hdf5_def_var(void *pdata)
   int ret = PIO_NOERR;
 
   Hdf5_def_var_info *def_var_info = static_cast<Hdf5_def_var_info *>(pdata);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ": fname = " + def_var_info->file->fname + ", vname: " + def_var_info->vname);
 
   assert(def_var_info && def_var_info->file && def_var_info->file->iosystem);
 
@@ -249,7 +269,7 @@ int spio_iosys_async_hdf5_def_var_op_add(file_desc_t *file, const char *name,
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->ioproc){
+  if(!SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
     return PIO_NOERR;
   }
 
@@ -280,6 +300,7 @@ int spio_iosys_async_hdf5_def_var_op_add(file_desc_t *file, const char *name,
 
 void spio_iosys_async_op_hdf5_put_att_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
   if(pdata){
     Hdf5_put_att_info *info = static_cast<Hdf5_put_att_info *>(pdata);
     free(info->abuf);
@@ -296,6 +317,7 @@ int spio_iosys_async_op_hdf5_put_att(void *pdata)
   assert(info && info->file && info->file->iosystem);
   assert((info->varid >= 0) || (info->varid == PIO_GLOBAL));
   assert(info->alen >= 0);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ": fname = " + info->file->fname + ", aname: " + info->aname);
 
   ret = spio_hdf5_put_att(info->file->iosystem, info->file,
           info->varid, info->aname.c_str(), info->atype,
@@ -317,7 +339,7 @@ int spio_iosys_async_hdf5_put_att_op_add(file_desc_t *file, int varid,
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->ioproc){
+  if(!SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
     return PIO_NOERR;
   }
 
@@ -355,6 +377,7 @@ int spio_iosys_async_hdf5_put_att_op_add(file_desc_t *file, int varid,
 
 void spio_iosys_async_op_hdf5_enddef_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
   if(pdata){
     delete(static_cast<Hdf5_enddef_info *>(pdata));
   }
@@ -367,6 +390,7 @@ int spio_iosys_async_op_hdf5_enddef(void *pdata)
   Hdf5_enddef_info *info = static_cast<Hdf5_enddef_info *>(pdata);
 
   assert(info && info->file && info->file->iosystem);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ": fname = " + info->file->fname);
 
   ret = spio_hdf5_enddef(info->file->iosystem, info->file);
 
@@ -384,7 +408,7 @@ int spio_iosys_async_hdf5_enddef_op_add(file_desc_t *file)
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->ioproc){
+  if(!SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
     return PIO_NOERR;
   }
 
@@ -414,6 +438,7 @@ int spio_iosys_async_hdf5_enddef_op_add(file_desc_t *file)
 
 void spio_iosys_async_op_hdf5_put_var_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
   if(pdata){
     Hdf5_put_var_info *info = static_cast<Hdf5_put_var_info *>(pdata);
     free(info->vbuf);
@@ -429,6 +454,7 @@ int spio_iosys_async_op_hdf5_put_var(void *pdata)
 
   assert(info && info->file && info->file->iosystem);
   assert((info->varid >= 0) || (info->varid == PIO_GLOBAL));
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ": fname = " + info->file->fname + ", varid=" + std::to_string(info->varid));
 
   ret = spio_hdf5_put_var(info->file->iosystem, info->file,
           info->varid,
@@ -453,7 +479,7 @@ int spio_iosys_async_hdf5_put_var_op_add(file_desc_t *file, int varid,
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->ioproc){
+  if(!SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
     return PIO_NOERR;
   }
 
@@ -510,6 +536,7 @@ int spio_iosys_async_hdf5_put_var_op_add(file_desc_t *file, int varid,
 
 void spio_iosys_async_op_hdf5_set_frame_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
   if(pdata){
     delete(static_cast<Hdf5_set_frame_info *>(pdata));
   }
@@ -522,6 +549,7 @@ int spio_iosys_async_op_hdf5_set_frame(void *pdata)
   Hdf5_set_frame_info *info = static_cast<Hdf5_set_frame_info *>(pdata);
 
   assert(info && info->file && info->file->iosystem);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ": fname = " + info->file->fname + ", frame=" + std::to_string(info->frame));
 
   ret = spio_hdf5_set_frame(info->file, info->varid, info->frame);
 
@@ -539,7 +567,7 @@ int spio_iosys_async_hdf5_set_frame_op_add(file_desc_t *file, int varid, int fra
 
   iosystem_desc_t *ios = file->iosystem;
 
-  if(!ios->ioproc){
+  if(!SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)){
     return PIO_NOERR;
   }
 
@@ -571,6 +599,7 @@ int spio_iosys_async_hdf5_set_frame_op_add(file_desc_t *file, int varid, int fra
 
 int spio_wait_all_hdf5_async_ops(int iosysid)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ", iosysid=" + std::to_string(iosysid));
   unsigned long long int sleep_time = 0;
   /* Sleep for 0.5 seconds */
   const int SLEEP_TIME_IN_MILLISECONDS = 500;
@@ -589,13 +618,22 @@ int spio_wait_all_hdf5_async_ops(int iosysid)
   return PIO_NOERR;
 }
 
-int pio_iosys_async_op_hdf5_write(void *pdata)
+/* The body of pio_iosys_async_op_hdf5_write(), separated out so that the
+ * pending-op counters (iodesc->nasync_pend_ops, file->npend_ops and
+ * SPIO_Util::GVars::npend_hdf5_async_ops) can be decremented on *every* exit
+ * path, including the error returns below. Leaking a pending-op count on an
+ * error used to be harmless because nothing ever waited on those counters;
+ * now that close/sync actually drain file->npend_ops (see
+ * spio_wait_file_async_pend_ops() in pio_file.cpp) a leaked count would stall
+ * the application until the async-op timeout expires. */
+static int pio_iosys_async_op_hdf5_write_impl(void *pdata)
 {
 #ifdef _HDF5
   /* FIXME: Add futures */
   int ret = PIO_NOERR;
   Hdf5_wcache *wcache = static_cast<struct Hdf5_wcache *>(pdata);
   assert(wcache);
+  //SPIO_Util::Dbg_Util::Stdout_logger(std::string(__func__) + ", fname=" + wcache->file->fname + ", nvars=" + std::to_string(wcache->nvars));
 
   file_desc_t *file = wcache->file;
   int nvars = wcache->nvars;
@@ -608,17 +646,32 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
   iosystem_desc_t *ios = file->iosystem;
   var_desc_t *v1desc = file->varlist + wcache->varids[0];
 
-  assert(ios && v1desc && ios->ioproc);
+  /* io_desc_info selected (sync or async) when this op was queued - use it,
+   * rather than iodesc->sync_io_desc_info directly, so an async-dispatched
+   * write uses the async rearranger's region/communicator info. */
+  assert(wcache->io_desc_info);
+  io_desc_info_t &io_desc_info = *(wcache->io_desc_info);
+  bool is_async = (wcache->io_desc_info == iodesc->async_io_desc_info);
+
+  assert(ios && v1desc);
+  assert(is_async ? ios->io_comm_info->is_async_io_proc() : ios->io_comm_info->is_sync_io_proc());
 
   bool wr_fillbuf = wcache->wr_fillbuf;
 
-  //int num_regions = (wr_fillbuf) ? iodesc->maxfillregions : iodesc->maxregions;
-  io_region *region = (wr_fillbuf) ? iodesc->fillregion : iodesc->firstregion;
-  PIO_Offset llen = (wr_fillbuf) ? iodesc->holegridsize : iodesc->llen;
+  //int num_regions = (wr_fillbuf) ? io_desc_info.maxfillregions : io_desc_info.maxregions;
+  io_region *region = (wr_fillbuf) ? io_desc_info.fillregion : io_desc_info.firstregion;
+  PIO_Offset llen = (wr_fillbuf) ? io_desc_info.holegridsize : io_desc_info.llen;
   void *iobuf = (wr_fillbuf) ? (wcache->fillbuf) : (wcache->iobuf);
   std::size_t iobuf_sz = (wr_fillbuf) ? (wcache->fillbuf_sz) : (wcache->iobuf_sz);
 
-  assert(region && (nvars * llen * iodesc->mpitype_size == static_cast<PIO_Offset>(iobuf_sz)));
+  /* region (fillregion/firstregion) is legitimately NULL when this rank has
+   * no local holes/data (under the selected sync/async view) to write - the
+   * while(region) loop below then leaves reg_nelems at 0 and the per-variable
+   * loop further down takes the "no data on this IO task" branch, which
+   * still issues region's collective H5Dwrite() with a NULL selection so
+   * this rank stays in step with peers that do have data. Only require a
+   * non-NULL region when there is actually buffered data to write. */
+  assert((region || (iobuf_sz == 0)) && (nvars * llen * io_desc_info.mpitype_size == static_cast<PIO_Offset>(iobuf_sz)));
   assert(((iobuf_sz == 0) && !iobuf) || ((iobuf_sz != 0) && iobuf));
 
   /* Info on all regions */
@@ -633,7 +686,7 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
   while(region){
     std::size_t start[fndims], count[fndims];
 
-    ret = spio_find_start_count(iodesc->ndims, iodesc->dimlen, fndims, v1desc, region, start, count);
+    ret = spio_find_start_count(io_desc_info.ndims, io_desc_info.dimlen, fndims, v1desc, region, start, count);
     if(ret != PIO_NOERR){
       return pio_err(ios, file, ret, __FILE__, __LINE__,
                       "Writing variables (number of variables = %d) to file (%s, ncid=%d) failed. Internal error finding start/count for the I/O regions written out from the I/O process", nvars, pio_get_fname_from_file(file), file->pio_ncid);
@@ -679,7 +732,6 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
         assert(static_cast<int>(wcache->frame.size()) == nvars);
         update_reg_infos_start_frame(vreg_infos, vdesc, wcache->frame[vidx]);
       }
-      
 
       /* Create a hyperslab of all the regions written out for a variable */
       H5S_seloper_t op = H5S_SELECT_SET;
@@ -707,7 +759,7 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
       }
 
       /* Get a pointer to the data. This buffer points to data from all the regions written out for this variable */
-      bufptr = (void *)((char *)iobuf + vidx * iodesc->mpitype_size * llen);
+      bufptr = (void *)((char *)iobuf + vidx * io_desc_info.mpitype_size * llen);
     }
     else{
       /* No data, across all regions, to write on this IO task */
@@ -730,12 +782,12 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
     }
 
     /* Collective write - for all regions in a single variable */
-    hid_t mem_type_id = spio_nc_type_to_hdf5_type(iodesc->piotype);
+    hid_t mem_type_id = spio_nc_type_to_hdf5_type(io_desc_info.piotype);
     if(mem_type_id == H5I_INVALID_HID){
       return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                      "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                      "Unsupported memory type (type=%x) for variable (%s, varid=%d)",
-                     nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype, pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
+                     nvars, pio_get_fname_from_file(file), file->pio_ncid, io_desc_info.piotype, pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
     }
 
     hid_t file_var_type_id = H5Dget_type(file->hdf5_vars[wcache->varids[vidx]].hdf5_dataset_id);
@@ -757,13 +809,13 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
     void *wbuf = bufptr;
     if((reg_nelems > 0) && !H5Tequal(mem_type_id, file_var_ntype_id)){
       assert(file->dt_converter);
-      wbuf = static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->convert(iodesc->ioid, bufptr, iodesc->mpitype_size * reg_nelems,
-              iodesc->piotype, spio_hdf5_type_to_pio_type(file_var_ntype_id));
+      wbuf = static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->convert(iodesc->ioid, bufptr, io_desc_info.mpitype_size * reg_nelems,
+              io_desc_info.piotype, spio_hdf5_type_to_pio_type(file_var_ntype_id));
       if(wbuf == NULL){
         return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                        "Writing variables (number of variables = %d) to file (%s, ncid=%d) using HDF5 iotype failed. "
                        "Unable to convert the type (from %d to %d) of variable (%s, varid=%d)",
-                       nvars, pio_get_fname_from_file(file), file->pio_ncid, iodesc->piotype,
+                       nvars, pio_get_fname_from_file(file), file->pio_ncid, io_desc_info.piotype,
                        spio_hdf5_type_to_pio_type(file_var_ntype_id), pio_get_vname_from_file(file, wcache->varids[vidx]), wcache->varids[vidx]);
       }
     }
@@ -801,12 +853,18 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
     }
   }
 
-  /* FIXME: Is this barrier needed ? */
-  MPI_Barrier(ios->io_comm);
-
-  iodesc->nasync_pend_ops--;
-  file->npend_ops--;
-  SPIO_Util::GVars::npend_hdf5_async_ops--;
+  /* FIXME: Is this barrier needed ?
+   * This op can run for either role - on the sync I/O ranks (is_async ==
+   * false) or on the disjoint async I/O ranks (is_async == true, see
+   * is_async's computation and the role assert above) - depending on which
+   * io_desc_info was selected when the op was queued. TComm_info caches
+   * per-role comms (get_io_comm() for the sync role, get_async_io_comm()
+   * for the async role; the "wrong" role's comm is MPI_COMM_NULL on a rank
+   * that only owns the other role), so the comm barriered on here must be
+   * selected using is_async, matching the role actually executing this op,
+   * rather than unconditionally using get_io_comm() (which is
+   * MPI_COMM_NULL on async-only I/O ranks and would abort the barrier). */
+  MPI_Barrier(is_async ? ios->tcomm_info->get_async_io_comm() : ios->tcomm_info->get_io_comm());
 
   return PIO_NOERR;
 #else // _HDF5
@@ -815,8 +873,32 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
 #endif // _HDF5
 }
 
+int pio_iosys_async_op_hdf5_write(void *pdata)
+{
+#ifdef _HDF5
+  Hdf5_wcache *wcache = static_cast<struct Hdf5_wcache *>(pdata);
+  assert(wcache);
+
+  int ret = pio_iosys_async_op_hdf5_write_impl(pdata);
+
+  /* One less pending op using this iodesc & file - decremented here, rather
+   * than at the end of the body above, so that it also happens when the body
+   * returns early with an error (see the comment on
+   * pio_iosys_async_op_hdf5_write_impl()) */
+  wcache->iodesc->nasync_pend_ops--;
+  wcache->file->npend_ops--;
+  SPIO_Util::GVars::npend_hdf5_async_ops--;
+
+  return ret;
+#else // _HDF5
+  assert(0);
+  return PIO_EINTERNAL;
+#endif // _HDF5
+}
+
 void pio_iosys_async_op_hdf5_write_free(void *pdata)
 {
+  //SPIO_Util::Dbg_Util::Stdout_logger(__func__);
 #ifdef _HDF5
   Hdf5_wcache *wcache = static_cast<struct Hdf5_wcache *>(pdata);
   assert(wcache);
@@ -839,20 +921,45 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
   iosystem_desc_t *ios = file->iosystem;
   assert(ios);
 
-  if(!ios->ioproc){
+  /* Select the io_desc_info_t (sync or async) that this write targets, and
+   * gate on the role-correct membership check: an async-dispatched write
+   * (CONTIG/BOX/SUBSET rearranger, PIO_USE_ASYNC_WR_THREAD on) is only
+   * queued/executed on async I/O procs, everything else (including the flag
+   * compiled off, where select_io_desc_info() always returns
+   * sync_io_desc_info) keeps the original sync I/O proc gate. */
+  io_desc_info_t &sel_desc = iodesc->select_io_desc_info(file->iotype, file);
+  bool is_async_write = (&sel_desc == iodesc->async_io_desc_info);
+
+  if(!(is_async_write ? ios->io_comm_info->is_async_io_proc() : ios->io_comm_info->is_sync_io_proc())){
     return PIO_NOERR;
   }
 
   Hdf5_wcache *wcache = new Hdf5_wcache(file, nvars, fndims, varids, iodesc,
     (fill) ? true : false, frame);
+  wcache->io_desc_info = &sel_desc;
 
   /* We need to copy the iobuf/fillbuf since the mvcache gets reused for future writes */
   /* Copy iobuf/fillvalue */
   var_desc_t *v1desc = file->varlist + varids[0];
-  //PIO_Offset llen = fill ? iodesc->holegridsize : iodesc->llen;
+  //PIO_Offset llen = fill ? sel_desc.holegridsize : sel_desc.llen;
   if(fill){
-    std::size_t fillbuf_sz = iodesc->holegridsize * iodesc->mpitype_size;
-    /* On I/O processes with no data (after rearrangement) to write the fillbuf_sz will be 0 */
+    /* fillbuf holds nvars copies of the per-variable hole-fill region (see
+     * the matching allocation/population in PIOc_write_darray_multi_impl(),
+     * pio_darray.cpp, which now also sizes v1desc->fillbuf using
+     * select_io_desc_info() so it agrees with sel_desc here on which
+     * sync/async view - and thus which physical I/O rank's holegridsize -
+     * applies). */
+    std::size_t fillbuf_sz = nvars * sel_desc.holegridsize * sel_desc.mpitype_size;
+    /* On I/O processes with no holes (after rearrangement) to fill, for this
+     * rank's selected view, fillbuf_sz will be 0 - "needsfill" is a
+     * decomposition-wide (not per-rank) flag, so an I/O proc can reach here
+     * with nothing local to fill. The op is still queued and executed (see
+     * pio_iosys_async_op_hdf5_write_impl()): H5Dwrite() below is collective
+     * (file->dxplid_coll), so every rank in the (async or sync) io comm must
+     * call it the same number of times - a rank with no local hole still
+     * participates with a NULL dataspace selection (H5Sselect_none()),
+     * rather than skipping the call, which would leave peer ranks blocked
+     * forever in their own collective H5Dwrite(). */
     if(fillbuf_sz > 0){
       wcache->fillbuf = bget(fillbuf_sz);
       if(!wcache->fillbuf){
@@ -860,14 +967,20 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
                         "Queuing asynchronous op/task for writing fillvalue for variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for caching variable fillvalue", nvars, pio_get_fname_from_file(file), file->pio_ncid, static_cast<long long int>(fillbuf_sz));
       }
 
+      /* v1desc->fillbuf is allocated/populated (pio_darray.cpp) using the
+       * same select_io_desc_info()-selected view as sel_desc above, so it is
+       * non-NULL here exactly when fillbuf_sz > 0. */
       std::memcpy(wcache->fillbuf, v1desc->fillbuf, fillbuf_sz);
       wcache->fillbuf_sz = fillbuf_sz;
     }
   }
   else{
     /* Copy buffer, with rearranged data, for nvars */
-    std::size_t iobuf_sz = nvars * iodesc->llen * iodesc->mpitype_size;
-    /* On I/O processes with no data (after rearrangement) to write the iobuf_sz will be 0 */
+    std::size_t iobuf_sz = nvars * sel_desc.llen * sel_desc.mpitype_size;
+    /* Same reasoning as the fillbuf_sz == 0 case above: an I/O proc with no
+     * local data (after rearrangement) to write, for this rank's selected
+     * view, must still queue (and execute) the op to keep the collective
+     * H5Dwrite() in sync with its peers. */
     if(iobuf_sz > 0){
       wcache->iobuf = bget(iobuf_sz);
       if(!wcache->iobuf){

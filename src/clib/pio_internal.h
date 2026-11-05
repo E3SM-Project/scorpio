@@ -33,6 +33,8 @@
 #include <string>
 #include <memory>
 
+namespace SPIO_Util{ namespace Iosys_Util{ class Io_comm_target; } }
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -127,6 +129,30 @@ extern "C" {
     int spio_close_soft_closed_file(const char *filename);
     int pio_add_to_file_list(file_desc_t *file, MPI_Comm comm);
 
+    /* Name, create and remove the filesystem lock file used to protect a
+     * sync-comm read-only reopen of a file from racing a disjoint async-comm
+     * pending write/close on that same file (see pio_file.cpp). Create/remove
+     * are gated on file->uses_async_io (an _HDF5-only field), so they are only
+     * declared/defined in _HDF5 builds; the filename helper has no such
+     * dependency and is always available. */
+    std::string spio_get_async_lock_filename(const char *filename, uint64_t lock_id);
+#ifdef _HDF5
+    int spio_create_async_lock_file(const iosystem_desc_t *ios, const file_desc_t *file);
+    int spio_remove_async_lock_file(const iosystem_desc_t *ios, const file_desc_t *file);
+#endif
+
+    /* Wait, on the sync I/O root only, for the asynchronous write lock file
+     * (named via spio_get_async_lock_filename() above) associated with
+     * filename to be removed, bounded by SPIO_ASYNC_OP_WAIT_TIMEOUT, before a
+     * read-only reopen of filename. A no-op (PIO_NOERR, no filesystem or MPI
+     * activity) when PIO_USE_ASYNC_WR_THREAD is disabled at compile time, or
+     * when this iosystem uses the disjoint-procs async I/O service
+     * (iosys_uses_async_io_service(ios)) rather than the in-process async
+     * write thread pool, since no lock file could ever exist for it. Never
+     * returns an error - a stale/un-removed lock file degrades to a
+     * PIOc_warn(), not a hard failure. See pio_file.cpp for details. */
+    int spio_wait_on_async_lock_file(const iosystem_desc_t *ios, const char *filename);
+
     /* Get a description of the variable represented by varid */
     const char *get_var_desc_str(int ncid, int varid, const char *desc_prefix);
 
@@ -148,6 +174,10 @@ extern "C" {
     std::shared_ptr<io_desc_t> spio_get_iodesc_ref_from_file(file_desc_t *file, const std::vector<int> &varids, int ioid);
     int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file, bool sync_with_ioprocs);
     int spio_soft_closefile(iosystem_desc_t *ios, file_desc_t *file);
+    /* Wait for pending asynchronous (e.g. HDF5 async write thread pool) ops on
+     * this file to complete. Returns PIO_NOERR once none are pending,
+     * PIO_EINTERNAL on timeout (caller is expected to warn and continue). */
+    int spio_wait_file_async_pend_ops(file_desc_t *file);
 
     iosystem_desc_t *pio_get_iosystem_from_id(int iosysid);
     int pio_add_to_iosystem_list(iosystem_desc_t *ios, MPI_Comm comm);
@@ -189,11 +219,13 @@ extern "C" {
                           int myiorank, PIO_Offset *start, PIO_Offset *count, int *num_aiotasks);
 
     /* Completes the mapping for the box rearranger. */
-    int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc, const int *dest_ioproc,
-                       const PIO_Offset *dest_ioindex);
+    int compute_counts(iosystem_desc_t *ios, io_desc_t *iodesc, io_desc_info_t &desc_info,
+                       const SPIO_Util::Iosys_Util::Io_comm_target &io_target,
+                       const int *dest_ioproc, const PIO_Offset *dest_ioindex);
 
     /* Create the MPI communicators needed by the subset rearranger. */
-    int default_subset_partition(iosystem_desc_t *ios, io_desc_t *iodesc);
+    int default_subset_partition(iosystem_desc_t *ios, io_desc_t *iodesc, io_desc_info_t &desc_info,
+                                 const SPIO_Util::Iosys_Util::Io_comm_target &io_target);
 
     /* Check return from MPI function and print error message. */
     void CheckMPIReturn(int ierr, const char *file, int line);
@@ -219,7 +251,7 @@ extern "C" {
     void init_rearr_opts(iosystem_desc_t *iosys);
 
     /* Determine whether fill values are needed. */
-    int determine_fill(iosystem_desc_t *ios, io_desc_t *iodesc, const int *gsize,
+    int determine_fill(iosystem_desc_t *ios, io_desc_info_t &desc_info, const int *gsize,
                        const PIO_Offset *compmap);
 
     /* Set start and count so that they describe the first region in map.*/
@@ -248,19 +280,28 @@ extern "C" {
 
     /* Create a subset rearranger. */
     int subset_rearrange_create(iosystem_desc_t *ios, int maplen, PIO_Offset *compmap, const int *gsize,
-                                int ndim, io_desc_t *iodesc);
+                                int ndim, io_desc_t *iodesc,
+                                io_desc_info_t &desc_info,
+                                const SPIO_Util::Iosys_Util::Io_comm_target &io_target);
 
 
     /* Create a box rearranger. */
     int box_rearrange_create(iosystem_desc_t *ios, int maplen, const PIO_Offset *compmap, const int *gsize,
-                             int ndim, io_desc_t *iodesc);
+                             int ndim, io_desc_t *iodesc,
+                             io_desc_info_t &desc_info,
+                             const SPIO_Util::Iosys_Util::Io_comm_target &io_target);
 
 
-    /* Move data from IO tasks to compute tasks. */
+    /* Move data from IO tasks to compute tasks. Defaults to iodesc's sync
+     * io_desc_info_t/comm target - callers that read through the async
+     * io_desc_info_t (select_io_desc_info()) must use the C++-only overload
+     * declared below (outside the extern "C" block) so the rearrange matches
+     * the half of the split that was actually read. */
     int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf, void *rbuf);
 
     /* Move data from compute tasks to IO tasks. */
-    int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, file_desc_t *file,
+    int rearrange_comp2io(iosystem_desc_t *ios, io_desc_t *iodesc, io_desc_info_t &desc_info,
+                          const SPIO_Util::Iosys_Util::Io_comm_target &io_target, file_desc_t *file,
                           const void *sbuf, void *rbuf, int nvars);
 
     void performance_tune_rearranger(iosystem_desc_t *ios, io_desc_t *iodesc);
@@ -269,7 +310,7 @@ extern "C" {
     int flush_output_buffer(file_desc_t *file, bool force, PIO_Offset addsize);
 
     /* Compute the size that the IO tasks will need to hold the data. */
-    int compute_maxIObuffersize(MPI_Comm io_comm, io_desc_t *iodesc);
+    int compute_maxIObuffersize(MPI_Comm io_comm, io_desc_info_t &desc_info);
 
     /* Allocation memory for a data region. */
     int alloc_region2(iosystem_desc_t *ios, int ndims, io_region **region);
@@ -292,7 +333,8 @@ extern "C" {
     int pair(int np, int p, int k);
 
     /* Create MPI datatypes used for comp2io and io2comp data transfers. */
-    int define_iodesc_datatypes(iosystem_desc_t *ios, io_desc_t *iodesc);
+    int define_iodesc_datatypes(iosystem_desc_t *ios, io_desc_t *iodesc, io_desc_info_t &desc_info,
+                                const SPIO_Util::Iosys_Util::Io_comm_target &io_target);
 
     /* Create the derived MPI datatypes used for comp2io and io2comp
      * transfers. */
@@ -311,7 +353,8 @@ extern "C" {
     /* Flush PIO's data buffer. */
     int flush_buffer(int ncid, wmulti_buffer *wmb, bool flushtodisk);
 
-    int compute_maxaggregate_bytes(iosystem_desc_t *ios, io_desc_t *iodesc);
+    int compute_maxaggregate_bytes(iosystem_desc_t *ios, io_desc_info_t &desc_info,
+                                   const SPIO_Util::Iosys_Util::Io_comm_target &io_target);
 
     /* Compute an element of start/count arrays. */
     void compute_one_dim(int gdim, int ioprocs, int rank, PIO_Offset *start,
@@ -713,5 +756,18 @@ int spio_find_start_count(int ndims, const int *dimlen, int fndims, var_desc_t *
 }
 #endif
 
+#if defined(__cplusplus)
+/* C++-only overload (not part of the C API, not bound from Fortran):
+ * cannot be declared inside the extern "C" block above since C linkage
+ * does not support overloading. */
+void PIOc_warn(MPI_Comm comm, const char *fname, int line, const char *uwarn_msg);
+
+/* C++-only overload of rearrange_io2comp() (see the declaration above):
+ * cannot be declared inside the extern "C" block above since C linkage
+ * does not support overloading. */
+int rearrange_io2comp(iosystem_desc_t *ios, io_desc_t *iodesc, const void *sbuf, void *rbuf,
+                      io_desc_info_t &desc_info,
+                      const SPIO_Util::Iosys_Util::Io_comm_target &io_target);
+#endif
 
 #endif /* __PIO_INTERNAL__ */

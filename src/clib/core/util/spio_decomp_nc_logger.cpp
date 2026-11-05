@@ -296,10 +296,10 @@ SPIO_Util::Decomp_Util::Decomp_logger &SPIO_Util::Decomp_Util::Decomp_nc_logger:
   assert(iodesc);
 
   /* Cache the iodesc info */
-  gdims_.resize(iodesc->ndims);
-  std::copy(iodesc->dimlen, iodesc->dimlen + iodesc->ndims, gdims_.begin());
-  lcompmap_.resize(iodesc->maplen);
-  std::copy(iodesc->map, iodesc->map + iodesc->maplen, lcompmap_.begin());
+  gdims_.resize(iodesc->sync_io_desc_info.ndims);
+  std::copy(iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.dimlen + iodesc->sync_io_desc_info.ndims, gdims_.begin());
+  lcompmap_.resize(iodesc->sync_io_desc_info.maplen);
+  std::copy(iodesc->sync_io_desc_info.map, iodesc->sync_io_desc_info.map + iodesc->sync_io_desc_info.maplen, lcompmap_.begin());
   info_cached_ = true;
 
   std::vector<int> agg_starts, agg_counts;
@@ -371,10 +371,10 @@ SPIO_Util::Decomp_Util::Decomp_logger &SPIO_Util::Decomp_Util::Decomp_nc_logger:
 
   ret = ncmpi_put_att_int(ncid_, NC_GLOBAL, ioid_att_name_.c_str(), NC_INT, 1, &(iodesc->ioid));
   if(ret == NC_NOERR){
-    ret = ncmpi_put_att_int(ncid_, NC_GLOBAL, ndims_att_name_.c_str(), NC_INT, 1, &(iodesc->ndims));
+    ret = ncmpi_put_att_int(ncid_, NC_GLOBAL, ndims_att_name_.c_str(), NC_INT, 1, &(iodesc->sync_io_desc_info.ndims));
   }
   if(ret == NC_NOERR){
-    ret = ncmpi_put_att_int(ncid_, NC_GLOBAL, gdimlen_att_name_.c_str(), NC_INT, iodesc->ndims, iodesc->dimlen);
+    ret = ncmpi_put_att_int(ncid_, NC_GLOBAL, gdimlen_att_name_.c_str(), NC_INT, iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen);
   }
   if(ret != NC_NOERR){
     throw std::runtime_error(std::string("Writing ioid/ndims/gdimlen to decomp log file, \"") + log_fname_ + std::string("\", failed, ierr =") + std::to_string(ret) + std::string(" ( ") + std::string(ncmpi_strerror(ret)) + std::string(")"));
@@ -476,7 +476,7 @@ void SPIO_Util::Decomp_Util::Decomp_nc_logger::gather_starts_counts(std::vector<
   assert(iodesc && (agg_comm_sz_ > 0));
   agg_io_chunk_sz = 0;
 
-  int lmap_sz = iodesc->maplen;
+  int lmap_sz = iodesc->sync_io_desc_info.maplen;
 
   ret = MPI_Gather(&lmap_sz, 1, MPI_INT, agg_counts.data(), 1, MPI_INT, 0, agg_comm_); assert(ret == MPI_SUCCESS);
 
@@ -488,9 +488,9 @@ void SPIO_Util::Decomp_Util::Decomp_nc_logger::gather_starts_counts(std::vector<
   }
 }
 
-/* The contiguous regions in iodesc->map[] are stored in sets of {start, count} in the
+/* The contiguous regions in iodesc->sync_io_desc_info.map[] are stored in sets of {start, count} in the
  * lregions array
- * e.g. iodesc->map[] = {3,4,5,8,11,12} => lregions.size = starts/counts for 3 regions
+ * e.g. iodesc->sync_io_desc_info.map[] = {3,4,5,8,11,12} => lregions.size = starts/counts for 3 regions
  *  lregions = {3, 3, 8, 1, 11, 2}
  */
 void SPIO_Util::Decomp_Util::Decomp_nc_logger::get_contig_map_regions(std::vector<PIO_Offset> &lregions, io_desc_t *iodesc)
@@ -498,28 +498,28 @@ void SPIO_Util::Decomp_Util::Decomp_nc_logger::get_contig_map_regions(std::vecto
   assert(iodesc && (lregions.size() == 0));
 
   PIO_Offset prev_map_val = 0;
-  for(int i = 0; i < iodesc->maplen; i++){
+  for(int i = 0; i < iodesc->sync_io_desc_info.maplen; i++){
     if(lregions.size() > 0){
-      if(iodesc->map[i] == prev_map_val + 1){
+      if(iodesc->sync_io_desc_info.map[i] == prev_map_val + 1){
         /* Update region : count */
         lregions.back() += 1;
       }
-      else if((iodesc->map[i] == 0) && (prev_map_val == 0)){
+      else if((iodesc->sync_io_desc_info.map[i] == 0) && (prev_map_val == 0)){
         /* Update region : count */
         lregions.back() += 1;
       }
       else{
         /* Add new region : start & count */
-        lregions.push_back(iodesc->map[i]);
+        lregions.push_back(iodesc->sync_io_desc_info.map[i]);
         lregions.push_back(1);
       }
     }
     else{
       /* Add first region : start & count */
-      lregions.push_back(iodesc->map[i]);
+      lregions.push_back(iodesc->sync_io_desc_info.map[i]);
       lregions.push_back(1);
     }
-    prev_map_val = iodesc->map[i];
+    prev_map_val = iodesc->sync_io_desc_info.map[i];
   }
 }
 
@@ -569,7 +569,7 @@ void SPIO_Util::Decomp_Util::Decomp_nc_logger::gather_gmap(const std::vector<int
   assert(iodesc);
   assert((agg_comm_rank_ != 0) || ((gmap_chunk.size() > 0) && (counts.size() > 0) && (starts.size() > 0)));
 
-  ret = MPI_Gatherv(iodesc->map, iodesc->maplen, MPI_OFFSET, gmap_chunk.data(),
+  ret = MPI_Gatherv(iodesc->sync_io_desc_info.map, iodesc->sync_io_desc_info.maplen, MPI_OFFSET, gmap_chunk.data(),
           counts.data(), starts.data(), MPI_OFFSET, 0, agg_comm_); assert(ret == MPI_SUCCESS);
 }
 

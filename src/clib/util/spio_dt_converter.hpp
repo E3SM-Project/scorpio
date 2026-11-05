@@ -5,6 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <cstdint>
+#include <mutex>
 
 #include "pio_config.h"
 #include "pio.h"
@@ -30,7 +31,10 @@ namespace SPIO_Util{
          */
         void *convert(const void *buf, std::size_t sz, nc_type from_pio_type, nc_type to_pio_type);
         /* Check if the converter has any cached buffers - useful for debugging */
-        bool empty(void ) const { return cbufs_.empty(); }
+        bool empty(void ) const {
+          std::lock_guard<std::mutex> lg(cbufs_mtx_);
+          return cbufs_.empty();
+        }
         /* Free the scratch/temp buffers associated with ncid/file */
         void free(int ncid);
         /* Clear all scratch/temp buffers */
@@ -60,6 +64,13 @@ namespace SPIO_Util{
         };
         /* Internal map to store scrach/temp bufs for each file/ncid */
         std::map<int, std::vector<Cachebuf> > cbufs_;
+        /* Guards cbufs_. A file's DTConverter is shared between the calling
+         * thread (which converts buffers on the write path and frees them via
+         * free()/clear()) and the async write thread pool worker(s) (which
+         * convert buffers while executing a queued HDF5 write op), so every
+         * access to cbufs_ must be serialized. Mutable so that the const
+         * empty() accessor can lock it. */
+        mutable std::mutex cbufs_mtx_;
 
         template<typename F, typename T>
         static inline void copy_to(F *from_buf, T *to_buf, std::size_t nelems){
