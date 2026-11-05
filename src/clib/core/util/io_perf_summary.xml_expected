@@ -32,6 +32,7 @@
   </ModelComponentIOStatistics>
   <FileIOStatistics>
     <name>"file1.nc"</name>
+    <iotype>"PIO_IOTYPE_PNETCDF, PIO_IOTYPE_NETCDF"</iotype>
     <model_component_name>"COMP_CPL: CPL"</model_component_name>
     <avg_wtput(MB/s)>2.5</avg_wtput(MB/s)>
     <avg_rtput(MB/s)>1.5</avg_rtput(MB/s)>
@@ -43,6 +44,7 @@
   </FileIOStatistics>
   <FileIOStatistics>
     <name>"file2.nc"</name>
+    <iotype>"PIO_IOTYPE_PNETCDF"</iotype>
     <model_component_name>"COMP_ATM: EAM"</model_component_name>
     <avg_wtput(MB/s)>2.5</avg_wtput(MB/s)>
     <avg_rtput(MB/s)>1.5</avg_rtput(MB/s)>
