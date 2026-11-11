@@ -1383,6 +1383,146 @@ static int test_disjoint_nondecomposed_put_get_roundtrip(MPI_Comm test_comm, int
 }
 
 /* ------------------------------------------------------------------------
+ * Scenario 11: PIOc_copy_att between two HDF5 files that route differently
+ * must report an error, not silently do nothing (review finding I2).
+ *
+ * PIOc_copy_att_impl()'s HDF5 arm only performs the copy on a rank that is
+ * a file-owning I/O proc for BOTH files. Copying from a read-only input
+ * file (always sync-routed) to a write-capable output file (async-routed)
+ * on a disjoint sync/async topology - the single most common real use of
+ * copy_att - satisfies that conjunction on no rank at all, so ierr stayed
+ * PIO_NOERR, the attribute was never copied, and the caller was told it
+ * succeeded. The underlying operation really is impossible in that
+ * topology (the two files' HDF5 handles live on disjoint rank sets); it is
+ * the silent success that is the defect.
+ * ------------------------------------------------------------------------ */
+static int test_cross_routing_copy_att_errors(MPI_Comm test_comm, int my_rank, int ntasks)
+{
+  int ret = PIO_NOERR;
+  int iosysid = -1, ioid = -1, gdimlen = 0;
+  char in_filename[PIO_MAX_NAME + 1], out_filename[PIO_MAX_NAME + 1];
+
+  snprintf(in_filename, PIO_MAX_NAME + 1, "%s_copy_att_in.nc", TEST_NAME);
+  snprintf(out_filename, PIO_MAX_NAME + 1, "%s_copy_att_out.nc", TEST_NAME);
+
+  if((ret = PIOc_Init_Intracomm(test_comm, NUM_IO1, STRIDE1, BASE0,
+                                PIO_REARR_CONTIG, &iosysid))){
+    LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() FAILED: PIOc_Init_Intracomm() "
+      "returned %d\n", ret);
+    return ret;
+  }
+
+#if !PIO_USE_ASYNC_WR_THREAD
+  /* uses_async_io is always false in this build (Task 1), so two HDF5 files
+   * can never route differently and the cross-routing condition this
+   * scenario is about is unreachable. */
+  LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() SKIPPED: PIO_USE_ASYNC_WR_THREAD "
+    "is disabled, so every file has uses_async_io == false and no two files can route "
+    "differently - there is no cross-routing copy to reject\n");
+  (void) ntasks;
+  finalize_iosys(iosysid);
+  return PIO_NOERR;
+#else
+  iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
+  if(!ios || !ios->io_comm_info){
+    LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() FAILED: "
+      "pio_get_iosystem_from_id() returned NULL\n");
+    finalize_iosys(iosysid);
+    return PIO_EINTERNAL;
+  }
+
+  if(!iosys_has_disjoint_io_procs(ios)){
+    LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() SKIPPED: this iosystem's sync "
+      "and async I/O procs are not disjoint on this topology\n");
+    finalize_iosys(iosysid);
+    return PIO_NOERR;
+  }
+
+  if((ret = init_test_decomp(iosysid, my_rank, ntasks, PIO_REARR_CONTIG, &gdimlen, &ioid))){
+    LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() FAILED: PIOc_init_decomp() "
+      "returned %d\n", ret);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  std::vector<int> wdata(MAPLEN_PER_RANK);
+  fill_wdata(wdata, my_rank, 0);
+
+  /* The input file: written, closed, then reopened PIO_NOWRITE so that it
+   * is sync-routed (uses_async_io == false). It carries GATT_NAME. */
+  if((ret = write_fixture_file(iosysid, ioid, in_filename, gdimlen, wdata, NULL, NULL))){
+    LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() FAILED: writing the fixture file "
+      "returned %d\n", ret);
+    PIOc_freedecomp(iosysid, ioid);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  drain_async_ops(iosysid);
+  MPI_Barrier(test_comm);
+
+  int nerrs = 0;
+  int in_ncid = -1, out_ncid = -1;
+  int in_format = PIO_IOTYPE_HDF5, out_format = PIO_IOTYPE_HDF5;
+
+  if((ret = PIOc_openfile(iosysid, &in_ncid, &in_format, in_filename, PIO_NOWRITE))){
+    LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() FAILED: the read-only open of "
+      "the input file returned %d\n", ret);
+    PIOc_freedecomp(iosysid, ioid);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  /* The output file: freshly created, so write-capable and async-routed. */
+  if((ret = PIOc_createfile(iosysid, &out_ncid, &out_format, out_filename, PIO_CLOBBER))){
+    LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() FAILED: creating the output file "
+      "returned %d\n", ret);
+    PIOc_closefile(in_ncid);
+    PIOc_freedecomp(iosysid, ioid);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  /* Confirm the two files really do route differently, so a PIO_NOERR
+   * below would genuinely be the silent no-op this scenario is about
+   * rather than a legitimately-performed copy. */
+  bool routing_differs = false;
+  {
+    file_desc_t *in_file = NULL, *out_file = NULL;
+    if((pio_get_file(in_ncid, &in_file) == PIO_NOERR) && in_file &&
+       (pio_get_file(out_ncid, &out_file) == PIO_NOERR) && out_file){
+      routing_differs = (in_file->uses_async_io != out_file->uses_async_io);
+    }
+  }
+
+  if(!routing_differs){
+    LOG_RANK0(my_rank, "test_cross_routing_copy_att_errors() FAILED: the read-only input file "
+      "and the write-capable output file have the same uses_async_io - there is no "
+      "cross-routing copy to reject and the scenario would prove nothing\n");
+    nerrs++;
+  }
+  else{
+    int copy_ret = PIOc_copy_att(in_ncid, PIO_GLOBAL, GATT_NAME, out_ncid, PIO_GLOBAL);
+    if(copy_ret == PIO_NOERR){
+      fprintf(stderr, "test_cross_routing_copy_att_errors() FAILED (rank %d): PIOc_copy_att() "
+        "between an async-routed and a sync-routed HDF5 file returned PIO_NOERR - the "
+        "attribute cannot have been copied (the two files' HDF5 handles live on disjoint "
+        "rank sets), so reporting success is silent data loss (review finding I2)\n",
+        my_rank);
+      nerrs++;
+    }
+  }
+
+  PIOc_closefile(out_ncid);
+  PIOc_closefile(in_ncid);
+  PIOc_freedecomp(iosysid, ioid);
+  finalize_iosys(iosysid);
+
+  return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
+#endif /* PIO_USE_ASYNC_WR_THREAD */
+}
+
+/* ------------------------------------------------------------------------
  * Scenarios 6-8: write via each rearranger, close, reopen write-capable,
  * and verify the file stayed PIO_IOTYPE_HDF5 (Tasks 10/11's native reopen,
  * not the historical switch-away to NETCDF4P/PNETCDF) with its dims, vars,
@@ -2175,6 +2315,9 @@ int main(int argc, char **argv)
 
     RUN_SCENARIO(test_disjoint_nondecomposed_put_get_roundtrip(test_comm, my_rank, ntasks),
                  "test_disjoint_nondecomposed_put_get_roundtrip");
+
+    RUN_SCENARIO(test_cross_routing_copy_att_errors(test_comm, my_rank, ntasks),
+                 "test_cross_routing_copy_att_errors");
 
     RUN_SCENARIO(test_disjoint_write_close_reopen_lock_absent(test_comm, my_rank, ntasks),
                  "test_disjoint_write_close_reopen_lock_absent");
