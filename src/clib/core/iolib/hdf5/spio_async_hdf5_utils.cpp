@@ -618,7 +618,15 @@ int spio_wait_all_hdf5_async_ops(int iosysid)
   return PIO_NOERR;
 }
 
-int pio_iosys_async_op_hdf5_write(void *pdata)
+/* The body of pio_iosys_async_op_hdf5_write(), separated out so that the
+ * pending-op counters (iodesc->nasync_pend_ops, file->npend_ops and
+ * SPIO_Util::GVars::npend_hdf5_async_ops) can be decremented on *every* exit
+ * path, including the error returns below. Leaking a pending-op count on an
+ * error used to be harmless because nothing ever waited on those counters;
+ * now that close/sync actually drain file->npend_ops (see
+ * spio_wait_file_async_pend_ops() in pio_file.cpp) a leaked count would stall
+ * the application until the async-op timeout expires. */
+static int pio_iosys_async_op_hdf5_write_impl(void *pdata)
 {
 #ifdef _HDF5
   /* FIXME: Add futures */
@@ -849,11 +857,30 @@ int pio_iosys_async_op_hdf5_write(void *pdata)
    * audit). */
   MPI_Barrier(ios->tcomm_info->get_io_comm());
 
-  iodesc->nasync_pend_ops--;
-  file->npend_ops--;
+  return PIO_NOERR;
+#else // _HDF5
+  assert(0);
+  return PIO_EINTERNAL;
+#endif // _HDF5
+}
+
+int pio_iosys_async_op_hdf5_write(void *pdata)
+{
+#ifdef _HDF5
+  Hdf5_wcache *wcache = static_cast<struct Hdf5_wcache *>(pdata);
+  assert(wcache);
+
+  int ret = pio_iosys_async_op_hdf5_write_impl(pdata);
+
+  /* One less pending op using this iodesc & file - decremented here, rather
+   * than at the end of the body above, so that it also happens when the body
+   * returns early with an error (see the comment on
+   * pio_iosys_async_op_hdf5_write_impl()) */
+  wcache->iodesc->nasync_pend_ops--;
+  wcache->file->npend_ops--;
   SPIO_Util::GVars::npend_hdf5_async_ops--;
 
-  return PIO_NOERR;
+  return ret;
 #else // _HDF5
   assert(0);
   return PIO_EINTERNAL;
