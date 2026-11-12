@@ -198,13 +198,26 @@ void io_desc_t::free_all_regions(void )
 
 void io_desc_t::free_mpi_types(MPI_Datatype *ptypes, int ntypes)
 {
+  int is_mpi_finalized = 0;
+
   assert(ntypes >= 0);
 
   if(!ptypes) { return; }
 
+  MPI_Finalized(&is_mpi_finalized);
+
   for(int i = 0; i < ntypes; i++){
     if(ptypes[i] != MPI_DATATYPE_NULL){
-      MPI_Type_free(&ptypes[i]);
+      if(!is_mpi_finalized){
+        MPI_Type_free(&ptypes[i]);
+      }
+      else{
+        /* MPI is already finalized by the time this destructor is called.
+         * I/O decomps are explicitly freed once all I/O systems are finalized,
+         * so the user is missing PIOc_finalize() calls for some I/O systems.
+         */
+        fprintf(stderr, "PIO: WARNING: Unable to free MPI type since MPI is already finalized. I/O decompositions are explicitly freed during PIOc_finalize, ensure that all I/O systems are finalized to free up all resources\n");
+      }
     }
   }
 }
