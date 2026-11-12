@@ -848,13 +848,19 @@ static int pio_iosys_async_op_hdf5_write_impl(void *pdata)
   }
 
   /* FIXME: Is this barrier needed ? TComm_info caches a single io_comm with
-   * no sync/async role distinction, but an async-dispatched write (CONTIG +
-   * HDF5/HDF5C + PIO_USE_ASYNC_WR_THREAD) can run on a disjoint async-I/O
-   * rank set (see IO_comm_info's disjoint-procs branch). If get_io_comm()
-   * was built from sync-only ranks, this barrier may be called by the wrong
-   * rank set here - a deadlock risk for the async-dispatched case
-   * specifically. Confirmed real, not fixed here (needs a TComm_info
-   * audit). */
+   * no sync/async role distinction - it is built from the *sync* I/O comm
+   * (see TComm_info's construction from io_comm_info->get_sync_io_comm()), so
+   * it is MPI_COMM_NULL on async-only I/O ranks. An async-dispatched write
+   * (CONTIG + HDF5/HDF5C + PIO_USE_ASYNC_WR_THREAD) would therefore barrier
+   * on the wrong rank set here if it ever ran on async I/O ranks disjoint
+   * from the sync ones. That configuration is currently prevented upstream by
+   * io_desc_t::select_io_desc_info(), which falls a CONTIG decomp back to
+   * sync_io_desc_info unless the sync and async I/O roles are performed by
+   * the same set of processes
+   * (IO_comm_info::sync_and_async_io_share_procs()), so this barrier is
+   * always reached by the full sync-I/O rank set today. It still needs a
+   * TComm_info audit (a sync/async role-aware io_comm) before HDF5
+   * file/dataset creation is extended to span the async comm. */
   MPI_Barrier(ios->tcomm_info->get_io_comm());
 
   return PIO_NOERR;
