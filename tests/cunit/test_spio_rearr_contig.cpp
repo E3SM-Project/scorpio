@@ -604,7 +604,7 @@ int main(int argc, char *argv[])
 {
   int ret;
 
-  ret = MPI_Init(&argc, &argv);
+  ret = pio_test_mpi_init(&argc, &argv);
   if(ret != MPI_SUCCESS){
     std::cerr << "MPI_Init() FAILED, ret = " << ret << "\n";
     return ret;
