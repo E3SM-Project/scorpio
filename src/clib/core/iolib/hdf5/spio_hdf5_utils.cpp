@@ -32,6 +32,7 @@
 
 #include "spio_hdf5_utils.hpp"
 #include "pio_sdecomps_regex.hpp"
+#include "spio_iosys_utils.hpp"
 /* Include headers for HDF5 compression filters */
 #if PIO_USE_HDF5
 #include <hdf5.h>
@@ -45,13 +46,33 @@
 #endif
 
 #ifdef _HDF5
+const char *SPIO_HDF5_ATT_NETCDF4_DIMID = "_Netcdf4Dimid";
+const char *SPIO_HDF5_ATT_NETCDF4_COORDINATES = "_Netcdf4Coordinates";
+
 int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filename)
 {
   int mpierr = MPI_SUCCESS, ret = PIO_NOERR;
 
   assert(ios && file && filename);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
-  assert(ios->ioproc);
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
+
+  /* Defensively disable HDF5's internal MPI_File_sync() around independent
+   * writes unless the user/launch script has already set this explicitly
+   * (setenv's overwrite=0 never clobbers an existing value). On some
+   * filesystems/ROMIO ADIO drivers (observed on ANL's compute-386* NFS-
+   * backed nodes), HDF5's H5D__ioinfo_adjust() refuses to downgrade a
+   * collective write to independent I/O unless HDF5_DO_MPI_FILE_SYNC=FALSE
+   * is set, aborting instead with a fatal "requires MPI_File_sync" error
+   * (seen on test_put_get_str_idx's offset write to var1d_midx). This is an
+   * HDF5-internal, env-var-only knob with no direct C API, so setenv() is
+   * the only way to set it; the existing H5Fset_mpi_atomicity() workaround
+   * below (SPIO_DISABLE_HDF5_MPI_FILE_SYNC) does not actually substitute
+   * for it - it was confirmed active and still failing on exactly this
+   * failure mode. Must happen before any HDF5 call that might trigger an
+   * independent write.
+   */
+  setenv("HDF5_DO_MPI_FILE_SYNC", "FALSE", 0);
 
   if(file->mode & PIO_NOCLOBBER){
     /* No clobber : Check if file exists from all processes */
@@ -64,14 +85,23 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
     }
   }
   else{
-    /* Clobber mode : Delete HDF5 file (from root I/O proc) if it exists */
-    if(ios->tcomm_info->get_io_comm_rank() == 0){
+    /* Clobber mode : Delete HDF5 file (from root I/O proc) if it exists.
+     * The rank-0 test must pick the rank out of the same comm the barrier
+     * below synchronizes on (and that the fapl is built from) - for an
+     * async-routed file that is the async I/O comm. Using the sync I/O comm
+     * rank here on a disjoint topology would test a rank number that has no
+     * relationship to the ranks actually running this code (and, for a rank
+     * with no sync I/O comm at all, would come from a default-constructed
+     * Comm_info whose rank is 0 - so either every async rank unlinks, or
+     * none does). */
+    if((file->uses_async_io ? ios->tcomm_info->get_async_io_comm_rank()
+                             : ios->tcomm_info->get_io_comm_rank()) == 0){
       struct stat sd;
       if(0 == stat(filename, &sd)) { unlink(filename); }
     }
 
     /* Wait for root process (that might delete an existing file) */
-    if((mpierr = MPI_Barrier(ios->tcomm_info->get_io_comm()))){
+    if((mpierr = MPI_Barrier(file->uses_async_io ? ios->tcomm_info->get_async_io_comm() : ios->tcomm_info->get_io_comm()))){
       return check_mpi(ios, file, mpierr, __FILE__, __LINE__);
     }
   }
@@ -118,7 +148,7 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
                    filename);
   }
 
-  if(H5Pset_fapl_mpio(fapl_id, ios->tcomm_info->get_io_comm(), *pinfo) < 0){
+  if(H5Pset_fapl_mpio(fapl_id, file->uses_async_io ? ios->tcomm_info->get_async_io_comm() : ios->tcomm_info->get_io_comm(), *pinfo) < 0){
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                    "Creating file (%s) using HDF5 iotype failed. "
                    "The low level (HDF5) I/O library call failed to store the user-supplied MPI IO parameters",
@@ -534,7 +564,7 @@ static inline int spio_add_nc_hidden_coord(iosystem_desc_t *ios, file_desc_t *fi
    * variable dimensions in an integer array.
    * This attribute is required for NetCDF to read HDF5 output
    */
-  const char* attr_name = "_Netcdf4Coordinates";
+  const char* attr_name = SPIO_HDF5_ATT_NETCDF4_COORDINATES;
 
   /* Sanity check : Ensure that "_Netcdf4Coordinates" attribute does not exist */
   htri_t attr_exists = H5Aexists(file->hdf5_vars[varid].hdf5_dataset_id, attr_name);
@@ -593,7 +623,7 @@ int spio_hdf5_def_var(iosystem_desc_t *ios, file_desc_t *file, const char *name,
   assert(ios && file && name && ndims >= 0 && varid >= 0);
   assert((ndims == 0) || dimidsp);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
-  assert(ios->ioproc);
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
   /* Cache the dim sizes for HDF5 calls */
   std::vector<hsize_t> dim_sz(ndims), max_dim_sz(ndims);
@@ -684,7 +714,7 @@ static int spio_hdf5_sync_defs(iosystem_desc_t *ios, file_desc_t *file)
 
   assert(ios && file);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
-  assert(ios->ioproc);
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
   /* Step 1 : Process dimensions with no coordinate variables associated with it */
   for(i = 0; i < file->hdf5_num_dims; i++){
@@ -773,7 +803,7 @@ static int spio_hdf5_sync_defs(iosystem_desc_t *ios, file_desc_t *file)
       }
 
       /* Writing _Netcdf4Dimid attribute */
-      const char* attr_name = "_Netcdf4Dimid";
+      const char* attr_name = SPIO_HDF5_ATT_NETCDF4_DIMID;
 
       /* H5Aexists() returns zero (false), a positive (true) or a negative (failure) value */
       attr_exists = H5Aexists(dimscale_id, attr_name);
@@ -848,7 +878,7 @@ static int spio_hdf5_sync_defs(iosystem_desc_t *ios, file_desc_t *file)
       htri_t attr_exists;
 
       /* Writing _Netcdf4Dimid attribute */
-      const char* attr_name = "_Netcdf4Dimid";
+      const char* attr_name = SPIO_HDF5_ATT_NETCDF4_DIMID;
 
       attr_exists = H5Aexists(dimscale_id, attr_name);
       if(attr_exists < 0){
@@ -931,6 +961,41 @@ static int spio_hdf5_sync_defs(iosystem_desc_t *ios, file_desc_t *file)
       if(ndims > 0){
         int* dimids = file->hdf5_vars[i].hdf5_dimids;
         for(int j = 0; j < ndims; j++){
+          /* Unlike Steps 1 and 2 above, this used to be unconditional,
+           * because the only callers of spio_hdf5_enddef()/
+           * spio_hdf5_sync_defs() were the original (write-side) def/enddef
+           * flow, where re-running this loop on a redef()/enddef() cycle for
+           * an already-attached dataset was the extent of the "repeat call"
+           * concern. A native HDF5 reopen (spio_hdf5_reopen(), used for a
+           * read-only reopen of a SCORPIO-written file) populates
+           * file->hdf5_vars[]/hdf5_dims[] with dataset handles for
+           * dimension-scale attachments that already exist on disk, and
+           * spio_hdf5_close() unconditionally calls spio_hdf5_enddef() to
+           * "handle pending defines" - so, for a reopened file, this loop
+           * would otherwise call H5DSattach_scale() again on a scale that is
+           * already attached. H5DSattach_scale() writes to the file (it
+           * updates the DIMENSION_LIST/REFERENCE_LIST attributes), which
+           * fails outright on a reopened file's handle (opened read-only by
+           * spio_hdf5_reopen()) with an HDF5 "no write intent on file"
+           * error. Checking H5DSis_attached() first makes this idempotent,
+           * matching Step 1's hdf5_dataset_id/H5I_INVALID_HID check and Step
+           * 2's H5Aexists() check just above.
+           */
+          htri_t is_attached = H5DSis_attached(file->hdf5_vars[i].hdf5_dataset_id,
+                                                file->hdf5_dims[dimids[j]].hdf5_dataset_id, j);
+          if(is_attached < 0){
+            return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                           "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
+                           "The low level (HDF5) I/O library call failed to determine whether a dimension scale (for dimension %s) is already attached to the %dth dimension of a dataset (for variable %s)",
+                           pio_get_fname_from_file(file), file->pio_ncid, file->hdf5_dims[dimids[j]].name, j, file->hdf5_vars[i].name);
+          }
+
+          if(is_attached > 0){
+            /* Already attached (e.g. a native HDF5 reopen of an already
+             * fully-defined file) - nothing to do for this dimension. */
+            continue;
+          }
+
           if(H5DSattach_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_dims[dimids[j]].hdf5_dataset_id, j) < 0){
             return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                            "Syncing definitions of variables/attributes in file (%s, ncid=%d) using HDF5 iotype failed. "
@@ -943,7 +1008,7 @@ static int spio_hdf5_sync_defs(iosystem_desc_t *ios, file_desc_t *file)
            * step between the ranks.
            * Workaround: place a barrier to sync H5DSattach_scale calls.
            */
-          MPI_Barrier(ios->tcomm_info->get_io_comm());
+          MPI_Barrier(file->uses_async_io ? ios->tcomm_info->get_async_io_comm() : ios->tcomm_info->get_io_comm());
         }
       }
     }
@@ -964,7 +1029,7 @@ int spio_hdf5_copy_att(iosystem_desc_t *ios, file_desc_t *ifile, int ivarid, con
   assert(ios && ifile && ofile && name);
   assert((ifile->iotype == PIO_IOTYPE_HDF5) || (ifile->iotype == PIO_IOTYPE_HDF5C));
   assert((ofile->iotype == PIO_IOTYPE_HDF5) || (ofile->iotype == PIO_IOTYPE_HDF5C));
-  assert(ios->ioproc);
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, ifile) && SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, ofile));
 
   /* Error message template */
   const std::string err_msg = std::string("Copying attribute (") + name + ") associated with variable (varid=" + std::to_string(ivarid) + " in input file (" + pio_get_fname_from_file(ifile) + ", ncid=" + std::to_string(ifile->pio_ncid) + ") to variable (varid=" + std::to_string(ovarid) + ") in file (" + pio_get_fname_from_file(ofile) + ", ncid=" + std::to_string(ofile->pio_ncid) + ") using HDF5 iotype failed.";
@@ -1040,7 +1105,7 @@ int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const 
 
   assert(ios && file && name && op);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
-  assert(ios->ioproc);
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
   if(varid == PIO_GLOBAL){
     loc_id = file->hdf5_file_id;
@@ -1175,6 +1240,129 @@ int spio_hdf5_put_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const 
   return PIO_NOERR;
 }
 
+/* Read an attribute's value directly via the HDF5 API, using whatever
+ * dataset/file handle this file's hdf5_vars[]/hdf5_file_id currently holds
+ * (e.g. the handles populated by a native HDF5 reopen - see
+ * spio_hdf5_reopen.cpp - for a file whose file->fh is not a valid netCDF
+ * id). H5Aread() performs the same on-the-fly numeric type conversion
+ * between the attribute's on-disk type and memtype that nc_get_att_*()
+ * callers rely on elsewhere in this library.
+ */
+int spio_hdf5_get_att(iosystem_desc_t *ios, file_desc_t *file, int varid, const char *name,
+                      nc_type memtype, void *ip)
+{
+  hid_t attr_id;
+  hid_t loc_id;
+  hid_t h5_memtype;
+  htri_t att_exists;
+
+  assert(ios && file && name && ip);
+  assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
+
+  if(varid == PIO_GLOBAL){
+    loc_id = file->hdf5_file_id;
+  }
+  else{
+    loc_id = file->hdf5_vars[varid].hdf5_dataset_id;
+  }
+
+  /* H5Aexists() returns zero (false), a positive (true) or a negative (failure) value */
+  att_exists = H5Aexists(loc_id, name);
+  if(att_exists <= 0){
+    return pio_err(ios, file, PIO_ENOTATT, __FILE__, __LINE__,
+                   "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "The attribute does not exist",
+                   name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  attr_id = H5Aopen(loc_id, name, H5P_DEFAULT);
+  if(attr_id == H5I_INVALID_HID){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to open this attribute",
+                   name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  if(memtype == NC_CHAR){
+    /* A string attribute is written (see spio_hdf5_put_att()) as a scalar
+     * dataspace with a fixed-size H5T_STRING type sized to the exact
+     * string length - except a zero-length string, which uses an
+     * H5S_NULL dataspace and has nothing to read back. */
+    hid_t aspace_id = H5Aget_space(attr_id);
+    if(aspace_id == H5I_INVALID_HID){
+      H5Aclose(attr_id);
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to get the dataspace of this attribute",
+                     name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    bool is_null_space = (H5Sget_simple_extent_type(aspace_id) == H5S_NULL);
+    if(H5Sclose(aspace_id) < 0){
+      H5Aclose(attr_id);
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to release the dataspace of this attribute",
+                     name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    if(!is_null_space){
+      hid_t atype_id = H5Aget_type(attr_id);
+      if(atype_id == H5I_INVALID_HID){
+        H5Aclose(attr_id);
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to get the type of this attribute",
+                       name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+      }
+
+      if(H5Aread(attr_id, atype_id, ip) < 0){
+        H5Tclose(atype_id);
+        H5Aclose(attr_id);
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to read this attribute",
+                       name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+      }
+
+      if(H5Tclose(atype_id) < 0){
+        H5Aclose(attr_id);
+        return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                       "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                       "The low level (HDF5) I/O library call failed to release the type of this attribute",
+                       name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+      }
+    }
+  }
+  else{
+    h5_memtype = (memtype == PIO_LONG_INTERNAL) ? H5T_NATIVE_LONG : spio_nc_type_to_hdf5_type(memtype);
+    if(h5_memtype == H5I_INVALID_HID){
+      H5Aclose(attr_id);
+      return pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
+                     "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Unsupported memory type (type=%x)",
+                     name, varid, pio_get_fname_from_file(file), file->pio_ncid, memtype);
+    }
+
+    if(H5Aread(attr_id, h5_memtype, ip) < 0){
+      H5Aclose(attr_id);
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to read this attribute",
+                     name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+  }
+
+  if(H5Aclose(attr_id) < 0){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reading attribute (%s) associated with variable (varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to close this attribute",
+                   name, varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  return PIO_NOERR;
+}
+
 int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
                       const PIO_Offset *start, const PIO_Offset *count,
                       const PIO_Offset *stride, nc_type xtype, const void *buf)
@@ -1185,7 +1373,7 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
 
   assert(ios && file && varid >= 0 && buf);
   assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
-  assert(ios->ioproc);
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
   hid_t file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
   if(file_space_id == H5I_INVALID_HID){
@@ -1247,8 +1435,19 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
     hstride[i] = 1;
   }
 
-  /* Only the IO master does the IO */
-  if(ios->iomaster == MPI_ROOT){
+  /* Only the IO master does the IO.
+   *
+   * Which rank that is depends on how this *file* is routed, not on the
+   * comm topology alone: for a write-capable, async-routed file
+   * (file->uses_async_io) the ranks running this function are the async I/O
+   * procs (see this function's is_file_owning_io_proc() assert above), and
+   * on a disjoint sync/async topology no async I/O proc is ever the sync I/O
+   * master - so testing get_sync_io_master() here would leave hcount[]/
+   * nelems at zero on every participating rank and silently write nothing
+   * while still returning PIO_NOERR. Same role-aware selection as
+   * SPIO_Util::Iosys_Util::is_file_owning_io_proc(). */
+  if((file->uses_async_io ? ios->io_comm_info->get_async_io_master()
+                           : ios->io_comm_info->get_sync_io_master()) == MPI_ROOT){
     if(count){
       for(int i = 0; i < ndims; i++){
         hcount[i] = (hsize_t)count[i];
@@ -1385,6 +1584,238 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
   return PIO_NOERR;
 }
 
+int spio_hdf5_get_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
+                      const PIO_Offset *start, const PIO_Offset *count,
+                      const PIO_Offset *stride, nc_type xtype, void *buf)
+{
+  hsize_t dims[H5S_MAX_RANK];
+  hsize_t mdims[H5S_MAX_RANK];
+
+  assert(ios && file && varid >= 0 && buf);
+  assert((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C));
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
+
+  hid_t file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
+  if(file_space_id == H5I_INVALID_HID){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to make a copy of the dataspace of the dataset associated with this variable",
+                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  if(H5Sget_simple_extent_dims(file_space_id, dims, mdims) < 0){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to retrieve dimension size and maximum size of a dataspace copied from the dataset associated with this variable",
+                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  int ndims = file->hdf5_vars[varid].ndims;
+
+  hsize_t hstart[(ndims > 0) ? ndims : 1];
+  hsize_t hcount[(ndims > 0) ? ndims : 1];
+  hsize_t hstride[(ndims > 0) ? ndims : 1];
+  hsize_t nelems = 0;
+
+  for(int i = 0; i < ndims; i++){
+    if(start){
+      hstart[i] = (hsize_t) start[i];
+    }
+    else{
+      hstart[i] = 0;
+    }
+    hcount[i] = 0;
+    hstride[i] = 1;
+  }
+
+  /* Only the IO master does the IO - selected by this file's own routing
+   * role, not by the comm topology alone. See the identical (and more
+   * fully explained) selection in spio_hdf5_put_var() above: on a disjoint
+   * sync/async topology an async-routed file's owning ranks are never the
+   * sync I/O master, so a get_sync_io_master() test here would leave
+   * hcount[]/nelems at zero and silently read nothing into the caller's
+   * buffer while returning PIO_NOERR. */
+  if((file->uses_async_io ? ios->io_comm_info->get_async_io_master()
+                           : ios->io_comm_info->get_sync_io_master()) == MPI_ROOT){
+    if(count){
+      for(int i = 0; i < ndims; i++){
+        hcount[i] = (hsize_t)count[i];
+      }
+    }
+    else{
+      for(int i = 0; i < ndims; i++){
+        hcount[i] = dims[i];
+      }
+    }
+
+    nelems = (ndims > 0) ? 1 : 0;
+    for(int i = 0; i < ndims; i++){
+      nelems *= hcount[i];
+    }
+
+    if(stride){
+      for(int i = 0; i < ndims; i++){
+        hstride[i] = (stride[i] > 0) ? ((hsize_t)stride[i]) : 1 ;
+      }
+    }
+  }
+
+  hid_t mem_space_id = H5Screate_simple(ndims, hcount, hcount);
+  if(mem_space_id == H5I_INVALID_HID){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to create a new simple dataspace",
+                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  if(ndims > 0){
+    if(H5Sselect_hyperslab(file_space_id, H5S_SELECT_SET, hstart, hstride, hcount, NULL) < 0){
+      H5Eprint2(H5E_DEFAULT, stderr);
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to select a hyperslab region for a dataspace copied from the dataset associated with this variable",
+                     pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+  }
+
+  hid_t mem_type_id;
+  if(xtype == NC_CHAR){
+    /* String type */
+    mem_type_id = H5Tcopy(H5T_C_S1);
+    if(mem_type_id == H5I_INVALID_HID){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to make a copy of the predefined string datatype in C",
+                     pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    if(H5Tset_strpad(mem_type_id, H5T_STR_NULLTERM) < 0){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to define the type of padding (NULL-terminated) used for a derived C-style string datatype",
+                     pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    if(H5Tset_cset(mem_type_id, H5T_CSET_ASCII) < 0){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to set the character set (US ASCII) to be used in a derived C-style string datatype",
+                     pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+  }
+  else{
+    mem_type_id = spio_nc_type_to_hdf5_type(xtype);
+    if(mem_type_id == H5I_INVALID_HID){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Unsupported memory type (type=%x)",
+                     pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, xtype);
+    }
+  }
+
+  hid_t file_var_type_id = H5Dget_type(file->hdf5_vars[varid].hdf5_dataset_id);
+  assert(file_var_type_id != H5I_INVALID_HID);
+
+  hid_t file_var_ntype_id = H5Tget_native_type(file_var_type_id, H5T_DIR_DEFAULT);
+  assert(file_var_ntype_id != H5I_INVALID_HID);
+
+  /* We manually perform datatype conversion (instead of letting HDF5 do it),
+   * matching the read-side pattern already used for decomposed HDF5 reads
+   * (see pio_darray_int.cpp). */
+  bool dt_conv_reqd = (nelems > 0) && !H5Tequal(mem_type_id, file_var_ntype_id);
+  void *native_buf = NULL;
+  void *read_buf = buf;
+  if(dt_conv_reqd){
+    std::size_t native_buf_sz = nelems *
+        SPIO_Util::File_Util::DTConverter::size_of(spio_hdf5_type_to_pio_type(file_var_ntype_id));
+    native_buf = bget(native_buf_sz);
+    if(native_buf == NULL){
+      /* Release the two type ids this function opened above, exactly as the
+       * sibling error returns below (the H5Dread failure and the
+       * converted_buf failure) already do - without this, both leak. */
+      H5Tclose(file_var_ntype_id);
+      H5Tclose(file_var_type_id);
+      return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                     "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Out of memory allocating a scratch buffer (%lld bytes) for datatype conversion",
+                     pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid,
+                     (long long int) native_buf_sz);
+    }
+    read_buf = native_buf;
+  }
+
+  /* Independent read */
+  if(H5Dread(file->hdf5_vars[varid].hdf5_dataset_id, (dt_conv_reqd) ? file_var_ntype_id : mem_type_id,
+             mem_space_id, file_space_id, file->dxplid_indep, read_buf) < 0){
+    H5Eprint2(H5E_DEFAULT, stderr);
+    if(native_buf){
+      brel(native_buf);
+    }
+    H5Tclose(file_var_ntype_id);
+    H5Tclose(file_var_type_id);
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to read the dataset associated with this variable",
+                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  if(dt_conv_reqd){
+    assert(file->dt_converter);
+    std::size_t native_buf_sz = nelems *
+        SPIO_Util::File_Util::DTConverter::size_of(spio_hdf5_type_to_pio_type(file_var_ntype_id));
+    void *converted_buf = static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->convert(
+            native_buf, native_buf_sz, spio_hdf5_type_to_pio_type(file_var_ntype_id), xtype);
+    if(converted_buf == NULL){
+      brel(native_buf);
+      int file_var_pio_type = spio_hdf5_type_to_pio_type(file_var_ntype_id);
+      H5Tclose(file_var_ntype_id);
+      H5Tclose(file_var_type_id);
+      return pio_err(ios, file, PIO_EINTERNAL, __FILE__, __LINE__,
+                     "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "Unable to convert buffer from %d (variable type in file) to %d (buffer type in memory)",
+                     pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid,
+                     file_var_pio_type, static_cast<int>(xtype));
+    }
+    memcpy(buf, converted_buf, spio_get_nc_type_size(xtype) * nelems);
+    brel(converted_buf);
+    brel(native_buf);
+  }
+
+  /* Both type handles have had their last use by this point (the datatype
+   * conversion block above is the only consumer of file_var_ntype_id after
+   * the H5Dread). Released here so the success path does not leak an HDF5
+   * type id per call - this is a read path, so it is called far more often
+   * than the equivalent (pre-existing, untouched) leak in
+   * spio_hdf5_put_var(). */
+  H5Tclose(file_var_ntype_id);
+  H5Tclose(file_var_type_id);
+
+  if(H5Sclose(mem_space_id) < 0){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to release a simple dataspace",
+                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  if(xtype == NC_CHAR){
+    if(H5Tclose(mem_type_id) < 0){
+      return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                     "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                     "The low level (HDF5) I/O library call failed to release a derived C-style string datatype used by this variable",
+                     pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+    }
+  }
+
+  if(H5Sclose(file_space_id) < 0){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) using HDF5 iotype failed. "
+                   "The low level (HDF5) I/O library call failed to release a dataspace copied from the dataset associated with this variable",
+                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  return PIO_NOERR;
+}
+
 int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file)
 {
   int i = 0;
@@ -1392,7 +1823,7 @@ int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file)
 
   assert(ios && file);
   assert((file->iotype == PIO_IOTYPE_HDF5) || ((file->iotype == PIO_IOTYPE_HDF5C)));
-  assert(ios->ioproc);
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
   /* Handle pending defines here
    * e.g. If user calls close() without an enddef()
@@ -1466,7 +1897,7 @@ int spio_hdf5_set_frame(file_desc_t *file, int varid, int frame)
 {
   assert(file && file->iosystem && (frame >= 0));
   iosystem_desc_t *ios = file->iosystem;
-  assert(ios->ioproc);
+  assert(SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file));
 
   hsize_t dims[H5S_MAX_RANK];
   hsize_t mdims[H5S_MAX_RANK];
@@ -1506,9 +1937,106 @@ int spio_hdf5_set_frame(file_desc_t *file, int varid, int frame)
     }
   }
 
-  /* Cache the frame in the varlist (used by the next write call) */
-  file->varlist[varid].record = frame;
+  /* Note: file->varlist[varid].record is *not* set here. Both callers
+   * (PIOc_setframe_impl()'s synchronous branch, and the deferred
+   * PIO_USE_ASYNC_WR_THREAD op executed by the single async worker thread)
+   * are only ever reached after PIOc_setframe_impl() has already set
+   * file->varlist[varid].record = frame synchronously, on the calling
+   * thread, before either branch runs (pioc.cpp). Re-assigning it here too
+   * used to be a harmless-looking redundant write for the synchronous path,
+   * but for the async path it is a genuine data race: the worker thread can
+   * run this function for an *earlier* setframe() call well after the main
+   * thread has already raced ahead and synchronously set record to a later
+   * frame (the main thread does not wait for this op to be dispatched/run).
+   * That stale write intermittently clobbered the live record value right
+   * as PIOc_write_darray_impl() read it to cache the frame number for the
+   * write-multi-buffer (wmb->frame[]), corrupting which frame/record a
+   * batched write actually targeted. Confirmed via instrumentation: wmb's
+   * cached frame number for one write call was observed to read back as an
+   * earlier call's frame number, reproducing the
+   * nc_wr_rd_2d_unlim_dim_* HDF5/HDF5C darray frame-aliasing test failures. */
 
+  return PIO_NOERR;
+}
+
+int spio_hdf5_get_cur_dim_len(iosystem_desc_t *ios, file_desc_t *file,
+                              hid_t dim_dataset_id, const char *dim_name, PIO_Offset *lenp)
+{
+  hid_t sid = H5Dget_space(dim_dataset_id);
+  if(sid == H5I_INVALID_HID){
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Inquiring the current length of dimension (%s) in file (%s, ncid=%d) using "
+                   "HDF5 iotype failed. The low level (HDF5) I/O library call failed to get the "
+                   "dataspace of the dimension-scale dataset",
+                   dim_name, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+
+  /* dim_dataset_id is not always a 1-D dimension-scale dataset: the "pure
+   * dimension" (no coordinate variable) fallback in
+   * spio_hdf5_get_unlimited_dimlen() calls this with a real variable's
+   * dataset instead, whose rank is that variable's ndims (e.g. 6 for a 6-D
+   * variable). H5Sget_simple_extent_dims() writes one hsize_t per dimension
+   * of the dataspace's actual rank into the buffer it is given, regardless
+   * of the buffer's size, so a buffer sized for only 1 dimension overflows
+   * the stack for any higher-rank dataset. Only dims[0] (the dimension's own
+   * axis, always the variable's first/slowest dimension by convention) is
+   * ever used below.
+   */
+  hsize_t dims[H5S_MAX_RANK] = {0};
+  if(H5Sget_simple_extent_dims(sid, dims, NULL) < 0){
+    H5Sclose(sid);
+    return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
+                   "Inquiring the current length of dimension (%s) in file (%s, ncid=%d) using "
+                   "HDF5 iotype failed. The low level (HDF5) I/O library call failed to get the "
+                   "extent of the dimension-scale dataset",
+                   dim_name, pio_get_fname_from_file(file), file->pio_ncid);
+  }
+  H5Sclose(sid);
+
+  *lenp = static_cast<PIO_Offset>(dims[0]);
+  return PIO_NOERR;
+}
+
+int spio_hdf5_get_unlimited_dimlen(iosystem_desc_t *ios, file_desc_t *file,
+                                   int dimid, PIO_Offset *lenp)
+{
+  assert(ios && file && lenp);
+  assert(0 <= dimid && dimid < file->hdf5_num_dims);
+
+  if(file->hdf5_dims[dimid].has_coord_var){
+    if(file->hdf5_dims[dimid].hdf5_dataset_id == H5I_INVALID_HID){
+      *lenp = 0;
+      return PIO_NOERR;
+    }
+    return spio_hdf5_get_cur_dim_len(ios, file, file->hdf5_dims[dimid].hdf5_dataset_id,
+                                      file->hdf5_dims[dimid].name, lenp);
+  }
+
+  /* Pure dimension (no coordinate variable) - its own dataset is never
+   * extended, so derive the current length from the real variables that use
+   * it instead (the dimension is always a variable's first dimension).
+   */
+  PIO_Offset max_len = 0;
+  for(int i = 0; i < file->hdf5_num_vars; i++){
+    if((file->hdf5_vars[i].ndims <= 0) || !file->hdf5_vars[i].hdf5_dimids ||
+       (file->hdf5_vars[i].hdf5_dimids[0] != dimid) ||
+       (file->hdf5_vars[i].hdf5_dataset_id == H5I_INVALID_HID)){
+      continue;
+    }
+
+    PIO_Offset var_len = 0;
+    int ret = spio_hdf5_get_cur_dim_len(ios, file, file->hdf5_vars[i].hdf5_dataset_id,
+                                        file->hdf5_vars[i].name, &var_len);
+    if(ret != PIO_NOERR){
+      return ret;
+    }
+
+    if(var_len > max_len){
+      max_len = var_len;
+    }
+  }
+
+  *lenp = max_len;
   return PIO_NOERR;
 }
 

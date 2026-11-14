@@ -1,5 +1,6 @@
 #include "pio.h"
 #include "pio_internal.h"
+#include "spio_iosys_utils.hpp"
 #include "pio_minmax.h"
 #include "pio_tests.h"
 
@@ -142,37 +143,32 @@ int test_setup(MPI_Comm comm, int rank, int sz,
    */
   ios->iosysid = TEST_IOSYSID;
   ios->union_comm = comm;
-  ios->io_comm = comm;
   ios->comp_comm = comm;
   ios->intercomm = MPI_COMM_NULL;
   ios->my_comm = comm;
   ios->compgroup = MPI_GROUP_NULL;
-  ios->iogroup = MPI_GROUP_NULL;
-  ios->num_iotasks = sz;
   ios->num_comptasks = sz;
   ios->num_uniontasks = sz;
   ios->union_rank = rank;
   ios->comp_rank = rank;
-  ios->io_rank = rank;
-  ios->iomaster = (rank == ROOT_RANK) ? MPI_ROOT : 0;
   ios->compmaster = (rank == ROOT_RANK) ? MPI_ROOT : 0;
-  ios->ioroot = ROOT_RANK;
   ios->comproot = ROOT_RANK;
   /* We don't need the I/O / compute process ranks for this test */
-  ios->ioranks = NULL;
   ios->compranks = NULL;
+  /* io_comm aliases comm (also union_comm/comp_comm/my_comm) - not owned here,
+   * so owns_resources = false to avoid a double MPI_Comm_free on finalize. */
+  ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(comm, rank, sz,
+      MPI_GROUP_NULL, std::vector<int>(), true, (rank == ROOT_RANK) ? MPI_ROOT : 0,
+      ROOT_RANK, false);
   ios->error_handler = PIO_RETURN_ERROR;
   ios->default_rearranger = PIO_REARR_BOX;
   ios->async = false;
-  ios->ioproc = true;
   ios->compproc = true;
   ios->info = MPI_INFO_NULL;
   ios->async_ios_msg_info.seq_num = 0;
   ios->async_ios_msg_info.prev_msg = 0;
   ios->comp_idx = 0;
   /* We don't need the rearranger options set for this test */
-  ios->next = NULL;
-
 
   /* Initialize file structure with some dummy requests */
   file->iosystem = ios;
@@ -208,6 +204,7 @@ int test_teardown(iosystem_desc_t **pios, file_desc_t **pfile)
   file_desc_t *file = *pfile;
 
   if(ios){
+    if(ios->io_comm_info) { delete(ios->io_comm_info); }
     free(ios);
     *pios = NULL;
   }
@@ -927,7 +924,7 @@ int main(int argc, char *argv[])
 #endif /* TIMING_INTERNAL */
 #endif /* TIMING */
 
-    ret = MPI_Init(&argc, &argv);
+    ret = pio_test_mpi_init(&argc, &argv);
     if(ret != MPI_SUCCESS){
         LOG_RANK0(wrank, "MPI_Init() FAILED, ret = %d\n", ret);
         return ret;

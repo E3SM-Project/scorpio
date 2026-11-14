@@ -13,6 +13,7 @@
 #include "pio.h"
 #include "pio_tests.h"
 #include "spio_decomp_logger.hpp"
+#include "spio_iosys_utils.hpp"
 
 #ifdef SPIO_ENABLE_GPTL_TIMING
 #ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
@@ -76,26 +77,29 @@ iosystem_desc_t *get_iosystem(MPI_Comm comm, int wrank, int wsz, int nio_procs)
   /* Assign first nio_procs procs as I/O processes */
   int color = (wrank/nio_procs == 0) ? 0 : 1;
 
-  ret = MPI_Comm_split(comm, color, 0, &(ios->io_comm));
+  MPI_Comm sync_io_comm = MPI_COMM_NULL;
+  ret = MPI_Comm_split(comm, color, 0, &sync_io_comm);
   if(ret != MPI_SUCCESS){
     LOG_RANK0(wrank, "Unable to split comm for creating I/O system\n");
     free(ios);
     return NULL;
   }
 
-  ios->num_iotasks = nio_procs;
-  ios->ioproc = (color == 0) ? true : false;
-  if(ios->ioproc){
-    ret = MPI_Comm_rank(ios->io_comm, &(ios->io_rank));
+  bool is_io_proc = (color == 0) ? true : false;
+  int io_rank = -1;
+  if(is_io_proc){
+    ret = MPI_Comm_rank(sync_io_comm, &io_rank);
     if(ret != MPI_SUCCESS){
       LOG_RANK0(wrank, "Unable to get rank of I/O process\n");
       free(ios);
       return NULL;
     }
   }
-  else{
-    ios->io_rank = -1;
-  }
+
+  /* sync_io_comm is genuinely owned (created via MPI_Comm_split above), so
+   * owns_resources = true: io_comm_info's destructor will MPI_Comm_free it. */
+  ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(sync_io_comm, io_rank,
+      nio_procs, MPI_GROUP_NULL, std::vector<int>(), is_io_proc, 0, 0, true);
 
   return ios;
 }
@@ -105,7 +109,7 @@ void free_iosystem(iosystem_desc_t *ios){
     return;
   }
 
-  MPI_Comm_free(&(ios->io_comm));
+  delete(ios->io_comm_info);
   free(ios);
 }
 
@@ -590,7 +594,7 @@ int main(int argc, char *argv[])
 #endif /* TIMING_INTERNAL */
 #endif /* TIMING */
 
-  ret = MPI_Init(&argc, &argv);
+  ret = pio_test_mpi_init(&argc, &argv);
   if(ret != MPI_SUCCESS){
     LOG_RANK0(wrank, "MPI_Init() FAILED, ret = %d\n", ret);
     return ret;

@@ -19,6 +19,41 @@
         "CMAKE_C_COMPILER": "mpicc",
         "CMAKE_Fortran_COMPILER": "mpif90"
       }
+    },
+    {
+      "name": "anlgce-debug-config",
+      "displayName": "ANL GCE Compute Node (Debug)",
+      "description": "Targeting ANL GCE Compute Node, Linux (Debug mode)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "environment": {
+        "MPI_PATH": "/nfs/gce/projects/climate/software/linux-ubuntu22.04-x86_64/mpich/4.1.2/gcc-12.1.0",
+        "ZLIB_PATH": "/nfs/gce/software/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.3.0/zlib-1.2.11-p7dmb5p",
+        "HDF5_PATH": "/nfs/gce/projects/climate/software/linux-ubuntu22.04-x86_64/hdf5/1.14.6/mpich-4.1.2/gcc-12.1.0-mt",
+        "Blosc2_DIR": "/nfs/gce/projects/climate/software/linux-ubuntu22.04-x86_64/c-blosc2/2.15.2/gcc-12.1.0",
+        "H5Z_BLOSC2_DIR": "/nfs/gce/projects/climate/software/linux-ubuntu22.04-x86_64/h5z-blosc2/2.0.0/mpich-4.1.2/gcc-12.1.0-mt",
+        "ZFP_DIR": "/nfs/gce/projects/climate/software/linux-ubuntu22.04-x86_64/zfp/1.0.1/gcc-12.1.0",
+        "H5Z_ZFP_DIR": "/nfs/gce/projects/climate/software/linux-ubuntu22.04-x86_64/h5z-zfp/1.1.1/mpich-4.1.2/gcc-12.1.0-mt",
+        "NETCDF_PATH": "/nfs/gce/projects/climate/software/linux-ubuntu22.04-x86_64/netcdf/4.8.0c-4.3.1cxx-4.5.3f-parallel/mpich-4.1.2/gcc-12.1.0-mt",
+        "PNETCDF_PATH": "/nfs/gce/projects/climate/software/linux-ubuntu22.04-x86_64/pnetcdf/1.12.3/mpich-4.1.2/gcc-12.1.0",
+        "HDF5_USE_FILE_LOCKING": "FALSE",
+        "HDF5_DO_MPI_FILE_SYNC": "FALSE"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_CXX_COMPILER": "$env{MPI_PATH}/bin/mpicxx",
+        "CMAKE_C_COMPILER": "$env{MPI_PATH}/bin/mpicc",
+        "CMAKE_Fortran_COMPILER": "$env{MPI_PATH}/bin/mpif90",
+        "WITH_HDF5": "TRUE",
+        "WITH_PNETCDF": "TRUE",
+        "WITH_NETCDF": "TRUE",
+        "PIO_USE_ASYNC_WR_THREAD": "ON",
+        "PnetCDF_PATH": "$env{PNETCDF_PATH}",
+        "HDF5_PATH": "$env{HDF5_PATH}",
+        "NetCDF_C_PATH": "$env{NETCDF_PATH}",
+        "NetCDF_Fortran_PATH": "$env{NETCDF_PATH}"
+      }
     }
   ],
   "buildPresets": [

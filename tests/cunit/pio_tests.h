@@ -64,6 +64,42 @@
         return e;                                                       \
     } while (0)
 
+/* Initialize MPI for a cunit test. When PIO_USE_ASYNC_WR_THREAD is
+ * enabled the HDF5 async write path makes MPI calls directly from its
+ * own worker threads, concurrently with calls made by the main thread -
+ * this requires MPI_THREAD_MULTIPLE, which plain MPI_Init() does not
+ * request (and is not required to provide). Mirrors the --threaded
+ * code path the Fortran test generator (pio_tf_f90gen.pl) already uses
+ * for the same macro. Returns the same contract as MPI_Init(): 0 on
+ * success, or a nonzero code to pass to MPIERR()/report as a failure.
+ *
+ * A header-only (static inline) helper, not a test_common_obj function,
+ * since several cunit test executables do not link test_common_obj. */
+static inline int pio_test_mpi_init(int *argc, char ***argv)
+{
+    int ret;
+
+#if PIO_USE_ASYNC_WR_THREAD
+    int provided;
+
+    if ((ret = MPI_Init_thread(argc, argv, MPI_THREAD_MULTIPLE, &provided)))
+        return ret;
+
+    if (provided < MPI_THREAD_MULTIPLE)
+    {
+        fprintf(stderr, "ERROR: MPI_Init_thread() could not provide MPI_THREAD_MULTIPLE "
+                "(got %d); required since PIO_USE_ASYNC_WR_THREAD is enabled and the "
+                "async HDF5 write path makes MPI calls directly from its own worker "
+                "threads, concurrently with the main thread\n", provided);
+        return ERR_AWFUL;
+    }
+
+    return 0;
+#else
+    return MPI_Init(argc, argv);
+#endif
+}
+
 #if defined(__cplusplus)
 extern "C" {
 #endif

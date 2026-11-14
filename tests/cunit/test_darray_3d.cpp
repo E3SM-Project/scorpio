@@ -284,29 +284,29 @@ int test_decomp_read_write(int iosysid, int ioid, int num_flavors, int *flavor, 
             /* Get the IO desc, which describes the decomposition. */
             if (!(iodesc = pio_get_iodesc_from_id(ioid2)))
                 return pio_err(ios, NULL, PIO_EBADID, __FILE__, __LINE__, "Getting I/O decomposition from ioid failed");
-            if (iodesc->ioid != ioid2 || iodesc->maplen != EXPECTED_MAPLEN || iodesc->ndims != NDIM3 ||
-                iodesc->ndof != EXPECTED_MAPLEN)
+            if (iodesc->ioid != ioid2 || iodesc->sync_io_desc_info.maplen != EXPECTED_MAPLEN || iodesc->sync_io_desc_info.ndims != NDIM3 ||
+                iodesc->sync_io_desc_info.ndof != EXPECTED_MAPLEN)
                 return ERR_WRONG;
-            if (iodesc->rearranger != rearranger || iodesc->maxregions != 1 ||
-                iodesc->needsfill || iodesc->mpitype != MPI_INT)
+            if (iodesc->sync_io_desc_info.rearranger != rearranger || iodesc->sync_io_desc_info.maxregions != 1 ||
+                iodesc->sync_io_desc_info.needsfill || iodesc->sync_io_desc_info.mpitype != MPI_INT)
                 return ERR_WRONG;
-            for (int e = 0; e < iodesc->maplen; e++)
-                if (iodesc->map[e] != my_rank * iodesc->maplen + e + 1)
+            for (int e = 0; e < iodesc->sync_io_desc_info.maplen; e++)
+                if (iodesc->sync_io_desc_info.map[e] != my_rank * iodesc->sync_io_desc_info.maplen + e + 1)
                     return ERR_WRONG;
-            if (iodesc->dimlen[0] != X_DIM_LEN || iodesc->dimlen[1] != Y_DIM_LEN ||
-                iodesc->dimlen[2] != Z_DIM_LEN)
+            if (iodesc->sync_io_desc_info.dimlen[0] != X_DIM_LEN || iodesc->sync_io_desc_info.dimlen[1] != Y_DIM_LEN ||
+                iodesc->sync_io_desc_info.dimlen[2] != Z_DIM_LEN)
                 return ERR_WRONG;
             if (rearranger == PIO_REARR_SUBSET)
             {
-                if (iodesc->nrecvs != 1  || iodesc->num_aiotasks != TARGET_NTASKS)
+                if (iodesc->sync_io_desc_info.nrecvs != 1  || iodesc->sync_io_desc_info.num_aiotasks != TARGET_NTASKS)
                     return ERR_WRONG;
             }
             else
             {
                 /* I haven't figured out yet what these should be for
                  * the box rearranger. */
-                printf("iodesc->nrecv = %d iodesc->num_aiotasks = %d\n", iodesc->nrecvs,
-                       iodesc->num_aiotasks);
+                printf("iodesc->nrecv = %d iodesc->sync_io_desc_info.num_aiotasks = %d\n", iodesc->sync_io_desc_info.nrecvs,
+                       iodesc->sync_io_desc_info.num_aiotasks);
             }
         }
 

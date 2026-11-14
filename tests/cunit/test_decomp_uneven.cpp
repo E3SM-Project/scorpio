@@ -234,35 +234,35 @@ int test_decomp_read_write(int iosysid, int ioid, int num_flavors, int *flavor, 
                 return ret;
 
             /* Check values in iodesc. */
-            printf("ioid2 = %d iodesc->ioid = %d iodesc->maplen = %d iodesc->ndims = %d "
-                   "iodesc->ndof = %d iodesc->rearranger = %d iodesc->maxregions = %d "
-                   "iodesc->needsfill = %d iodesc->mpitype = %d expected_mpi_type = %d\n",
-                   ioid2, iodesc->ioid, iodesc->maplen, iodesc->ndims, iodesc->ndof,
-                   iodesc->rearranger, iodesc->maxregions, iodesc->needsfill, iodesc->mpitype,
+            printf("ioid2 = %d iodesc->ioid = %d iodesc->sync_io_desc_info.maplen = %d iodesc->sync_io_desc_info.ndims = %d "
+                   "iodesc->sync_io_desc_info.ndof = %d iodesc->sync_io_desc_info.rearranger = %d iodesc->sync_io_desc_info.maxregions = %d "
+                   "iodesc->sync_io_desc_info.needsfill = %d iodesc->sync_io_desc_info.mpitype = %d expected_mpi_type = %d\n",
+                   ioid2, iodesc->ioid, iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.ndof,
+                   iodesc->sync_io_desc_info.rearranger, iodesc->sync_io_desc_info.maxregions, iodesc->sync_io_desc_info.needsfill, iodesc->sync_io_desc_info.mpitype,
                    expected_mpi_type);
             if (strcmp(title, title_in) || strcmp(history, history_in))
                 return ERR_WRONG;
-            if (iodesc->ioid != ioid2 || iodesc->rearranger != rearranger ||
-                iodesc->mpitype != expected_mpi_type)
+            if (iodesc->ioid != ioid2 || iodesc->sync_io_desc_info.rearranger != rearranger ||
+                iodesc->sync_io_desc_info.mpitype != expected_mpi_type)
                 return ERR_WRONG;
-            if (iodesc->ndims != NDIM3)
+            if (iodesc->sync_io_desc_info.ndims != NDIM3)
                 return ERR_WRONG;
-            if (iodesc->maplen != expected_maplen[my_rank])
+            if (iodesc->sync_io_desc_info.maplen != expected_maplen[my_rank])
                 return ERR_WRONG;
-            if (iodesc->ndims != NDIM3 || iodesc->ndof != expected_maplen[my_rank])
+            if (iodesc->sync_io_desc_info.ndims != NDIM3 || iodesc->sync_io_desc_info.ndof != expected_maplen[my_rank])
                 return ERR_WRONG;
-            if (iodesc->needsfill)
+            if (iodesc->sync_io_desc_info.needsfill)
                 return ERR_WRONG;
             /* Don't forget to add 1! */
-            for (int e = 0; e < iodesc->maplen; e++)
+            for (int e = 0; e < iodesc->sync_io_desc_info.maplen; e++)
             {
-                printf("%d e = %d max_maplen = %d iodesc->map[e] = %lld expected_map[my_rank * max_maplen + e] = %d\n",
-                       my_rank, e, max_maplen, iodesc->map[e], expected_map[my_rank * max_maplen + e]);
-                if (iodesc->map[e] != expected_map[my_rank * max_maplen + e] + 1)
+                printf("%d e = %d max_maplen = %d iodesc->sync_io_desc_info.map[e] = %lld expected_map[my_rank * max_maplen + e] = %d\n",
+                       my_rank, e, max_maplen, iodesc->sync_io_desc_info.map[e], expected_map[my_rank * max_maplen + e]);
+                if (iodesc->sync_io_desc_info.map[e] != expected_map[my_rank * max_maplen + e] + 1)
                     return ERR_WRONG;
             }
             for (int d = 0; d < NDIM3; d++)
-                if (iodesc->dimlen[d] != dim_len[d])
+                if (iodesc->sync_io_desc_info.dimlen[d] != dim_len[d])
                     return ERR_WRONG;
         }
 

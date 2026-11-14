@@ -4,7 +4,8 @@
 message(STATUS "===== Configuring SCORPIO C Core (hdf5)... =====")
 # HDF5 Support
 set (spio_core_iolib_hdf5_src
-  spio_hdf5_utils.cpp)
+  spio_hdf5_utils.cpp
+  spio_hdf5_reopen.cpp)
 
 if(PIO_USE_ASYNC_WR_THREAD)
   list (APPEND spio_core_iolib_hdf5_src spio_async_hdf5_utils.cpp)

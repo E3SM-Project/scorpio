@@ -1645,17 +1645,17 @@ int test_malloc_iodesc2(int iosysid, int my_rank)
           1, gdimlen,
           1, compmap, PIO_REARR_BOX, false);
 
-        if (iodesc->mpitype != mpi_type[t])
+        if (iodesc->sync_io_desc_info.mpitype != mpi_type[t])
             return ERR_WRONG;
-        if (iodesc->ndims != 1)
+        if (iodesc->sync_io_desc_info.ndims != 1)
             return ERR_WRONG;
         ioid = pio_add_to_iodesc_list(iodesc, MPI_COMM_NULL);
-        if(iodesc->firstregion){
-          iodesc->free_region_list(iodesc->firstregion);
-          iodesc->firstregion = NULL;
+        if(iodesc->sync_io_desc_info.firstregion){
+          iodesc->sync_io_desc_info.free_region_list(iodesc->sync_io_desc_info.firstregion);
+          iodesc->sync_io_desc_info.firstregion = NULL;
         }
-        free(iodesc->map); iodesc->map = NULL;
-        free(iodesc->dimlen); iodesc->dimlen = NULL;
+        free(iodesc->sync_io_desc_info.map); iodesc->sync_io_desc_info.map = NULL;
+        free(iodesc->sync_io_desc_info.dimlen); iodesc->sync_io_desc_info.dimlen = NULL;
         if ((ret = pio_delete_iodesc_from_list(ioid)))
             return ret;
     }
@@ -2101,6 +2101,38 @@ int test_all(int iosysid, int num_flavors, int *flavor, int my_rank, MPI_Comm te
 
     if ((ret = MPI_Comm_size(test_comm, &my_test_size)))
         MPIERR(ret);
+
+    /* Regression test: looking up a file id that was never registered
+     * (e.g. ncid=0, as used internally before a file is added to the
+     * file list) must fail gracefully, not abort the process, even when
+     * the *global default* error handler is PIO_INTERNAL_ERROR - the
+     * setting real (non-test) applications like E3SM run with, since
+     * pio_test_init() switches it to PIO_RETURN_ERROR for the rest of
+     * this test program. This guards against a bug where pio_get_file()'s
+     * internal failure path invoked the default error handler directly,
+     * aborting callers (e.g. PIOc_File_is_Open(), PIOc_get_iosystem())
+     * that are designed to tolerate a missing/invalid file id. */
+    {
+        const int INVALID_NCID = 999999;
+        int old_default_handler;
+
+        if ((ret = PIOc_set_iosystem_error_handling(PIO_DEFAULT, PIO_INTERNAL_ERROR,
+                                                     &old_default_handler)))
+            return ret;
+
+        if (PIOc_File_is_Open(INVALID_NCID))
+            ret = ERR_WRONG;
+        else if (PIOc_get_iosystem(INVALID_NCID) != -1)
+            ret = ERR_WRONG;
+        else
+            ret = PIO_NOERR;
+
+        if ((PIOc_set_iosystem_error_handling(PIO_DEFAULT, old_default_handler, NULL)))
+            return ERR_WRONG;
+
+        if (ret)
+            return ret;
+    }
 
     /* This will be our file name for writing out decompositions. */
     sprintf(filename, "decomp_%d.txt", my_rank);

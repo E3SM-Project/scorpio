@@ -777,23 +777,23 @@ int test_decomp_read_write(int iosysid, int ioid, int num_flavors, int *flavor, 
             /* Get the IO desc, which describes the decomposition. */
             if (!(iodesc = pio_get_iodesc_from_id(ioid2)))
                 return pio_err(ios, NULL, PIO_EBADID, __FILE__, __LINE__, "Getting I/O decomposition from ioid failed");
-            if (iodesc->ioid != ioid2 || iodesc->maplen != EXPECTED_MAPLEN || iodesc->ndims != NDIM)
+            if (iodesc->ioid != ioid2 || iodesc->sync_io_desc_info.maplen != EXPECTED_MAPLEN || iodesc->sync_io_desc_info.ndims != NDIM)
                 return ERR_WRONG;
-            /* if (iodesc->nrecvs != 1) */
+            /* if (iodesc->sync_io_desc_info.nrecvs != 1) */
             /*     return ERR_WRONG; */
-            /* if (iodesc->num_aiotasks != TARGET_NTASKS) */
+            /* if (iodesc->sync_io_desc_info.num_aiotasks != TARGET_NTASKS) */
             /*     return ERR_WRONG; */
-            printf("iodesc->nrecvs = %d iodesc->num_aiotasks = %d\n", iodesc->nrecvs, iodesc->num_aiotasks);
-            if (iodesc->ndof != EXPECTED_MAPLEN)
+            printf("iodesc->sync_io_desc_info.nrecvs = %d iodesc->sync_io_desc_info.num_aiotasks = %d\n", iodesc->sync_io_desc_info.nrecvs, iodesc->sync_io_desc_info.num_aiotasks);
+            if (iodesc->sync_io_desc_info.ndof != EXPECTED_MAPLEN)
                 return ERR_WRONG;
-            if (iodesc->rearranger != rearranger || iodesc->maxregions != 1)
+            if (iodesc->sync_io_desc_info.rearranger != rearranger || iodesc->sync_io_desc_info.maxregions != 1)
                 return ERR_WRONG;
-            if (!iodesc->needsfill || iodesc->mpitype != expected_basetype)
+            if (!iodesc->sync_io_desc_info.needsfill || iodesc->sync_io_desc_info.mpitype != expected_basetype)
                 return ERR_WRONG;
             /* Don't forget to add 1!! */
-            if (iodesc->map[0] != my_rank + 1 || iodesc->map[1] != 0)
+            if (iodesc->sync_io_desc_info.map[0] != my_rank + 1 || iodesc->sync_io_desc_info.map[1] != 0)
                 return ERR_WRONG;
-            if (iodesc->dimlen[0] != DIM_LEN)
+            if (iodesc->sync_io_desc_info.dimlen[0] != DIM_LEN)
                 return ERR_WRONG;
         }
 

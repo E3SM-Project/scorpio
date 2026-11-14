@@ -30,6 +30,7 @@ extern "C"{
 #include "spio_dbg_utils.hpp"
 #include "spio_dt_converter.hpp"
 #include "spio_hdf5_utils.hpp"
+#include "spio_iosys_utils.hpp"
 
 /* Use this function for op kinds with no wait functions
  * We use it to indicate,
@@ -261,7 +262,7 @@ void pio_viobuf_free(void *p)
   /* pviobuf->fillvalue is only valid if
    * 1) Var has a fillvalue defined in file, vdesc->fillvalue is valid
    * or
-   * 2) iodesc->needsfill is true
+   * 2) iodesc->sync_io_desc_info.needsfill is true
    */ 
   if(pviobuf->fillvalue){
     free(pviobuf->fillvalue);
@@ -481,11 +482,11 @@ int pio_var_rearr_and_cache(file_desc_t *file, var_desc_t *vdesc,
   void *sbuf = buf;
   void *rbuf = NULL;
   viobuf_cache_t *pnew = NULL;
-  /* iodesc->maxiobuflen can be zero if all procs have
+  /* iodesc->sync_io_desc_info.maxiobuflen can be zero if all procs have
    * no data to receive from other procs in a subset
    * of procs (SUBSET rearranger)
    */
-  if((ios->ioproc) && (iodesc->maxiobuflen > 0)){
+  if((ios->io_comm_info->is_sync_io_proc()) && (iodesc->sync_io_desc_info.maxiobuflen > 0)){
     /* viobuf cache list keeps track of iobuf that contains the
      * rearranged data
      */
@@ -503,7 +504,7 @@ int pio_var_rearr_and_cache(file_desc_t *file, var_desc_t *vdesc,
      * allocate memory for max memory required among all procs,
      * i.e., maxiobuflen
      */
-    pnew->iobuf_sz = iodesc->mpitype_size * iodesc->maxiobuflen;
+    pnew->iobuf_sz = iodesc->sync_io_desc_info.mpitype_size * iodesc->sync_io_desc_info.maxiobuflen;
     pnew->iobuf = bget(pnew->iobuf_sz);
     if(!(pnew->iobuf)){
       return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
@@ -512,23 +513,23 @@ int pio_var_rearr_and_cache(file_desc_t *file, var_desc_t *vdesc,
     rbuf = pnew->iobuf;
     pnew->fillvalue = NULL;
     pnew->fillvalue_sz = 0;
-    if(iodesc->needsfill){
-      pnew->fillvalue = malloc(iodesc->mpitype_size);
+    if(iodesc->sync_io_desc_info.needsfill){
+      pnew->fillvalue = malloc(iodesc->sync_io_desc_info.mpitype_size);
       if(!(pnew->fillvalue)){
         return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Error while queueing asynchronous operation to start rearranging of data on file (%s, ncid=%d). Unable to allocate %lld bytes for caching fillvalue associated with user data", pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long) (iodesc->mpitype_size));
+                        "Error while queueing asynchronous operation to start rearranging of data on file (%s, ncid=%d). Unable to allocate %lld bytes for caching fillvalue associated with user data", pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long) (iodesc->sync_io_desc_info.mpitype_size));
       }
-      pnew->fillvalue_sz = iodesc->mpitype_size;
+      pnew->fillvalue_sz = iodesc->sync_io_desc_info.mpitype_size;
       assert(fillvalue || vdesc->fillvalue);
       if(fillvalue){
         /* Use the given fillvalue (explicit fillvalue specified
          * by the user
          */
-        memcpy(pnew->fillvalue, fillvalue, iodesc->mpitype_size);
+        memcpy(pnew->fillvalue, fillvalue, iodesc->sync_io_desc_info.mpitype_size);
       }
       else{
         /* Use default fillvalue for the variable */
-        memcpy(pnew->fillvalue, vdesc->fillvalue, iodesc->mpitype_size);
+        memcpy(pnew->fillvalue, vdesc->fillvalue, iodesc->sync_io_desc_info.mpitype_size);
       }
     }
     
@@ -538,11 +539,11 @@ int pio_var_rearr_and_cache(file_desc_t *file, var_desc_t *vdesc,
      * so init the buffer, to store rearranged data, with fill
      * values
      */
-    if(iodesc->needsfill && (iodesc->rearranger == PIO_REARR_BOX)){
+    if(iodesc->sync_io_desc_info.needsfill && (iodesc->sync_io_desc_info.rearranger == PIO_REARR_BOX)){
       assert(pnew->fillvalue);
-      for(int i=0; i<iodesc->maxiobuflen; i++){
-        memcpy(&((char *)pnew->iobuf)[iodesc->mpitype_size * i],
-            pnew->fillvalue, iodesc->mpitype_size);
+      for(int i=0; i<iodesc->sync_io_desc_info.maxiobuflen; i++){
+        memcpy(&((char *)pnew->iobuf)[iodesc->sync_io_desc_info.mpitype_size * i],
+            pnew->fillvalue, iodesc->sync_io_desc_info.mpitype_size);
       }
     }
 
@@ -559,13 +560,14 @@ int pio_var_rearr_and_cache(file_desc_t *file, var_desc_t *vdesc,
    * rearrange is complete
    */
   int nvars = 1;
-  ierr = rearrange_comp2io(ios, iodesc, file, sbuf, rbuf, nvars);
+  ierr = rearrange_comp2io(ios, iodesc, iodesc->sync_io_desc_info,
+                           SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios), file, sbuf, rbuf, nvars);
   if(ierr != PIO_NOERR){
     return pio_err(ios, file, ierr, __FILE__, __LINE__,
                     "Error while rearranging data from compute processes to I/O processes before writing it out to file (%s, ncid=%d). Internal error occured while rearranging data", pio_get_fname_from_file(file), file->pio_ncid);
   }
 
-  if((ios->ioproc) && (iodesc->maxiobuflen > 0)){
+  if((ios->io_comm_info->is_sync_io_proc()) && (iodesc->sync_io_desc_info.maxiobuflen > 0)){
     /* Add the new node to the end of the list */
     if(vdesc->viobuf_ltail){
       vdesc->viobuf_ltail->next = pnew;
@@ -678,12 +680,12 @@ int pio_file_compact_and_copy_rearr_data(void *dest, size_t dest_sz,
     assert(pviobuf);
 
     /* Copy this iobuf to dest buffer */
-    /* Note that for each variable we only copy iodesc->llen values, that
+    /* Note that for each variable we only copy iodesc->sync_io_desc_info.llen values, that
      * contain the valid values. Each pviobuf->iobuf is of size 
-     * pviobuf->iobuf_sz (== iodesc->maxiobuflen) 
-     * >= iodesc->llen * iodesc->mpitype_size.
+     * pviobuf->iobuf_sz (== iodesc->sync_io_desc_info.maxiobuflen) 
+     * >= iodesc->sync_io_desc_info.llen * iodesc->sync_io_desc_info.mpitype_size.
      */ 
-    size_t iobuf_sz = iodesc->mpitype_size * iodesc->llen;
+    size_t iobuf_sz = iodesc->sync_io_desc_info.mpitype_size * iodesc->sync_io_desc_info.llen;
     assert(rem_sz >= iobuf_sz);
     memcpy((void *) ((char *)dest + off), pviobuf->iobuf, iobuf_sz);
     off += iobuf_sz;

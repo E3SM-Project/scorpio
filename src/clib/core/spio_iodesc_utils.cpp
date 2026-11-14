@@ -54,10 +54,10 @@ int alloc_region2(iosystem_desc_t *ios, int ndims, io_region **regionp)
   return PIO_NOERR;
 }
 
-io_desc_t::io_desc_t(iosystem_desc_t *ios, int piotype,
+io_desc_info_t::io_desc_info_t(iosystem_desc_t *ios, int piotype,
   int ndims, const int *gdimlen,
   int maplen, const PIO_Offset *compmap,
-  int rearranger, bool map_zero_based): ioid(SPIO_INVALID_ID),
+  int rearranger, bool map_zero_based):
     maplen(0), map(NULL), nrecvs(0), ndof(0), ndims(0), dimlen(NULL),
     num_aiotasks(0), rearranger(rearranger), maxregions(0), needsfill(false),
     maxbytes(0), piotype(piotype), piotype_size(0), mpitype(MPI_DATATYPE_NULL),
@@ -68,8 +68,7 @@ io_desc_t::io_desc_t(iosystem_desc_t *ios, int piotype,
     rearr_opts({PIO_REARR_COMM_P2P, PIO_REARR_COMM_FC_2D_ENABLE,
       {true, true, PIO_REARR_COMM_UNLIMITED_PEND_REQ},
       {true, true, PIO_REARR_COMM_UNLIMITED_PEND_REQ}}),
-    subset_comm(MPI_COMM_NULL), is_saved(false), rearr(NULL),
-    nasync_pend_ops(0)
+    subset_comm(MPI_COMM_NULL), is_saved(false), rearr(NULL)
 {
   int ret;
 
@@ -116,7 +115,7 @@ io_desc_t::io_desc_t(iosystem_desc_t *ios, int piotype,
   rearr_opts = ios->rearr_opts;
 }
 
-void io_desc_t::init_map(int maplen, const PIO_Offset *compmap, int rearranger, bool map_zero_based)
+void io_desc_info_t::init_map(int maplen, const PIO_Offset *compmap, int rearranger, bool map_zero_based)
 {
   if(maplen == 0) { return; }
 
@@ -151,7 +150,7 @@ void io_desc_t::init_map(int maplen, const PIO_Offset *compmap, int rearranger, 
   }
 }
 
-io_desc_t::~io_desc_t()
+io_desc_info_t::~io_desc_info_t()
 {
   if(map) { free(map); }
   if(dimlen) { free(dimlen); }
@@ -176,7 +175,7 @@ io_desc_t::~io_desc_t()
 
 /* FIXME: Move to C++ lists instead of custom lists */
 /* Free an I/O region list */
-void io_desc_t::free_region_list(io_region *phead)
+void io_desc_info_t::free_region_list(io_region *phead)
 {
   io_region *p = phead, *prev = NULL;
 
@@ -190,13 +189,13 @@ void io_desc_t::free_region_list(io_region *phead)
 }
 
 /* Free all I/O regions */
-void io_desc_t::free_all_regions(void )
+void io_desc_info_t::free_all_regions(void )
 {
   free_region_list(firstregion); firstregion = NULL;
   free_region_list(fillregion);  fillregion = NULL;
 }
 
-void io_desc_t::free_mpi_types(MPI_Datatype *ptypes, int ntypes)
+void io_desc_info_t::free_mpi_types(MPI_Datatype *ptypes, int ntypes)
 {
   int is_mpi_finalized = 0;
 
@@ -222,7 +221,7 @@ void io_desc_t::free_mpi_types(MPI_Datatype *ptypes, int ntypes)
   }
 }
 
-void io_desc_t::free_all_mpi_types(void )
+void io_desc_info_t::free_all_mpi_types(void )
 {
   if(rtype){
     free_mpi_types(rtype, nrecvs);
@@ -233,6 +232,67 @@ void io_desc_t::free_all_mpi_types(void )
     free_mpi_types(stype, num_stypes);
     free(stype); stype = NULL;
   }
+}
+
+io_desc_t::io_desc_t(iosystem_desc_t *ios, int piotype,
+  int ndims, const int *gdimlen,
+  int maplen, const PIO_Offset *compmap,
+  int rearranger, bool map_zero_based): ioid(SPIO_INVALID_ID),
+    sync_io_desc_info(ios, piotype, ndims, gdimlen, maplen, compmap, rearranger, map_zero_based),
+    async_io_desc_info(NULL), nasync_pend_ops(0)
+{
+}
+
+io_desc_t::~io_desc_t()
+{
+  if(async_io_desc_info != NULL){
+    delete async_io_desc_info;
+  }
+}
+
+/* Get I/O desc to use for an I/O type:
+ * Sync I/O : Use the sync I/O desc
+ * Async I/O : If using the Contig/Box/Subset rearranger, and the file uses
+ *             async I/O (file->uses_async_io), use async I/O desc for writes
+ *             with HDF5 I/O types. Use sync I/O desc for all other cases.
+ */
+io_desc_info_t &io_desc_t::select_io_desc_info(int iotype, const file_desc_t *file)
+{
+#if PIO_USE_ASYNC_WR_THREAD
+  if(((iotype == PIO_IOTYPE_HDF5) || (iotype == PIO_IOTYPE_HDF5C)) &&
+      (async_io_desc_info != NULL) &&
+      file->uses_async_io &&
+      ((sync_io_desc_info.rearranger == PIO_REARR_CONTIG) ||
+       (sync_io_desc_info.rearranger == PIO_REARR_BOX) ||
+       (sync_io_desc_info.rearranger == PIO_REARR_SUBSET))){
+    /* PIO_REARR_ANY never appears in sync_io_desc_info.rearranger here (or
+     * anywhere else this plan touches) and so needs no case of its own: it is
+     * resolved to PIO_REARR_BOX or PIO_REARR_SUBSET by box_rearranger_init()/
+     * subset_rearranger_init()'s caller before an io_desc_info_t is ever
+     * constructed, so by the time this function runs, rearranger already
+     * holds the resolved value. No dedicated PIO_REARR_ANY test is needed for
+     * the same reason.
+     *
+     * An async-dispatched HDF5/HDF5C write executes on the *async* I/O ranks.
+     * The HDF5 file and its datasets are created on whichever ranks own I/O
+     * for the file (file_desc_t::uses_async_io decides this via
+     * is_file_owning_io_proc() - the sync I/O ranks when uses_async_io is
+     * false, the dedicated async I/O ranks when it's true and sync/async
+     * roles are disjoint), so the ranks that execute the async write are the
+     * same ranks that created the dataset in the first place. This applies
+     * equally to CONTIG, BOX, and SUBSET decomps.
+     *
+     * file->uses_async_io (set once, at file create/open time - see
+     * spio_createfile_int()/PIOc_openfile_retry_impl()) is the single source
+     * of truth for whether this file's writes are routed to async I/O procs
+     * at all; this function no longer re-derives that decision per call from
+     * comm topology (e.g. sync_and_async_io_share_procs()). */
+    return *async_io_desc_info;
+  }
+#else
+  (void )file;
+#endif
+  return sync_io_desc_info;
 }
 
 /**

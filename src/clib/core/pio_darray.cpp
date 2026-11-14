@@ -186,7 +186,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
   }
   iodesc = sp_iodesc.get();
 
-  pioassert(iodesc->rearranger == PIO_REARR_BOX || iodesc->rearranger == PIO_REARR_SUBSET || iodesc->rearranger == PIO_REARR_CONTIG,
+  pioassert(iodesc->sync_io_desc_info.rearranger == PIO_REARR_BOX || iodesc->sync_io_desc_info.rearranger == PIO_REARR_SUBSET || iodesc->sync_io_desc_info.rearranger == PIO_REARR_CONTIG,
             "unknown rearranger", __FILE__, __LINE__);
 
   /* Get a pointer to the variable info for the first variable. */
@@ -194,7 +194,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
 
   /* Run these on all tasks if async is not in use, but only on
    * non-IO tasks if async is in use. */
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     /* Get the number of dims for this var. */
     LOG((3, "about to call PIOc_inq_varndims varids[0] = %d", varids[0]));
     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -227,15 +227,15 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
       amsg_frame = (int *)calloc(nvars, sizeof(int));
     }
     if(!fillvalue_present){
-      amsg_fillvalue = (char *) calloc(nvars * iodesc->piotype_size, sizeof(char ));
+      amsg_fillvalue = (char *) calloc(nvars * iodesc->sync_io_desc_info.piotype_size, sizeof(char ));
     }
 
     PIO_SEND_ASYNC_MSG(ios, msg, &ierr,
         ncid, nvars, nvars, varids, ioid, arraylen,
-        arraylen * iodesc->piotype_size, array, frame_present,
+        arraylen * iodesc->sync_io_desc_info.piotype_size, array, frame_present,
         nvars,
         (frame_present) ? frame : amsg_frame, fillvalue_present,
-        nvars * iodesc->piotype_size, amsg_fillvalue, flushtodisk_int);
+        nvars * iodesc->sync_io_desc_info.piotype_size, amsg_fillvalue, flushtodisk_int);
 
     if(!frame_present){
       free(amsg_frame);
@@ -262,17 +262,22 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
 
   pioassert(!spio_file_mvcache_get(file, ioid), "buffer overwrite",__FILE__, __LINE__);
 
+  /* Use async io_desc_info_t for writing with HDF5[C] + PIO_ASYNC_WR_THREAD (for all rearrangers)
+   * Use sync io_desc_info_t otherwise
+   */
+  io_desc_info_t &write_desc_info = iodesc->select_io_desc_info(file->iotype, file);
+
   /* Determine total size of aggregated data (all vars/records).
    * For netcdf serial writes we collect the data on io nodes and
    * then move that data one node at a time to the io master node
    * and write. The buffer size on io task 0 must be as large as
    * the largest used to accommodate this serial io method (use
-   * iodesc->maxiobuflen to calculate it). */
-  if((file->iotype == PIO_IOTYPE_NETCDF || file->iotype == PIO_IOTYPE_NETCDF4C) && ios->iomaster == MPI_ROOT){
-    rlen = iodesc->maxiobuflen * nvars;
+   * iodesc->sync_io_desc_info.maxiobuflen to calculate it). */
+  if((file->iotype == PIO_IOTYPE_NETCDF || file->iotype == PIO_IOTYPE_NETCDF4C) && ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
+    rlen = write_desc_info.maxiobuflen * nvars;
   }
   else{
-    rlen = iodesc->llen * nvars;
+    rlen = write_desc_info.llen * nvars;
   }
 
 #ifdef PIO_MICRO_TIMING
@@ -304,27 +309,27 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
   void *mv_iobuf = NULL;
   if(rlen > 0){
     /* Allocate memory for the buffer for all vars/records. */
-    mv_iobuf = spio_file_mvcache_alloc(file, ioid, iodesc->mpitype_size * rlen);
+    mv_iobuf = spio_file_mvcache_alloc(file, ioid, write_desc_info.mpitype_size * rlen);
     if(!mv_iobuf){
       return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Writing multiple variables to file (%s, ncid=%d) failed. Out of memory (Trying to allocate %lld bytes for rearranged data for multiple variables with the same decomposition)", pio_get_fname_from_file(file), ncid, (unsigned long long)(iodesc->mpitype_size * rlen));
+                      "Writing multiple variables to file (%s, ncid=%d) failed. Out of memory (Trying to allocate %lld bytes for rearranged data for multiple variables with the same decomposition)", pio_get_fname_from_file(file), ncid, (unsigned long long)(write_desc_info.mpitype_size * rlen));
     }
-    LOG((3, "allocated %lld bytes for variable buffer", rlen * iodesc->mpitype_size));
+    LOG((3, "allocated %lld bytes for variable buffer", rlen * write_desc_info.mpitype_size));
 
     /* If fill values are desired, and we're using the BOX
      * rearranger, insert fill values. */
-    if(iodesc->needsfill && ((iodesc->rearranger == PIO_REARR_BOX) || (iodesc->rearranger == PIO_REARR_CONTIG))){
+    if(write_desc_info.needsfill && ((write_desc_info.rearranger == PIO_REARR_BOX) || (write_desc_info.rearranger == PIO_REARR_CONTIG))){
       PIO_Offset localiobuflen = rlen / nvars;
-      LOG((3, "inserting fill values iodesc->maxiobuflen = %lld, localiobuflen = %lld", iodesc->maxiobuflen, localiobuflen));
+      LOG((3, "inserting fill values write_desc_info.maxiobuflen = %lld, localiobuflen = %lld", write_desc_info.maxiobuflen, localiobuflen));
       for(int nv = 0; nv < nvars; nv++){
         for(PIO_Offset i = 0; i < localiobuflen; i++){
-          memcpy(&((char *)mv_iobuf)[iodesc->mpitype_size * (i + nv * localiobuflen)],
-                 &((char *)fillvalue)[nv * iodesc->mpitype_size], iodesc->mpitype_size);
+          memcpy(&((char *)mv_iobuf)[write_desc_info.mpitype_size * (i + nv * localiobuflen)],
+                 &((char *)fillvalue)[nv * write_desc_info.mpitype_size], write_desc_info.mpitype_size);
         }
       }
     }
   }
-  else if(file->iotype == PIO_IOTYPE_PNETCDF && ios->ioproc){
+  else if(file->iotype == PIO_IOTYPE_PNETCDF && ios->io_comm_info->is_sync_io_proc()){
     /* this assures that iobuf is allocated on all iotasks thus
      assuring that the flush_output_buffer call above is called
      collectively (from all iotasks) */
@@ -336,17 +341,24 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     LOG((3, "allocated token for variable buffer"));
   }
 
-  /* Move data from compute to IO tasks. */
-  if(iodesc->rearranger == PIO_REARR_CONTIG){
-    ierr = iodesc->rearr->rearrange_comp2io(array, arraylen * nvars * iodesc->mpitype_size, mv_iobuf, rlen * iodesc->mpitype_size, nvars);
+  /* Move data from compute to IO tasks.
+   * For PIO_USE_ASYNC_WR_THREAD + HDF5[C] (for all rearrangers):
+   *  write_desc_info is set to use the async io_desc_info_t so that the data is rearranged to the async I/O procs.
+   */
+  if(write_desc_info.rearranger == PIO_REARR_CONTIG){
+    ierr = write_desc_info.rearr->rearrange_comp2io(array, arraylen * nvars * write_desc_info.mpitype_size, mv_iobuf, rlen * write_desc_info.mpitype_size, nvars);
   }
   else{
-    ierr = rearrange_comp2io(ios, iodesc, file, array, mv_iobuf, nvars);
+    bool is_async_write = (&write_desc_info == iodesc->async_io_desc_info);
+    SPIO_Util::Iosys_Util::Io_comm_target io_target = is_async_write ?
+      SPIO_Util::Iosys_Util::make_async_io_comm_target(ios) :
+      SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios);
+    ierr = rearrange_comp2io(ios, iodesc, write_desc_info, io_target, file, array, mv_iobuf, nvars);
   }
   if(ierr != PIO_NOERR){
     return pio_err(ios, file, ierr, __FILE__, __LINE__,
                     "Writing multiple variables to file (%s, ncid=%d) failed. Error rearranging and moving data from compute tasks to I/O tasks(rearranger = %d)",
-                    pio_get_fname_from_file(file), ncid, iodesc->rearranger);
+                    pio_get_fname_from_file(file), ncid, write_desc_info.rearranger);
   }
 
 #ifdef PIO_MICRO_TIMING
@@ -426,6 +438,14 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
         break;
     case PIO_IOTYPE_HDF5:
     case PIO_IOTYPE_HDF5C:
+        /* Every HDF5/HDF5C write is queued on the async write thread pool
+         * when PIO_USE_ASYNC_WR_THREAD is compiled in, for *all* rearrangers.
+         * pio_iosys_async_hdf5_write_op_add() makes the sync-vs-async
+         * io_desc_info_t selection (via iodesc->select_io_desc_info(), which
+         * routes through file->uses_async_io) and gates on the role-correct
+         * I/O proc set itself: CONTIG, BOX and SUBSET decomps alike target
+         * the async I/O ranks when the file uses async I/O, and the sync I/O
+         * ranks otherwise. */
 #if PIO_USE_ASYNC_WR_THREAD
         ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, sp_iodesc,
                                                   DARRAY_DATA, frame);
@@ -463,6 +483,12 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
       spio_file_mvcache_free(file, ioid);
     }
 #if !PIO_USE_ASYNC_WR_THREAD
+    /* When PIO_USE_ASYNC_WR_THREAD is on, every HDF5/HDF5C write above was
+     * queued on the async thread pool (for all rearrangers) and the queued op
+     * still reads these converted buffers while it runs - freeing them here,
+     * on the calling thread, would be a use-after-free. These buffers are
+     * instead released later, at file teardown, by DTConverter::clear()
+     * (pio_lists.cpp) - not per-op when the queued write completes. */
     if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
       assert(file->dt_converter);
       static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->free(ioid);
@@ -480,27 +506,37 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
    * points. This is generally faster than the netcdf method of
    * filling the entire array with missing values before overwriting
    * those values later. */
-  if(iodesc->rearranger == PIO_REARR_SUBSET && iodesc->needsfill){
-    LOG((2, "nvars = %d holegridsize = %ld iodesc->needsfill = %d\n", nvars,
-         iodesc->holegridsize, iodesc->needsfill));
+  if(write_desc_info.rearranger == PIO_REARR_SUBSET && write_desc_info.needsfill){
+    LOG((2, "nvars = %d holegridsize = %ld write_desc_info.needsfill = %d\n", nvars,
+         write_desc_info.holegridsize, write_desc_info.needsfill));
 
     pioassert(!vdesc0->fillbuf, "buffer overwrite",__FILE__, __LINE__);
 
-    /* Get a buffer. */
-    if(ios->io_rank == 0){
-      vdesc0->fillbuf = bget(iodesc->maxholegridsize * iodesc->mpitype_size * nvars);
+    /* Get a buffer. This must be sized/populated using the same
+     * sync-vs-async io_desc_info_t view selected above (write_desc_info),
+     * since that is the view the actual I/O proc rank for this file uses -
+     * for an HDF5 file with file->uses_async_io, the sync and async I/O
+     * communicators are disjoint sets of physical ranks (see IO_comm_info),
+     * so mixing views here left vdesc0->fillbuf unpopulated/NULL on the
+     * physical rank that pio_iosys_async_hdf5_write_op_add() (which also
+     * uses select_io_desc_info()) later reads it from. */
+    bool is_async_write = (&write_desc_info == iodesc->async_io_desc_info);
+    int my_io_comm_rank = is_async_write ? ios->io_comm_info->get_async_io_comm_rank() :
+                                            ios->io_comm_info->get_sync_io_comm_rank();
+    if(my_io_comm_rank == 0){
+      vdesc0->fillbuf = bget(write_desc_info.maxholegridsize * write_desc_info.mpitype_size * nvars);
     }
-    else if(iodesc->holegridsize > 0){
-      vdesc0->fillbuf = bget(iodesc->holegridsize * iodesc->mpitype_size * nvars);
+    else if(write_desc_info.holegridsize > 0){
+      vdesc0->fillbuf = bget(write_desc_info.holegridsize * write_desc_info.mpitype_size * nvars);
     }
 
     /* copying the fill value into the data buffer for the box
      * rearranger. This will be overwritten with data where
      * provided. */
     for(int nv = 0; nv < nvars; nv++){
-      for(int i = 0; i < iodesc->holegridsize; i++){
-        memcpy(&((char *)vdesc0->fillbuf)[iodesc->mpitype_size * (i + nv * iodesc->holegridsize)],
-               &((char *)fillvalue)[iodesc->mpitype_size * nv], iodesc->mpitype_size);
+      for(int i = 0; i < write_desc_info.holegridsize; i++){
+        memcpy(&((char *)vdesc0->fillbuf)[write_desc_info.mpitype_size * (i + nv * write_desc_info.holegridsize)],
+               &((char *)fillvalue)[write_desc_info.mpitype_size * nv], write_desc_info.mpitype_size);
       }
     }
 
@@ -518,20 +554,24 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
       /* FIXME: Handle fillvalues for HDF5 */
       case PIO_IOTYPE_HDF5:
       case PIO_IOTYPE_HDF5C:
-  #if PIO_USE_ASYNC_WR_THREAD
+          /* As with the DARRAY_DATA dispatch above, queue the fillvalue write
+           * on the async write thread pool for all rearrangers whenever
+           * PIO_USE_ASYNC_WR_THREAD is compiled in - the queued op does its
+           * own sync/async io_desc_info_t selection and I/O proc gating. */
+#if PIO_USE_ASYNC_WR_THREAD
           ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, sp_iodesc,
                                                     DARRAY_FILL, frame);
           if(ierr != PIO_NOERR){
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
                             "Writing multiple variables to file (%s, ncid=%d) failed. Internal error queing async task to write variable fillvalues in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
           }
-  #else
+#else
           if((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
                                              DARRAY_FILL, frame))){
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
                             "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable fillvalues in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
           }
-  #endif
+#endif
           break;
       case PIO_IOTYPE_NETCDF4C:
       case PIO_IOTYPE_NETCDF:
@@ -553,12 +593,16 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
         brel(vdesc0->fillbuf);
         vdesc0->fillbuf = NULL;
       }
-  #if !PIO_USE_ASYNC_WR_THREAD
+#if !PIO_USE_ASYNC_WR_THREAD
+      /* See the matching guard after the DARRAY_DATA dispatch above: with
+       * PIO_USE_ASYNC_WR_THREAD on, the queued async op owns these buffers
+       * until it completes, and they are only released later at file
+       * teardown by DTConverter::clear() (pio_lists.cpp), not per-op. */
       if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
         assert(file->dt_converter);
         static_cast<SPIO_Util::File_Util::DTConverter *>(file->dt_converter)->free(ioid);
       }
-  #endif
+#endif
     }
   }
 
@@ -566,7 +610,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
    * needs an explicit flush/wait to make sure data is written
    * to disk (if the buffer is full)
    */
-  if(ios->ioproc && file->iotype == PIO_IOTYPE_PNETCDF){
+  if(ios->io_comm_info->is_sync_io_proc() && file->iotype == PIO_IOTYPE_PNETCDF){
     /* Flush data to disk for pnetcdf. */
     if((ierr = flush_output_buffer(file, flushtodisk, 0))){
       return pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -658,9 +702,9 @@ static int PIO_wmb_needs_flush(wmulti_buffer *wmb, int arraylen, io_desc_t *iode
     bstats(&curalloc, &totfree, &maxfree, &nget, &nrel);
 
     LOG((2, "maxfree = %ld wmb->num_arrays = %d (1 + wmb->num_arrays) *"
-         " arraylen * iodesc->mpitype_size = %ld totfree = %ld\n",
+         " arraylen * iodesc->sync_io_desc_info.mpitype_size = %ld totfree = %ld\n",
           maxfree, wmb->num_arrays,
-         (1 + wmb->num_arrays) * arraylen * iodesc->mpitype_size, totfree));
+         (1 + wmb->num_arrays) * arraylen * iodesc->sync_io_desc_info.mpitype_size, totfree));
 
     /* We have exceeded the set buffer write cache limit, write data to
      * disk
@@ -670,7 +714,7 @@ static int PIO_wmb_needs_flush(wmulti_buffer *wmb, int arraylen, io_desc_t *iode
         return NEEDS_DISK_FLUSH;
     }
 
-    PIO_Offset array_sz_bytes = arraylen * iodesc->mpitype_size;
+    PIO_Offset array_sz_bytes = arraylen * iodesc->sync_io_desc_info.mpitype_size;
     /* Total cache size required to cache this array
      * - including existing data cached in wmb
      * Note that all the arrays are cached in an wmb in a single
@@ -880,7 +924,7 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
   int maplen = -1;
   void *mapbuf = NULL;
   std::unique_ptr<PIO_Offset[]> tmp_mapbuf;
-  if(iodesc->maplen < 1){
+  if(iodesc->sync_io_desc_info.maplen < 1){
     /* FIXME: Do we need to save a map of size 2? */
     maplen = 2;
     tmp_mapbuf = std::make_unique<PIO_Offset[]>(maplen);
@@ -888,25 +932,25 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
     tmp_mapbuf[1] = 0;
     mapbuf = static_cast<void *>(tmp_mapbuf.get());
   }
-  else if(iodesc->maplen == 1){
+  else if(iodesc->sync_io_desc_info.maplen == 1){
     /* FIXME: Do we need to save a map of size 2? */
     maplen = 2;
     tmp_mapbuf = std::make_unique<PIO_Offset[]>(maplen);
     /* For contig rearr, convert map from 0-based to 1-based */
-    tmp_mapbuf[0] = ((iodesc->rearranger == PIO_REARR_CONTIG) ? (iodesc->map[0] + 1) : iodesc->map[0]);
+    tmp_mapbuf[0] = ((iodesc->sync_io_desc_info.rearranger == PIO_REARR_CONTIG) ? (iodesc->sync_io_desc_info.map[0] + 1) : iodesc->sync_io_desc_info.map[0]);
     tmp_mapbuf[1] = 0;
     mapbuf = static_cast<void *>(tmp_mapbuf.get());
   }
   else{
-    maplen = iodesc->maplen;
-    if(iodesc->rearranger == PIO_REARR_CONTIG){
+    maplen = iodesc->sync_io_desc_info.maplen;
+    if(iodesc->sync_io_desc_info.rearranger == PIO_REARR_CONTIG){
       /* Convert map from 0-based to 1-based */
       tmp_mapbuf = std::make_unique<PIO_Offset[]>(maplen);
-      std::transform(iodesc->map, iodesc->map + maplen, tmp_mapbuf.get(), [](PIO_Offset off) { return off + 1; });
+      std::transform(iodesc->sync_io_desc_info.map, iodesc->sync_io_desc_info.map + maplen, tmp_mapbuf.get(), [](PIO_Offset off) { return off + 1; });
       mapbuf = static_cast<void *>(tmp_mapbuf.get());
     }
     else{
-      mapbuf = iodesc->map;
+      mapbuf = iodesc->sync_io_desc_info.map;
     }
   }
 
@@ -1064,7 +1108,7 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
     snprintf(att_name, PIO_MAX_NAME, "%s/piotype", name);
     adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, att_name);
     if(attributeH == NULL){
-      attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_int32_t, &iodesc->piotype);
+      attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_int32_t, &iodesc->sync_io_desc_info.piotype);
       if(attributeH == NULL){
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                        "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
@@ -1075,7 +1119,7 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
     snprintf(att_name, PIO_MAX_NAME, "%s/ndims", name);
     attributeH = adios2_inquire_attribute(file->ioH, att_name);
     if(attributeH == NULL){
-      attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_int32_t, &iodesc->ndims);
+      attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_int32_t, &iodesc->sync_io_desc_info.ndims);
       if(attributeH == NULL){
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                        "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
@@ -1086,11 +1130,11 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
     snprintf(att_name, PIO_MAX_NAME, "%s/dimlen", name);
     attributeH = adios2_inquire_attribute(file->ioH, att_name);
     if(attributeH == NULL){
-      attributeH = adios2_define_attribute_array(file->ioH, att_name, adios2_type_int32_t, iodesc->dimlen, iodesc->ndims);
+      attributeH = adios2_define_attribute_array(file->ioH, att_name, adios2_type_int32_t, iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.ndims);
       if(attributeH == NULL){
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                        "Defining (ADIOS) attribute array (name=%s, size=%d) failed for file (%s, ncid=%d)",
-                       att_name, iodesc->ndims, pio_get_fname_from_file(file), file->pio_ncid);
+                       att_name, iodesc->sync_io_desc_info.ndims, pio_get_fname_from_file(file), file->pio_ncid);
       }
     }
     file->num_written_blocks += 3;
@@ -1480,51 +1524,51 @@ static int check_adios2_need_to_flush(file_desc_t *file, adios_var_desc_t *av)
 
 #define ADIOS_CONVERT_FROM(FROM_TYPE_ID, from_type, array, arraylen, buf) \
 { \
-    if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_DOUBLE) \
+    if (iodesc->sync_io_desc_info.piotype == FROM_TYPE_ID && av->nc_type == PIO_DOUBLE) \
     { \
         ADIOS_CONVERT_ARRAY(array, arraylen, from_type, double, *ierr, buf); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_FLOAT) \
+    else if (iodesc->sync_io_desc_info.piotype == FROM_TYPE_ID && av->nc_type == PIO_FLOAT) \
     { \
         ADIOS_CONVERT_ARRAY(array, arraylen, from_type, float, *ierr, buf); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_REAL) \
+    else if (iodesc->sync_io_desc_info.piotype == FROM_TYPE_ID && av->nc_type == PIO_REAL) \
     { \
         ADIOS_CONVERT_ARRAY(array, arraylen, from_type, float, *ierr, buf); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_INT) \
+    else if (iodesc->sync_io_desc_info.piotype == FROM_TYPE_ID && av->nc_type == PIO_INT) \
     { \
         ADIOS_CONVERT_ARRAY(array, arraylen, from_type, int, *ierr, buf); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_UINT) \
+    else if (iodesc->sync_io_desc_info.piotype == FROM_TYPE_ID && av->nc_type == PIO_UINT) \
     { \
         ADIOS_CONVERT_ARRAY(array, arraylen, from_type, unsigned int, *ierr, buf); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_SHORT) \
+    else if (iodesc->sync_io_desc_info.piotype == FROM_TYPE_ID && av->nc_type == PIO_SHORT) \
     { \
         ADIOS_CONVERT_ARRAY(array, arraylen, from_type, short int, *ierr, buf); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_USHORT) \
+    else if (iodesc->sync_io_desc_info.piotype == FROM_TYPE_ID && av->nc_type == PIO_USHORT) \
     { \
         ADIOS_CONVERT_ARRAY(array, arraylen, from_type, unsigned short int, *ierr, buf); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_INT64) \
+    else if (iodesc->sync_io_desc_info.piotype == FROM_TYPE_ID && av->nc_type == PIO_INT64) \
     { \
         ADIOS_CONVERT_ARRAY(array, arraylen, from_type, int64_t, *ierr, buf); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_UINT64) \
+    else if (iodesc->sync_io_desc_info.piotype == FROM_TYPE_ID && av->nc_type == PIO_UINT64) \
     { \
         ADIOS_CONVERT_ARRAY(array, arraylen, from_type, uint64_t, *ierr, buf); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_CHAR) \
+    else if (iodesc->sync_io_desc_info.piotype == FROM_TYPE_ID && av->nc_type == PIO_CHAR) \
     { \
         ADIOS_CONVERT_ARRAY(array, arraylen, from_type, char, *ierr, buf); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_BYTE) \
+    else if (iodesc->sync_io_desc_info.piotype == FROM_TYPE_ID && av->nc_type == PIO_BYTE) \
     { \
         ADIOS_CONVERT_ARRAY(array, arraylen, from_type, char, *ierr, buf); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_UBYTE) \
+    else if (iodesc->sync_io_desc_info.piotype == FROM_TYPE_ID && av->nc_type == PIO_UBYTE) \
     { \
         ADIOS_CONVERT_ARRAY(array, arraylen, from_type, unsigned char, *ierr, buf); \
     } \
@@ -1565,27 +1609,27 @@ void *PIOc_copy_one_element_adios(const void *array, io_desc_t *iodesc)
 {
     assert(array != NULL && iodesc != NULL);
     void *temp_buf = NULL;
-    if (iodesc->piotype == PIO_DOUBLE)
+    if (iodesc->sync_io_desc_info.piotype == PIO_DOUBLE)
     {
         ADIOS_COPY_ONE(temp_buf, array, double);
     }
-    else if (iodesc->piotype == PIO_FLOAT || iodesc->piotype == PIO_REAL)
+    else if (iodesc->sync_io_desc_info.piotype == PIO_FLOAT || iodesc->sync_io_desc_info.piotype == PIO_REAL)
     {
         ADIOS_COPY_ONE(temp_buf, array, float);
     }
-    else if (iodesc->piotype == PIO_INT || iodesc->piotype == PIO_UINT)
+    else if (iodesc->sync_io_desc_info.piotype == PIO_INT || iodesc->sync_io_desc_info.piotype == PIO_UINT)
     {
         ADIOS_COPY_ONE(temp_buf, array, int);
     }
-    else if (iodesc->piotype == PIO_SHORT || iodesc->piotype == PIO_USHORT)
+    else if (iodesc->sync_io_desc_info.piotype == PIO_SHORT || iodesc->sync_io_desc_info.piotype == PIO_USHORT)
     {
         ADIOS_COPY_ONE(temp_buf, array, short int);
     }
-    else if (iodesc->piotype == PIO_INT64 || iodesc->piotype == PIO_UINT64)
+    else if (iodesc->sync_io_desc_info.piotype == PIO_INT64 || iodesc->sync_io_desc_info.piotype == PIO_UINT64)
     {
         ADIOS_COPY_ONE(temp_buf, array, int64_t);
     }
-    else if (iodesc->piotype == PIO_CHAR || iodesc->piotype == PIO_BYTE || iodesc->piotype == PIO_UBYTE)
+    else if (iodesc->sync_io_desc_info.piotype == PIO_CHAR || iodesc->sync_io_desc_info.piotype == PIO_BYTE || iodesc->sync_io_desc_info.piotype == PIO_UBYTE)
     {
         ADIOS_COPY_ONE(temp_buf, array, char);
     }
@@ -1640,7 +1684,7 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
         {
             return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
                            "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for a temporary buffer",
-                           varid, pio_get_fname_from_file(file), file->pio_ncid, (long long) (arraylen * iodesc->piotype_size));
+                           varid, pio_get_fname_from_file(file), file->pio_ncid, (long long) (arraylen * iodesc->sync_io_desc_info.piotype_size));
         }
         array = temp_buf;
     }
@@ -1723,7 +1767,7 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
     void *temp_databuf = NULL;
     void *temp_fillbuf = NULL;
     int need_to_free_databuf = 0;
-    if (iodesc->piotype != av->nc_type)
+    if (iodesc->sync_io_desc_info.piotype != av->nc_type)
     {
         temp_databuf = PIOc_convert_buffer_adios(file, iodesc, av, array, arraylen, &ierr);
         if (ierr != PIO_NOERR)
@@ -1995,16 +2039,16 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
    * size expected by the io descriptor. Fail if arraylen is too
    * small, just put a warning in the log and truncate arraylen
    * if it is too big (the excess values will be ignored.) */
-  if(arraylen < iodesc->ndof){
+  if(arraylen < iodesc->sync_io_desc_info.ndof){
     if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
       GPTLstop("PIO:write_total_adios");
     }
     return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__,
-                    "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. The local array size (arraylen=%lld) is smaller than expected, the I/O decomposition (ioid=%d) requires a local array of size = %lld", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) arraylen, ioid, (long long int) iodesc->ndof);
+                    "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. The local array size (arraylen=%lld) is smaller than expected, the I/O decomposition (ioid=%d) requires a local array of size = %lld", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) arraylen, ioid, (long long int) iodesc->sync_io_desc_info.ndof);
   }
-  LOG((2, "%s arraylen = %d iodesc->ndof = %d",
-       (arraylen > iodesc->ndof) ? "WARNING: arraylen > iodesc->ndof" : "",
-       arraylen, iodesc->ndof));
+  LOG((2, "%s arraylen = %d iodesc->sync_io_desc_info.ndof = %d",
+       (arraylen > iodesc->sync_io_desc_info.ndof) ? "WARNING: arraylen > iodesc->sync_io_desc_info.ndof" : "",
+       arraylen, iodesc->sync_io_desc_info.ndof));
 
 #ifdef _ADIOS2
   if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
@@ -2037,19 +2081,19 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
    * size expected by the io descriptor. Fail if arraylen is too
    * small, just put a warning in the log and truncate arraylen
    * if it is too big (the excess values will be ignored.) */
-  if(arraylen < iodesc->ndof){
+  if(arraylen < iodesc->sync_io_desc_info.ndof){
     if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
       GPTLstop("PIO:PIOc_write_darray_adios");
       GPTLstop("PIO:write_total_adios");
     }
     return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__,
-                    "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. The local array size (arraylen=%lld) is smaller than expected, the I/O decomposition (ioid=%d) requires a local array of size = %lld", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) arraylen, ioid, (long long int) iodesc->ndof);
+                    "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. The local array size (arraylen=%lld) is smaller than expected, the I/O decomposition (ioid=%d) requires a local array of size = %lld", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) arraylen, ioid, (long long int) iodesc->sync_io_desc_info.ndof);
   }
-  LOG((2, "%s arraylen = %d iodesc->ndof = %d",
-       (arraylen > iodesc->ndof) ? "WARNING: arraylen > iodesc->ndof" : "",
-       arraylen, iodesc->ndof));
-  if(arraylen > iodesc->ndof){
-    arraylen = iodesc->ndof;
+  LOG((2, "%s arraylen = %d iodesc->sync_io_desc_info.ndof = %d",
+       (arraylen > iodesc->sync_io_desc_info.ndof) ? "WARNING: arraylen > iodesc->sync_io_desc_info.ndof" : "",
+       arraylen, iodesc->sync_io_desc_info.ndof));
+  if(arraylen > iodesc->sync_io_desc_info.ndof){
+    arraylen = iodesc->sync_io_desc_info.ndof;
   }
 
 #ifdef PIO_MICRO_TIMING
@@ -2057,13 +2101,13 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
 #endif
 
 #if PIO_SAVE_DECOMPS
-  if(!(iodesc->is_saved) &&
+  if(!(iodesc->sync_io_desc_info.is_saved) &&
       pio_save_decomps_regex_match(ioid, file->fname, file->varlist[varid].vname)){
     std::string filename;
     pio_create_uniq_str(ios, iodesc, filename, "piodecomp", ".dat");
 
     LOG((2, "Saving decomp map (write) to %s", filename.c_str()));
-    PIOc_writemap_impl(filename.c_str(), ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
+    PIOc_writemap_impl(filename.c_str(), ioid, iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map, ios->my_comm);
 
     std::string log_fname;
     pio_create_uniq_str(ios, iodesc, log_fname, "piodecomp", ".nc");
@@ -2071,7 +2115,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
     (*logger).write_only().open().put(iodesc).close();
     delete logger;
 
-    iodesc->is_saved = true;
+    iodesc->sync_io_desc_info.is_saved = true;
     SPIO_Util::Decomp_Util::gdpool_mgr.get_decomp_map_info_pool()->add_decomp_map_info(ioid, filename.c_str());
   }
   SPIO_Util::Decomp_Util::gdpool_mgr.get_decomp_map_info_pool()->add_var_info(ioid, file->pio_ncid, file->fname, varid, file->varlist[varid].vname);
@@ -2082,7 +2126,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
 
   /* Run these on all tasks if async is not in use, but only on
    * non-IO tasks if async is in use. */
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     spio_ltimer_stop(ios->io_fstats->wr_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->wr_timer_name);
@@ -2114,8 +2158,8 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
     spio_ltimer_start(file->io_fstats->tot_timer_name);
   }
 
-  ios->io_fstats->wb += vdesc->type_size * iodesc->llen;
-  file->io_fstats->wb += vdesc->type_size * iodesc->llen;
+  ios->io_fstats->wb += vdesc->type_size * iodesc->sync_io_desc_info.llen;
+  file->io_fstats->wb += vdesc->type_size * iodesc->sync_io_desc_info.llen;
 
   /* If we don't know the fill value for this var, get it. */
   /* TODO handle fill values for HDF5 type later */
@@ -2184,8 +2228,8 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
     wmb->frame = NULL;
     wmb->fillvalue = NULL;
   }
-  LOG((2, "wmb->num_arrays = %d arraylen = %d iodesc->mpitype_size = %d\n",
-       wmb->num_arrays, arraylen, iodesc->mpitype_size));
+  LOG((2, "wmb->num_arrays = %d arraylen = %d iodesc->sync_io_desc_info.mpitype_size = %d\n",
+       wmb->num_arrays, arraylen, iodesc->sync_io_desc_info.mpitype_size));
 
   needsflush = PIO_wmb_needs_flush(wmb, arraylen, iodesc);
   assert(needsflush >= 0);
@@ -2206,7 +2250,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
      Latest PnetCDF (version 1.11.0 and later) is more efficient at
      handling very large number of regions, so we have turned off
      PIO_LIMIT_CACHED_IO_REGIONS option by default. */
-  decomp_max_regions = (iodesc->maxregions >= iodesc->maxfillregions)? iodesc->maxregions : iodesc->maxfillregions;
+  decomp_max_regions = (iodesc->sync_io_desc_info.maxregions >= iodesc->sync_io_desc_info.maxfillregions)? iodesc->sync_io_desc_info.maxregions : iodesc->sync_io_desc_info.maxfillregions;
   io_max_regions = (1 + wmb->num_arrays) * decomp_max_regions;
   if(io_max_regions > PIO_MAX_CACHED_IO_REGIONS){
     needsflush = 2;
@@ -2220,7 +2264,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
   }
   LOG((2, "needsflush = %d", needsflush));
 
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     if(file->varlist[varid].vrsize == 0){
       spio_ltimer_stop(ios->io_fstats->wr_timer_name);
       spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -2284,11 +2328,11 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
 
   /* Get memory for data. */
   if(arraylen > 0){
-    if(!(wmb->data = bgetr(wmb->data, (1 + wmb->num_arrays) * arraylen * iodesc->mpitype_size))){
+    if(!(wmb->data = bgetr(wmb->data, (1 + wmb->num_arrays) * arraylen * iodesc->sync_io_desc_info.mpitype_size))){
       return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating space (realloc %lld bytes) to cache user data", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int )((1 + wmb->num_arrays) * arraylen * iodesc->mpitype_size));
+                      "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating space (realloc %lld bytes) to cache user data", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int )((1 + wmb->num_arrays) * arraylen * iodesc->sync_io_desc_info.mpitype_size));
     }
-    LOG((2, "got %ld bytes for data", (1 + wmb->num_arrays) * arraylen * iodesc->mpitype_size));
+    LOG((2, "got %ld bytes for data", (1 + wmb->num_arrays) * arraylen * iodesc->sync_io_desc_info.mpitype_size));
   }
 
   /* vid is an array of variable ids in the wmb list, grow the list
@@ -2311,20 +2355,20 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
   /* If we need a fill value, get it. If we are using the subset
    * rearranger and not using the netcdf fill mode then we need to
    * do an extra write to fill in the holes with the fill value. */
-  if(iodesc->needsfill){
+  if(iodesc->sync_io_desc_info.needsfill){
     /* Get memory to hold fill value. */
-    if(!(wmb->fillvalue = bgetr(wmb->fillvalue, iodesc->mpitype_size * (1 + wmb->num_arrays)))){
+    if(!(wmb->fillvalue = bgetr(wmb->fillvalue, iodesc->sync_io_desc_info.mpitype_size * (1 + wmb->num_arrays)))){
       return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating space (realloc %lld bytes) for variable fillvalues in write multi buffer to cache user data", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long)(iodesc->mpitype_size * (1 + wmb->num_arrays)));
+                      "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating space (realloc %lld bytes) for variable fillvalues in write multi buffer to cache user data", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long)(iodesc->sync_io_desc_info.mpitype_size * (1 + wmb->num_arrays)));
     }
 
     /* If the user passed a fill value, use that, otherwise use
      * the default fill value of the netCDF type. Copy the fill
      * value to the buffer. */
     if(fillvalue){
-      memcpy((char *)wmb->fillvalue + iodesc->mpitype_size * wmb->num_arrays,
-             fillvalue, iodesc->mpitype_size);
-      LOG((3, "copied user-provided fill value iodesc->mpitype_size = %d", iodesc->mpitype_size));
+      memcpy((char *)wmb->fillvalue + iodesc->sync_io_desc_info.mpitype_size * wmb->num_arrays,
+             fillvalue, iodesc->sync_io_desc_info.mpitype_size);
+      LOG((3, "copied user-provided fill value iodesc->sync_io_desc_info.mpitype_size = %d", iodesc->sync_io_desc_info.mpitype_size));
     }
     else{
       void *fill;
@@ -2341,7 +2385,7 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
       long long int64_fill = PIO_FILL_INT64;
       long long uint64_fill = PIO_FILL_UINT64;
 #endif /* _NETCDF4 */
-      vtype = (MPI_Datatype)iodesc->mpitype;
+      vtype = (MPI_Datatype)iodesc->sync_io_desc_info.mpitype;
       LOG((3, "caller did not provide fill value vtype = %d", vtype));
 
       /* This must be done with an if statement, not a case, or
@@ -2386,8 +2430,8 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
                         "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Unable to find a default fillvalue for variable, unsupported variable type", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
       }
 
-      memcpy((char *)wmb->fillvalue + iodesc->mpitype_size * wmb->num_arrays,
-             fill, iodesc->mpitype_size);
+      memcpy((char *)wmb->fillvalue + iodesc->sync_io_desc_info.mpitype_size * wmb->num_arrays,
+             fill, iodesc->sync_io_desc_info.mpitype_size);
       LOG((3, "copied fill value"));
     }
   }
@@ -2399,10 +2443,10 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
        wmb->vid[wmb->num_arrays]));
 
   /* Copy the user-provided data to the buffer. */
-  bufptr = (void *)((char *)wmb->data + arraylen * iodesc->mpitype_size * wmb->num_arrays);
+  bufptr = (void *)((char *)wmb->data + arraylen * iodesc->sync_io_desc_info.mpitype_size * wmb->num_arrays);
   if(arraylen > 0){
-    memcpy(bufptr, array, arraylen * iodesc->mpitype_size);
-    LOG((3, "copied %ld bytes of user data", arraylen * iodesc->mpitype_size));
+    memcpy(bufptr, array, arraylen * iodesc->sync_io_desc_info.mpitype_size);
+    LOG((3, "copied %ld bytes of user data", arraylen * iodesc->sync_io_desc_info.mpitype_size));
   }
 
   /* Add the unlimited dimension value of this variable to the frame
@@ -2415,9 +2459,9 @@ int PIOc_write_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen, c
   /* Cache a ref to the iodesc in the file */
   spio_add_iodesc_ref_to_file(file, varid, ioid);
 
-  LOG((2, "wmb->num_arrays = %d iodesc->maxbytes / iodesc->mpitype_size = %d "
-       "iodesc->ndof = %d iodesc->llen = %d", wmb->num_arrays,
-       iodesc->maxbytes / iodesc->mpitype_size, iodesc->ndof, iodesc->llen));
+  LOG((2, "wmb->num_arrays = %d iodesc->sync_io_desc_info.maxbytes / iodesc->sync_io_desc_info.mpitype_size = %d "
+       "iodesc->sync_io_desc_info.ndof = %d iodesc->sync_io_desc_info.llen = %d", wmb->num_arrays,
+       iodesc->sync_io_desc_info.maxbytes / iodesc->sync_io_desc_info.mpitype_size, iodesc->sync_io_desc_info.ndof, iodesc->sync_io_desc_info.llen));
 
   LOG((1, "Write darray end : pending bytes for ncid=%d, varid=%d var_wb_pend=%llu file_wb_pend=%llu",
         ncid, varid,
@@ -2536,7 +2580,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
     adios_vdesc = file->adios_vars + varid;
 
     /* Get the number of dimensions in the decomposition. */
-    ndims = iodesc->ndims;
+    ndims = iodesc->sync_io_desc_info.ndims;
 
     /* This is a record (or quasi-record) var. If the record
        number has not been set yet, set it to 0 by default */
@@ -2573,8 +2617,8 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
     }
 
     /* Get decomposition map */
-    PIO_Offset *start_decomp = &(iodesc->map[0]);
-    PIO_Offset len_decomp = iodesc->maplen;
+    PIO_Offset *start_decomp = &(iodesc->sync_io_desc_info.map[0]);
+    PIO_Offset len_decomp = iodesc->sync_io_desc_info.maplen;
 
     /* Get decomposition info from file */
     int target_block = -1;
@@ -2955,9 +2999,9 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
 
           /* Gather map lengths from all computation tasks and fill the task_maplen array on all tasks. */
           int mpierr = MPI_SUCCESS;
-          if ((mpierr = MPI_Allgather(&iodesc->maplen, 1, MPI_INT, task_maplen, 1, MPI_INT, ios->comp_comm)))
+          if ((mpierr = MPI_Allgather(&iodesc->sync_io_desc_info.maplen, 1, MPI_INT, task_maplen, 1, MPI_INT, ios->comp_comm)))
               return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
-          assert(task_maplen[file->all_rank] == iodesc->maplen);
+          assert(task_maplen[file->all_rank] == iodesc->sync_io_desc_info.maplen);
 
           start_idx_in_target_block = 0;
           for (int proc = 0; proc < ios->num_comptasks; proc++)
@@ -2975,7 +3019,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
               }
           }
 
-          end_idx_in_target_block = start_idx_in_target_block + iodesc->maplen - 1;
+          end_idx_in_target_block = start_idx_in_target_block + iodesc->sync_io_desc_info.maplen - 1;
       }
 
         /* Add to cache */
@@ -3269,7 +3313,7 @@ static int PIOc_read_darray_adios(file_desc_t *file, int fndims, io_desc_t *iode
         }
 
         size_t read_type_size = get_adios2_type_size(read_type, NULL);
-        adios2_type out_type = spio_get_adios_type(iodesc->piotype);
+        adios2_type out_type = spio_get_adios_type(iodesc->sync_io_desc_info.piotype);
         int out_type_size = get_adios2_type_size(out_type, NULL);
 
         /* Check that frame_id is not a special case of -1 */
@@ -3441,7 +3485,15 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
     return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
                     "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed. Invalid arguments provided, I/O descriptor id (ioid=%d) is invalid", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
   }
-  pioassert(iodesc->rearranger == PIO_REARR_BOX || iodesc->rearranger == PIO_REARR_SUBSET || iodesc->rearranger == PIO_REARR_CONTIG,
+  /* Select the io_desc_info_t (sync or async) matching the role that will
+   * actually perform this read - mirrors the selection already done for
+   * HDF5 async-dispatched writes (see pio_iosys_async_hdf5_write_op_add()/
+   * pio_read_darray_nc()). For every iotype other than HDF5/HDF5C with
+   * file->uses_async_io, this is identical to iodesc->sync_io_desc_info
+   * today, so behavior is unchanged in that case. */
+  io_desc_info_t &desc_info = iodesc->select_io_desc_info(file->iotype, file);
+
+  pioassert(desc_info.rearranger == PIO_REARR_BOX || desc_info.rearranger == PIO_REARR_SUBSET || desc_info.rearranger == PIO_REARR_CONTIG,
             "unknown rearranger", __FILE__, __LINE__);
 
   /* Get var description. */
@@ -3456,7 +3508,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 
   /* Run these on all tasks if async is not in use, but only on
    * non-IO tasks if async is in use. */
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -3507,13 +3559,13 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 
   if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
 #ifdef _ADIOS2
-    ios->io_fstats->rb += vdesc_adios2->adios_type_size * iodesc->llen;
-    file->io_fstats->rb += vdesc_adios2->adios_type_size * iodesc->llen;
+    ios->io_fstats->rb += vdesc_adios2->adios_type_size * desc_info.llen;
+    file->io_fstats->rb += vdesc_adios2->adios_type_size * desc_info.llen;
 #endif
   }
   else{
-    ios->io_fstats->rb += vdesc->type_size * iodesc->llen;
-    file->io_fstats->rb += vdesc->type_size * iodesc->llen;
+    ios->io_fstats->rb += vdesc->type_size * desc_info.llen;
+    file->io_fstats->rb += vdesc->type_size * desc_info.llen;
   }
 
 #ifdef PIO_MICRO_TIMING
@@ -3522,7 +3574,7 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 
   /* Run these on all tasks if async is not in use, but only on
    * non-IO tasks if async is in use. */
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     /* Get the number of dims for this var. */
     LOG((3, "about to call PIOc_inq_varndims varid = %d", varid));
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -3546,18 +3598,18 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
    * buffer size on io task 0 must be as large as the largest
    * used to accommodate this serial io method (use iodesc->
    * maxiobuflen to set it). */
-  if((file->iotype == PIO_IOTYPE_NETCDF || file->iotype == PIO_IOTYPE_NETCDF4C) && ios->iomaster == MPI_ROOT){
-    rlen = iodesc->maxiobuflen;
+  if((file->iotype == PIO_IOTYPE_NETCDF || file->iotype == PIO_IOTYPE_NETCDF4C) && ios->io_comm_info->get_sync_io_master() == MPI_ROOT){
+    rlen = desc_info.maxiobuflen;
   }
   else{
-    rlen = iodesc->llen;
+    rlen = desc_info.llen;
   }
 
   if((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC)){
     rlen = 0;
   }
 
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     if(file->varlist[varid].vrsize == 0){
       spio_ltimer_stop(ios->io_fstats->rd_timer_name);
       spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -3577,11 +3629,22 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
   file->varlist[varid].rb_pend += file->varlist[varid].vrsize;
   file->rb_pend += file->varlist[varid].vrsize;
 
-  /* Allocate a buffer for one record. */
-  if(ios->ioproc && rlen > 0){
-    if(!(iobuf = bget(iodesc->mpitype_size * rlen))){
+  /* Allocate a buffer for one record.
+   * rlen (derived from desc_info.llen/maxiobuflen just above) is already
+   * correctly 0 on ranks that don't own this read (mirrors the write-side
+   * iobuf allocation gate at PIOc_write_darray_multi_impl(), which also
+   * relies solely on rlen > 0 - see write_desc_info.llen/maxiobuflen above).
+   * Gating on is_sync_io_proc() here as well is redundant for every iotype
+   * other than HDF5/HDF5C with file->uses_async_io, and actively wrong for
+   * that case: desc_info can there be the async io_desc_info_t, whose llen
+   * is nonzero on the async-owning rank rather than the sync I/O rank, so
+   * the extra is_sync_io_proc() check would leave iobuf NULL on the rank
+   * that pio_read_darray_nc()'s own ownership-aware gate (is_file_owning_io_proc())
+   * actually dispatches the HDF5 read to. */
+  if(rlen > 0){
+    if(!(iobuf = bget(desc_info.mpitype_size * rlen))){
       return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                      "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Out of memory allocating space (%lld bytes) in I/O processes to read data from file (before rearrangement)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (iodesc->mpitype_size * rlen));
+                      "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Out of memory allocating space (%lld bytes) in I/O processes to read data from file (before rearrangement)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (desc_info.mpitype_size * rlen));
     }
   }
 
@@ -3604,19 +3667,35 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
   }
 
 #if PIO_SAVE_DECOMPS
-  if(!(iodesc->is_saved) &&
+  if(!(desc_info.is_saved) &&
       pio_save_decomps_regex_match(ioid, file->fname, file->varlist[varid].vname)){
     std::string filename;
     pio_create_uniq_str(ios, iodesc, filename, "piodecomp", ".dat");
 
     LOG((2, "Saving decomp map (read) to %s", filename.c_str()));
-    PIOc_writemap_impl(filename.c_str(), ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map, ios->my_comm);
-    iodesc->is_saved = true;
+    PIOc_writemap_impl(filename.c_str(), ioid, desc_info.ndims, desc_info.dimlen, desc_info.maplen, desc_info.map, ios->my_comm);
+    desc_info.is_saved = true;
   }
 #endif
 
   /* Call the correct darray read function based on iotype. */
-  if(!ios->async || ios->ioproc){
+  if(!ios->async || ios->io_comm_info->is_sync_io_proc()){
+#ifdef _HDF5
+      /* The same physical I/O procs that serve the async write thread pool
+       * also serve this read (see
+       * SPIO_Util::Iosys_Util::is_file_owning_io_proc()), so a read must wait
+       * for this file's pending async writes to complete before it can see
+       * their results - reads themselves are always synchronous, there is no
+       * async read op to queue here. Mirrors the equivalent wait added to
+       * spio_get_vars_tc() for the non-decomposed read path. */
+      if(((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)) && file->uses_async_io){
+        if(spio_wait_file_async_pend_ops(file) != PIO_NOERR){
+          PIOc_warn(ios->iosysid, file->pio_ncid, __FILE__, __LINE__,
+            "Timed out waiting for pending asynchronous operations on this file to complete before reading it. "
+            "Continuing with the read - the data read may not reflect those operations");
+        }
+      }
+#endif
       switch (file->iotype){
         case PIO_IOTYPE_NETCDF:
         case PIO_IOTYPE_NETCDF4C:
@@ -3628,6 +3707,10 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
         case PIO_IOTYPE_PNETCDF:
         case PIO_IOTYPE_NETCDF4P:
         case PIO_IOTYPE_NETCDF4P_NCZARR:
+#ifdef _HDF5
+        case PIO_IOTYPE_HDF5:
+        case PIO_IOTYPE_HDF5C:
+#endif
             if((ierr = pio_read_darray_nc(file, fndims, iodesc, varid, iobuf))){
               return pio_err(ios, file, ierr, __FILE__, __LINE__,
                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Reading variable in parallel (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
@@ -3653,12 +3736,20 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
 #ifdef PIO_MICRO_TIMING
   mtimer_start(file->varlist[varid].rd_rearr_mtimer);
 #endif
-  /* Rearrange the data. */
-  if(iodesc->rearranger == PIO_REARR_CONTIG){
-    ierr = iodesc->rearr->rearrange_io2comp(iobuf, rlen * iodesc->mpitype_size, array, iodesc->ndof * iodesc->mpitype_size, 1);
+  /* Rearrange the data.
+   * For PIO_USE_ASYNC_WR_THREAD + HDF5[C] (for all rearrangers):
+   *  desc_info may be the async io_desc_info_t (see select_io_desc_info() above), so the
+   *  rearrange must use the matching comm target, not unconditionally the sync one.
+   */
+  if(desc_info.rearranger == PIO_REARR_CONTIG){
+    ierr = desc_info.rearr->rearrange_io2comp(iobuf, rlen * desc_info.mpitype_size, array, desc_info.ndof * desc_info.mpitype_size, 1);
   }
   else{
-    ierr = rearrange_io2comp(ios, iodesc, iobuf, array);
+    bool is_async_read = (&desc_info == iodesc->async_io_desc_info);
+    SPIO_Util::Iosys_Util::Io_comm_target io_target = is_async_read ?
+      SPIO_Util::Iosys_Util::make_async_io_comm_target(ios) :
+      SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios);
+    ierr = rearrange_io2comp(ios, iodesc, iobuf, array, desc_info, io_target);
   }
   if(ierr != PIO_NOERR){
     return pio_err(ios, file, ierr, __FILE__, __LINE__,
