@@ -397,7 +397,12 @@ int test_rearrs_combs(SPIO_TF::Test_framework &tf)
 int main(int argc, char *argv[])
 {
   int ret = MPI_SUCCESS, nerrs = 0;
+#if PIO_USE_ASYNC_WR_THREAD
+  int mpi_thread_support_provided = MPI_THREAD_SINGLE;
+  ret = MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &mpi_thread_support_provided);
+#else
   ret = MPI_Init(&argc, &argv);
+#endif
   if(ret != MPI_SUCCESS){
     std::cerr << "MPI_Init() FAILED, ret = " << ret << "\n";
     return ret;
