@@ -94,6 +94,45 @@ SUBROUTINE get_1d_bc_mreg_info(rank, sz, dims, start, count)
 
 END SUBROUTINE get_1d_bc_mreg_info
 
+! Get a block cyclic decomposition with multiple regions to write
+! from a single proc. The size of the variable is set so that it
+! cannot be evenly distributed across all I/O procs - at least one
+! I/O proc has a slack (extra elements to write out)
+! # All procs except the last one has VEC_LOCAL_SZ elements starting
+!   at offset rank+1 and also starting at offset (size * VEC_LOCAL_SZ)
+! # The last proc has VEC_LOCAL_SZ + 1 elements, VEC_LOCAL_SZ elements
+!   allocated as above, and the last element assigned to it.
+! # Note: The number of regions remain the same as in get_1d_bc_mreg_info()
+! e.g. For VEC_LOCAL_SZ = 2, NUM_REGIONS=2
+! e.g. 1)    [1,2,7,8] [3,4,9,10] [5,6,11,12,13]
+SUBROUTINE get_1d_bc_mreg_info_unbal(rank, sz, dims, start, count)
+  integer, parameter :: VEC_LOCAL_SZ = 7
+  integer, parameter :: VEC_LOCAL_SZ_LAST_PROC = VEC_LOCAL_SZ + 1
+  integer, parameter :: NUM_REGIONS = 3
+  integer, intent(in) :: rank
+  integer, intent(in) :: sz
+  integer, dimension(1), intent(out) :: dims
+  integer, dimension(:), allocatable, intent(out) :: start
+  integer, dimension(:), allocatable, intent(out) :: count
+  integer :: i
+
+  dims(1) = (sz - 1) * VEC_LOCAL_SZ * NUM_REGIONS + VEC_LOCAL_SZ_LAST_PROC * NUM_REGIONS
+  allocate(start(NUM_REGIONS))
+  allocate(count(NUM_REGIONS))
+
+  do i=1,NUM_REGIONS
+    count(i) = VEC_LOCAL_SZ
+    start(i) = rank * VEC_LOCAL_SZ + (i-1) * (sz * VEC_LOCAL_SZ) + 1
+  end do
+
+  if(rank == (sz - 1)) then
+    ! The number of regions is the same across all procs,however the last
+    ! proc has an extra element (the last element) in the last region
+    count(NUM_REGIONS) = count(NUM_REGIONS) + 1
+  end if
+
+END SUBROUTINE get_1d_bc_mreg_info_unbal
+
 ! Get a decomp that represents data in global reverse order
 ! i.e., rank i contains data corresponding to
 !       (total_procs - i - 1)
@@ -545,6 +584,140 @@ PIO_TF_AUTO_TEST_SUB_BEGIN nc_wr_rd_mreg_1d_bc
   deallocate(rbuf)
   deallocate(wbuf)
 PIO_TF_AUTO_TEST_SUB_END nc_wr_rd_mreg_1d_bc
+
+! Test write/read of a variable where each proc writes/reads multiple regions
+! of the data. The variable size is chosen so that its not evenly distributable
+! across all I/O procs
+PIO_TF_TEMPLATE<PIO_TF_PREDEF_TYPENAME PIO_TF_DATA_TYPE, PIO_TF_PREDEF_TYPENAME PIO_TF_FC_DATA_TYPE>
+PIO_TF_AUTO_TEST_SUB_BEGIN nc_wr_rd_mreg_1d_bc_unbal
+  implicit none
+  interface
+    subroutine get_1d_bc_mreg_info_unbal(rank, sz, dims, start, count)
+      integer, intent(in) :: rank
+      integer, intent(in) :: sz
+      integer, dimension(1), intent(out) :: dims
+      integer, dimension(:), allocatable, intent(out) :: start
+      integer, dimension(:), allocatable, intent(out) :: count
+    end subroutine get_1d_bc_mreg_info_unbal
+  end interface
+  type(var_desc_t)  :: pio_var1, pio_var2
+  type(file_desc_t) :: pio_file
+  character(len=PIO_TF_MAX_STR_LEN) :: filename
+  character(len=*), parameter :: PIO_VAR1_NAME = 'PIO_TF_test_var1'
+  character(len=*), parameter :: PIO_VAR2_NAME = 'PIO_TF_test_var2'
+  type(io_desc_t) :: iodesc
+  integer, dimension(:), allocatable :: compdof
+  integer, dimension(:), allocatable :: start, count
+  integer :: total_count
+  PIO_TF_FC_DATA_TYPE, dimension(:), allocatable :: rbuf, wbuf
+  integer, dimension(1) :: dims
+  integer :: pio_dim
+  integer :: i, j, idx, ierr
+  ! iotypes = valid io types
+  integer, dimension(:), allocatable :: iotypes
+  character(len=PIO_TF_MAX_STR_LEN), dimension(:), allocatable :: iotype_descs
+  integer :: num_iotypes
+  integer :: num_regions
+
+  call get_1d_bc_mreg_info_unbal(pio_tf_world_rank_, pio_tf_world_sz_,&
+         dims, start, count)
+  num_regions = size(start)
+  total_count = 0
+  do i=1,size(count)
+    total_count = total_count + count(i)
+  end do
+  allocate(wbuf(total_count))
+  allocate(rbuf(total_count))
+  allocate(compdof(total_count))
+
+  idx = 1
+  do i=1,num_regions
+    do j=1,count(i)
+      compdof(idx) = start(i) + j - 1
+      wbuf(idx) = compdof(idx)
+      idx = idx + 1
+    end do
+  end do
+
+  if(allocated(start)) then
+    deallocate(start)
+  end if
+  if(allocated(count)) then
+    deallocate(count)
+  end if
+
+  call PIO_initdecomp(pio_tf_iosystem_, PIO_TF_DATA_TYPE, dims, compdof, iodesc)
+  deallocate(compdof)
+
+  num_iotypes = 0
+  call PIO_TF_Get_nc_iotypes(iotypes, iotype_descs, num_iotypes)
+  filename = "test_pio_decomp_simple_tests.testfile"
+  do i=1,num_iotypes
+    PIO_TF_LOG(0,*) "Testing : PIO_TF_DATA_TYPE : ", iotype_descs(i)
+    ierr = PIO_createfile(pio_tf_iosystem_, pio_file, iotypes(i), filename, PIO_CLOBBER)
+    PIO_TF_CHECK_ERR(ierr, "Could not create file " // trim(filename))
+
+    ierr = PIO_def_dim(pio_file, 'PIO_TF_test_dim', dims(1), pio_dim)
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a dim : " // trim(filename))
+
+    ierr = PIO_def_var(pio_file, PIO_VAR1_NAME, PIO_TF_DATA_TYPE, (/pio_dim/), pio_var1)
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a var1 : " // trim(filename))
+
+    ierr = PIO_def_var(pio_file, PIO_VAR2_NAME, PIO_TF_DATA_TYPE, (/pio_dim/), pio_var2)
+    PIO_TF_CHECK_ERR(ierr, "Failed to define a var2 : " // trim(filename))
+
+    ierr = PIO_enddef(pio_file)
+    PIO_TF_CHECK_ERR(ierr, "Failed to end redef mode : " // trim(filename))
+
+    ! Write the variable out
+    call PIO_write_darray(pio_file, pio_var1, iodesc, wbuf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to write darray (var1) : " // trim(filename))
+
+    call PIO_write_darray(pio_file, pio_var2, iodesc, wbuf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to write darray (var2) : " // trim(filename))
+
+#ifdef PIO_TEST_CLOSE_OPEN_FOR_SYNC
+    call PIO_closefile(pio_file)
+
+    ierr = PIO_openfile(pio_tf_iosystem_, pio_file, iotypes(i), filename, PIO_nowrite)
+    PIO_TF_CHECK_ERR(ierr, "Could not reopen file " // trim(filename))
+
+    ierr = PIO_inq_varid(pio_file, PIO_VAR1_NAME, pio_var1)
+    PIO_TF_CHECK_ERR(ierr, "Could not inq var1 : " // trim(filename))
+
+    ierr = PIO_inq_varid(pio_file, PIO_VAR2_NAME, pio_var2)
+    PIO_TF_CHECK_ERR(ierr, "Could not inq var2 : " // trim(filename))
+#else
+    call PIO_syncfile(pio_file)
+#endif
+
+    rbuf = 0
+    call PIO_read_darray(pio_file, pio_var1, iodesc, rbuf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to read darray (var1) : " // trim(filename))
+
+    PIO_TF_CHECK_VAL((rbuf, wbuf), "Got wrong val (var1)")
+
+    rbuf = 0
+    call PIO_read_darray(pio_file, pio_var2, iodesc, rbuf, ierr)
+    PIO_TF_CHECK_ERR(ierr, "Failed to read darray (var2) : " // trim(filename))
+
+    PIO_TF_CHECK_VAL((rbuf, wbuf), "Got wrong val (var2)")
+
+    call PIO_closefile(pio_file)
+
+    call PIO_deletefile(pio_tf_iosystem_, filename);
+  end do
+
+  if(allocated(iotypes)) then
+    deallocate(iotypes)
+    deallocate(iotype_descs)
+  end if
+
+  call PIO_freedecomp(pio_tf_iosystem_, iodesc)
+  deallocate(rbuf)
+  deallocate(wbuf)
+
+PIO_TF_AUTO_TEST_SUB_END nc_wr_rd_mreg_1d_bc_unbal
 
 PIO_TF_TEMPLATE<PIO_TF_PREDEF_TYPENAME PIO_TF_DATA_TYPE, PIO_TF_PREDEF_TYPENAME PIO_TF_FC_DATA_TYPE>
 PIO_TF_AUTO_TEST_SUB_BEGIN nc_wr_1d_bc_with_holes
