@@ -83,6 +83,9 @@ endif ()
 # Get the name of the build host
 cmake_host_system_information (RESULT FQDN_SITENAME QUERY FQDN)
 
+# Build position independent code (PIC) for shared library builds
+set(CMAKE_POSITION_INDEPENDENT_CODE ${BUILD_SHARED_LIBS})
+
 # Backwards Compatibility - allow users to define [NETCDF|PNETCDF]_DIR instead
 # of [NetCDF|PnetCDF]_PATH
 # Old NETCDF_DIR variable --> NetCDF_PATH
