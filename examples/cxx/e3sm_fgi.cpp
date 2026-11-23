@@ -19,6 +19,7 @@ namespace Util{
 
     /* Available I/O rearrangers */
     std::unordered_map<std::string, int> rearrs = {
+      {"CONTIG", PIO_REARR_CONTIG},
       {"SUBSET", PIO_REARR_SUBSET},
       {"BOX", PIO_REARR_BOX},
       {"ANY", PIO_REARR_ANY}
