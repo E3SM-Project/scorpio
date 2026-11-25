@@ -49,6 +49,7 @@
         "WITH_PNETCDF": "TRUE",
         "WITH_NETCDF": "TRUE",
         "PIO_USE_ASYNC_WR_THREAD": "ON",
+        "PIO_USE_ASYNC_WR_REARR": "ON",
         "PnetCDF_PATH": "$env{PNETCDF_PATH}",
         "HDF5_PATH": "$env{HDF5_PATH}",
         "NetCDF_C_PATH": "$env{NETCDF_PATH}",

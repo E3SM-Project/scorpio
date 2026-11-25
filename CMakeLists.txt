@@ -52,6 +52,7 @@ option (PIO_USE_INDEP_MODE   "Use PnetCDF independent data mode"            ON)
 option (PIO_MICRO_TIMING     "Enable internal micro timers"                 OFF)
 option (PIO_SAVE_DECOMPS     "Dump the decomposition information"           OFF)
 option (PIO_USE_ASYNC_WR_THREAD    "Use an asynchronous thread for writes (Requires C++11 support)" OFF)
+option (PIO_USE_ASYNC_WR_REARR     "Rearrange data asynchronously, on the asynchronous write thread, for writes using the CONTIG rearranger (requires PIO_USE_ASYNC_WR_THREAD)" OFF)
 option (PIO_LIMIT_CACHED_IO_REGIONS  "Limit the number of non-contiguous regions in an IO process" OFF)
 option (WITH_PNETCDF         "Require the use of PnetCDF"                   ON)
 option (WITH_NETCDF          "Require the use of NetCDF"                    ON)
@@ -165,6 +166,16 @@ set(USE_ASYNC_WR_THREAD 0)
 if(PIO_USE_ASYNC_WR_THREAD)
   message(STATUS "Using asynchronous I/O thread for writes")
   set(USE_ASYNC_WR_THREAD 1)
+endif()
+
+set(USE_ASYNC_WR_REARR 0)
+if(PIO_USE_ASYNC_WR_REARR)
+  if(NOT PIO_USE_ASYNC_WR_THREAD)
+    message(FATAL_ERROR "PIO_USE_ASYNC_WR_REARR requires PIO_USE_ASYNC_WR_THREAD to be ON "
+                        "(asynchronous data rearrangement is performed by the asynchronous write thread)")
+  endif()
+  message(STATUS "Using asynchronous data rearrangement for CONTIG writes")
+  set(USE_ASYNC_WR_REARR 1)
 endif()
 
 if(PIO_LIMIT_CACHED_IO_REGIONS)
@@ -388,6 +399,12 @@ else()
   if(PIO_USE_ASYNC_WR_THREAD)
     message(STATUS "Setting number of asynchronous I/O threads to ${SPIO_ASYNC_NTHREADS}")
   endif()
+endif()
+
+if(PIO_USE_ASYNC_WR_REARR AND (NOT SPIO_ASYNC_NTHREADS EQUAL 1))
+  message(FATAL_ERROR "PIO_USE_ASYNC_WR_REARR requires SPIO_ASYNC_NTHREADS == 1: asynchronous "
+                      "rearrangement relies on the thread pool's strict FIFO, single-worker ordering "
+                      "to keep the rearranger's collective MPI calls on rearr_comm_ matched across I/O ranks")
 endif()
 
 if(DEFINED SPIO_OVERRIDE_HDF5_COMPRESSION_VNAME_REGEX)
