@@ -202,12 +202,21 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
                    filename);
   }
 
-  /* Set up independent dataset transfer property list */
+  /* Set up this file's second dataset transfer property list, dxplid_indep.
+   * Despite the name (kept to avoid a wide, purely-cosmetic rename), this is
+   * NOT an independent (non-collective) transfer mode: H5Pset_dxpl_mpio()
+   * below sets H5FD_MPIO_COLLECTIVE, same as dxplid_coll - H5Dwrite()/
+   * H5Dread() calls made with dxplid_indep are still collective HDF5 calls
+   * that every rank sharing the dataset's communicator must invoke. The only
+   * difference from dxplid_coll is H5Pset_dxpl_mpio_collective_opt() just
+   * below, which permits (but does not require) HDF5 to satisfy that
+   * collective call via independent low-level MPI-IO operations rather than
+   * collective I/O. */
   file->dxplid_indep = H5Pcreate(H5P_DATASET_XFER);
   if(file->dxplid_indep == H5I_INVALID_HID){
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                    "Creating file (%s) using HDF5 iotype failed. "
-                   "The low level (HDF5) I/O library call failed to create a new dataset transfer property list (independent data transfer)",
+                   "The low level (HDF5) I/O library call failed to create a new dataset transfer property list (collective data transfer, individual low-level I/O)",
                    filename);
   }
 
@@ -221,7 +230,7 @@ int spio_hdf5_create(iosystem_desc_t *ios, file_desc_t *file, const char *filena
   if(H5Pset_dxpl_mpio_collective_opt(file->dxplid_indep, H5FD_MPIO_INDIVIDUAL_IO) < 0){
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                    "Creating file (%s) using HDF5 iotype failed. "
-                   "The low level (HDF5) I/O library call failed to set data transfer mode to individual I/O",
+                   "The low level (HDF5) I/O library call failed to permit individual (vs. collective) low-level I/O for the collective data transfer",
                    filename);
   }
 
@@ -1544,7 +1553,9 @@ int spio_hdf5_put_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
     }
   }
 
-  /* Independent write */
+  /* Collective write (dxplid_indep permits individual low-level I/O, but the
+   * H5Dwrite() call itself is still collective - see dxplid_indep's setup
+   * above in spio_hdf5_create(), and similarly in spio_hdf5_reopen.cpp). */
   if(H5Dwrite(file->hdf5_vars[varid].hdf5_dataset_id, file_var_ntype_id, mem_space_id,
                 file_space_id, file->dxplid_indep, (dt_conv_reqd) ? wbuf : buf) < 0){
     H5Eprint2(H5E_DEFAULT, stderr);
@@ -1744,7 +1755,9 @@ int spio_hdf5_get_var(iosystem_desc_t *ios, file_desc_t *file, int varid,
     read_buf = native_buf;
   }
 
-  /* Independent read */
+  /* Collective read (dxplid_indep permits individual low-level I/O, but the
+   * H5Dread() call itself is still collective - see dxplid_indep's setup
+   * above in spio_hdf5_create(), and similarly in spio_hdf5_reopen.cpp). */
   if(H5Dread(file->hdf5_vars[varid].hdf5_dataset_id, (dt_conv_reqd) ? file_var_ntype_id : mem_type_id,
              mem_space_id, file_space_id, file->dxplid_indep, read_buf) < 0){
     H5Eprint2(H5E_DEFAULT, stderr);
@@ -1850,7 +1863,7 @@ int spio_hdf5_close(iosystem_desc_t *ios, file_desc_t *file)
   if(H5Pclose(file->dxplid_indep) < 0){
     return pio_err(ios, file, PIO_EHDF5ERR, __FILE__, __LINE__,
                    "Closing file (%s, ncid=%d) using HDF5 iotype failed. "
-                   "The low level (HDF5) I/O library call failed to close a dataset transfer property list (independent data transfer)",
+                   "The low level (HDF5) I/O library call failed to close a dataset transfer property list (collective data transfer, individual low-level I/O)",
                    pio_get_fname_from_file(file), file->pio_ncid);
   }
 
