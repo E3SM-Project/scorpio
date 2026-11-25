@@ -4016,17 +4016,37 @@ int PIOc_def_var_impl(int ncid, const char *name, nc_type xtype, int ndims,
               * ch3:nemesis channel) - but the root cause was that the process
               * had never requested MPI_THREAD_MULTIPLE (plain MPI_Init()), so
               * MPICH's progress engine had no obligation to make genuinely
-              * concurrent cross-thread collectives safe. Now that every
-              * caller is required to have called
+              * concurrent cross-thread collectives safe.
+              *
+              * Now that every caller is required to have called
               * MPI_Init_thread()/MPI_THREAD_MULTIPLE before using the library
               * (see pio_test_mpi_init() in tests/cunit/pio_tests.h for the
               * cunit harness's side of this), the two collectives running
-              * concurrently is no longer a correctness problem, so there is
-              * no need to drain this op here - draining it would only give
-              * up the thread-pool overlap this async path exists for.
-              * Confirmed via 10 consecutive runs of
-              * test_subset_def_var_all_io_procs_no_race() with the drain
-              * removed and MPI_THREAD_MULTIPLE in effect: 0 failures. */
+              * concurrently is no longer a correctness problem HERE - but not
+              * merely because MPI_THREAD_MULTIPLE was requested. Per the MPI
+              * standard (e.g. MPI-3.1 S12.4.3), MPI_THREAD_MULTIPLE makes
+              * concurrent calls from different threads safe against each
+              * other, but it explicitly does NOT define what happens when two
+              * different threads issue matching collective operations on the
+              * SAME communicator concurrently - that remains the caller's
+              * responsibility to avoid. What actually makes this safe is that
+              * H5D__chunk_collective_fill() above runs on this rank's async
+              * I/O comm (a distinct, dup'd MPI_Comm - see IO_comm_info in
+              * spio_iosys_utils.cpp), while the caller's next collective call
+              * runs on a different communicator entirely, so there is no
+              * same-communicator collective to mismatch in the first place;
+              * MPI_THREAD_MULTIPLE's role is only to let the two threads issue
+              * those (differently-communicator-scoped) collectives
+              * concurrently without corrupting MPI's internal state (the
+              * SEGV this fixed). This reasoning does not generalize to a
+              * caller's next collective call sharing the SAME communicator as
+              * the worker thread's op - that case would still need either a
+              * drain or a dedicated communicator. There is no need to drain
+              * this op here - draining it would only give up the thread-pool
+              * overlap this async path exists for. Confirmed via 10
+              * consecutive runs of test_subset_def_var_all_io_procs_no_race()
+              * with the drain removed and MPI_THREAD_MULTIPLE in effect: 0
+              * failures. */
 #else
              ierr = spio_hdf5_def_var(ios, file, name, xtype, ndims, dimidsp, *varidp);
 #endif
