@@ -118,6 +118,52 @@ namespace SPIO{
                               void *rbuf, std::size_t rbuf_sz, int nvars);
         int rearrange_io2comp(const void *sbuf, std::size_t sbuf_sz,
                               void *rbuf, std::size_t rbuf_sz, int nvars);
+
+        /* True on exactly the I/O proc that owns/aggregates data for the
+         * "local range" of compute procs grouped with it in agg_comm_ (see
+         * create_agg_comm()) - i.e. the proc that aggregate_comp2io() hands
+         * a non-NULL agg_buf to, and the proc that must call
+         * rearrange_aggregated_to_io() for this decomposition. False on
+         * every compute proc, for which rearrange_data() (and so
+         * rearrange_aggregated_to_io()) is always a local no-op, since
+         * rearr_comm_ is MPI_COMM_NULL there (see create_rearr_comm()). */
+        bool is_agg_root(void ) const{ return is_agg_root_; }
+
+        /* rearrange_comp2io() split into its two phases, so a caller can
+         * take the cheap phase (aggregation) synchronously and defer the
+         * costly phase (rearrangement) elsewhere (e.g. PIO_USE_ASYNC_WR_REARR).
+         * rearrange_comp2io() itself is unchanged for every other caller -
+         * it is now just a wrapper calling both phases in sequence.
+         *
+         * aggregate_comp2io() is COLLECTIVE on agg_comm_ and must be called
+         * by every rank of ios_->union_comm (agg_comm_ spans compute AND I/O
+         * ranks - see create_agg_comm()). Where is_agg_root() is true (the
+         * one I/O proc per aggregation group), it mallocs the aggregation
+         * buffer, fills it via aggregate_data(), and TRANSFERS OWNERSHIP of
+         * it to the caller via agg_buf_out; everywhere else agg_buf_out is
+         * set to NULL. agg_buf_sz_out is set to the same value
+         * (nvars * agg_iochunk_sz_ * elem_mpi_type_sz_) on every rank,
+         * matching what the fused implementation always computed, whether
+         * or not this rank is an agg root. The caller must std::free() a
+         * non-NULL agg_buf_out (or pass that ownership on to something that
+         * will) - this function never frees it itself on success. On
+         * failure *agg_buf_out is left NULL (any partial allocation freed
+         * here) and *agg_buf_sz_out is left 0. */
+        int aggregate_comp2io(const void *sbuf, std::size_t sbuf_sz,
+                              void *&agg_buf_out, std::size_t &agg_buf_sz_out, int nvars);
+
+        /* The second (costly) phase: rearranges the aggregated buffer
+         * produced by aggregate_comp2io() across just the I/O ranks. Does
+         * NOT take ownership of agg_buf and does not free it - the caller
+         * still owns it after this returns (success or failure). COLLECTIVE
+         * on rearr_comm_, which only ever has I/O ranks as members
+         * (create_rearr_comm() leaves it MPI_COMM_NULL on compute ranks) -
+         * rearrange_data() itself opens with a local, no-MPI early return
+         * when !role_is_io_proc(), so this is always a cheap no-op on
+         * compute ranks. */
+        int rearrange_aggregated_to_io(void *agg_buf, std::size_t agg_buf_sz,
+                              void *rbuf, std::size_t rbuf_sz, int nvars);
+
         /* Finalize the rearranger */
         int finalize(void );
       private:

@@ -351,8 +351,8 @@ void SPIO::DataRearr::Contig_rearr::off_range_to_dim_range(PIO_Offset start_off,
   convert_off_to_count_dim_idx(count_off, count);
 }
 
-int SPIO::DataRearr::Contig_rearr::rearrange_comp2io(const void *sbuf, std::size_t sbuf_sz,
-      void *rbuf, std::size_t rbuf_sz, int nvars)
+int SPIO::DataRearr::Contig_rearr::aggregate_comp2io(const void *sbuf, std::size_t sbuf_sz,
+      void *&agg_buf_out, std::size_t &agg_buf_sz_out, int nvars)
 {
   int ret = PIO_NOERR;
   assert(is_init_);
@@ -365,6 +365,8 @@ int SPIO::DataRearr::Contig_rearr::rearrange_comp2io(const void *sbuf, std::size
   if(is_agg_root_){
     agg_buf = malloc(agg_buf_sz);
     if(!agg_buf){
+      agg_buf_out = NULL;
+      agg_buf_sz_out = 0;
       return pio_err(ios_, NULL, PIO_ENOMEM, __FILE__, __LINE__,
         "Internal error while aggregating data from compute processes to aggregating processes (PIO_REARR_CONTIG). Unable to allocate memory to recv data (%lld bytes) for data aggregation (iosysid = %d)", static_cast<long long int> (agg_buf_sz), ios_->iosysid);
     }
@@ -372,18 +374,56 @@ int SPIO::DataRearr::Contig_rearr::rearrange_comp2io(const void *sbuf, std::size
 
   ret = aggregate_data(sbuf, sbuf_sz, agg_buf, agg_buf_sz, nvars);
   if(ret != PIO_NOERR){
+    if(agg_buf){ free(agg_buf); }
+    agg_buf_out = NULL;
+    agg_buf_sz_out = 0;
     return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
-      "Internal error while aggregating data from compute processes to aggregating processes (PIO_REARR_CONTIG). Data aggregation failed(aggregating buffer size = %lld bytes, receive buffer size = %lld bytes, nvars = %d, iosysid = %d)", static_cast<unsigned long long int>(agg_buf_sz),
-                            static_cast<unsigned long long int>(rbuf_sz), nvars, ios_->iosysid);
+      "Internal error while aggregating data from compute processes to aggregating processes (PIO_REARR_CONTIG). Data aggregation failed(aggregating buffer size = %lld bytes, nvars = %d, iosysid = %d)", static_cast<unsigned long long int>(agg_buf_sz),
+                            nvars, ios_->iosysid);
   }
 
-  /* Rearrange data  - aggregate processes to rearrange processes */
+  agg_buf_out = agg_buf;
+  agg_buf_sz_out = agg_buf_sz;
+  return PIO_NOERR;
+}
+
+int SPIO::DataRearr::Contig_rearr::rearrange_aggregated_to_io(void *agg_buf, std::size_t agg_buf_sz,
+      void *rbuf, std::size_t rbuf_sz, int nvars)
+{
+  int ret = PIO_NOERR;
+  assert(is_init_);
+
+  /* Rearrange data  - aggregate processes to rearrange processes.
+   * Collective on rearr_comm_ (I/O ranks only - see rearrange_data()'s own
+   * early return for !role_is_io_proc()). Does not take ownership of
+   * agg_buf; the caller still owns and must free it. */
   ret = rearrange_data(agg_buf, agg_buf_sz, rbuf, rbuf_sz, nvars, true);
   if(ret != PIO_NOERR){
     return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
       "Internal error while rearranging data between IO/aggregating processes (PIO_REARR_CONTIG). Data rearrangement failed(aggregating buffer size = %lld bytes, receive buffer size = %lld bytes, nvars = %d, iosysid = %d)", static_cast<unsigned long long int>(agg_buf_sz),
               static_cast<unsigned long long int>(rbuf_sz), nvars, ios_->iosysid);
   }
+
+  return ret;
+}
+
+int SPIO::DataRearr::Contig_rearr::rearrange_comp2io(const void *sbuf, std::size_t sbuf_sz,
+      void *rbuf, std::size_t rbuf_sz, int nvars)
+{
+  /* Thin wrapper over the two phases (see PIO_USE_ASYNC_WR_REARR for why
+   * they are split): aggregation (cheap, compute+I/O, agg_comm_) followed
+   * by rearrangement (costly, I/O-only, rearr_comm_). Unchanged behavior
+   * for every caller that doesn't defer the second phase elsewhere. */
+  int ret = PIO_NOERR;
+  void *agg_buf = NULL;
+  std::size_t agg_buf_sz = 0;
+
+  ret = aggregate_comp2io(sbuf, sbuf_sz, agg_buf, agg_buf_sz, nvars);
+  if(ret != PIO_NOERR){
+    return ret;
+  }
+
+  ret = rearrange_aggregated_to_io(agg_buf, agg_buf_sz, rbuf, rbuf_sz, nvars);
 
   if(agg_buf){
     free(agg_buf);

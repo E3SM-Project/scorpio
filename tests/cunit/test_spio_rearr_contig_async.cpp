@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <cassert>
+#include <cstring>
 #include <numeric>
 #include <sstream>
 #include <functional>
@@ -205,6 +206,175 @@ int test_contig_rearr_sync_async_role_dispatch(SPIO_TF::Test_framework &tf)
   return PIO_NOERR;
 }
 
+/* Tests that rearrange_comp2io() (the fused, original entry point) and
+ * aggregate_comp2io() -> rearrange_aggregated_to_io() (the split phases
+ * added for PIO_USE_ASYNC_WR_REARR) produce byte-identical results, for a
+ * single-variable and a multi-variable write, on an imbalanced topology
+ * (the "async" role setup below has exactly one I/O/agg-root rank and
+ * wsz-1 compute ranks, matching the real disjoint-topology shape this
+ * split exists for).
+ */
+static int run_aggregate_rearrange_equivalence_case(SPIO_TF::Test_framework &tf,
+    SPIO::DataRearr::Contig_rearr &rearr, int nvars, PIO_Offset lcompmap_sz, int wrank)
+{
+  SPIO_Util::Logger::MPI_logger<std::ofstream> logger = tf.get_logger();
+  int ret = PIO_NOERR;
+
+  /* Rank- and var-distinguishable input: sbuf holds nvars contiguous blocks,
+   * each lcompmap_sz elements, matching the layout PIOc_write_darray_multi_
+   * impl() passes (pio_darray.cpp:349's sbuf_sz = arraylen * nvars * mpitype_size). */
+  std::vector<double> sbuf(lcompmap_sz * nvars);
+  for(int v = 0; v < nvars; v++){
+    for(PIO_Offset i = 0; i < lcompmap_sz; i++){
+      sbuf[v * lcompmap_sz + i] = 1000.0 * v + 100.0 * wrank + static_cast<double>(i);
+    }
+  }
+  std::size_t sbuf_sz = sbuf.size() * sizeof(double);
+
+  std::size_t rlen = rearr.get_rearrange_buf_sz();
+  std::size_t rbuf_sz = rlen * nvars * sizeof(double);
+  /* Same sentinel for both buffers: this test checks fused-vs-split
+   * EQUIVALENCE, not absolute correctness of what CONTIG writes (that is
+   * covered elsewhere, e.g. test_darray_hdf5_contig) - using different
+   * sentinels would flag an untouched position as a "difference" even
+   * when both paths behave identically. */
+  const double UNWRITTEN_SENTINEL = -999.0;
+  std::vector<double> rbuf_fused(rlen * nvars, UNWRITTEN_SENTINEL);
+  std::vector<double> rbuf_split(rlen * nvars, UNWRITTEN_SENTINEL);
+
+  /* (1) The fused, original call. */
+  ret = rearr.rearrange_comp2io(sbuf.data(), sbuf_sz, rbuf_fused.data(), rbuf_sz, nvars);
+  if(ret != PIO_NOERR){
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "rearrange_comp2io() (fused) failed");
+    return PIO_EINTERNAL;
+  }
+
+  /* (2) The split call. */
+  void *agg_buf = NULL;
+  std::size_t agg_buf_sz = 0;
+  ret = rearr.aggregate_comp2io(sbuf.data(), sbuf_sz, agg_buf, agg_buf_sz, nvars);
+  if(ret != PIO_NOERR){
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "aggregate_comp2io() failed");
+    return PIO_EINTERNAL;
+  }
+
+  bool test_success = true;
+
+  if((agg_buf != NULL) != rearr.is_agg_root()){
+    std::ostringstream oss;
+    oss << "ERROR: (agg_buf != NULL) = " << (agg_buf != NULL)
+        << " does not match is_agg_root() = " << rearr.is_agg_root() << "\n";
+    logger.log(SPIO_Util::Logger::Log_level::INFO, oss.str());
+    test_success = false;
+  }
+
+  /* agg_buf_sz must be identical on every rank (the fused implementation
+   * always computed it the same way regardless of is_agg_root_). */
+  unsigned long long local_sz = static_cast<unsigned long long>(agg_buf_sz);
+  unsigned long long min_sz = 0, max_sz = 0;
+  MPI_Allreduce(&local_sz, &min_sz, 1, MPI_UNSIGNED_LONG_LONG, MPI_MIN, tf.get_comm());
+  MPI_Allreduce(&local_sz, &max_sz, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, tf.get_comm());
+  if(min_sz != max_sz){
+    std::ostringstream oss;
+    oss << "ERROR: agg_buf_sz is not identical across ranks (min=" << min_sz
+        << ", max=" << max_sz << ")\n";
+    logger.log(SPIO_Util::Logger::Log_level::INFO, oss.str());
+    test_success = false;
+  }
+
+  ret = rearr.rearrange_aggregated_to_io(agg_buf, agg_buf_sz, rbuf_split.data(), rbuf_sz, nvars);
+  if(agg_buf){ free(agg_buf); }
+  if(ret != PIO_NOERR){
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "rearrange_aggregated_to_io() failed");
+    return PIO_EINTERNAL;
+  }
+
+  if(std::memcmp(rbuf_fused.data(), rbuf_split.data(), rbuf_sz) != 0){
+    std::ostringstream oss;
+    oss << "ERROR: rearrange_comp2io() (fused) and aggregate_comp2io()+"
+        << "rearrange_aggregated_to_io() (split) produced different data (nvars=" << nvars
+        << ", rank=" << wrank << ")\n";
+    logger.log(SPIO_Util::Logger::Log_level::INFO, oss.str());
+    test_success = false;
+  }
+
+  return test_success ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+int test_contig_rearr_aggregate_rearrange_equivalence(SPIO_TF::Test_framework &tf)
+{
+  MPI_Comm comm = tf.get_comm();
+  int wrank = tf.get_comm_rank();
+  int wsz = tf.get_comm_size();
+  SPIO_Util::Logger::MPI_logger<std::ofstream> logger = tf.get_logger();
+
+  int ret = PIO_NOERR;
+
+  assert(wsz >= 2);
+
+  MPI_Comm sync_io_comm = MPI_COMM_NULL, async_io_comm = MPI_COMM_NULL;
+  ret = MPI_Comm_dup(comm, &sync_io_comm);
+  if(ret != MPI_SUCCESS){
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Unable to dup comm for sync I/O comm");
+    return PIO_EINTERNAL;
+  }
+
+  /* One I/O/agg-root rank (rank 0), wsz-1 compute ranks - the imbalanced
+   * shape that exercises is_agg_root() == false. */
+  int async_color = (wrank == 0) ? 0 : 1;
+  ret = MPI_Comm_split(comm, async_color, wrank, &async_io_comm);
+  if(ret != MPI_SUCCESS){
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Unable to split comm for async I/O comm");
+    MPI_Comm_free(&sync_io_comm);
+    return PIO_EINTERNAL;
+  }
+
+  iosystem_desc_t *ios = get_sync_async_iosystem(tf, comm, wrank, wsz, sync_io_comm, async_io_comm);
+  if(!ios){
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Unable to get I/O system");
+    MPI_Comm_free(&sync_io_comm);
+    MPI_Comm_free(&async_io_comm);
+    return PIO_EINTERNAL;
+  }
+
+  int test_ret = PIO_NOERR;
+  try{
+    const int LOCAL_COMPMAP_SZ = wsz - 1;
+    int gdimlen = LOCAL_COMPMAP_SZ * wsz;
+    std::vector<PIO_Offset> compmap(LOCAL_COMPMAP_SZ);
+    std::iota(compmap.begin(), compmap.end(), wrank * LOCAL_COMPMAP_SZ);
+
+    SPIO::DataRearr::Contig_rearr rearr(ios, true);
+    ret = rearr.init(PIO_DOUBLE, compmap.data(), compmap.size(), &gdimlen, 1, NULL);
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Initializing contig rearranger failed");
+      free_sync_async_iosystem(ios);
+      return PIO_EINTERNAL;
+    }
+
+    for(int nvars : {1, 3}){
+      int case_ret = run_aggregate_rearrange_equivalence_case(tf, rearr, nvars, LOCAL_COMPMAP_SZ, wrank);
+      if(case_ret != PIO_NOERR){
+        test_ret = case_ret;
+      }
+    }
+
+    ret = rearr.finalize();
+    if(ret != PIO_NOERR){
+      logger.log(SPIO_Util::Logger::Log_level::INFO, "Finalizing contig rearranger failed");
+      test_ret = PIO_EINTERNAL;
+    }
+  }
+  catch(...){
+    logger.log(SPIO_Util::Logger::Log_level::INFO, "Testing aggregate/rearrange equivalence failed");
+    free_sync_async_iosystem(ios);
+    return PIO_EINTERNAL;
+  }
+
+  free_sync_async_iosystem(ios);
+  return test_ret;
+}
+
 int main(int argc, char *argv[])
 {
   int ret;
@@ -216,7 +386,8 @@ int main(int argc, char *argv[])
   }
 
   std::vector<std::pair<std::string, std::function<int(SPIO_TF::Test_framework &)> > > rfuncs = {
-    {"test_contig_rearr_sync_async_role_dispatch", test_contig_rearr_sync_async_role_dispatch}
+    {"test_contig_rearr_sync_async_role_dispatch", test_contig_rearr_sync_async_role_dispatch},
+    {"test_contig_rearr_aggregate_rearrange_equivalence", test_contig_rearr_aggregate_rearrange_equivalence}
   };
 
   SPIO_TF::Test_framework tf("test_spio_rearr_contig_async", MPI_COMM_WORLD, rfuncs);
