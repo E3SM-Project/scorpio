@@ -2398,39 +2398,6 @@ int spio_get_var_tc(int ncid, int varid, nc_type xtype, void *buf)
     return spio_get_vars_tc(ncid, varid, startp, countp, NULL, xtype, buf);
 }
 
-/* Returns true if a variable has unlimited dimensions, false otherwise (and on error) */
-static bool spio_var_has_unlimited_dims(file_desc_t *file, int varid, int &ret)
-{
-  ret = PIO_NOERR;
-  assert(file && (varid >= 0));
-
-  /* Get the unlimited dimension in the file
-   * Note: We assume that we have just one unlimited dimension (no longer valid for
-   * NetCDF4 files) in a file
-   */
-  int unlim_dimid = -1;
-  ret = PIOc_inq_unlimdim_impl(file->pio_ncid, &unlim_dimid);
-  if((ret != PIO_NOERR) || (unlim_dimid == -1)) { return false; }
-
-  /* Get the number of dimensions in the variable */
-  int ndims = -1;
-  ret = PIOc_inq_varndims_impl(file->pio_ncid, varid, &ndims);
-  if((ret != PIO_NOERR) || (ndims <= 0)) { return false; }
-
-  /* Get the variable dimensions */
-  std::vector<int> vdims(ndims);
-  ret = PIOc_inq_vardimid_impl(file->pio_ncid, varid, vdims.data());
-  if(ret != PIO_NOERR) { return false; }
-
-  /* Check if any variable dimension is an unlimited dimension */
-  std::vector<int>::const_iterator iter =
-    std::find_if(vdims.cbegin(), vdims.cend(),
-      [unlim_dimid](int vdim){ return vdim == unlim_dimid; });
-  if(iter != vdims.cend()) { return true; }
-
-  return false;
-}
-
 /**
  * Internal PIO function which provides a type-neutral interface to
  * nc_put_vars.
@@ -3410,36 +3377,44 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
 #if PIO_USE_ASYNC_WR_THREAD
         ierr = spio_iosys_async_hdf5_put_var_op_add(file, varid, start, count, stride, xtype, buf);
-        /* spio_iosys_async_hdf5_put_var_op_add() enqueues spio_hdf5_put_var()
-         * onto this rank's async thread pool queue and returns immediately,
-         * before the worker thread has run it. For a variable with an
-         * unlimited (record) dimension, spio_hdf5_put_var() may call
-         * H5Dextend() to grow the dataset - H5Dextend() is a collective HDF5
-         * call that every rank sharing this file's communicator must invoke,
-         * in the same order, to the same effective record index. Since each
-         * rank's async op is dispatched to its own independently-scheduled
-         * worker thread (see spio_async_hdf5_utils.cpp), nothing otherwise
-         * guarantees that two ranks reach their Nth record's H5Dextend() at
-         * the same logical point - one rank's thread can race ahead to a
-         * later record while another is still behind, racing collective
-         * H5Dextend() calls against each other (the same architectural class
-         * of bug fixed for createfile/create in commit 56d2ab618c and for
-         * def_var's collective H5Dcreate2() fill above). Unlike the def_var
-         * and createfile races, this doesn't crash: it silently leaves some
-         * records unwritten/zeroed, since mismatched collective extends
-         * leave the dataset's recognized extent inconsistent across ranks.
-         * Waiting here, right after enqueueing, keeps every rank's record
-         * writes in lockstep with the next PIOc_put_var() call made by the
-         * caller (which issues one call per record, collectively, across
-         * ranks) - the same fix shape used for the two prior races. */
-        if(ierr == PIO_NOERR)
-        {
-          int has_unlimdim_ierr = PIO_NOERR;
-          if(spio_var_has_unlimited_dims(file, varid, has_unlimdim_ierr))
-          {
-            ierr = spio_wait_file_async_pend_ops(file);
-          }
-        }
+        /* No drain needed here, for a variable with an unlimited (record)
+         * dimension or otherwise. A prior version of this comment argued
+         * that removing the drain risks mismatched collective H5Dextend()
+         * calls across ranks (the dataset's record dimension growing to a
+         * different extent on different ranks) - that argument does not
+         * hold, for two independent reasons:
+         *
+         *  - spio_iosys_async_hdf5_put_var_op_add() enqueues onto THIS rank's
+         *    async thread pool queue from the calling (application) thread,
+         *    synchronously, before PIOc_put_var() returns - a rank's queue
+         *    contents and their order are determined entirely by that rank's
+         *    own control flow, never by worker-thread scheduling. Every
+         *    owning rank runs the same SPMD program, so every rank's queue
+         *    receives the identical sequence of ops in the identical order;
+         *    timing skew between ranks can change when each rank's worker
+         *    thread drains its queue, never the relative order of what is in
+         *    it.
+         *  - H5Dextend(), like H5Dwrite() itself (both collective here - see
+         *    the H5FD_MPIO_COLLECTIVE transfer mode on file->dxplid_indep in
+         *    spio_hdf5_utils.cpp, despite the "independent" name), is
+         *    self-synchronizing: a rank's worker thread blocks inside a
+         *    collective call until every other owning rank's worker reaches
+         *    the matching call. A worker cannot race ahead to record N+1's
+         *    op while another rank's worker is still on record N, because
+         *    its own FIFO queue - built in the same order as every other
+         *    rank's - dequeues and blocks on record N's collective call
+         *    before record N+1's op is even looked at.
+         *
+         * So the Nth collective HDF5 call on this file's communicator always
+         * matches the Nth collective call made by every other owning rank,
+         * regardless of relative timing between ranks' worker threads. This
+         * is the same class of H5Dextend() call as PIOc_setframe_impl()'s
+         * (see pioc.cpp), whose equivalent drain was removed after stress
+         * testing found no reproductions; removing this one rests on the
+         * structural argument above, not only on the absence of failures in
+         * test_subset_put_var_record_dim_no_race() (test_hdf5_async_full_
+         * lifecycle.cpp), which already exercises this exact scenario with
+         * all 4 ranks simultaneously I/O-owning. */
 #else
         ierr = spio_hdf5_put_var(ios, file, varid, start, count, stride, xtype, buf);
 #endif
