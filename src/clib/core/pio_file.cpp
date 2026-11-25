@@ -857,15 +857,42 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
      * npend_ops > 0 for this file, so the wait is restricted to that proc -
      * on every other proc npend_ops is always 0 and this is a no-op anyway.
      *
-     * Note that this is usually already satisfied when we get here: the
-     * "soft close" path (PIOc_closefile_impl() -> spio_soft_closefile() ->
-     * pio_iosys_async_file_close_op_wait()) requeues the close op until
-     * npend_ops reaches 0 and only then calls this function. This drain
-     * covers the direct ("hard close") callers of this function. */
+     * For non-HDF5/HDF5C iotypes this function is always called directly/
+     * synchronously from PIOc_closefile_impl() (there is no "soft close" path
+     * for those iotypes), so the sync I/O proc can genuinely reach here with
+     * npend_ops > 0 - the wait is a real, needed drain for that case.
+     *
+     * For HDF5/HDF5C files, by contrast, "usually" above is actually
+     * "always": the owning rank (is_file_owning_io_proc() == true) NEVER
+     * calls this function directly - PIOc_closefile_impl() routes it through
+     * spio_soft_closefile() instead, which queues the close onto the async
+     * write thread pool - so the only way wait_for_file_async_pend_ops
+     * evaluates true for an HDF5/HDF5C file is this function being called
+     * from pio_iosys_async_file_close_op_wait(), running on the thread pool's
+     * own worker thread, which only calls this function once it has already
+     * confirmed file->npend_ops == 0 (see that function - it requeues the
+     * close op instead of calling here until npend_ops reaches 0). So for
+     * HDF5/HDF5C the wait below is never actually "waiting" in the sense of
+     * blocking on another rank or on future work: it is the thread pool's own
+     * worker re-checking a condition it just confirmed about an op it is
+     * itself responsible for completing - the exact pattern
+     * spio_wait_file_async_pend_ops()'s own doc comment calls out as a
+     * deadlock hazard in general, made safe here only by that pre-check
+     * always being true by the time we get here. The assert just below pins
+     * that invariant down explicitly instead of leaving it implicit. */
 #ifdef _HDF5
     bool wait_for_file_async_pend_ops = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
         ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)
         : (ios->io_comm_info && ios->io_comm_info->is_sync_io_proc());
+    /* If this ever fires, some new HDF5/HDF5C caller reaches this function
+     * directly (bypassing spio_soft_closefile()'s queued close) while the
+     * owning rank still has pending async ops - at which point the call to
+     * spio_wait_file_async_pend_ops() below stops being the guaranteed-
+     * instant no-op described above and becomes a genuine (and, if that new
+     * caller is itself a thread pool worker, deadlock-prone) wait. */
+    assert(!wait_for_file_async_pend_ops ||
+           ((file->iotype != PIO_IOTYPE_HDF5) && (file->iotype != PIO_IOTYPE_HDF5C)) ||
+           (file->npend_ops == 0));
 #else
     bool wait_for_file_async_pend_ops = (ios->io_comm_info && ios->io_comm_info->is_sync_io_proc());
 #endif
