@@ -5,9 +5,11 @@
 #include <iostream>
 #include <cassert>
 #include <cstring>
+#include <cstdlib>
 #include <string>
 #include <numeric>
 #include <functional>
+#include <vector>
 
 extern "C"{
 
@@ -31,6 +33,7 @@ extern "C"{
 #include "spio_hdf5_utils.hpp"
 #include "spio_async_tcomm.hpp"
 #include "spio_iosys_utils.hpp"
+#include "pio_rearr_contig.hpp"
 
 struct Hdf5_create_info{
   file_desc_t *file;
@@ -1022,3 +1025,257 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
 #endif // _HDF5
 }
 
+
+#if PIO_USE_ASYNC_WR_REARR
+/* Combined async rearrange+write op for the CONTIG rearranger.
+ *
+ * By the time this is queued, the cheap phase (aggregation, over agg_comm_,
+ * run on every rank - compute and I/O - at its usual cost) has already
+ * happened synchronously, on the application thread, via
+ * Contig_rearr::aggregate_comp2io() - see PIOc_write_darray_multi_impl()
+ * (pio_darray.cpp). Only ranks where Contig_rearr::is_agg_root() is true got
+ * a non-NULL agg_buf back from that call, and only those ranks ever reach
+ * pio_iosys_async_hdf5_rearr_write_op_add() below. This op defers just the
+ * costly phase (rearrangement, over rearr_comm_ - I/O ranks only, a
+ * guaranteed local no-op elsewhere) and the HDF5 write that follows it to
+ * the async write thread pool.
+ */
+struct Hdf5_rearr_wcache{
+  /* The HDF5 write half of this op. Owned. Its iobuf is allocated,
+   * populated (by the rearranger below), and released entirely on the
+   * worker thread - unlike pio_iosys_async_hdf5_write_op_add()'s, which
+   * bgets on the app thread and brels on the worker. */
+  Hdf5_wcache *wcache;
+
+  /* The AGGREGATED compute-side data, produced synchronously on the
+   * application thread by Contig_rearr::aggregate_comp2io() before this op
+   * was queued. Owned here: malloc'd by aggregate_comp2io(), std::free()d
+   * by ~Hdf5_rearr_wcache(). Ownership transfers by pointer - there is NO
+   * copy of the user's original compute-side buffer, and none is needed:
+   * that buffer was already consumed by the aggregation before
+   * PIOc_write_darray_multi_impl() returned. Never NULL for a queued op:
+   * this op is only ever queued where Contig_rearr::is_agg_root() is true. */
+  void *agg_buf;
+  std::size_t agg_buf_sz;
+
+  /* Elements (not bytes) in the rearranged destination buffer the worker
+   * allocates: rlen == io_desc_info->llen * nvars. */
+  std::size_t rlen;
+
+  /* needsfill is io_desc_info->needsfill; fillvalue holds nvars elements
+   * (nvars * piotype_size bytes), copied at queue time from the flat
+   * fillvalue buffer the caller passes (matching how
+   * PIOc_write_darray_multi_impl()'s own synchronous CONTIG fill prefill,
+   * pio_darray.cpp, already treats its fillvalue parameter - a flat,
+   * nvars * mpitype_size-byte buffer, not a per-variable array of
+   * pointers, regardless of the public API's const void** declaration).
+   * The worker prefills the rearranged buffer from this before rearranging
+   * - see pio_iosys_async_op_hdf5_rearr_write_impl() below. */
+  bool needsfill;
+  std::vector<char> fillvalue;
+
+  Hdf5_rearr_wcache(file_desc_t *file, int nvars, int fndims,
+    const int *varids, std::shared_ptr<io_desc_t> iodesc, const int *frame);
+  ~Hdf5_rearr_wcache();
+};
+
+Hdf5_rearr_wcache::Hdf5_rearr_wcache(file_desc_t *file, int nvars, int fndims,
+    const int *varids, std::shared_ptr<io_desc_t> iodesc, const int *frame):
+    agg_buf(NULL), agg_buf_sz(0), rlen(0), needsfill(false)
+{
+  /* CONTIG async rearrange+write never writes a separate hole-fill buffer:
+   * the DARRAY_FILL second pass (pio_darray.cpp) is PIO_REARR_SUBSET-only. */
+  wcache = new Hdf5_wcache(file, nvars, fndims, varids, iodesc, /*wr_fillbuf=*/false, frame);
+}
+
+Hdf5_rearr_wcache::~Hdf5_rearr_wcache()
+{
+  delete(wcache);
+  if(agg_buf){ std::free(agg_buf); agg_buf = NULL; }
+}
+
+int pio_iosys_async_op_hdf5_rearr_write_impl(void *pdata)
+{
+#ifdef _HDF5
+  int ret = PIO_NOERR;
+  Hdf5_rearr_wcache *rwcache = static_cast<Hdf5_rearr_wcache *>(pdata);
+  assert(rwcache && rwcache->wcache);
+
+  Hdf5_wcache *wcache = rwcache->wcache;
+  io_desc_info_t *io_desc_info = wcache->io_desc_info;
+  assert(io_desc_info && io_desc_info->rearr && io_desc_info->rearr->is_init());
+  assert(rwcache->agg_buf);
+
+  iosystem_desc_t *ios = wcache->file->iosystem;
+  assert(ios);
+
+  if(rwcache->rlen > 0){
+    wcache->iobuf_sz = rwcache->rlen * io_desc_info->mpitype_size;
+    wcache->iobuf = bget(wcache->iobuf_sz);
+    if(!(wcache->iobuf)){
+      return pio_err(ios, wcache->file, PIO_ENOMEM, __FILE__, __LINE__,
+                      "Asynchronously rearranging and writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Unable to allocate memory (%lld bytes) for the rearranged destination buffer", wcache->nvars, pio_get_fname_from_file(wcache->file), wcache->file->pio_ncid, static_cast<long long int>(wcache->iobuf_sz));
+    }
+
+    /* Prefill the rearranged destination with the fill value before
+     * rearranging - the rearrange only overwrites the elements covered by
+     * this rank's data, so any element never covered by any compute rank's
+     * contribution must already hold the fill value. Must happen here, on
+     * the worker, immediately before the rearrange - leaving it on the
+     * application thread (as the synchronous path still does, for
+     * mv_iobuf) would require the destination buffer to exist there, which
+     * is exactly what deferring the rearrange removes. */
+    if(rwcache->needsfill){
+      PIO_Offset localiobuflen = static_cast<PIO_Offset>(rwcache->rlen) / wcache->nvars;
+      for(int nv = 0; nv < wcache->nvars; nv++){
+        for(PIO_Offset i = 0; i < localiobuflen; i++){
+          std::memcpy(&((char *)wcache->iobuf)[io_desc_info->mpitype_size * (i + nv * localiobuflen)],
+                 &(rwcache->fillvalue[nv * io_desc_info->mpitype_size]), io_desc_info->mpitype_size);
+        }
+      }
+    }
+  }
+
+  /* The costly phase: collective on rearr_comm_ (I/O ranks only -
+   * Contig_rearr::rearrange_data() is a guaranteed local no-op elsewhere,
+   * since rearr_comm_ is MPI_COMM_NULL there). This is the only rearranger
+   * communicator a worker thread ever touches - agg_comm_ and union_comm
+   * are never touched off the application thread (see
+   * PIOc_write_darray_multi_impl()), so this cannot race a compute rank's
+   * (or another file's, sharing this ioid's) use of agg_comm_. */
+  ret = io_desc_info->rearr->rearrange_aggregated_to_io(rwcache->agg_buf, rwcache->agg_buf_sz,
+          wcache->iobuf, wcache->iobuf_sz, wcache->nvars);
+  if(ret != PIO_NOERR){
+    return pio_err(ios, wcache->file, ret, __FILE__, __LINE__,
+                    "Asynchronously rearranging and writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. Rearranging the aggregated data to the I/O ranks failed", wcache->nvars, pio_get_fname_from_file(wcache->file), wcache->file->pio_ncid);
+  }
+
+  /* agg_buf is dead from here - freed by ~Hdf5_rearr_wcache(), not here, so
+   * there is a single free site regardless of which path below is taken. */
+
+  /* Write half, mirroring pio_iosys_async_hdf5_write_op_add()'s own role
+   * gate verbatim: a rank with rlen == 0 (not an I/O rank for this file's
+   * selected view) has nothing to write and must not enter the trailing
+   * collective MPI_Barrier inside pio_iosys_async_op_hdf5_write_impl(). */
+  bool is_async = (io_desc_info == wcache->iodesc->async_io_desc_info);
+  if(is_async ? ios->io_comm_info->is_async_io_proc() : ios->io_comm_info->is_sync_io_proc()){
+    ret = pio_iosys_async_op_hdf5_write_impl(wcache);
+    if(ret != PIO_NOERR){
+      return pio_err(ios, wcache->file, ret, __FILE__, __LINE__,
+                      "Asynchronously rearranging and writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5x failed. The write half of the operation failed", wcache->nvars, pio_get_fname_from_file(wcache->file), wcache->file->pio_ncid);
+    }
+  }
+
+  return PIO_NOERR;
+#else // _HDF5
+  assert(0);
+  return PIO_EINTERNAL;
+#endif // _HDF5
+}
+
+int pio_iosys_async_op_hdf5_rearr_write(void *pdata)
+{
+#ifdef _HDF5
+  Hdf5_rearr_wcache *rwcache = static_cast<Hdf5_rearr_wcache *>(pdata);
+  assert(rwcache && rwcache->wcache);
+
+  int ret = pio_iosys_async_op_hdf5_rearr_write_impl(pdata);
+
+  /* One less pending op using this iodesc & file - decremented here, on
+   * every exit path (success or failure), matching
+   * pio_iosys_async_op_hdf5_write()'s own discipline: a leaked count would
+   * stall PIOc_sync()/close and permanently defer this decomposition's
+   * free in PIOc_freedecomp_impl(). */
+  rwcache->wcache->iodesc->nasync_pend_ops--;
+  rwcache->wcache->file->npend_ops--;
+  SPIO_Util::GVars::npend_hdf5_async_ops--;
+
+  return ret;
+#else // _HDF5
+  assert(0);
+  return PIO_EINTERNAL;
+#endif // _HDF5
+}
+
+void pio_iosys_async_op_hdf5_rearr_write_free(void *pdata)
+{
+#ifdef _HDF5
+  Hdf5_rearr_wcache *rwcache = static_cast<Hdf5_rearr_wcache *>(pdata);
+  assert(rwcache);
+
+  delete(rwcache);
+#else // _HDF5
+  assert(0);
+#endif // _HDF5
+}
+
+int pio_iosys_async_hdf5_rearr_write_op_add(file_desc_t *file, int nvars, int fndims,
+      const int *varids, std::shared_ptr<io_desc_t> iodesc, const int *frame,
+      void *agg_buf, std::size_t agg_buf_sz, const void *fillvalue)
+{
+#ifdef _HDF5
+  int ret = PIO_NOERR;
+
+  assert(file && file->iosystem && (nvars > 0) && (fndims > 0) && varids && iodesc);
+  assert(agg_buf && (agg_buf_sz > 0));
+
+  iosystem_desc_t *ios = file->iosystem;
+  assert(ios);
+
+  io_desc_info_t &sel_desc = iodesc->select_io_desc_info(file->iotype, file);
+  assert((sel_desc.rearranger == PIO_REARR_CONTIG) && sel_desc.rearr);
+
+  /* This function is only ever called on agg-root ranks - the ranks
+   * Contig_rearr::aggregate_comp2io() handed a non-NULL agg_buf to (see
+   * PIOc_write_darray_multi_impl(), pio_darray.cpp). This coincides exactly
+   * with the role gate pio_iosys_async_hdf5_write_op_add() already uses for
+   * the plain HDF5 write op (confirmed by inspection of role_is_io_proc()/
+   * create_agg_comm(): both reduce to is_async_io_proc() when sel_desc is
+   * the async view, is_sync_io_proc() otherwise) - the invariant
+   * PIOc_sync_impl()/spio_hard_closefile()'s existing is_file_owning_io_proc()
+   * gates rely on; if this assert ever fires, those gates need revisiting. */
+  assert(sel_desc.rearr->is_agg_root());
+
+  Hdf5_rearr_wcache *rwcache = new Hdf5_rearr_wcache(file, nvars, fndims, varids, iodesc, frame);
+  rwcache->wcache->io_desc_info = &sel_desc;
+  rwcache->agg_buf = agg_buf;
+  rwcache->agg_buf_sz = agg_buf_sz;
+
+  rwcache->rlen = static_cast<std::size_t>(sel_desc.llen) * nvars;
+
+  if(sel_desc.needsfill){
+    rwcache->needsfill = true;
+    std::size_t fillvalue_sz = static_cast<std::size_t>(nvars) * sel_desc.piotype_size;
+    rwcache->fillvalue.resize(fillvalue_sz);
+    std::memcpy(rwcache->fillvalue.data(), fillvalue, fillvalue_sz);
+  }
+
+  /* One more pending op using this iodesc & file - the same counters
+   * pio_iosys_async_hdf5_write_op_add() increments, so the existing
+   * is_file_owning_io_proc()-gated drains in PIOc_sync_impl()/
+   * spio_hard_closefile() need no widening (see the assert above). */
+  iodesc->nasync_pend_ops++;
+  file->npend_ops++;
+  SPIO_Util::GVars::npend_hdf5_async_ops++;
+
+  /* Create async task */
+  SPIO_Util::Async_op op = {SPIO_Util::Async_op::Op_type::SPIO_ASYNC_HDF5_REARR_WRITE_OP,
+                            static_cast<void *>(rwcache),
+                            pio_iosys_async_op_hdf5_rearr_write,
+                            pio_async_poke_func_unavail,
+                            pio_iosys_async_op_hdf5_rearr_write_free};
+
+  ret = pio_async_tpool_op_add(op);
+  if(ret != PIO_NOERR){
+    LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
+    return pio_err(ios, NULL, ret, __FILE__, __LINE__,
+                    "Internal error while adding asynchronous pending operation (to rearrange and write %d variables in file = %s) to the thread pool (iosystem = %d). Adding the asynchronous operation failed", nvars, pio_get_fname_from_file(file), ios->iosysid);
+  }
+
+  return PIO_NOERR;
+#else // _HDF5
+  assert(0);
+  return PIO_EINTERNAL;
+#endif // _HDF5
+}
+#endif /* PIO_USE_ASYNC_WR_REARR */

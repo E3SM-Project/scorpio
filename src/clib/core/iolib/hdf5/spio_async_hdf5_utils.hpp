@@ -27,5 +27,17 @@ int pio_iosys_async_hdf5_write_op_add(file_desc_t *file, int nvars, int fndims,
       const int *varids, std::shared_ptr<io_desc_t> iodesc, int fill, const int *frame);
 int spio_iosys_async_hdf5_set_frame_op_add(file_desc_t *file, int varid, int frame);
 
+#if PIO_USE_ASYNC_WR_REARR
+/* Combined async rearrange (CONTIG only)+HDF5 write op - see the long
+ * comment above Hdf5_rearr_wcache (spio_async_hdf5_utils.cpp) for the
+ * design. Only ever called on ranks where
+ * Contig_rearr::aggregate_comp2io() (pio_rearr_contig.hpp) returned a
+ * non-NULL agg_buf - takes ownership of agg_buf unconditionally, including
+ * on its own failure paths. */
+int pio_iosys_async_hdf5_rearr_write_op_add(file_desc_t *file, int nvars, int fndims,
+      const int *varids, std::shared_ptr<io_desc_t> iodesc, const int *frame,
+      void *agg_buf, std::size_t agg_buf_sz, const void *fillvalue);
+#endif /* PIO_USE_ASYNC_WR_REARR */
+
 #define __SPIO_ASYNC_HDF5_UTILS_HPP__
 #endif // __SPIO_ASYNC_HDF5_UTILS_HPP__
