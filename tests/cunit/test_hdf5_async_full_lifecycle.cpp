@@ -74,6 +74,9 @@
  *      test that PIOc_freedecomp() with a pending async op outstanding
  *      still works via the pre-existing defer-to-last-iosystem-finalize
  *      mechanism, unmodified by this plan.
+ *  21. test_async_rearr_contig_shared_ioid_read_write_stress - a stress
+ *      (repeat ~75 times) version of scenario 19's race, since a
+ *      single-shot scenario passes by luck most of the time.
  *
  * This file adds tests only - it does not change any production code.
  *
@@ -3253,6 +3256,154 @@ static int test_async_rearr_contig_freedecomp_while_pending(MPI_Comm test_comm, 
 
   return ((ret_pending == PIO_NOERR) && (ret_drained == PIO_NOERR)) ? PIO_NOERR : PIO_EINTERNAL;
 }
+
+/* ------------------------------------------------------------------------
+ * Scenario 21: stress test for the read-vs-pending-rearrange race that
+ * scenario 19 (test_async_rearr_contig_shared_ioid_two_files) exercises
+ * once. A single-shot scenario passes by luck most of the time - the
+ * worker thread often finishes well before the application thread reaches
+ * the read. Repeats the write-to-A/read-from-B pattern STRESS_NUM_ITERS
+ * times with a distinct per-iteration value, asserting every read, using
+ * the same repeat-until-it-races structure as
+ * test_subset_put_var_record_dim_no_race() above (and the commits that
+ * motivated it: 5edad70cc2, 5b7e671fb1, fd929570f7) - reports the first
+ * failing iteration and first mismatching index, not just "failed".
+ *
+ * niotasks == 1, for the same reason scenarios 16-20 above do (see their
+ * shared doc comment): CONTIG + HDF5 + niotasks > 1 + a decomposed read
+ * hits a separate, pre-existing, out-of-scope heap-buffer-overflow. The
+ * plan's Task 12 Step 3 additionally asks for an np in {2, 3, 4} sweep;
+ * this file's MIN_NTASKS == TARGET_NTASKS == 4 is fixed (every scenario in
+ * this file assumes exactly 4 ranks), so that sweep is not done here - see
+ * the commit message for this scenario for how it was run instead. */
+#define STRESS_NUM_ITERS 75
+
+static int test_async_rearr_contig_shared_ioid_read_write_stress(MPI_Comm test_comm, int my_rank, int ntasks)
+{
+  int ret = PIO_NOERR;
+  int iosysid = -1, ioid = -1, gdimlen = 0;
+  char filenameA[PIO_MAX_NAME + 1], filenameB[PIO_MAX_NAME + 1];
+  const int num_io_procs = 1;
+
+  snprintf(filenameA, PIO_MAX_NAME + 1, "%s_async_rearr_stress_A.nc", TEST_NAME);
+  snprintf(filenameB, PIO_MAX_NAME + 1, "%s_async_rearr_stress_B.nc", TEST_NAME);
+
+  if((ret = PIOc_Init_Intracomm(test_comm, num_io_procs, STRIDE1, BASE0,
+                                PIO_REARR_CONTIG, &iosysid))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_shared_ioid_read_write_stress() FAILED: "
+      "PIOc_Init_Intracomm() returned %d\n", ret);
+    return ret;
+  }
+
+  if((ret = init_test_decomp(iosysid, my_rank, ntasks, PIO_REARR_CONTIG, &gdimlen, &ioid))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_shared_ioid_read_write_stress() FAILED: "
+      "PIOc_init_decomp() returned %d\n", ret);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  int nerrs = 0;
+  int ncidA = -1, ncidB = -1, dimidA = -1, dimidB = -1, varidA = -1, varidB = -1;
+  int format = PIO_IOTYPE_HDF5;
+
+  if((ret = PIOc_createfile(iosysid, &ncidA, &format, filenameA, PIO_CLOBBER)) ||
+     (ret = PIOc_def_dim(ncidA, DIM_NAME, (PIO_Offset) gdimlen, &dimidA)) ||
+     (ret = PIOc_def_var(ncidA, VAR_NAME, PIO_INT, NDIM1, &dimidA, &varidA)) ||
+     (ret = PIOc_enddef(ncidA)) ||
+     (ret = PIOc_createfile(iosysid, &ncidB, &format, filenameB, PIO_CLOBBER)) ||
+     (ret = PIOc_def_dim(ncidB, DIM_NAME, (PIO_Offset) gdimlen, &dimidB)) ||
+     (ret = PIOc_def_var(ncidB, VAR_NAME, PIO_INT, NDIM1, &dimidB, &varidB)) ||
+     (ret = PIOc_enddef(ncidB))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_shared_ioid_read_write_stress() FAILED: "
+      "setting up files A/B returned %d\n", ret);
+    if(ncidA >= 0){ PIOc_closefile(ncidA); }
+    if(ncidB >= 0){ PIOc_closefile(ncidB); }
+    PIOc_freedecomp(iosysid, ioid);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  std::vector<int> wdataA(MAPLEN_PER_RANK), wdataB(MAPLEN_PER_RANK), rdataB(MAPLEN_PER_RANK, -1);
+  int first_fail_iter = -1, first_fail_idx = -1;
+  int first_fail_got = 0, first_fail_expected = 0;
+
+  for(int iter = 0; (iter < STRESS_NUM_ITERS) && (nerrs == 0); iter++){
+    /* B gets a distinct, known pattern each iteration, synced before the
+     * race window below, so a corrupted/raced read is visibly wrong rather
+     * than accidentally matching by luck. */
+    fill_wdata(wdataB, my_rank, 1000 + iter);
+    if((ret = PIOc_write_darray(ncidB, varidB, ioid, (PIO_Offset) MAPLEN_PER_RANK,
+                                wdataB.data(), NULL)) ||
+       (ret = PIOc_sync(ncidB))){
+      LOG_RANK0(my_rank, "test_async_rearr_contig_shared_ioid_read_write_stress() FAILED: "
+        "priming file B at iteration %d returned %d\n", iter, ret);
+      nerrs++;
+      break;
+    }
+
+    /* The race window: write to A (queues a new async CONTIG
+     * rearrange+write op on this ioid's rearr_comm_), then immediately
+     * read from B on the same ioid, with no intervening sync on A - see
+     * scenario 19's doc comment for the full hazard description. */
+    fill_wdata(wdataA, my_rank, iter);
+    if((ret = PIOc_write_darray(ncidA, varidA, ioid, (PIO_Offset) MAPLEN_PER_RANK,
+                                wdataA.data(), NULL))){
+      LOG_RANK0(my_rank, "test_async_rearr_contig_shared_ioid_read_write_stress() FAILED: "
+        "PIOc_write_darray() on file A at iteration %d returned %d\n", iter, ret);
+      nerrs++;
+      break;
+    }
+
+    if((ret = PIOc_read_darray(ncidB, varidB, ioid, (PIO_Offset) MAPLEN_PER_RANK, rdataB.data()))){
+      LOG_RANK0(my_rank, "test_async_rearr_contig_shared_ioid_read_write_stress() FAILED: "
+        "PIOc_read_darray() on file B at iteration %d returned %d\n", iter, ret);
+      nerrs++;
+      break;
+    }
+
+    for(int i = 0; i < MAPLEN_PER_RANK; i++){
+      if(rdataB[i] != wdataB[i]){
+        first_fail_iter = iter;
+        first_fail_idx = i;
+        first_fail_got = rdataB[i];
+        first_fail_expected = wdataB[i];
+        nerrs++;
+        break;
+      }
+    }
+
+    /* Drain A's pending op before the next iteration reuses ncidA/ioid, so
+     * each iteration starts from a clean, known state - not load-bearing
+     * for the race window above, which has already been evaluated by this
+     * point in the loop body. */
+    if((ret = PIOc_sync(ncidA))){
+      LOG_RANK0(my_rank, "test_async_rearr_contig_shared_ioid_read_write_stress() FAILED: "
+        "draining file A at iteration %d returned %d\n", iter, ret);
+      nerrs++;
+      break;
+    }
+  }
+
+  if(first_fail_iter >= 0){
+    fprintf(stderr, "test_async_rearr_contig_shared_ioid_read_write_stress() FAILED (rank %d): "
+      "first mismatch at iteration %d, index %d: rdataB (%d) != wdataB (%d) - reading file B "
+      "raced/corrupted the still-in-flight async CONTIG rearrange+write queued by file A's "
+      "write, sharing the same decomposition\n", my_rank, first_fail_iter, first_fail_idx,
+      first_fail_got, first_fail_expected);
+  }
+
+  PIOc_closefile(ncidA);
+  PIOc_closefile(ncidB);
+  PIOc_freedecomp(iosysid, ioid);
+  finalize_iosys(iosysid);
+
+  if(my_rank == 0){
+    remove(filenameA);
+    remove(filenameB);
+  }
+
+  return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
 #endif /* PIO_USE_ASYNC_WR_REARR */
 
 /* ------------------------------------------------------------------------ */
@@ -3369,6 +3520,9 @@ int main(int argc, char **argv)
 
     RUN_SCENARIO(test_async_rearr_contig_freedecomp_while_pending(test_comm, my_rank, ntasks),
                  "test_async_rearr_contig_freedecomp_while_pending");
+
+    RUN_SCENARIO(test_async_rearr_contig_shared_ioid_read_write_stress(test_comm, my_rank, ntasks),
+                 "test_async_rearr_contig_shared_ioid_read_write_stress");
 #else
     LOG_RANK0(my_rank, "test_async_rearr_contig_* scenarios SKIPPED "
       "(PIO_USE_ASYNC_WR_REARR is disabled in this build)\n");
