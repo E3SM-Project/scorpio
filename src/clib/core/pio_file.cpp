@@ -951,6 +951,25 @@ int spio_hard_closefile(iosystem_desc_t *ios, file_desc_t *file,
      * deadlock hazard in general, made safe here only by that pre-check
      * always being true by the time we get here. The assert just below pins
      * that invariant down explicitly instead of leaving it implicit. */
+    /* PIO_USE_ASYNC_WR_REARR note: this gate (is_file_owning_io_proc()) is
+     * NOT widened for the async CONTIG rearrange+write op added for that
+     * option. Only agg-root ranks (Contig_rearr::is_agg_root()) ever queue
+     * that op (see the assert in pio_iosys_async_hdf5_rearr_write_op_add()),
+     * and for a CONTIG-rearranged HDF5/HDF5C file is_agg_root() on the
+     * file's selected io_desc_info_t (iodesc->select_io_desc_info(), the
+     * same selection is_file_owning_io_proc() is built from) is exactly
+     * is_file_owning_io_proc(ios, file): both reduce to
+     * targets_async_comm_ ? is_async_io_proc() : is_sync_io_proc(), with
+     * targets_async_comm_ true for exactly the same async_io_desc_info
+     * view file->uses_async_io selects (confirmed by inspection of
+     * create_agg_comm()/role_is_io_proc(), pio_rearr_contig.cpp, and
+     * select_io_desc_info(), pio_types.hpp). So the op's pending-op count
+     * (file->npend_ops) is nonzero on precisely the rank set this gate
+     * already admits - compute ranks hold no pending ops and no
+     * file_desc_t reference from this op, and this gate needs no widening.
+     * If the assert below ever fires for a CONTIG rearranger, that
+     * invariant has broken and this gate (and PIOc_sync_impl()'s matching
+     * one) need revisiting. */
 #ifdef _HDF5
     bool wait_for_file_async_pend_ops = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
         ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)
@@ -1857,7 +1876,13 @@ int PIOc_sync_impl(int ncid)
      * this file (the async-owning proc for HDF5/HDF5C files in a disjoint
      * sync/async-procs topology, the sync I/O proc otherwise - see
      * is_file_owning_io_proc()) ever has pending async ops on it, so this is
-     * a no-op everywhere else. */
+     * a no-op everywhere else.
+     *
+     * PIO_USE_ASYNC_WR_REARR note: this gate is not widened for the async
+     * CONTIG rearrange+write op - see the matching note above
+     * spio_hard_closefile()'s identical gate (pio_file.cpp) for why
+     * is_file_owning_io_proc() already coincides exactly with the set of
+     * ranks (Contig_rearr::is_agg_root()) that can ever queue that op. */
 #ifdef _HDF5
     bool sync_wait_for_pend_ops = file->iosystem && file->iosystem->io_comm_info &&
         (((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
@@ -1891,6 +1916,30 @@ int PIOc_sync_impl(int ncid)
         GPTLstop("PIO:write_total");
         if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
             GPTLstop("PIO:write_total_adios");
+    }
+
+    /* Drain again, after sync_file(). sync_file() calls flush_buffer(),
+     * which calls PIOc_write_darray_multi() for any buffered darrays -
+     * under PIO_USE_ASYNC_WR_REARR + PIO_USE_ASYNC_WR_THREAD this QUEUES
+     * NEW async rearrange+write (or plain write) ops, which the drain
+     * above - taken before sync_file() ran - cannot have waited for. A
+     * PIOc_sync() call is required (by this library's own documented
+     * contract - see AGENTS.md/SCORPIO docs: applications must call
+     * PIOc_sync() before reading data written by a prior write call) to
+     * force all of a file's writes to be on disk when it returns, so this
+     * second drain is load-bearing, not optional: without it, data
+     * buffered by sync_file()'s own flush could still be queued when
+     * PIOc_sync() returns. Same gate as above - see the note above it for
+     * why it is already the exact right rank set and needs no widening. */
+    if (sync_wait_for_pend_ops)
+    {
+        if (spio_wait_file_async_pend_ops(file) != PIO_NOERR)
+        {
+            PIOc_warn(file->iosystem->iosysid, ncid, __FILE__, __LINE__,
+              "Timed out waiting for pending asynchronous operations (queued by this sync's own "
+              "buffer flush) on this file to complete before returning from the sync. "
+              "Continuing - data written by those operations may not be included");
+        }
     }
 
     return ierr;
