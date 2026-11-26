@@ -1324,6 +1324,73 @@ static int init_adios_comm(iosystem_desc_t *ios)
 }
 #endif
 
+#if PIO_USE_ASYNC_WR_THREAD
+/**
+ * Verify that MPI was initialized with (at least) MPI_THREAD_MULTIPLE,
+ * when PIO_USE_ASYNC_WR_THREAD is compiled in.
+ *
+ * The async HDF5 write thread pool makes MPI calls directly from its own
+ * worker thread(s), concurrently with the application's main thread - e.g.
+ * pio_iosys_async_op_hdf5_write_impl()'s collective H5Dwrite()/H5Fclose()
+ * calls, and, when PIO_USE_ASYNC_WR_REARR is also enabled,
+ * pio_iosys_async_op_hdf5_rearr_write_impl()'s rearrange_aggregated_to_io()
+ * collective on Contig_rearr's rearr_comm_. This requires MPI_THREAD_MULTIPLE
+ * (MPI 3.1 Sec 12.4): MPI_THREAD_SINGLE, MPI_THREAD_FUNNELED and
+ * MPI_THREAD_SERIALIZED all restrict which thread(s) may make MPI calls and
+ * when, in ways this library's worker thread does not respect (it is not
+ * coordinated with the application thread via any mutual-exclusion the
+ * application arranges, as MPI_THREAD_SERIALIZED would require).
+ *
+ * This library does not call MPI_Init()/MPI_Init_thread() itself - the
+ * application (or, for the Fortran interface, the runtime) is expected to
+ * have already initialized MPI before calling into SCORPIO. If MPI is not
+ * yet initialized when this runs, there is nothing to verify here: whichever
+ * call initializes MPI afterwards is responsible for requesting
+ * MPI_THREAD_MULTIPLE, and this function cannot see that in advance. If MPI
+ * IS already initialized, MPI_Query_thread() reports the thread support
+ * level that was actually PROVIDED - which can be less than what the
+ * application requested, since MPI_Init_thread() is only required to try,
+ * not to guarantee the requested level (MPI 3.1 Sec 12.4.3) - and this
+ * function errors out rather than silently proceeding into undefined
+ * behavior (observed in practice as MPI internal thread-safety assertion
+ * failures and data corruption under concurrent progress).
+ *
+ * @return PIO_NOERR if the check passes (including the "MPI not yet
+ * initialized" case), a PIO/MPI error code otherwise.
+ */
+static int spio_check_mpi_thread_multiple(void)
+{
+    int mpierr;
+    int mpi_is_initialized = 0;
+
+    mpierr = MPI_Initialized(&mpi_is_initialized);
+    if(mpierr != MPI_SUCCESS)
+    {
+        return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
+    }
+
+    if(mpi_is_initialized)
+    {
+        int provided_thread_level = MPI_THREAD_SINGLE;
+
+        mpierr = MPI_Query_thread(&provided_thread_level);
+        if(mpierr != MPI_SUCCESS)
+        {
+            return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
+        }
+
+        if(provided_thread_level < MPI_THREAD_MULTIPLE)
+        {
+            return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
+                            "PIO Init failed. PIO_USE_ASYNC_WR_THREAD is enabled, which requires MPI to have been initialized with MPI_THREAD_MULTIPLE (the async HDF5 write thread pool makes MPI calls directly from its own worker thread(s), concurrently with the application thread), but MPI was already initialized with a lower thread support level (%d; MPI_THREAD_MULTIPLE = %d). Initialize MPI with MPI_Init_thread(..., MPI_THREAD_MULTIPLE, &provided) and confirm the returned \"provided\" level is actually MPI_THREAD_MULTIPLE (some MPI implementations silently provide less than requested) before calling this function, or rebuild SCORPIO with PIO_USE_ASYNC_WR_THREAD=OFF",
+                            provided_thread_level, (int) MPI_THREAD_MULTIPLE);
+        }
+    }
+
+    return PIO_NOERR;
+}
+#endif /* PIO_USE_ASYNC_WR_THREAD */
+
 /**
  * Library initialization used when IO tasks are a subset of compute
  * tasks.
@@ -1415,6 +1482,13 @@ int PIOc_Init_Intracomm_impl(MPI_Comm comp_comm, int num_iotasks, int stride, in
 
     LOG((1, "PIOc_Init_Intracomm comp_comm = %d num_iotasks = %d stride = %d base = %d "
          "rearr = %d", comp_comm, num_iotasks, stride, base, rearr));
+
+#if PIO_USE_ASYNC_WR_THREAD
+    if ((ret = spio_check_mpi_thread_multiple()))
+    {
+        return ret;
+    }
+#endif
 
     /* Allocate memory for the iosystem info. */
     if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
@@ -2779,6 +2853,13 @@ int PIOc_init_intercomm_impl(int component_count, const MPI_Comm peer_comm,
         return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
                         "PIO Init (async) failed. Invalid arguments provided, component_count=%d (expected > 0), ucomp_comms is %s (expected not NULL), rearranger=%s (expected PIO_REARR_BOX or PIO_REARR_SUBSET), iosysidps is %s (expected not NULL)", component_count, (ucomp_comms) ? "not NULL" : "NULL", (rearranger == PIO_REARR_BOX) ? "PIO_REARR_BOX" : ((rearranger == PIO_REARR_SUBSET) ? "PIO_REARR_SUBSET" : "UNKNOWN REARRANGER"), (iosysidps) ? "not NULL" : "NULL");
     }
+
+#if PIO_USE_ASYNC_WR_THREAD
+    if ((ret = spio_check_mpi_thread_multiple()))
+    {
+        return ret;
+    }
+#endif
 
     /* Turn on the logging system for PIO. */
     pio_init_logging();
