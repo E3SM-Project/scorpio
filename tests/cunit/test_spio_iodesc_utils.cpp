@@ -5,6 +5,9 @@
 #include <vector>
 #include <cassert>
 #include <cstdlib>
+#include <chrono>
+#include <thread>
+#include <new>
 
 #include "pio.h"
 #include "pio_tests.h"
@@ -315,6 +318,114 @@ int test_uses_async_io_computation(int wrank)
   return ret;
 }
 
+/* Minimal mock io_desc_t: raw memory, no real construction (this test never
+ * calls io_desc_t's real constructor, which needs a live MPI decomposition -
+ * it only needs a valid ioid and a usable nasync_pend_ops). Placement-new
+ * just the atomic_int field, rather than relying on calloc's zero-fill being
+ * a valid std::atomic<int> state, to avoid relying on implementation-defined
+ * behavior. Mirrors this file's existing calloc-based mocks for
+ * iosystem_desc_t/file_desc_t above.
+ */
+static io_desc_t *get_mock_iodesc(int ioid)
+{
+  io_desc_t *iodesc = (io_desc_t *) calloc(1, sizeof(io_desc_t));
+  if(iodesc){
+    new (&iodesc->nasync_pend_ops) std::atomic_int(0);
+    iodesc->ioid = ioid;
+  }
+  return iodesc;
+}
+
+static void free_mock_iodesc(io_desc_t *iodesc)
+{
+  if(iodesc){
+    iodesc->nasync_pend_ops.~atomic();
+    free(iodesc);
+  }
+}
+
+/* (a) nasync_pend_ops == 0 must return PIO_NOERR via the fast path, with no
+ * sleeping/yielding at all - this is what makes the call free on every rank
+ * that never queues an async op for a decomposition (e.g. a compute rank
+ * under PIO_USE_ASYNC_WR_REARR, where only agg-root I/O ranks ever
+ * increment nasync_pend_ops).
+ */
+int test_wait_iodesc_async_pend_ops_fast_path(void)
+{
+  io_desc_t *iodesc = get_mock_iodesc(1);
+  if(!iodesc){ return PIO_ENOMEM; }
+
+  auto t0 = std::chrono::steady_clock::now();
+  int ret = spio_wait_iodesc_async_pend_ops(iodesc);
+  auto t1 = std::chrono::steady_clock::now();
+  long long elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+
+  free_mock_iodesc(iodesc);
+
+  if(ret != PIO_NOERR){
+    LOG_ERR(0, "spio_wait_iodesc_async_pend_ops() with nasync_pend_ops == 0 returned %d (expected PIO_NOERR)\n", ret);
+    return PIO_EINTERNAL;
+  }
+  /* Generous bound: the fast path does no sleeping, so this should complete
+   * in well under a millisecond; 100 ms leaves headroom for a loaded CI
+   * machine while still catching a fast path that accidentally sleeps. */
+  if(elapsed_ms >= 100){
+    LOG_ERR(0, "spio_wait_iodesc_async_pend_ops() with nasync_pend_ops == 0 took %lld ms (expected the fast path, well under 100 ms)\n", elapsed_ms);
+    return PIO_EINTERNAL;
+  }
+
+  return PIO_NOERR;
+}
+
+/* (b) a count decremented to 0 by another thread while this one polls must
+ * return PIO_NOERR once it does, without waiting for the (120 s default)
+ * timeout.
+ */
+int test_wait_iodesc_async_pend_ops_background_complete(void)
+{
+  const int DECREMENT_AFTER_MS = 50;
+
+  io_desc_t *iodesc = get_mock_iodesc(2);
+  if(!iodesc){ return PIO_ENOMEM; }
+
+  iodesc->nasync_pend_ops = 1;
+
+  std::thread decrementer([iodesc, DECREMENT_AFTER_MS](){
+    std::this_thread::sleep_for(std::chrono::milliseconds(DECREMENT_AFTER_MS));
+    iodesc->nasync_pend_ops--;
+  });
+
+  auto t0 = std::chrono::steady_clock::now();
+  int ret = spio_wait_iodesc_async_pend_ops(iodesc);
+  auto t1 = std::chrono::steady_clock::now();
+  long long elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+
+  decrementer.join();
+  free_mock_iodesc(iodesc);
+
+  if(ret != PIO_NOERR){
+    LOG_ERR(0, "spio_wait_iodesc_async_pend_ops() returned %d (expected PIO_NOERR) after the count was decremented to 0\n", ret);
+    return PIO_EINTERNAL;
+  }
+  if(elapsed_ms < DECREMENT_AFTER_MS){
+    LOG_ERR(0, "spio_wait_iodesc_async_pend_ops() returned after only %lld ms (expected it to actually wait for the ~%d ms decrement)\n", elapsed_ms, DECREMENT_AFTER_MS);
+    return PIO_EINTERNAL;
+  }
+  /* Comfortably less than SPIO_ASYNC_OP_WAIT_TIMEOUT (120000 ms default) -
+   * confirms this returned because the count dropped to 0, not because of
+   * an unrelated timeout. Case (c) (a genuine timeout) is not exercised
+   * here: at the 120 s default it would make this test too slow, and the
+   * timeout bound itself (SPIO_ASYNC_OP_WAIT_TIMEOUT) is shared, by
+   * construction, with spio_wait_file_async_pend_ops() - see Step 3's
+   * implementation, which copies that function's structure exactly. */
+  if(elapsed_ms >= 5000){
+    LOG_ERR(0, "spio_wait_iodesc_async_pend_ops() took %lld ms to notice a decrement after ~%d ms (expected well under 5000 ms)\n", elapsed_ms, DECREMENT_AFTER_MS);
+    return PIO_EINTERNAL;
+  }
+
+  return PIO_NOERR;
+}
+
 int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
 {
   int nerrs = 0, ret = PIO_NOERR;
@@ -339,6 +450,34 @@ int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
   }
   else{
     LOG_ERR(wrank, "test_uses_async_io_computation() PASSED\n");
+  }
+
+  try{
+    ret = test_wait_iodesc_async_pend_ops_fast_path();
+  }
+  catch(...){
+    ret = PIO_EINTERNAL;
+  }
+  if(ret != PIO_NOERR){
+    LOG_ERR(wrank, "test_wait_iodesc_async_pend_ops_fast_path() FAILED, ret = %d\n", ret);
+    nerrs++;
+  }
+  else{
+    LOG_ERR(wrank, "test_wait_iodesc_async_pend_ops_fast_path() PASSED\n");
+  }
+
+  try{
+    ret = test_wait_iodesc_async_pend_ops_background_complete();
+  }
+  catch(...){
+    ret = PIO_EINTERNAL;
+  }
+  if(ret != PIO_NOERR){
+    LOG_ERR(wrank, "test_wait_iodesc_async_pend_ops_background_complete() FAILED, ret = %d\n", ret);
+    nerrs++;
+  }
+  else{
+    LOG_ERR(wrank, "test_wait_iodesc_async_pend_ops_background_complete() PASSED\n");
   }
 
   /* Disjoint I/O comm info: sync_io_root = 0, sync_io_stride = 2,

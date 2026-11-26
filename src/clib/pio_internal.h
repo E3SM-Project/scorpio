@@ -178,6 +178,11 @@ extern "C" {
      * this file to complete. Returns PIO_NOERR once none are pending,
      * PIO_EINTERNAL on timeout (caller is expected to warn and continue). */
     int spio_wait_file_async_pend_ops(file_desc_t *file);
+    /* Same as spio_wait_file_async_pend_ops() above, but scoped to an I/O
+     * decomposition (io_desc_t::nasync_pend_ops) rather than a file - see
+     * its own doc comment (pio_file.cpp) for why a decomposition needs its
+     * own drain. Purely local/per-rank, never collective. */
+    int spio_wait_iodesc_async_pend_ops(io_desc_t *iodesc);
 
     iosystem_desc_t *pio_get_iosystem_from_id(int iosysid);
     int pio_add_to_iosystem_list(iosystem_desc_t *ios, MPI_Comm comm);

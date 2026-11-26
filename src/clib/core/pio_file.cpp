@@ -629,6 +629,77 @@ int spio_wait_file_async_pend_ops(file_desc_t *file)
   return PIO_NOERR;
 }
 
+/* Wait ("drain") for all asynchronous operations pending on an I/O
+ * decomposition (io_desc_t) to complete. This is the decomposition-scoped
+ * counterpart to spio_wait_file_async_pend_ops() above - iodesc->nasync_pend_ops
+ * is incremented/decremented by the same async ops that increment/decrement a
+ * file's npend_ops (see pio_iosys_async_hdf5_write_op_add()), but is scoped to
+ * the DECOMPOSITION rather than the file, because resources tied to a
+ * decomposition (e.g. Contig_rearr's rearr_comm_) are shared across every file
+ * and variable that uses it, not just one file. A file-scoped drain can read
+ * zero pending ops for file B while an op belonging to file A, sharing the
+ * same ioid, is still running.
+ *
+ * Implementation note: this is the same deliberately bounded, yielding poll as
+ * spio_wait_file_async_pend_ops() - not a pure busy spin, not a condition
+ * variable - for the identical reasons documented there.
+ *
+ * Standing invariants (mirrors spio_wait_file_async_pend_ops()'s, plus a
+ * third specific to this function):
+ *  - Must only be called from a thread that is not itself an async thread
+ *    pool worker - a worker waiting here for an op it is itself supposed to
+ *    run would deadlock. The bounded timeout below keeps that from hanging
+ *    forever if it ever happens.
+ *  - It is purely local and per-rank, and never collective: it says nothing
+ *    about whether OTHER ranks also have nothing pending for this iodesc. A
+ *    caller that needs every rank to agree on a single free-vs-defer (or
+ *    similar) decision for a decomposition must arrange that agreement
+ *    itself - this function only guarantees that, when it returns PIO_NOERR,
+ *    the calling rank's own share of this decomposition's communicators
+ *    (e.g. rearr_comm_) is not about to be touched by that rank's own
+ *    worker thread.
+ *
+ * @param iodesc: Pointer to the I/O decomposition
+ * @returns PIO_NOERR once no async ops are pending, PIO_EINTERNAL if the wait
+ * timed out (the caller is expected to warn and continue)
+ */
+int spio_wait_iodesc_async_pend_ops(io_desc_t *iodesc)
+{
+  const int SLEEP_TIME_IN_MILLISECONDS = 1;
+  const int WARN_TIME_IN_MILLISECONDS = 5000;
+  const int TIMEOUT_IN_MILLISECONDS = SPIO_ASYNC_OP_WAIT_TIMEOUT;
+
+  assert(iodesc);
+
+  /* Fast path: nothing pending, no sleeping/yielding at all. This is what
+   * makes this call free on every rank that never queues an async op for
+   * this decomposition (e.g. a compute rank under PIO_USE_ASYNC_WR_REARR,
+   * where only the agg-root I/O rank(s) ever increment nasync_pend_ops). */
+  if(iodesc->nasync_pend_ops <= 0) { return PIO_NOERR; }
+
+  int wait_time = 0;
+  while(iodesc->nasync_pend_ops > 0){
+    /* Give the async worker thread(s) a chance to run before sleeping */
+    std::this_thread::yield();
+    std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME_IN_MILLISECONDS));
+    wait_time += SLEEP_TIME_IN_MILLISECONDS;
+
+    if((iodesc->nasync_pend_ops > 0) && (wait_time % WARN_TIME_IN_MILLISECONDS == 0)){
+      std::string warn_msg = std::string("Continuing to wait for pending asynchronous operations (") +
+        std::to_string(static_cast<int>(iodesc->nasync_pend_ops)) + std::string(" ops pending) on I/O decomposition (ioid=") +
+        std::to_string(iodesc->ioid) + std::string(")... (Elapsed time = ") +
+        std::to_string(wait_time) + std::string(" ms)");
+      PIOc_warn(PIO_DEFAULT, PIO_DEFAULT, __FILE__, __LINE__, warn_msg.c_str());
+    }
+
+    if(wait_time >= TIMEOUT_IN_MILLISECONDS){
+      return PIO_EINTERNAL;
+    }
+  }
+
+  return PIO_NOERR;
+}
+
 /* Returns the path of the filesystem lock file used to protect a sync-comm
  * read-only reopen of filename from racing a disjoint async-comm pending
  * write/close on the same file (see spio_create_async_lock_file()/

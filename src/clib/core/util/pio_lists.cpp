@@ -531,12 +531,18 @@ int pio_delete_iodesc_from_list(int ioid)
 
 static int spio_wait_async_iodesc_ops(io_desc_t *iodesc)
 {
-  const int SLEEP_TIME_IN_MILLISECONDS = 500;
-  while(iodesc->nasync_pend_ops > 0){
-    std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME_IN_MILLISECONDS));
-  }
-
-  return PIO_NOERR;
+  /* Forwards to the bounded, warning-emitting drain (pio_file.cpp) instead
+   * of looping unboundedly/silently - see its doc comment for why an
+   * unbounded wait here is undesirable (a stuck/failed async op would hang
+   * this call, and thus pio_delete_all_iodescs()/PIOc_finalize(), forever).
+   * A timeout (PIO_EINTERNAL) is forwarded as-is: pio_delete_all_iodescs(),
+   * the only caller, already turns a non-PIO_NOERR return here into a hard
+   * pio_err() failure of the whole finalize - that was previously
+   * unreachable dead code, since the old unbounded loop could never return
+   * anything but PIO_NOERR (or hang forever). Never freeing a decomposition
+   * whose async ops did not drain in time is safer than freeing it under an
+   * in-flight op. */
+  return spio_wait_iodesc_async_pend_ops(iodesc);
 }
 
 int pio_delete_all_iodescs(int iosysid)
