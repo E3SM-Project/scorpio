@@ -267,6 +267,23 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
    */
   io_desc_info_t &write_desc_info = iodesc->select_io_desc_info(file->iotype, file);
 
+#if PIO_USE_ASYNC_WR_REARR
+  /* When set, the costly phase of the CONTIG rearrangement (and the HDF5
+   * write that follows it) is deferred to the async write thread pool
+   * instead of happening synchronously below - see
+   * pio_iosys_async_hdf5_rearr_write_op_add() (spio_async_hdf5_utils.cpp).
+   * Deliberately does not also require (&write_desc_info ==
+   * iodesc->async_io_desc_info): with PIO_USE_ASYNC_WR_THREAD on, the HDF5
+   * write is queued for both the sync- and async-selected views (the
+   * sibling pio_iosys_async_hdf5_write_op_add() queues unconditionally and
+   * gates only on role), so the rearrange must follow it in both. */
+  const bool use_async_rearr =
+    ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)) &&
+    (write_desc_info.rearranger == PIO_REARR_CONTIG);
+#else
+  const bool use_async_rearr = false;
+#endif
+
   /* Determine total size of aggregated data (all vars/records).
    * For netcdf serial writes we collect the data on io nodes and
    * then move that data one node at a time to the io master node
@@ -307,7 +324,7 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
 
   /* Allocate iobuf. */
   void *mv_iobuf = NULL;
-  if(rlen > 0){
+  if(!use_async_rearr && (rlen > 0)){
     /* Allocate memory for the buffer for all vars/records. */
     mv_iobuf = spio_file_mvcache_alloc(file, ioid, write_desc_info.mpitype_size * rlen);
     if(!mv_iobuf){
@@ -330,6 +347,8 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
     }
   }
   else if(file->iotype == PIO_IOTYPE_PNETCDF && ios->io_comm_info->is_sync_io_proc()){
+    /* use_async_rearr is never true here: it requires HDF5/HDF5C, mutually
+     * exclusive with PIO_IOTYPE_PNETCDF. */
     /* this assures that iobuf is allocated on all iotasks thus
      assuring that the flush_output_buffer call above is called
      collectively (from all iotasks) */
@@ -346,7 +365,65 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
    *  write_desc_info is set to use the async io_desc_info_t so that the data is rearranged to the async I/O procs.
    */
   if(write_desc_info.rearranger == PIO_REARR_CONTIG){
-    ierr = write_desc_info.rearr->rearrange_comp2io(array, arraylen * nvars * write_desc_info.mpitype_size, mv_iobuf, rlen * write_desc_info.mpitype_size, nvars);
+#if PIO_USE_ASYNC_WR_REARR
+    if(use_async_rearr){
+      /* Phase 1 - AGGREGATION. Synchronous on every rank, exactly as the
+       * fused rearrange_comp2io() below does: collective on agg_comm_ (a
+       * split of union_comm grouping each I/O proc with a contiguous range
+       * of node-adjacent compute ranks), blocking and cheap. The user's
+       * `array` is fully consumed here, so nothing needs to be copied for
+       * the deferred phase below. */
+      void *agg_buf = NULL;
+      std::size_t agg_buf_sz = 0;
+      ierr = write_desc_info.rearr->aggregate_comp2io(array,
+                arraylen * nvars * write_desc_info.mpitype_size,
+                agg_buf, agg_buf_sz, nvars);
+      if(ierr != PIO_NOERR){
+        return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                        "Writing multiple variables to file (%s, ncid=%d) failed. Error aggregating data from compute tasks to I/O tasks(rearranger = %d)",
+                        pio_get_fname_from_file(file), ncid, write_desc_info.rearranger);
+      }
+
+      /* Phase 2 - REARRANGEMENT (+ H5Dwrite), deferred to the thread pool.
+       * Only agg-root (I/O) ranks reach here with a non-NULL agg_buf;
+       * rearrange_data() is a guaranteed local no-op elsewhere (rearr_comm_
+       * == MPI_COMM_NULL), so other ranks have nothing to defer and queue
+       * nothing. Ownership of agg_buf transfers to the op - on failure the
+       * op already takes ownership unconditionally (see
+       * pio_iosys_async_hdf5_rearr_write_op_add()), so agg_buf must not be
+       * freed here either way.
+       *
+       * Deliberately no fallback to a synchronous rearrange on failure: the
+       * fallback would be a *local* decision about a *collective* operation
+       * on rearr_comm_ - if this rank fell back to rearrange_aggregated_to_io()
+       * inline while another agg-root rank queued it instead, the two
+       * ranks' rearr_comm_ collective calls would be issued from different
+       * threads (this rank's application thread vs. the other's worker
+       * thread) with nothing ordering them, which is exactly the hazard
+       * this design exists to avoid. The only realistic failure here is
+       * malloc ENOMEM, where aborting the write is the right answer. */
+      if(agg_buf){
+        assert(write_desc_info.rearr->is_agg_root());
+        ierr = pio_iosys_async_hdf5_rearr_write_op_add(file, nvars, fndims, varids,
+                  sp_iodesc, frame, agg_buf, agg_buf_sz, fillvalue);
+        if(ierr != PIO_NOERR){
+          return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                          "Writing multiple variables to file (%s, ncid=%d) failed. Error queueing asynchronous rearrange+write operation(rearranger = %d)",
+                          pio_get_fname_from_file(file), ncid, write_desc_info.rearranger);
+        }
+      }
+    }
+    else
+#endif /* PIO_USE_ASYNC_WR_REARR */
+    {
+      /* Unchanged synchronous path. When this ioid is shared with a file
+       * whose writes DO use the async rearrange op above (e.g. a mixed-
+       * iotype application sharing one decomposition across an HDF5 file
+       * and a PnetCDF/NetCDF4P file), the drain added in a later commit on
+       * this branch (spio_wait_iodesc_async_pend_ops(), gated to I/O ranks)
+       * must run here first - see that commit for why. */
+      ierr = write_desc_info.rearr->rearrange_comp2io(array, arraylen * nvars * write_desc_info.mpitype_size, mv_iobuf, rlen * write_desc_info.mpitype_size, nvars);
+    }
   }
   else{
     bool is_async_write = (&write_desc_info == iodesc->async_io_desc_info);
@@ -365,6 +442,18 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
   double rearr_time = 0;
   /* Use the timer on the first variable to capture the total
     *time to rearrange data for all variables
+    *
+    * NOTE: when use_async_rearr is true (CONTIG rearranger with
+    * PIO_USE_ASYNC_WR_REARR enabled), this timer no longer measures the
+    * full comp2io rearrange time on this call path. It only spans
+    * aggregate_comp2io() (synchronous) plus, on agg-root I/O ranks,
+    * queueing the combined rearrange+write op
+    * (pio_iosys_async_hdf5_rearr_write_op_add(), itself cheap - it just
+    * builds and enqueues an Async_op). The actual, costly I/O-only
+    * rearrange_data() call happens later, asynchronously, on the worker
+    * thread inside pio_iosys_async_op_hdf5_rearr_write_impl() - it is not
+    * captured by wr_rearr_mtimer at all. Interpreting PIO_MICRO_TIMING
+    * rearrange-time output for this mode requires accounting for this.
     */
   ierr = mtimer_pause(file->varlist[varids[0]].wr_rearr_mtimer, NULL);
   if(ierr != PIO_NOERR){
@@ -445,13 +534,31 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
          * routes through file->uses_async_io) and gates on the role-correct
          * I/O proc set itself: CONTIG, BOX and SUBSET decomps alike target
          * the async I/O ranks when the file uses async I/O, and the sync I/O
-         * ranks otherwise. */
+         * ranks otherwise.
+         *
+         * Exception: when use_async_rearr is true (CONTIG rearranger with
+         * PIO_USE_ASYNC_WR_REARR enabled) this write op is redundant and
+         * must be skipped - the combined rearrange+write op already queued
+         * above, in the CONTIG rearrange-call branch
+         * (pio_iosys_async_hdf5_rearr_write_op_add()), performs the HDF5
+         * write itself once the deferred rearrangement completes. mv_iobuf
+         * was never populated in this mode (see the gated allocation
+         * above), so a second write op here would write stale/uninitialized
+         * data. On compute ranks this guard is a no-op either way -
+         * pio_iosys_async_hdf5_write_op_add() already early-returns on the
+         * role gate - but it keeps the I/O-rank path correct, which is
+         * what matters. */
 #if PIO_USE_ASYNC_WR_THREAD
-        ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, sp_iodesc,
-                                                  DARRAY_DATA, frame);
-        if(ierr != PIO_NOERR){
-          return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                          "Writing multiple variables to file (%s, ncid=%d) failed. Internal error queing async task to write variable data in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
+#if PIO_USE_ASYNC_WR_REARR
+        if(!use_async_rearr)
+#endif
+        {
+          ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, sp_iodesc,
+                                                    DARRAY_DATA, frame);
+          if(ierr != PIO_NOERR){
+            return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                            "Writing multiple variables to file (%s, ncid=%d) failed. Internal error queing async task to write variable data in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
+          }
         }
 #else
         if((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
@@ -557,7 +664,13 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
           /* As with the DARRAY_DATA dispatch above, queue the fillvalue write
            * on the async write thread pool for all rearrangers whenever
            * PIO_USE_ASYNC_WR_THREAD is compiled in - the queued op does its
-           * own sync/async io_desc_info_t selection and I/O proc gating. */
+           * own sync/async io_desc_info_t selection and I/O proc gating.
+           *
+           * No use_async_rearr guard is needed here (unlike the DARRAY_DATA
+           * dispatch above): this whole block is reachable only when
+           * write_desc_info.rearranger == PIO_REARR_SUBSET (see the
+           * needsfill check that gates entry into this block), which is
+           * mutually exclusive with use_async_rearr (CONTIG-only). */
 #if PIO_USE_ASYNC_WR_THREAD
           ierr = pio_iosys_async_hdf5_write_op_add(file, nvars, fndims, varids, sp_iodesc,
                                                     DARRAY_FILL, frame);
