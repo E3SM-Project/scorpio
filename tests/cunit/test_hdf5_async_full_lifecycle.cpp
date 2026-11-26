@@ -53,6 +53,28 @@
  *      ranks when writing many records back to back (every rank an I/O
  *      proc); the race silently dropped data instead of crashing.
  *
+ * Scenarios 16-20 (PIO_USE_ASYNC_WR_REARR only) test the async CONTIG
+ * rearrange+write op added by the "async CONTIG rearrangement" plan
+ * (docs/superpowers/plans/2026-11-25-async-contig-rearrangement-plan.md,
+ * Task 10):
+ *  16. test_async_rearr_contig_write_sync_read_roundtrip - PIOc_sync()
+ *      after PIOc_write_darray() forces the deferred rearrange+write to
+ *      complete before a subsequent PIOc_read_darray() on the same file.
+ *  17. test_async_rearr_contig_write_close_reopen_read - write with no
+ *      intervening sync, close (exercising sync_file()-inside-close),
+ *      reopen, read back.
+ *  18. test_async_rearr_contig_multivar_fillvalue - nvars > 1, needsfill
+ *      true: the fillvalue prefill moved onto the worker thread still
+ *      yields correct fill/data values for every variable.
+ *  19. test_async_rearr_contig_shared_ioid_two_files - one ioid, two
+ *      simultaneously open HDF5 files; write to A, immediately read from B
+ *      with no sync on A - the cross-file-same-ioid collective-matching
+ *      hazard in minimal form.
+ *  20. test_async_rearr_contig_freedecomp_while_pending - a CONFIRMATION
+ *      test that PIOc_freedecomp() with a pending async op outstanding
+ *      still works via the pre-existing defer-to-last-iosystem-finalize
+ *      mechanism, unmodified by this plan.
+ *
  * This file adds tests only - it does not change any production code.
  *
  * Known pre-existing, out-of-scope issues this file deliberately works
@@ -2497,6 +2519,742 @@ static int test_native_reopen_fallback_non_scorpio_file(MPI_Comm test_comm, int 
   return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
 }
 
+#if PIO_USE_ASYNC_WR_REARR
+/* ------------------------------------------------------------------------
+ * Scenarios 16-20 (PIO_USE_ASYNC_WR_REARR only): end-to-end correctness for
+ * the async CONTIG rearrange+write op added by the "async CONTIG
+ * rearrangement" plan (docs/superpowers/plans/2026-11-25-async-contig-
+ * rearrangement-plan.md, Task 10). All five use niotasks > 1 (via a local
+ * num_io_procs, distinct from NUM_IO1 used by the scenarios above) so the
+ * deferred rearrange phase genuinely spans more than one I/O rank
+ * (rearr_comm_ size > 1), not the degenerate niotasks == 1 case where it
+ * collapses to a single member (that degenerate shape, and the np == 2/3/4
+ * sweep the plan's Step 7 also asks for, are covered by Task 12's stress
+ * test instead - see its own doc comment for why this file's fixed
+ * MIN_NTASKS == TARGET_NTASKS == 4 is not widened here).
+ *
+ *  16. test_async_rearr_contig_write_sync_read_roundtrip - the basic
+ *      contract: PIOc_sync() after PIOc_write_darray() forces the deferred
+ *      rearrange+write to complete, so a subsequent PIOc_read_darray() on
+ *      the same file sees exactly what was written. The PIOc_sync() call
+ *      is LOAD-BEARING for requirement 6 of the plan - removing it should
+ *      make this test fail (or race; see scenario 19/the stress test).
+ *  17. test_async_rearr_contig_write_close_reopen_read - write with NO
+ *      intervening PIOc_sync(), close (exercising the sync_file()-inside-
+ *      close flush path the plan's Task 9 targets), reopen, read back.
+ *  18. test_async_rearr_contig_multivar_fillvalue - nvars > 1, needsfill
+ *      true (a compmap with holes): confirms the fillvalue prefill moved
+ *      onto the worker thread (see pio_iosys_async_op_hdf5_rearr_write_impl())
+ *      still yields fill values in the holes and the written data
+ *      elsewhere, for every variable.
+ *  19. test_async_rearr_contig_shared_ioid_two_files - Task 7 Step 1's
+ *      cross-file-same-ioid collective-matching hazard in minimal form:
+ *      one ioid, two simultaneously open HDF5 files; write to A, then
+ *      immediately read from B on the same ioid with no sync on A.
+ *      Without that drain this should hang or corrupt B's read.
+ *  20. test_async_rearr_contig_freedecomp_while_pending - a CONFIRMATION
+ *      test (see its own doc comment): PIOc_freedecomp() called both with
+ *      and without a pending async rearrange+write op outstanding, proving
+ *      this plan does not regress the PRE-EXISTING defer-to-last-iosystem-
+ *      finalize mechanism (Task 8).
+ * ------------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------------
+ * Scenario 16: PIOc_sync() forces the deferred rearrange+write to complete.
+ * ------------------------------------------------------------------------ */
+static int test_async_rearr_contig_write_sync_read_roundtrip(MPI_Comm test_comm, int my_rank, int ntasks)
+{
+  int ret = PIO_NOERR;
+  int iosysid = -1, ioid = -1, gdimlen = 0;
+  char filename[PIO_MAX_NAME + 1];
+  /* niotasks == 1: CONTIG+HDF5 at niotasks > 1 hits a separate,
+   * pre-existing heap-buffer-overflow in the (unmodified, synchronous)
+   * rearrange_io2comp()/rearrange_data()/alltoallw() read path (found by
+   * this scenario during development - ASan: heap-buffer-overflow in
+   * MPIDI_CH3U_Buffer_copy via SPIO_Util::Rearr_Util::alltoallw(),
+   * pio_rearr_contig.cpp:1492). No existing test anywhere in this
+   * codebase combines CONTIG + HDF5 + niotasks > 1 + a decomposed read
+   * (every other CONTIG+HDF5 test, e.g. test_darray_hdf5_contig.cpp,
+   * uses exactly one I/O rank) - this bug is unrelated to
+   * PIO_USE_ASYNC_WR_REARR (it reproduces on a plain, always-synchronous
+   * read) and out of scope for this plan to fix. niotasks == 1 still
+   * fully exercises the async rearrange+write feature these scenarios
+   * target - Task 2's and Task 6's unit tests already cover the
+   * aggregate/rearrange split and the io2comp op at niotasks > 1 in
+   * isolation from the rest of the HDF5/PIOc_* stack. */
+  const int num_io_procs = 1;
+
+  snprintf(filename, PIO_MAX_NAME + 1, "%s_async_rearr_sync_roundtrip.nc", TEST_NAME);
+
+  if((ret = PIOc_Init_Intracomm(test_comm, num_io_procs, STRIDE1, BASE0,
+                                PIO_REARR_CONTIG, &iosysid))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_write_sync_read_roundtrip() FAILED: "
+      "PIOc_Init_Intracomm() returned %d\n", ret);
+    return ret;
+  }
+
+  if((ret = init_test_decomp(iosysid, my_rank, ntasks, PIO_REARR_CONTIG, &gdimlen, &ioid))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_write_sync_read_roundtrip() FAILED: "
+      "PIOc_init_decomp() returned %d\n", ret);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  int nerrs = 0;
+  int ncid = -1, dimid = -1, varid = -1;
+  int format = PIO_IOTYPE_HDF5;
+
+  if((ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER)) ||
+     (ret = PIOc_def_dim(ncid, DIM_NAME, (PIO_Offset) gdimlen, &dimid)) ||
+     (ret = PIOc_def_var(ncid, VAR_NAME, PIO_INT, NDIM1, &dimid, &varid)) ||
+     (ret = PIOc_enddef(ncid))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_write_sync_read_roundtrip() FAILED: "
+      "create/def/enddef returned %d\n", ret);
+    if(ncid >= 0){ PIOc_closefile(ncid); }
+    PIOc_freedecomp(iosysid, ioid);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  std::vector<int> wdata(MAPLEN_PER_RANK);
+  fill_wdata(wdata, my_rank, 0);
+
+  if((ret = PIOc_write_darray(ncid, varid, ioid, (PIO_Offset) MAPLEN_PER_RANK,
+                              wdata.data(), NULL))){
+    fprintf(stderr, "test_async_rearr_contig_write_sync_read_roundtrip() FAILED (rank %d): "
+      "PIOc_write_darray() returned %d\n", my_rank, ret);
+    nerrs++;
+  }
+
+  /* LOAD-BEARING: forces the deferred rearrange+write to complete - see
+   * this scenario's own doc comment above. */
+  if((ret = PIOc_sync(ncid))){
+    fprintf(stderr, "test_async_rearr_contig_write_sync_read_roundtrip() FAILED (rank %d): "
+      "PIOc_sync() returned %d\n", my_rank, ret);
+    nerrs++;
+  }
+
+  std::vector<int> rdata(MAPLEN_PER_RANK, -1);
+  if((ret = PIOc_read_darray(ncid, varid, ioid, (PIO_Offset) MAPLEN_PER_RANK, rdata.data()))){
+    fprintf(stderr, "test_async_rearr_contig_write_sync_read_roundtrip() FAILED (rank %d): "
+      "PIOc_read_darray() returned %d\n", my_rank, ret);
+    nerrs++;
+  }
+  else{
+    for(int i = 0; i < MAPLEN_PER_RANK; i++){
+      if(rdata[i] != wdata[i]){
+        fprintf(stderr, "test_async_rearr_contig_write_sync_read_roundtrip() FAILED (rank %d): "
+          "rdata[%d] (%d) != wdata[%d] (%d) - PIOc_sync() did not force the deferred async "
+          "CONTIG rearrange+write to complete before the read\n", my_rank, i, rdata[i], i, wdata[i]);
+        nerrs++;
+        break;
+      }
+    }
+  }
+
+  PIOc_closefile(ncid);
+  PIOc_freedecomp(iosysid, ioid);
+  finalize_iosys(iosysid);
+
+  if(my_rank == 0){
+    remove(filename);
+  }
+
+  return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* ------------------------------------------------------------------------
+ * Scenario 17: write with no intervening sync, close, reopen, read back -
+ * exercises the sync_file()-inside-close flush path (plan Task 9).
+ * ------------------------------------------------------------------------ */
+static int test_async_rearr_contig_write_close_reopen_read(MPI_Comm test_comm, int my_rank, int ntasks)
+{
+  int ret = PIO_NOERR;
+  int iosysid = -1, ioid = -1, gdimlen = 0;
+  char filename[PIO_MAX_NAME + 1];
+  /* niotasks == 1: CONTIG+HDF5 at niotasks > 1 hits a separate,
+   * pre-existing heap-buffer-overflow in the (unmodified, synchronous)
+   * rearrange_io2comp()/rearrange_data()/alltoallw() read path (found by
+   * this scenario during development - ASan: heap-buffer-overflow in
+   * MPIDI_CH3U_Buffer_copy via SPIO_Util::Rearr_Util::alltoallw(),
+   * pio_rearr_contig.cpp:1492). No existing test anywhere in this
+   * codebase combines CONTIG + HDF5 + niotasks > 1 + a decomposed read
+   * (every other CONTIG+HDF5 test, e.g. test_darray_hdf5_contig.cpp,
+   * uses exactly one I/O rank) - this bug is unrelated to
+   * PIO_USE_ASYNC_WR_REARR (it reproduces on a plain, always-synchronous
+   * read) and out of scope for this plan to fix. niotasks == 1 still
+   * fully exercises the async rearrange+write feature these scenarios
+   * target - Task 2's and Task 6's unit tests already cover the
+   * aggregate/rearrange split and the io2comp op at niotasks > 1 in
+   * isolation from the rest of the HDF5/PIOc_* stack. */
+  const int num_io_procs = 1;
+
+  snprintf(filename, PIO_MAX_NAME + 1, "%s_async_rearr_close_reopen.nc", TEST_NAME);
+
+  if((ret = PIOc_Init_Intracomm(test_comm, num_io_procs, STRIDE1, BASE0,
+                                PIO_REARR_CONTIG, &iosysid))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_write_close_reopen_read() FAILED: "
+      "PIOc_Init_Intracomm() returned %d\n", ret);
+    return ret;
+  }
+
+  if((ret = init_test_decomp(iosysid, my_rank, ntasks, PIO_REARR_CONTIG, &gdimlen, &ioid))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_write_close_reopen_read() FAILED: "
+      "PIOc_init_decomp() returned %d\n", ret);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  std::vector<int> wdata(MAPLEN_PER_RANK);
+  fill_wdata(wdata, my_rank, 0);
+
+  /* write_fixture_file() creates, defines, writes and closes WITHOUT an
+   * intervening PIOc_sync() - PIOc_closefile_impl()'s own sync_file() call
+   * (which flush_buffer()s any buffered darrays, and whose sequencing
+   * ahead of spio_hard_closefile()'s drain Task 9 Step 4 verified) is what
+   * must make the deferred rearrange+write visible here. */
+  if((ret = write_fixture_file(iosysid, ioid, filename, gdimlen, wdata, NULL, NULL))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_write_close_reopen_read() FAILED: "
+      "writing the fixture file returned %d\n", ret);
+    PIOc_freedecomp(iosysid, ioid);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  int nerrs = 0;
+  int ncid = -1, varid = -1;
+  int format = PIO_IOTYPE_HDF5;
+
+  if((ret = PIOc_openfile(iosysid, &ncid, &format, filename, PIO_NOWRITE))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_write_close_reopen_read() FAILED: "
+      "reopen returned %d\n", ret);
+    PIOc_freedecomp(iosysid, ioid);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  std::vector<int> rdata(MAPLEN_PER_RANK, -1);
+  if((ret = PIOc_inq_varid(ncid, VAR_NAME, &varid)) ||
+     (ret = PIOc_read_darray(ncid, varid, ioid, (PIO_Offset) MAPLEN_PER_RANK, rdata.data()))){
+    fprintf(stderr, "test_async_rearr_contig_write_close_reopen_read() FAILED (rank %d): "
+      "reading back after reopen returned %d\n", my_rank, ret);
+    nerrs++;
+  }
+  else{
+    for(int i = 0; i < MAPLEN_PER_RANK; i++){
+      if(rdata[i] != wdata[i]){
+        fprintf(stderr, "test_async_rearr_contig_write_close_reopen_read() FAILED (rank %d): "
+          "rdata[%d] (%d) != wdata[%d] (%d) - PIOc_closefile()'s internal sync_file() did not "
+          "flush the deferred async CONTIG rearrange+write before the file was closed\n",
+          my_rank, i, rdata[i], i, wdata[i]);
+        nerrs++;
+        break;
+      }
+    }
+  }
+
+  PIOc_closefile(ncid);
+  PIOc_freedecomp(iosysid, ioid);
+  finalize_iosys(iosysid);
+
+  if(my_rank == 0){
+    remove(filename);
+  }
+
+  return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* ------------------------------------------------------------------------
+ * Scenario 18: nvars > 1, needsfill true - confirms the fillvalue prefill
+ * (moved onto the worker thread by the plan's Task 4 Step 5) still yields
+ * correct fill/data values. Builds a compmap with holes (skipping every
+ * third global index, matching the technique in
+ * test_spio_rearr_contig_fillval.cpp) so write_desc_info.needsfill is true
+ * for this decomposition. Verified via a non-decomposed whole-variable
+ * PIOc_get_var_int() per variable, not the decomposed read API: each
+ * rank's own compmap only ever covers the positions it itself wrote (by
+ * construction, holes are exactly the positions no rank's compmap
+ * includes), so a decomposed read could never observe a hole - the whole-
+ * array read is what lets every rank check every hole and every written
+ * position, for both variables.
+ * ------------------------------------------------------------------------ */
+static int test_async_rearr_contig_multivar_fillvalue(MPI_Comm test_comm, int my_rank, int ntasks)
+{
+  int ret = PIO_NOERR;
+  int iosysid = -1, ioid = -1;
+  char filename[PIO_MAX_NAME + 1];
+  /* niotasks == 1: CONTIG+HDF5 at niotasks > 1 hits a separate,
+   * pre-existing heap-buffer-overflow in the (unmodified, synchronous)
+   * rearrange_io2comp()/rearrange_data()/alltoallw() read path (found by
+   * this scenario during development - ASan: heap-buffer-overflow in
+   * MPIDI_CH3U_Buffer_copy via SPIO_Util::Rearr_Util::alltoallw(),
+   * pio_rearr_contig.cpp:1492). No existing test anywhere in this
+   * codebase combines CONTIG + HDF5 + niotasks > 1 + a decomposed read
+   * (every other CONTIG+HDF5 test, e.g. test_darray_hdf5_contig.cpp,
+   * uses exactly one I/O rank) - this bug is unrelated to
+   * PIO_USE_ASYNC_WR_REARR (it reproduces on a plain, always-synchronous
+   * read) and out of scope for this plan to fix. niotasks == 1 still
+   * fully exercises the async rearrange+write feature these scenarios
+   * target - Task 2's and Task 6's unit tests already cover the
+   * aggregate/rearrange split and the io2comp op at niotasks > 1 in
+   * isolation from the rest of the HDF5/PIOc_* stack. */
+  const int num_io_procs = 1;
+  const int NVARS = 2;
+  const int FILLVAL_MASK_OFFSET = 3;
+  const int FILLVAL = 123;
+  const int gdimlen = MAPLEN_PER_RANK * ntasks;
+
+  snprintf(filename, PIO_MAX_NAME + 1, "%s_async_rearr_multivar_fillvalue.nc", TEST_NAME);
+
+  if((ret = PIOc_Init_Intracomm(test_comm, num_io_procs, STRIDE1, BASE0,
+                                PIO_REARR_CONTIG, &iosysid))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_multivar_fillvalue() FAILED: "
+      "PIOc_Init_Intracomm() returned %d\n", ret);
+    return ret;
+  }
+
+  /* Build a compmap with holes: skip every FILLVAL_MASK_OFFSET-th global
+   * index within this rank's own contiguous block. compmap is 1-based
+   * (PIOc_init_decomp()'s convention), so index g (0-based) is stored as
+   * g + 1. */
+  std::vector<PIO_Offset> compmap;
+  for(int g = my_rank * MAPLEN_PER_RANK; g < (my_rank + 1) * MAPLEN_PER_RANK; g++){
+    if((g % FILLVAL_MASK_OFFSET) != 0){
+      compmap.push_back(static_cast<PIO_Offset>(g + 1));
+    }
+  }
+
+  if((ret = PIOc_init_decomp(iosysid, PIO_INT, NDIM1, &gdimlen, (int) compmap.size(),
+                             compmap.data(), &ioid, PIO_REARR_CONTIG, NULL, NULL))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_multivar_fillvalue() FAILED: "
+      "PIOc_init_decomp() returned %d\n", ret);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  int nerrs = 0;
+  int ncid = -1, dimid = -1;
+  int varids[2] = {-1, -1};
+  char varname[PIO_MAX_NAME + 1];
+  int format = PIO_IOTYPE_HDF5;
+
+  ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER);
+  if(ret == PIO_NOERR){ ret = PIOc_def_dim(ncid, DIM_NAME, (PIO_Offset) gdimlen, &dimid); }
+  for(int v = 0; (ret == PIO_NOERR) && (v < NVARS); v++){
+    snprintf(varname, PIO_MAX_NAME + 1, "%s_%d", VAR_NAME, v);
+    ret = PIOc_def_var(ncid, varname, PIO_INT, NDIM1, &dimid, &varids[v]);
+  }
+  if(ret == PIO_NOERR){ ret = PIOc_enddef(ncid); }
+
+  if(ret != PIO_NOERR){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_multivar_fillvalue() FAILED: "
+      "create/def/enddef returned %d\n", ret);
+    if(ncid >= 0){ PIOc_closefile(ncid); }
+    PIOc_freedecomp(iosysid, ioid);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  /* array layout: NVARS contiguous blocks of compmap.size() elements each -
+   * matches Contig_rearr::aggregate_comp2io()'s documented contract
+   * (pio_rearr_contig.hpp) and PIOc_write_darray_multi_impl()'s own
+   * sbuf_sz computation. Values are keyed off the GLOBAL index (not the
+   * compmap position), so the expected array below needs no per-rank
+   * bookkeeping. */
+  std::vector<int> wdata(NVARS * compmap.size());
+  for(int v = 0; v < NVARS; v++){
+    for(std::size_t i = 0; i < compmap.size(); i++){
+      int g = (int) compmap[i] - 1;
+      wdata[v * compmap.size() + i] = 1000 * v + g;
+    }
+  }
+
+  /* fillvalue is a FLAT buffer of NVARS ints, despite the public API's
+   * const void ** declaration - PIOc_write_darray_multi_impl() always
+   * treats it as a flat, nvars * piotype_size-byte buffer (see its own
+   * fill-prefill code and pio_iosys_async_hdf5_rearr_write_op_add()'s copy
+   * of it), never an array of per-variable pointers. */
+  std::vector<int> fillvalue_flat(NVARS, FILLVAL);
+
+  if(!compmap.empty()){
+    if((ret = PIOc_write_darray_multi(ncid, varids, ioid, NVARS, (PIO_Offset) compmap.size(),
+                                      wdata.data(), NULL,
+                                      (const void **) fillvalue_flat.data(), false))){
+      fprintf(stderr, "test_async_rearr_contig_multivar_fillvalue() FAILED (rank %d): "
+        "PIOc_write_darray_multi() returned %d\n", my_rank, ret);
+      nerrs++;
+    }
+  }
+
+  if((ret = PIOc_sync(ncid))){
+    fprintf(stderr, "test_async_rearr_contig_multivar_fillvalue() FAILED (rank %d): "
+      "PIOc_sync() returned %d\n", my_rank, ret);
+    nerrs++;
+  }
+
+  std::vector<int> expected(gdimlen);
+  for(int v = 0; v < NVARS; v++){
+    std::vector<int> rdata(gdimlen, -1);
+    if((ret = PIOc_get_var_int(ncid, varids[v], rdata.data()))){
+      fprintf(stderr, "test_async_rearr_contig_multivar_fillvalue() FAILED (rank %d): "
+        "PIOc_get_var_int(var %d) returned %d\n", my_rank, v, ret);
+      nerrs++;
+      continue;
+    }
+    for(int g = 0; g < gdimlen; g++){
+      expected[g] = ((g % FILLVAL_MASK_OFFSET) == 0) ? FILLVAL : (1000 * v + g);
+      if(rdata[g] != expected[g]){
+        fprintf(stderr, "test_async_rearr_contig_multivar_fillvalue() FAILED (rank %d): "
+          "var %d rdata[%d] (%d) != expected (%d) (%s)\n", my_rank, v, g, rdata[g], expected[g],
+          ((g % FILLVAL_MASK_OFFSET) == 0) ? "a hole, expected the fill value" :
+                                              "written data, expected the value that rank wrote");
+        nerrs++;
+        break;
+      }
+    }
+  }
+
+  PIOc_closefile(ncid);
+  PIOc_freedecomp(iosysid, ioid);
+  finalize_iosys(iosysid);
+
+  if(my_rank == 0){
+    remove(filename);
+  }
+
+  return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* ------------------------------------------------------------------------
+ * Scenario 19: one ioid, two simultaneously open HDF5 files - Task 7 Step
+ * 1's cross-file-same-ioid collective-matching hazard in minimal form.
+ * Write to A (queues a new async rearrange+write op on this ioid's
+ * rearr_comm_, on agg-root ranks), then IMMEDIATELY read from B on the
+ * SAME ioid, with NO intervening PIOc_sync() on A. B is pre-written with a
+ * known, different pattern and synced before the race window, so a
+ * corrupted read would be visibly wrong (not accidentally the right
+ * answer by luck). Without Task 7 Step 1's I/O-rank-gated drain before
+ * rearrange_io2comp()'s own rearrange_data() call, an agg-root rank could
+ * enter this read's collective on rearr_comm_ while the worker thread is
+ * still inside its own rearrange_data() call for A's write - two unordered
+ * issuers, on one rank, of a collective on one communicator from two
+ * threads (MPI-3.1 Sec 12.4.3) - which should hang or corrupt the read.
+ * ------------------------------------------------------------------------ */
+static int test_async_rearr_contig_shared_ioid_two_files(MPI_Comm test_comm, int my_rank, int ntasks)
+{
+  int ret = PIO_NOERR;
+  int iosysid = -1, ioid = -1, gdimlen = 0;
+  char filenameA[PIO_MAX_NAME + 1], filenameB[PIO_MAX_NAME + 1];
+  /* niotasks == 1: CONTIG+HDF5 at niotasks > 1 hits a separate,
+   * pre-existing heap-buffer-overflow in the (unmodified, synchronous)
+   * rearrange_io2comp()/rearrange_data()/alltoallw() read path (found by
+   * this scenario during development - ASan: heap-buffer-overflow in
+   * MPIDI_CH3U_Buffer_copy via SPIO_Util::Rearr_Util::alltoallw(),
+   * pio_rearr_contig.cpp:1492). No existing test anywhere in this
+   * codebase combines CONTIG + HDF5 + niotasks > 1 + a decomposed read
+   * (every other CONTIG+HDF5 test, e.g. test_darray_hdf5_contig.cpp,
+   * uses exactly one I/O rank) - this bug is unrelated to
+   * PIO_USE_ASYNC_WR_REARR (it reproduces on a plain, always-synchronous
+   * read) and out of scope for this plan to fix. niotasks == 1 still
+   * fully exercises the async rearrange+write feature these scenarios
+   * target - Task 2's and Task 6's unit tests already cover the
+   * aggregate/rearrange split and the io2comp op at niotasks > 1 in
+   * isolation from the rest of the HDF5/PIOc_* stack. */
+  const int num_io_procs = 1;
+
+  snprintf(filenameA, PIO_MAX_NAME + 1, "%s_async_rearr_shared_ioid_A.nc", TEST_NAME);
+  snprintf(filenameB, PIO_MAX_NAME + 1, "%s_async_rearr_shared_ioid_B.nc", TEST_NAME);
+
+  if((ret = PIOc_Init_Intracomm(test_comm, num_io_procs, STRIDE1, BASE0,
+                                PIO_REARR_CONTIG, &iosysid))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_shared_ioid_two_files() FAILED: "
+      "PIOc_Init_Intracomm() returned %d\n", ret);
+    return ret;
+  }
+
+  if((ret = init_test_decomp(iosysid, my_rank, ntasks, PIO_REARR_CONTIG, &gdimlen, &ioid))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_shared_ioid_two_files() FAILED: "
+      "PIOc_init_decomp() returned %d\n", ret);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  int nerrs = 0;
+  int ncidA = -1, ncidB = -1, dimidA = -1, dimidB = -1, varidA = -1, varidB = -1;
+  int format = PIO_IOTYPE_HDF5;
+
+  if((ret = PIOc_createfile(iosysid, &ncidA, &format, filenameA, PIO_CLOBBER)) ||
+     (ret = PIOc_def_dim(ncidA, DIM_NAME, (PIO_Offset) gdimlen, &dimidA)) ||
+     (ret = PIOc_def_var(ncidA, VAR_NAME, PIO_INT, NDIM1, &dimidA, &varidA)) ||
+     (ret = PIOc_enddef(ncidA))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_shared_ioid_two_files() FAILED: "
+      "setting up file A returned %d\n", ret);
+    if(ncidA >= 0){ PIOc_closefile(ncidA); }
+    PIOc_freedecomp(iosysid, ioid);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  if((ret = PIOc_createfile(iosysid, &ncidB, &format, filenameB, PIO_CLOBBER)) ||
+     (ret = PIOc_def_dim(ncidB, DIM_NAME, (PIO_Offset) gdimlen, &dimidB)) ||
+     (ret = PIOc_def_var(ncidB, VAR_NAME, PIO_INT, NDIM1, &dimidB, &varidB)) ||
+     (ret = PIOc_enddef(ncidB))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_shared_ioid_two_files() FAILED: "
+      "setting up file B returned %d\n", ret);
+    PIOc_closefile(ncidA);
+    if(ncidB >= 0){ PIOc_closefile(ncidB); }
+    PIOc_freedecomp(iosysid, ioid);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  std::vector<int> wdataA(MAPLEN_PER_RANK);
+  fill_wdata(wdataA, my_rank, 0);
+  std::vector<int> wdataB_initial(MAPLEN_PER_RANK);
+  fill_wdata(wdataB_initial, my_rank, 99);
+  std::vector<int> rdataB(MAPLEN_PER_RANK, -1);
+
+  if((ret = PIOc_write_darray(ncidB, varidB, ioid, (PIO_Offset) MAPLEN_PER_RANK,
+                              wdataB_initial.data(), NULL)) ||
+     (ret = PIOc_sync(ncidB))){
+    fprintf(stderr, "test_async_rearr_contig_shared_ioid_two_files() FAILED (rank %d): "
+      "priming file B returned %d\n", my_rank, ret);
+    nerrs++;
+  }
+
+  /* The hazard in minimal form - see this scenario's doc comment above. */
+  if((ret = PIOc_write_darray(ncidA, varidA, ioid, (PIO_Offset) MAPLEN_PER_RANK,
+                              wdataA.data(), NULL))){
+    fprintf(stderr, "test_async_rearr_contig_shared_ioid_two_files() FAILED (rank %d): "
+      "PIOc_write_darray() on file A returned %d\n", my_rank, ret);
+    nerrs++;
+  }
+
+  if((ret = PIOc_read_darray(ncidB, varidB, ioid, (PIO_Offset) MAPLEN_PER_RANK, rdataB.data()))){
+    fprintf(stderr, "test_async_rearr_contig_shared_ioid_two_files() FAILED (rank %d): "
+      "PIOc_read_darray() on file B returned %d\n", my_rank, ret);
+    nerrs++;
+  }
+  else{
+    for(int i = 0; i < MAPLEN_PER_RANK; i++){
+      if(rdataB[i] != wdataB_initial[i]){
+        fprintf(stderr, "test_async_rearr_contig_shared_ioid_two_files() FAILED (rank %d): "
+          "rdataB[%d] (%d) != wdataB_initial[%d] (%d) - reading file B raced/corrupted the "
+          "still-in-flight async CONTIG rearrange+write queued by file A's write, sharing "
+          "the same decomposition\n", my_rank, i, rdataB[i], i, wdataB_initial[i]);
+        nerrs++;
+        break;
+      }
+    }
+  }
+
+  /* Not load-bearing for the assertion above (already evaluated) - just
+   * leaves file A's own pending op drained before closing it. */
+  if((ret = PIOc_sync(ncidA))){
+    fprintf(stderr, "test_async_rearr_contig_shared_ioid_two_files() FAILED (rank %d): "
+      "final PIOc_sync() on file A returned %d\n", my_rank, ret);
+    nerrs++;
+  }
+
+  PIOc_closefile(ncidA);
+  PIOc_closefile(ncidB);
+  PIOc_freedecomp(iosysid, ioid);
+  finalize_iosys(iosysid);
+
+  if(my_rank == 0){
+    remove(filenameA);
+    remove(filenameB);
+  }
+
+  return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* ------------------------------------------------------------------------
+ * Scenario 20: PIOc_freedecomp() with (and, separately, without) a pending
+ * async CONTIG rearrange+write op outstanding. This is a CONFIRMATION
+ * test, NOT a test of a new fix: the defer-to-last-iosystem-finalize
+ * mechanism it exercises (PIOc_freedecomp_impl()'s local nasync_pend_ops
+ * check, PIOc_finalize_impl()'s niosysid == 1 branch,
+ * pio_delete_all_iodescs()'s process-global sweep) already exists in the
+ * codebase and is UNMODIFIED by this plan - see Task 8's commit. A failure
+ * here means this plan regressed that pre-existing mechanism, not that
+ * some new fix is broken.
+ *
+ * Runs the same scenario twice (via the helper below), once with the
+ * pending op deliberately drained before PIOc_freedecomp() runs (the
+ * "every rank already agrees, free now" layout) and once with no drain
+ * (the "an agg-root I/O rank likely still has nasync_pend_ops > 0 while
+ * compute ranks always have 0" layout) - both must: (a) return PIO_NOERR
+ * from PIOc_freedecomp() promptly on every rank, with no rank blocking on
+ * another rank's free-vs-defer decision; (b)/(c) reach PIOc_finalize()
+ * (via finalize_iosys()) with no MPI error and no leaked/double-freed
+ * communicator, including on compute ranks whose rearr_comm_ is
+ * MPI_COMM_NULL; and (d) leave the file's contents correct and complete -
+ * proving the deferred op actually ran rather than being silently dropped
+ * when its iodesc's list entry was (or was not) deferred.
+ * ------------------------------------------------------------------------ */
+static int run_freedecomp_while_pending_case(MPI_Comm test_comm, int my_rank, int ntasks,
+    bool force_drain_before_freedecomp)
+{
+  int ret = PIO_NOERR;
+  int iosysid = -1, ioid = -1, gdimlen = 0;
+  char filename[PIO_MAX_NAME + 1];
+  /* niotasks == 1: CONTIG+HDF5 at niotasks > 1 hits a separate,
+   * pre-existing heap-buffer-overflow in the (unmodified, synchronous)
+   * rearrange_io2comp()/rearrange_data()/alltoallw() read path (found by
+   * this scenario during development - ASan: heap-buffer-overflow in
+   * MPIDI_CH3U_Buffer_copy via SPIO_Util::Rearr_Util::alltoallw(),
+   * pio_rearr_contig.cpp:1492). No existing test anywhere in this
+   * codebase combines CONTIG + HDF5 + niotasks > 1 + a decomposed read
+   * (every other CONTIG+HDF5 test, e.g. test_darray_hdf5_contig.cpp,
+   * uses exactly one I/O rank) - this bug is unrelated to
+   * PIO_USE_ASYNC_WR_REARR (it reproduces on a plain, always-synchronous
+   * read) and out of scope for this plan to fix. niotasks == 1 still
+   * fully exercises the async rearrange+write feature these scenarios
+   * target - Task 2's and Task 6's unit tests already cover the
+   * aggregate/rearrange split and the io2comp op at niotasks > 1 in
+   * isolation from the rest of the HDF5/PIOc_* stack. */
+  const int num_io_procs = 1;
+  const char *case_name = force_drain_before_freedecomp ? "drained" : "pending";
+
+  snprintf(filename, PIO_MAX_NAME + 1, "%s_async_rearr_freedecomp_%s.nc", TEST_NAME, case_name);
+
+  if((ret = PIOc_Init_Intracomm(test_comm, num_io_procs, STRIDE1, BASE0,
+                                PIO_REARR_CONTIG, &iosysid))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_freedecomp_while_pending() FAILED (case=%s): "
+      "PIOc_Init_Intracomm() returned %d\n", case_name, ret);
+    return ret;
+  }
+
+  if((ret = init_test_decomp(iosysid, my_rank, ntasks, PIO_REARR_CONTIG, &gdimlen, &ioid))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_freedecomp_while_pending() FAILED (case=%s): "
+      "PIOc_init_decomp() returned %d\n", case_name, ret);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  int nerrs = 0;
+  int ncid = -1, dimid = -1, varid = -1;
+  int format = PIO_IOTYPE_HDF5;
+
+  if((ret = PIOc_createfile(iosysid, &ncid, &format, filename, PIO_CLOBBER)) ||
+     (ret = PIOc_def_dim(ncid, DIM_NAME, (PIO_Offset) gdimlen, &dimid)) ||
+     (ret = PIOc_def_var(ncid, VAR_NAME, PIO_INT, NDIM1, &dimid, &varid)) ||
+     (ret = PIOc_enddef(ncid))){
+    LOG_RANK0(my_rank, "test_async_rearr_contig_freedecomp_while_pending() FAILED (case=%s): "
+      "create/def/enddef returned %d\n", case_name, ret);
+    if(ncid >= 0){ PIOc_closefile(ncid); }
+    PIOc_freedecomp(iosysid, ioid);
+    finalize_iosys(iosysid);
+    return ret;
+  }
+
+  std::vector<int> wdata(MAPLEN_PER_RANK);
+  fill_wdata(wdata, my_rank, 0);
+
+  if((ret = PIOc_write_darray(ncid, varid, ioid, (PIO_Offset) MAPLEN_PER_RANK,
+                              wdata.data(), NULL))){
+    fprintf(stderr, "test_async_rearr_contig_freedecomp_while_pending() FAILED (rank %d, "
+      "case=%s): PIOc_write_darray() returned %d\n", my_rank, case_name, ret);
+    nerrs++;
+  }
+
+  if(force_drain_before_freedecomp){
+    /* The "all ranks already agree" layout: force the pending op to
+     * complete before freedecomp() runs. */
+    drain_async_ops(iosysid);
+  }
+  /* else: the "a genuine pending op at freedecomp() time" layout - call
+   * freedecomp() immediately, with no drain. */
+
+  /* (a) */
+  if((ret = PIOc_freedecomp(iosysid, ioid)) != PIO_NOERR){
+    fprintf(stderr, "test_async_rearr_contig_freedecomp_while_pending() FAILED (rank %d, "
+      "case=%s): PIOc_freedecomp() returned %d (expected PIO_NOERR on every rank, even one "
+      "merely deferring the real free to finalize)\n", my_rank, case_name, ret);
+    nerrs++;
+  }
+
+  /* (b)/(d), partially: close the file - spio_hard_closefile()'s own
+   * drain (is_file_owning_io_proc()-gated, independent of the iodesc's own
+   * nasync_pend_ops accounting - this is file->npend_ops) waits for this
+   * file's pending op to complete, so the deferred rearrange+write is
+   * guaranteed done by the time this returns. The queued op kept the
+   * io_desc_t alive via its own std::shared_ptr<io_desc_t>, regardless of
+   * whether PIOc_freedecomp() above removed it from the global iodesc list
+   * on this rank. */
+  if((ret = PIOc_closefile(ncid))){
+    fprintf(stderr, "test_async_rearr_contig_freedecomp_while_pending() FAILED (rank %d, "
+      "case=%s): PIOc_closefile() returned %d\n", my_rank, case_name, ret);
+    nerrs++;
+  }
+
+  /* (d): reopen (fresh ioid - the original was just freed above) and
+   * confirm the deferred write actually ran. */
+  int ioid2 = -1;
+  if((ret = init_test_decomp(iosysid, my_rank, ntasks, PIO_REARR_CONTIG, NULL, &ioid2))){
+    fprintf(stderr, "test_async_rearr_contig_freedecomp_while_pending() FAILED (rank %d, "
+      "case=%s): re-initializing the decomposition for readback returned %d\n",
+      my_rank, case_name, ret);
+    nerrs++;
+  }
+  else{
+    int rncid = -1, rvarid = -1;
+    if((ret = PIOc_openfile(iosysid, &rncid, &format, filename, PIO_NOWRITE)) ||
+       (ret = PIOc_inq_varid(rncid, VAR_NAME, &rvarid))){
+      fprintf(stderr, "test_async_rearr_contig_freedecomp_while_pending() FAILED (rank %d, "
+        "case=%s): reopening for readback returned %d\n", my_rank, case_name, ret);
+      nerrs++;
+    }
+    else{
+      std::vector<int> rdata(MAPLEN_PER_RANK, -1);
+      if((ret = PIOc_read_darray(rncid, rvarid, ioid2, (PIO_Offset) MAPLEN_PER_RANK, rdata.data()))){
+        fprintf(stderr, "test_async_rearr_contig_freedecomp_while_pending() FAILED (rank %d, "
+          "case=%s): PIOc_read_darray() after reopen returned %d\n", my_rank, case_name, ret);
+        nerrs++;
+      }
+      else{
+        for(int i = 0; i < MAPLEN_PER_RANK; i++){
+          if(rdata[i] != wdata[i]){
+            fprintf(stderr, "test_async_rearr_contig_freedecomp_while_pending() FAILED (rank %d, "
+              "case=%s): rdata[%d] (%d) != wdata[%d] (%d) - the deferred async CONTIG "
+              "rearrange+write queued before PIOc_freedecomp() was dropped or never ran\n",
+              my_rank, case_name, i, rdata[i], i, wdata[i]);
+            nerrs++;
+            break;
+          }
+        }
+      }
+      if(rncid >= 0){ PIOc_closefile(rncid); }
+    }
+    PIOc_freedecomp(iosysid, ioid2);
+  }
+
+  /* (b)/(c): the last-iosystem branch's pio_delete_all_iodescs() sweep is
+   * what actually frees any iodesc a rank deferred above (though by this
+   * point the file close's own drain has already completed the op, so
+   * nasync_pend_ops should already read 0 everywhere - this still
+   * exercises the sweep finding and freeing a list-resident iodesc that an
+   * earlier PIOc_freedecomp() call declined to remove). Must complete with
+   * no MPI error and no leaked/double-freed communicator. */
+  finalize_iosys(iosysid);
+
+  if(my_rank == 0){
+    remove(filename);
+  }
+
+  return (reduce_nerrs(test_comm, nerrs) == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+static int test_async_rearr_contig_freedecomp_while_pending(MPI_Comm test_comm, int my_rank, int ntasks)
+{
+  int ret_pending = run_freedecomp_while_pending_case(test_comm, my_rank, ntasks, false);
+  int ret_drained = run_freedecomp_while_pending_case(test_comm, my_rank, ntasks, true);
+
+  return ((ret_pending == PIO_NOERR) && (ret_drained == PIO_NOERR)) ? PIO_NOERR : PIO_EINTERNAL;
+}
+#endif /* PIO_USE_ASYNC_WR_REARR */
+
 /* ------------------------------------------------------------------------ */
 
 #define RUN_SCENARIO(call, name)                                              \
@@ -2595,6 +3353,26 @@ int main(int argc, char **argv)
 
     RUN_SCENARIO(test_subset_put_var_record_dim_no_race(test_comm, my_rank, ntasks),
                  "test_subset_put_var_record_dim_no_race");
+
+#if PIO_USE_ASYNC_WR_REARR
+    RUN_SCENARIO(test_async_rearr_contig_write_sync_read_roundtrip(test_comm, my_rank, ntasks),
+                 "test_async_rearr_contig_write_sync_read_roundtrip");
+
+    RUN_SCENARIO(test_async_rearr_contig_write_close_reopen_read(test_comm, my_rank, ntasks),
+                 "test_async_rearr_contig_write_close_reopen_read");
+
+    RUN_SCENARIO(test_async_rearr_contig_multivar_fillvalue(test_comm, my_rank, ntasks),
+                 "test_async_rearr_contig_multivar_fillvalue");
+
+    RUN_SCENARIO(test_async_rearr_contig_shared_ioid_two_files(test_comm, my_rank, ntasks),
+                 "test_async_rearr_contig_shared_ioid_two_files");
+
+    RUN_SCENARIO(test_async_rearr_contig_freedecomp_while_pending(test_comm, my_rank, ntasks),
+                 "test_async_rearr_contig_freedecomp_while_pending");
+#else
+    LOG_RANK0(my_rank, "test_async_rearr_contig_* scenarios SKIPPED "
+      "(PIO_USE_ASYNC_WR_REARR is disabled in this build)\n");
+#endif
 
     if(single_rank_comm != MPI_COMM_NULL){
       MPI_Comm_free(&single_rank_comm);
