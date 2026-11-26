@@ -34,7 +34,7 @@
 <dt>Does SCORPIO support I/O data compression?</dt>
   <dd>Yes, SCORPIO supports lossless and lossy I/O data compression using NetCDF, HDF5 and ADIOS2 I/O libraries.</dd>
 <dt>Does SCORPIO support asynchronous I/O?<dt>
-  <dd>Yes, SCORPIO supports asynchronous I/O using asynchronous threads for making progress on I/O calls (currently supported only for the HDF5 I/O library) and using asynchronous I/O processes (A separate set of asynchronous I/O processes that are forwarded and make progress on all I/O calls, see \ref PIO_init for more information)</dd>
+  <dd>Yes, SCORPIO supports asynchronous I/O using asynchronous threads for making progress on I/O calls (currently supported only for the HDF5 I/O library, see the PIO_USE_ASYNC_WR_THREAD CMake configuration option) and using asynchronous I/O processes (A separate set of asynchronous I/O processes that are forwarded and make progress on all I/O calls, see \ref PIO_init for more information). When using the asynchronous I/O thread, data rearrangement for writes using the CONTIG rearranger can also be offloaded onto the asynchronous thread, instead of blocking the application thread, using the PIO_USE_ASYNC_WR_REARR CMake configuration option.</dd>
 <dt>How do I install SCORPIO on my machine?<dt>
   <dd>SCORPIO uses CMake for configuring the library and assumes that an MPI library is available on the system. See \ref install for more information</dd>
 <dt>Can I use SCORPIO if my application runs on a single process?</dt>
