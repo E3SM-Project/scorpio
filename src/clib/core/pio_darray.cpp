@@ -419,9 +419,21 @@ int PIOc_write_darray_multi_impl(int ncid, const int *varids, int ioid, int nvar
       /* Unchanged synchronous path. When this ioid is shared with a file
        * whose writes DO use the async rearrange op above (e.g. a mixed-
        * iotype application sharing one decomposition across an HDF5 file
-       * and a PnetCDF/NetCDF4P file), the drain added in a later commit on
-       * this branch (spio_wait_iodesc_async_pend_ops(), gated to I/O ranks)
-       * must run here first - see that commit for why. */
+       * and a PnetCDF/NetCDF4P file), rearr_comm_ may still be in use by
+       * the worker thread on behalf of that other file - see the identical
+       * drain (and its full rationale) above the rearrange_io2comp() call
+       * in PIOc_read_darray_impl(). I/O ranks only, same reasoning. */
+#if PIO_USE_ASYNC_WR_REARR
+      if(write_desc_info.rearr->is_agg_root()){
+        if(spio_wait_iodesc_async_pend_ops(iodesc) != PIO_NOERR){
+          PIOc_warn(ios->iosysid, file->pio_ncid, __FILE__, __LINE__,
+            "Timed out waiting for a pending asynchronous CONTIG rearrange (queued by a "
+            "write to a different file sharing this same decomposition) to complete before "
+            "a synchronous rearrange on this file. Continuing with the write - the "
+            "rearranger communicator may still be in use, risking a collective ordering error");
+        }
+      }
+#endif /* PIO_USE_ASYNC_WR_REARR */
       ierr = write_desc_info.rearr->rearrange_comp2io(array, arraylen * nvars * write_desc_info.mpitype_size, mv_iobuf, rlen * write_desc_info.mpitype_size, nvars);
     }
   }
@@ -3855,6 +3867,48 @@ int PIOc_read_darray_impl(int ncid, int varid, int ioid, PIO_Offset arraylen,
    *  rearrange must use the matching comm target, not unconditionally the sync one.
    */
   if(desc_info.rearranger == PIO_REARR_CONTIG){
+#if PIO_USE_ASYNC_WR_REARR
+    /* rearr_comm_ is scoped to the decomposition (ioid), routinely shared
+     * across files and variables - the spio_wait_file_async_pend_ops()
+     * call above is file-scoped and does not cover a pending async
+     * rearrange+write op queued by a *different* file sharing this same
+     * ioid. rearrange_io2comp() begins with rearrange_data() on that same
+     * communicator (rearr_comm_), so entering it from this (application)
+     * thread while the worker thread may still be inside its own
+     * rearrange_data() call for that other file would be a second,
+     * unordered issuer of a collective on one communicator from two
+     * threads of one rank - MPI-3.1 Sec 12.4.3 leaves matching to the
+     * caller; MPI_THREAD_MULTIPLE does not make this safe.
+     *
+     * I/O ranks only: a compute rank's rearr_comm_ is MPI_COMM_NULL
+     * (Contig_rearr::create_rearr_comm()) and its nasync_pend_ops is
+     * always 0, since only agg-roots (is_agg_root()) ever queue this op -
+     * compute ranks cannot race on rearr_comm_ by construction and have
+     * nothing to wait for. The drain's own nasync_pend_ops <= 0 fast path
+     * (spio_wait_iodesc_async_pend_ops()) already makes this a no-op
+     * there; the is_agg_root() gate here exists to keep the intent
+     * unambiguous for a future reader, not because it is load-bearing.
+     *
+     * Alternative considered and rejected: give the async write path its
+     * own duplicated rearr_comm_ so the worker and this thread never share
+     * one (MPI_THREAD_MULTIPLE would make that safe, preserving more
+     * concurrency here). Rejected because it does not remove the need for
+     * a drain at finalize()/MPI_Comm_free() time (Task 8 covers that
+     * regardless); communicators are a finite per-decomposition resource
+     * and E3SM holds many decompositions at once; and the common
+     * read-after-write-on-the-same-file case already pays the file-scoped
+     * drain above, so the incremental cost here is confined to the
+     * cross-file-same-ioid case. */
+    if(desc_info.rearr->is_agg_root()){
+      if(spio_wait_iodesc_async_pend_ops(iodesc) != PIO_NOERR){
+        PIOc_warn(ios->iosysid, file->pio_ncid, __FILE__, __LINE__,
+          "Timed out waiting for a pending asynchronous CONTIG rearrange (queued by a "
+          "write to a different file sharing this same decomposition) to complete before "
+          "reading. Continuing with the read - the rearranger communicator may still be in "
+          "use, risking a collective ordering error");
+      }
+    }
+#endif /* PIO_USE_ASYNC_WR_REARR */
     ierr = desc_info.rearr->rearrange_io2comp(iobuf, rlen * desc_info.mpitype_size, array, desc_info.ndof * desc_info.mpitype_size, 1);
   }
   else{
