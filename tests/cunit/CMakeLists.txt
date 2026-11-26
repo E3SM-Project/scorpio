@@ -96,6 +96,14 @@ if (NOT PIO_USE_MPISERIAL)
                     test_iosystem3_simple2 test_iosystem3 test_pioc test_pioc_unlim test_pioc_putget
                     test_pioc_fill test_darray test_darray_multi test_darray_multivar test_darray_multivar2
                     test_darray_1d test_darray_3d test_decomp_uneven test_decomps test_rearr)
+  if (WITH_HDF5)
+    add_spio_executable (test_darray_hdf5_contig TRUE "" test_darray_hdf5_contig.cpp OBJ_LIBS test_common_obj)
+    add_spio_executable (test_putget_hdf5 TRUE "" test_putget_hdf5.cpp OBJ_LIBS test_common_obj)
+    add_spio_executable (test_hdf5_reopen TRUE "" test_hdf5_reopen.cpp OBJ_LIBS test_common_obj)
+    add_spio_executable (test_hdf5_async_full_lifecycle TRUE "" test_hdf5_async_full_lifecycle.cpp OBJ_LIBS test_common_obj)
+    add_dependencies (tests test_darray_hdf5_contig test_putget_hdf5 test_hdf5_reopen
+                      test_hdf5_async_full_lifecycle)
+  endif ()
   if (PIO_USE_MALLOC)
     add_spio_executable (test_darray_async_simple TRUE "" test_darray_async_simple.cpp OBJ_LIBS test_common_obj)
     add_spio_executable (test_darray_async TRUE "" test_darray_async.cpp OBJ_LIBS test_common_obj)
@@ -119,18 +127,27 @@ add_spio_executable (test_spio_decomp_logger TRUE "" test_spio_decomp_logger.cpp
 add_spio_executable (test_sdecomp_regex TRUE "" test_sdecomp_regex.cpp OBJ_LIBS test_common_obj)
 add_spio_executable(test_req_block_wait TRUE "" test_req_block_wait.cpp OBJ_LIBS test_common_obj)
 add_spio_executable(test_spio_dt_converter TRUE "" test_spio_dt_converter.cpp)
+add_spio_executable(test_spio_select_io_desc_info TRUE "" test_spio_select_io_desc_info.cpp OBJ_LIBS test_common_obj)
+add_spio_executable(test_spio_iodesc_utils TRUE "" test_spio_iodesc_utils.cpp)
+add_spio_executable(test_spio_iosys_utils TRUE "" test_spio_iosys_utils.cpp)
+add_spio_executable(test_spio_async_tcomm TRUE "" test_spio_async_tcomm.cpp)
+add_spio_executable(test_pio_file_lock TRUE "" test_pio_file_lock.cpp)
 add_dependencies (tests test_spmd test_spio_ltimer test_spio_serializer test_spio_tree
                   test_spio_file_mvcache test_spio_sort_utils test_spio_rearr_utils_gather
                   test_spio_rearr_utils_scatter test_spio_rearr_utils_alltoall
                   test_spio_rearr_contig test_spio_rearr_contig_nvars test_spio_rearr_contig_fillval
                   test_spio_decomp_logger test_sdecomp_regex test_req_block_wait
-                  test_spio_dt_converter)
+                  test_spio_dt_converter test_spio_select_io_desc_info test_spio_iodesc_utils
+                  test_spio_iosys_utils test_spio_async_tcomm test_pio_file_lock)
 
 if(PIO_USE_ASYNC_WR_THREAD)
   add_spio_executable (test_mtq TRUE "" test_async_mtq.cpp OBJ_LIBS test_common_obj)
   add_spio_executable (test_mtq_signal TRUE "" test_async_mtq_signal.cpp OBJ_LIBS test_common_obj)
   add_spio_executable (test_mtq_pool TRUE "" test_async_tpool.cpp OBJ_LIBS test_common_obj)
-  add_dependencies(tests test_mtq test_mtq_signal test_mtq_pool)
+  add_spio_executable (test_spio_rearr_contig_async TRUE "" test_spio_rearr_contig_async.cpp OBJ_LIBS test_common_obj)
+  add_spio_executable (test_spio_contig_async_io_desc_info TRUE "" test_spio_contig_async_io_desc_info.cpp OBJ_LIBS test_common_obj)
+  add_dependencies(tests test_mtq test_mtq_signal test_mtq_pool test_spio_rearr_contig_async
+                    test_spio_contig_async_io_desc_info)
 endif()
 
 set (SPIO_TEST_MAX_NPROCS 4)
@@ -154,6 +171,9 @@ add_test(NAME test_spio_serializer COMMAND test_spio_serializer)
 add_test(NAME test_spio_tree COMMAND test_spio_tree)
 add_test(NAME test_spio_file_mvcache COMMAND test_spio_file_mvcache)
 add_test(NAME test_spio_dt_converter COMMAND test_spio_dt_converter)
+add_test(NAME test_spio_select_io_desc_info COMMAND test_spio_select_io_desc_info)
+add_test(NAME test_spio_async_tcomm COMMAND test_spio_async_tcomm)
+add_test(NAME test_pio_file_lock COMMAND test_pio_file_lock)
 add_test(NAME test_sdecomp_regex COMMAND test_sdecomp_regex)
 add_test(NAME test_spio_sort_utils COMMAND test_spio_sort_utils)
 
@@ -183,6 +203,19 @@ else ()
     EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_req_block_wait
     NUMPROCS 4
     TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  # Needs exactly 2 procs so a disjoint sync-only-vs-async-only I/O comm info
+  # (see test_driver() in test_spio_iodesc_utils.cpp) can be constructed; a
+  # no-op (always passes) when the library was not configured with WITH_HDF5.
+  add_mpi_test(test_spio_iodesc_utils
+    EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_iodesc_utils
+    NUMPROCS 2
+    TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
+    add_mpi_test(test_spio_iosys_utils${nproc}
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_iosys_utils
+      NUMPROCS ${nproc}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endforeach()
   foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
     add_mpi_test(test_spio_rearr_utils_gather${nproc}
       EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_utils_gather
@@ -207,6 +240,28 @@ else ()
       NUMPROCS ${nproc}
       TIMEOUT ${DEFAULT_TEST_TIMEOUT})
   endforeach()
+  if(PIO_USE_ASYNC_WR_THREAD)
+    # FIXME: Fix the comm split logic in the tests below so that it runs with
+    # any number of procs
+
+    # Needs at least 2 procs so the sync and async I/O comms used in this test can
+    # genuinely have different sizes (see test_spio_rearr_contig_async.cpp)
+    foreach(nproc RANGE 2 ${SPIO_TEST_MAX_NPROCS})
+      add_mpi_test(test_spio_rearr_contig_async${nproc}
+        EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_contig_async
+        NUMPROCS ${nproc}
+        TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+    endforeach()
+    # Needs at least 2 procs so the maplen == 0 edge case can give one rank an
+    # empty compmap while other ranks still have data (see
+    # test_spio_contig_async_io_desc_info.cpp)
+    foreach(nproc RANGE 2 ${SPIO_TEST_MAX_NPROCS})
+      add_mpi_test(test_spio_contig_async_io_desc_info${nproc}
+        EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_contig_async_io_desc_info
+        NUMPROCS ${nproc}
+        TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+    endforeach()
+  endif()
   foreach(nproc RANGE 1 ${SPIO_TEST_MAX_NPROCS})
     add_mpi_test(test_spio_rearr_contig_nvars${nproc}
       EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_spio_rearr_contig_nvars
@@ -313,6 +368,30 @@ else ()
     EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_darray_3d
     NUMPROCS ${AT_LEAST_FOUR_TASKS}
     TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  if (WITH_HDF5)
+    # FIXME: Make sure that the test works with any number of MPI procs
+    add_mpi_test(test_darray_hdf5_contig
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_darray_hdf5_contig
+      NUMPROCS ${AT_LEAST_FOUR_TASKS}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+    add_mpi_test(test_putget_hdf5
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_putget_hdf5
+      NUMPROCS 1
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+    add_mpi_test(test_hdf5_reopen
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_hdf5_reopen
+      NUMPROCS 1
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+    # End-to-end async-write lifecycle/lock-file/native-reopen integration
+    # tests. Several scenarios use a disjoint sync/async I/O proc topology,
+    # which is where this library's known, pre-existing async concurrency
+    # issues live - an explicit TIMEOUT makes such a scenario fail fast
+    # instead of hanging the whole ctest run.
+    add_mpi_test(test_hdf5_async_full_lifecycle
+      EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_hdf5_async_full_lifecycle
+      NUMPROCS ${AT_LEAST_FOUR_TASKS}
+      TIMEOUT ${DEFAULT_TEST_TIMEOUT})
+  endif ()
   add_mpi_test(test_decomp_uneven
     EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/test_decomp_uneven
     NUMPROCS ${AT_LEAST_FOUR_TASKS}

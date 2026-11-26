@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstdbool>
 #include <cstring>
+#include <cstdint>
 
 #ifdef MPI_SERIAL
 #if defined(__cplusplus)
@@ -70,6 +71,9 @@ struct var_desc_t;
 /* Fwd declaration of thread-specific comm class used in iosystem_desc_t */
 namespace SPIO_Util{
   class TComm_info;
+  namespace Iosys_Util{
+    class IO_comm_info;
+  }
 }
 
 const int SPIO_INVALID_ID = -1;
@@ -218,24 +222,22 @@ namespace SPIO{
 }
 
 struct iosystem_desc_t;
-/* FIXME: Move io_desc_t to a proper class with public/private
+
+/* FIXME: Move io_desc_info_t to a proper class with public/private
  * data members (instead of a struct with all public members)
  */
 /**
- * IO descriptor structure.
+ * IO decomposition info.
  *
- * This structure defines the mapping for a given variable between
- * compute and IO decomposition.
+ * Contains all information for data rearrangement when reading or
+ * writing data.
  */
-struct io_desc_t
+struct io_desc_info_t
 {
-    /** The ID of this io_desc_t. */
-    int ioid;
-
     /** The length of the decomposition map. */
     int maplen;
 
-    /** A 1-D array with iodesc->maplen elements, which are the
+    /** A 1-D array with maplen elements, which are the
      * 1-based mappings to the global array for that task. */
     PIO_Offset *map;
 
@@ -246,7 +248,7 @@ struct io_desc_t
     /** Local size of the decomposition array on the compute node. */
     int ndof;
 
-    /** All vars included in this io_desc_t have the same number of
+    /** All vars included in this io_desc_info_t have the same number of
      * dimensions. */
     int ndims;
 
@@ -266,7 +268,7 @@ struct io_desc_t
      * everywhere (false) */
     bool needsfill;
 
-    /** The maximum number of bytes of this iodesc before flushing. */
+    /** The maximum number of bytes of this io_desc_info_t before flushing. */
     int maxbytes;
 
     /** The PIO type of the data. */
@@ -351,17 +353,78 @@ struct io_desc_t
     /* FIXME: Once we have classes for subset/box this ptr should be to a base rearr class */
     SPIO::DataRearr::Contig_rearr *rearr;
 
-    /* Number of pending async ops using this I/O desc */
-    std::atomic_int nasync_pend_ops;
-
-    io_desc_t(iosystem_desc_t *ios, int piotype, int ndims, const int *gdimlen,
+    io_desc_info_t(iosystem_desc_t *ios, int piotype, int ndims, const int *gdimlen,
               int maplen, const PIO_Offset *compmap, int rearranger, bool map_zero_based);
+
+    /* Not copyable: owns malloc'ed arrays, region lists, an MPI comm and
+     * the rearranger object, all freed in the destructor - a shallow copy
+     * would double-free them. */
+    io_desc_info_t(const io_desc_info_t &) = delete;
+    io_desc_info_t &operator=(const io_desc_info_t &) = delete;
+
     void init_map(int maplen, const PIO_Offset *compmap, int rearranger, bool map_zero_based);
     void free_region_list(io_region *phead);
     void free_all_regions(void );
     void free_mpi_types(MPI_Datatype *ptypes, int ntypes);
     void free_all_mpi_types(void );
+    ~io_desc_info_t();
+};
+
+/* Forward decl - full definition (typedef struct file_desc_t) comes later in
+ * this header; select_io_desc_info() below only needs a pointer to it. */
+struct file_desc_t;
+
+/**
+ * IO descriptor structure.
+ *
+ * This structure defines the mapping for a given variable between
+ * compute and IO decomposition.
+ */
+struct io_desc_t
+{
+    /** The ID of this io_desc_t. */
+    int ioid;
+
+    /* I/O decomposition info for synchronous reads/writes */
+    io_desc_info_t sync_io_desc_info;
+
+    /* I/O decomposition info for asynchronous writes. Allocated for
+     * PIO_REARR_CONTIG, PIO_REARR_BOX, and PIO_REARR_SUBSET decomps when
+     * using async I/O (PIO_USE_ASYNC_WR_THREAD). NULL otherwise.
+     */
+    io_desc_info_t *async_io_desc_info;
+
+    /* Number of pending async ops using this I/O desc */
+    std::atomic_int nasync_pend_ops;
+
+    io_desc_t(iosystem_desc_t *ios, int piotype, int ndims, const int *gdimlen,
+              int maplen, const PIO_Offset *compmap, int rearranger, bool map_zero_based);
     ~io_desc_t();
+
+    /* Returns the io_desc_info_t to use for a write/read of the given iotype:
+     * async_io_desc_info for CONTIG/BOX/SUBSET-rearranger HDF5/HDF5C writes
+     * when the file uses async I/O (file->uses_async_io) and async_io_desc_info
+     * has been allocated, sync_io_desc_info otherwise.
+     *
+     * @param iotype The iotype of the file being written/read
+     * @param file The file being written/read. file->uses_async_io is computed
+     * once per file, at create/open time (see spio_createfile_int(),
+     * PIOc_openfile_retry_impl()), as (file->mode & PIO_WRITE) &&
+     * !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios) - it is the
+     * single source of truth this function uses to decide whether this file's
+     * writes are eligible for async I/O procs at all. (HDF5 files/datasets
+     * are only ever created on sync I/O ranks, so async I/O ranks disjoint
+     * from them cannot write to the dataset; see
+     * IO_comm_info::sync_and_async_io_share_procs() and
+     * SPIO_Util::Iosys_Util::is_file_owning_io_proc() for the related
+     * role-membership checks made elsewhere.)
+     *
+     * Note: all callers writing/reading the same buffer *must* pass the same
+     * (iotype, file) pair - the rearrange step in write_darray_multi() and the
+     * dispatch in pio_iosys_async_hdf5_write_op_add() must agree on the
+     * selected io_desc_info_t or the rearranged data lands on a different set
+     * of ranks than the one that writes it out. */
+    io_desc_info_t &select_io_desc_info(int iotype, const file_desc_t *file);
 };
 
 /* Forward decl for I/O file summary stats info */
@@ -386,9 +449,8 @@ typedef struct iosystem_desc_t
      * both the IO and the computation communicators. */
     MPI_Comm union_comm;
 
-    /** This is an MPI intra communicator that includes all the tasks
-     * involved in IO. */
-    MPI_Comm io_comm;
+    /** I/O Communicator info : comm, ranks, root */
+    SPIO_Util::Iosys_Util::IO_comm_info *io_comm_info;
 
     /** This is an MPI intra communicator that includes all the tasks
      * involved in computation. */
@@ -410,12 +472,6 @@ typedef struct iosystem_desc_t
      * computation. */
     MPI_Group compgroup;
 
-    /** This MPI group contains the processors involved in I/O. */
-    MPI_Group iogroup;
-
-    /** The number of tasks in the IO communicator. */
-    int num_iotasks;
-
     /** The number of tasks in the computation communicator. */
     int num_comptasks;
 
@@ -431,21 +487,9 @@ typedef struct iosystem_desc_t
      * if this process is not part of the computation communicator. */
     int comp_rank;
 
-    /** The rank of this process in the IO communicator, or -1 if this
-     * process is not part of the IO communicator. */
-    int io_rank;
-
-    /** Set to MPI_ROOT if this task is the master of IO communicator, 0
-     * otherwise. */
-    int iomaster;
-
     /** Set to MPI_ROOT if this task is the master of comp communicator, 0
      * otherwise. */
     int compmaster;
-
-    /** Rank of IO root task (which is rank 0 in io_comm) in the union
-     * communicator. Will always be 0 for async situations. */
-    int ioroot;
 
     /** Rank of computation root task (which is rank 0 in
      * comm_comms[cmp]) in the union communicator. Will always = number
@@ -453,10 +497,6 @@ typedef struct iosystem_desc_t
     int comproot;
 
     SPIO_Util::TComm_info *tcomm_info;
-
-    /** An array of the ranks of all IO tasks within the union
-     * communicator. */
-    int *ioranks;
 
     /** An array of the ranks of all computation tasks within the
      * union communicator. */
@@ -471,9 +511,6 @@ typedef struct iosystem_desc_t
 
     /** True if asynchronous interface is in use. */
     bool async;
-
-    /** True if this task is a member of the IO communicator. */
-    bool ioproc;
 
     /** True if this task is a member of a computation
      * communicator. */
@@ -493,6 +530,15 @@ typedef struct iosystem_desc_t
 
     /** Rearranger options. */
     rearr_opt_t rearr_opts;
+
+    /** Per-iosystem random lock id, generated once (from true entropy, not a
+     * seeded PRNG) and broadcast to every task at PIOc_Init_Intracomm_impl()
+     * time - see SPIO_Util::Iosys_Util::generate_and_bcast_lock_id(). Used to
+     * name a filesystem lock file coordinating async I/O write lifecycle
+     * across ranks. Present regardless of _HDF5/PIO_USE_ASYNC_WR_THREAD so
+     * later code can reference it unconditionally, even though its value is
+     * only ever meaningful under those macros. */
+    uint64_t spio_lock_id;
 
 #ifdef _ADIOS2
     /* ADIOS handles */
@@ -521,9 +567,6 @@ typedef struct iosystem_desc_t
 
     /* List of pending async operations on this iosystem */
     std::deque<SPIO_Util::Async_op> async_pend_ops;
-
-    /** Pointer to the next iosystem_desc_t in the list. */
-    struct iosystem_desc_t *next;
 } iosystem_desc_t;
 
 /**
@@ -883,6 +926,13 @@ typedef struct file_desc_t
 
     /** Number of global attrs defined */
     int hdf5_num_gattrs;
+
+    /** True if this file's HDF5/HDF5C writes are routed to the async I/O
+     * procs instead of the sync I/O procs. Computed once, at file create/open
+     * time, from PIO_USE_ASYNC_WR_THREAD, file->mode (write-capable) and
+     * whether the iosystem has a usable async I/O comm at all - never
+     * re-derived per call. */
+    bool uses_async_io;
 
 #endif /* _HDF5 */
     /** A datatype converter for user buffers */

@@ -11,6 +11,7 @@
 #include "pio_rearr_utils.hpp"
 #include "spio_dbg_utils.hpp"
 #include "spio_gptl_utils.hpp"
+#include "spio_iosys_utils.hpp"
 
 namespace SPIO_Util{
   template<typename CIter, typename Iter>
@@ -48,6 +49,39 @@ namespace SPIO_Util{
     }
   }
 } // namespace SPIO_Util
+
+SPIO::DataRearr::Contig_rearr::Contig_rearr(iosystem_desc_t *ios, bool targets_async_comm):
+  is_init_(false), ios_(ios), targets_async_comm_(targets_async_comm), iodesc_(NULL),
+  lcompmap_sz_(0), elem_pio_type_(PIO_NAT), elem_mpi_type_(MPI_DATATYPE_NULL),
+  elem_mpi_type_sz_(0), agg_comm_(MPI_COMM_NULL), is_agg_root_(false),
+  agg_comm_sz_(0), agg_iochunk_sz_(0), rearr_comm_(MPI_COMM_NULL), rearr_comm_sz_(0),
+  rearr_comm_iochunk_sz_(0)
+{
+}
+
+MPI_Comm SPIO::DataRearr::Contig_rearr::role_io_comm(void ) const
+{
+  return targets_async_comm_ ? ios_->io_comm_info->get_async_io_comm()
+                              : ios_->io_comm_info->get_sync_io_comm();
+}
+
+bool SPIO::DataRearr::Contig_rearr::role_is_io_proc(void ) const
+{
+  return targets_async_comm_ ? ios_->io_comm_info->is_async_io_proc()
+                              : ios_->io_comm_info->is_sync_io_proc();
+}
+
+int SPIO::DataRearr::Contig_rearr::role_io_comm_sz(void ) const
+{
+  return targets_async_comm_ ? ios_->io_comm_info->get_async_io_comm_sz()
+                              : ios_->io_comm_info->get_sync_io_comm_sz();
+}
+
+int SPIO::DataRearr::Contig_rearr::role_io_comm_rank(void ) const
+{
+  return targets_async_comm_ ? ios_->io_comm_info->get_async_io_comm_rank()
+                              : ios_->io_comm_info->get_sync_io_comm_rank();
+}
 
 int SPIO::DataRearr::Contig_rearr::init(int pio_type,
       const PIO_Offset *compmap, std::size_t compmap_sz,
@@ -317,8 +351,8 @@ void SPIO::DataRearr::Contig_rearr::off_range_to_dim_range(PIO_Offset start_off,
   convert_off_to_count_dim_idx(count_off, count);
 }
 
-int SPIO::DataRearr::Contig_rearr::rearrange_comp2io(const void *sbuf, std::size_t sbuf_sz,
-      void *rbuf, std::size_t rbuf_sz, int nvars)
+int SPIO::DataRearr::Contig_rearr::aggregate_comp2io(const void *sbuf, std::size_t sbuf_sz,
+      void *&agg_buf_out, std::size_t &agg_buf_sz_out, int nvars)
 {
   int ret = PIO_NOERR;
   assert(is_init_);
@@ -331,6 +365,8 @@ int SPIO::DataRearr::Contig_rearr::rearrange_comp2io(const void *sbuf, std::size
   if(is_agg_root_){
     agg_buf = malloc(agg_buf_sz);
     if(!agg_buf){
+      agg_buf_out = NULL;
+      agg_buf_sz_out = 0;
       return pio_err(ios_, NULL, PIO_ENOMEM, __FILE__, __LINE__,
         "Internal error while aggregating data from compute processes to aggregating processes (PIO_REARR_CONTIG). Unable to allocate memory to recv data (%lld bytes) for data aggregation (iosysid = %d)", static_cast<long long int> (agg_buf_sz), ios_->iosysid);
     }
@@ -338,18 +374,56 @@ int SPIO::DataRearr::Contig_rearr::rearrange_comp2io(const void *sbuf, std::size
 
   ret = aggregate_data(sbuf, sbuf_sz, agg_buf, agg_buf_sz, nvars);
   if(ret != PIO_NOERR){
+    if(agg_buf){ free(agg_buf); }
+    agg_buf_out = NULL;
+    agg_buf_sz_out = 0;
     return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
-      "Internal error while aggregating data from compute processes to aggregating processes (PIO_REARR_CONTIG). Data aggregation failed(aggregating buffer size = %lld bytes, receive buffer size = %lld bytes, nvars = %d, iosysid = %d)", static_cast<unsigned long long int>(agg_buf_sz),
-                            static_cast<unsigned long long int>(rbuf_sz), nvars, ios_->iosysid);
+      "Internal error while aggregating data from compute processes to aggregating processes (PIO_REARR_CONTIG). Data aggregation failed(aggregating buffer size = %lld bytes, nvars = %d, iosysid = %d)", static_cast<unsigned long long int>(agg_buf_sz),
+                            nvars, ios_->iosysid);
   }
 
-  /* Rearrange data  - aggregate processes to rearrange processes */
+  agg_buf_out = agg_buf;
+  agg_buf_sz_out = agg_buf_sz;
+  return PIO_NOERR;
+}
+
+int SPIO::DataRearr::Contig_rearr::rearrange_aggregated_to_io(void *agg_buf, std::size_t agg_buf_sz,
+      void *rbuf, std::size_t rbuf_sz, int nvars)
+{
+  int ret = PIO_NOERR;
+  assert(is_init_);
+
+  /* Rearrange data  - aggregate processes to rearrange processes.
+   * Collective on rearr_comm_ (I/O ranks only - see rearrange_data()'s own
+   * early return for !role_is_io_proc()). Does not take ownership of
+   * agg_buf; the caller still owns and must free it. */
   ret = rearrange_data(agg_buf, agg_buf_sz, rbuf, rbuf_sz, nvars, true);
   if(ret != PIO_NOERR){
     return pio_err(ios_, NULL, ret, __FILE__, __LINE__,
       "Internal error while rearranging data between IO/aggregating processes (PIO_REARR_CONTIG). Data rearrangement failed(aggregating buffer size = %lld bytes, receive buffer size = %lld bytes, nvars = %d, iosysid = %d)", static_cast<unsigned long long int>(agg_buf_sz),
               static_cast<unsigned long long int>(rbuf_sz), nvars, ios_->iosysid);
   }
+
+  return ret;
+}
+
+int SPIO::DataRearr::Contig_rearr::rearrange_comp2io(const void *sbuf, std::size_t sbuf_sz,
+      void *rbuf, std::size_t rbuf_sz, int nvars)
+{
+  /* Thin wrapper over the two phases (see PIO_USE_ASYNC_WR_REARR for why
+   * they are split): aggregation (cheap, compute+I/O, agg_comm_) followed
+   * by rearrangement (costly, I/O-only, rearr_comm_). Unchanged behavior
+   * for every caller that doesn't defer the second phase elsewhere. */
+  int ret = PIO_NOERR;
+  void *agg_buf = NULL;
+  std::size_t agg_buf_sz = 0;
+
+  ret = aggregate_comp2io(sbuf, sbuf_sz, agg_buf, agg_buf_sz, nvars);
+  if(ret != PIO_NOERR){
+    return ret;
+  }
+
+  ret = rearrange_aggregated_to_io(agg_buf, agg_buf_sz, rbuf, rbuf_sz, nvars);
 
   if(agg_buf){
     free(agg_buf);
@@ -619,15 +693,16 @@ inline int SPIO::DataRearr::Contig_rearr::create_agg_comm(void )
 
   assert(ios_);
 
-  /* Divide union comm into (ios_->num_iotasks) groups */
-  int agg_range_sz = ios_->num_uniontasks/ios_->num_iotasks;
+  /* Divide union comm into (number of sync/async I/O tasks, depending on targets_async_comm_)
+   * groups */
+  int agg_range_sz = ios_->num_uniontasks/role_io_comm_sz();
   /* Ensure that each group/color gets an I/O process - which is also the aggregating process */
-  int color = (ios_->ioproc) ? ios_->io_rank : (ios_->union_rank/agg_range_sz);
+  int color = (role_is_io_proc()) ? role_io_comm_rank() : (ios_->union_rank/agg_range_sz);
   /* Put the extra set of procs, after evenly dividing procs among I/O procs, with the last I/O proc */
-  color = (color >= ios_->num_iotasks) ? (ios_->num_iotasks - 1) : color;
+  color = (color >= role_io_comm_sz()) ? (role_io_comm_sz() - 1) : color;
 
   /* Each I/O process is rank 0 in the new aggregator comm, and is also the aggregating proc */
-  int key = (ios_->ioproc) ? 0 : 1;
+  int key = (role_is_io_proc()) ? 0 : 1;
 
   ret = MPI_Comm_split(ios_->union_comm, color, key, &agg_comm_);
   if(ret == MPI_SUCCESS){
@@ -958,11 +1033,11 @@ inline int SPIO::DataRearr::Contig_rearr::create_rearr_comm(void )
   assert(ios_);
   assert(gdecomp_sz_ > 0);
   
-  if(!ios_->ioproc){
+  if(!role_is_io_proc()){
     return ret;
   }
 
-  ret = MPI_Comm_dup(ios_->io_comm, &rearr_comm_);
+  ret = MPI_Comm_dup(role_io_comm(), &rearr_comm_);
   if(ret == MPI_SUCCESS){
     ret = MPI_Comm_size(rearr_comm_, &rearr_comm_sz_);
     if(ret == MPI_SUCCESS){
@@ -985,7 +1060,7 @@ inline void SPIO::DataRearr::Contig_rearr::set_rearr_comm_iochunk_sz(int ndims, 
   assert(ios_);
   assert(gdecomp_sz_ > 0);
 
-  if(ios_->ioproc){
+  if(role_is_io_proc()){
     assert((rearr_comm_ != MPI_COMM_NULL) && (rearr_comm_sz_ > 0));
 
     rearr_comm_iochunk_sz_ = gdecomp_sz_ / rearr_comm_sz_;
@@ -1034,7 +1109,7 @@ int SPIO::DataRearr::Contig_rearr::get_rearr_toproc_map(const std::vector<PIO_Of
   int ret = PIO_NOERR;
   assert(ios_);
   
-  if(!ios_->ioproc){
+  if(!role_is_io_proc()){
     return ret;
   }
   assert(rearr_comm_sz_ > 0);
@@ -1068,7 +1143,7 @@ int SPIO::DataRearr::Contig_rearr::setup_data_rearr_info(std::vector<PIO_Offset>
   SPIO_Util::GPTL_Util::GPTL_timer ftimer("PIO:Contig_rearr::setup_data_rearr_info");
   assert(ios_);
 
-  if(!ios_->ioproc){
+  if(!role_is_io_proc()){
     return ret;
   }
   assert(rearr_comm_sz_ > 0);
@@ -1201,7 +1276,7 @@ int SPIO::DataRearr::Contig_rearr::init_rearr_send_types(
   int ret = PIO_NOERR;
   SPIO_Util::GPTL_Util::GPTL_timer ftimer("PIO:Contig_rearr::init_rearr_send_types");
 
-  assert(ios_ && ios_->ioproc);
+  assert(ios_ && role_is_io_proc());
   assert(rearr_comm_sz_ > 0);
   assert(static_cast<int>(nregion_infos_sent.size()) == rearr_comm_sz_);
 
@@ -1262,7 +1337,7 @@ int SPIO::DataRearr::Contig_rearr::init_rearr_recvd_types(
   int ret = PIO_NOERR;
   SPIO_Util::GPTL_Util::GPTL_timer ftimer("PIO:Contig_rearr::init_rearr_recvd_types");
 
-  assert(ios_ && ios_->ioproc);
+  assert(ios_ && role_is_io_proc());
   assert(rearr_comm_sz_ > 0);
   assert(static_cast<int>(nregion_infos_recvd.size()) == rearr_comm_sz_);
 
@@ -1334,7 +1409,7 @@ int SPIO::DataRearr::Contig_rearr::rearrange_data(const void *sbuf, std::size_t 
   assert(is_init_);
 
   assert(ios_);
-  if(!ios_->ioproc){
+  if(!role_is_io_proc()){
     return PIO_NOERR;
   }
 

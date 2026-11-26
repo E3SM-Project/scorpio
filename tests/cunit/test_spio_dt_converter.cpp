@@ -235,7 +235,7 @@ int main(int argc, char *argv[])
 #endif /* TIMING_INTERNAL */
 #endif /* TIMING */
 
-  ret = MPI_Init(&argc, &argv);
+  ret = pio_test_mpi_init(&argc, &argv);
   if(ret != MPI_SUCCESS){
     LOG_RANK0(wrank, "MPI_Init() FAILED, ret = %d\n", ret);
     return ret;

@@ -39,6 +39,24 @@ std::vector<std::size_t> PIO_Util::PIO_async_tpool::get_thread_ids(void ) const
 PIO_Util::PIO_async_tpool::PIO_async_tpool(int nthreads)
 {
   LOG((2, "PIO_async_tpool:PIO_async_tpool: Creating %d threads", nthreads));
+  /* FIXME: SCORPIO never calls MPI_Init_thread/requests MPI_THREAD_MULTIPLE
+   * anywhere in the codebase, yet these background threads make direct MPI
+   * calls (e.g. MPI_Barrier in pio_iosys_async_op_hdf5_write) - undefined
+   * behavior per the MPI standard. This is a real, separate, pre-existing
+   * gap. Note that it is *not* the cause of the "H5Dget_space(): invalid
+   * dataset identifier" crash seen with async CONTIG HDF5 writes: that was
+   * caused by dispatching those writes to async I/O ranks disjoint from the
+   * sync I/O ranks that created the HDF5 file/datasets, and is mitigated by
+   * the fallback in io_desc_t::select_io_desc_info().
+   *
+   * It is, however, implicated (together with the unsynchronized bget()/
+   * brel() allocator - see the FIXME in
+   * SPIO_Util::File_Util::DTConverter::convert(), spio_dt_converter.cpp -
+   * and a non-thread-safe HDF5 build) in nondeterministic ASAN
+   * heap-use-after-free/double-free failures observed in worker-thread
+   * H5Dwrite calls whenever an HDF5 async write requires a datatype
+   * conversion. Confirmed during review to predate this file's CONTIG-write
+   * changes; tracked as a follow-up, not fixed here. */
   for(int i=0; i<nthreads; i++){
     pool_threads_.push_back(std::thread(PIO_async_tpool::dequeue_and_process, this));
   }
@@ -71,10 +89,22 @@ int PIO_Util::PIO_async_tpool::dequeue_and_process(
       SPIO_Util::Async_op op = tpool->mtq_.dequeue();
       ret = op.wait();
       if(ret != PIO_NOERR){
-        return pio_err(NULL, NULL, PIO_EINTERNAL, __FILE__, __LINE__,
-                        "Internal error dequeuing and processing asynchronous operation (%s) in the thread pool. Internal error waiting on asynchronous file write operation",
-                        SPIO_Util::Async_op::op_type_to_string(op.type()).c_str());
+        /* Report the error (pio_err() aborts here if the application left
+         * the error handler at its default PIO_INTERNAL_ERROR, same as
+         * before), but do not let a single failed op kill this worker
+         * thread: SPIO_ASYNC_NTHREADS defaults to 1, so returning out of
+         * this function permanently stops the only thread servicing the
+         * shared op queue - every op enqueued after this point, for every
+         * file and every iosystem in the process (including unrelated
+         * files' close ops), is then stranded forever rather than this one
+         * op simply failing. Pre-existing bug, confirmed during review. */
+        pio_err(NULL, NULL, ret, __FILE__, __LINE__,
+                "Internal error dequeuing and processing asynchronous operation (%s) in the thread pool. Internal error waiting on asynchronous file write operation",
+                SPIO_Util::Async_op::op_type_to_string(op.type()).c_str());
       }
+      /* Always free the op's user data, even on failure - the original
+       * early-return on failure skipped this, leaking it (e.g. the
+       * Hdf5_wcache/Hdf5_create_info the op owns) on every failed op. */
       op.free();
     }catch(const PIO_Util::PIO_mtq<SPIO_Util::Async_op>::Mtq_exception &e){
       /* MTQ exceptions are for MTQ signal handling, stop waiting on the queue */
@@ -89,11 +119,9 @@ int PIO_Util::PIO_async_tpool::dequeue_and_process(
 PIO_Util::PIO_async_tpool *
           PIO_Util::PIO_async_tpool_manager::get_tpool_instance(void )
 {
-  /* We need to make NUM_THREADS configurable by the user (compile-time) */
-  const int NUM_THREADS = SPIO_ASYNC_NTHREADS;
   if(tpool_ == NULL){
     LOG((2, "PIO_async_tpool_manager:get_tpool_instance: Creating new tpool instance"));
-    tpool_ = new PIO_Util::PIO_async_tpool(NUM_THREADS);
+    tpool_ = new PIO_Util::PIO_async_tpool(get_num_threads());
   }
   else{
     LOG((2, "PIO_async_tpool_manager:get_tpool_instance: Retrieving tpool instance"));

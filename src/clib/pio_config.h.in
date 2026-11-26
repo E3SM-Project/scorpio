@@ -183,6 +183,11 @@
  *  0 otherwise */
 #define SPIO_ENABLE_API_VAR_TRACING @ENABLE_API_VAR_TRACING@
 
+/** Set to 1 if the library is configured to trace API calls &
+ *  trace I/O decomposition data in the API calls,
+ *  0 otherwise */
+#define SPIO_ENABLE_API_DECOMP_TRACING @ENABLE_API_DECOMP_TRACING@
+
 /** Set to 1 if the library is configured to use PnetCDF independent data mode,
  *  0 otherwise */
 #define PIO_USE_INDEP_MODE @USE_INDEP_MODE@
@@ -190,6 +195,14 @@
 /** Set to 1 if the library is configured to use asynchronous I/O
  *  0 otherwise */
 #define PIO_USE_ASYNC_WR_THREAD @USE_ASYNC_WR_THREAD@
+
+/** Set to 1 if the library is configured to rearrange data asynchronously
+ *  (on the asynchronous write thread) for CONTIG-rearranger writes,
+ *  0 otherwise. Only ever 1 when PIO_USE_ASYNC_WR_THREAD is also 1. Only
+ *  the rearrangement phase (among I/O ranks) and the HDF5 write that
+ *  follows it are deferred - the aggregation phase (compute+I/O ranks)
+ *  always stays synchronous, on every rank, at its usual cost. */
+#define PIO_USE_ASYNC_WR_REARR @USE_ASYNC_WR_REARR@
 
 /** Maximum wait for asynchronous I/O operations (in milliseconds) */
 #define SPIO_ASYNC_OP_WAIT_TIMEOUT @SPIO_ASYNC_OP_WAIT_TIMEOUT@

@@ -30,8 +30,10 @@
 #include "spio_decomp_logger.hpp"
 #include "spio_async_utils.hpp"
 #include "spio_hdf5_utils.hpp"
+#include "spio_hdf5_reopen.hpp"
 #if PIO_USE_ASYNC_WR_THREAD
 #include "spio_async_hdf5_utils.hpp"
+#include "spio_iosys_utils.hpp"
 #endif
 #include "spio_async_tcomm.hpp"
 #include <typeinfo>
@@ -1225,12 +1227,12 @@ int spio_handle_err(iosystem_desc_t *ios, file_desc_t *file, int eh,
 
     LOG((2, "spio_handle_err chose error handler = %d", eh));
     if(file){
-        ioroot = file->iosystem->ioroot;
+        ioroot = file->iosystem->io_comm_info->get_sync_io_root();
         comm = file->iosystem->my_comm;
     }
     else{
         assert(ios);
-        ioroot = ios->ioroot;
+        ioroot = ios->io_comm_info->get_sync_io_root();
         comm = ios->my_comm;
     }
 
@@ -1381,73 +1383,78 @@ int pio_err(iosystem_desc_t *ios, file_desc_t *file,
             int err_num, const char *fname, int line,
             const char *uerr_msg_fmt, ...)
 {
-    char err_msg[PIO_MAX_NAME + 1];
-    int err_handler = default_error_handler; /* Default error handler. */
-    int ret;
+  char err_msg[PIO_MAX_NAME + 1];
+  int err_handler = default_error_handler; /* Default error handler. */
+  int ret;
 
-    /* User must provide this. */
-    pioassert(fname, "file name must be provided", __FILE__, __LINE__);
+  /* User must provide this. */
+  pioassert(fname, "file name must be provided", __FILE__, __LINE__);
 
-    /* No harm, no foul. */
-    if (err_num == PIO_NOERR)
-        return PIO_NOERR;
+  /* No harm, no foul. */
+  if(err_num == PIO_NOERR) { return PIO_NOERR; }
 
-    /* Get the error message. */
-    if ((ret = PIOc_strerror_impl(err_num, err_msg, PIO_MAX_NAME)))
-        return ret;
+  /* Get the error message. */
+  ret = PIOc_strerror_impl(err_num, err_msg, PIO_MAX_NAME);
+  if(ret != PIO_NOERR) { return ret; }
 
-    /* PIO_MAX_NAME may not be enough to store the entire user error
-     * message, especially when long filenames are provided by the
-     * user in the message
+  /* PIO_MAX_NAME may not be enough to store the entire user error
+   * message, especially when long filenames are provided by the
+   * user in the message
+   */
+  const int UERR_MSG_MAX_LEN = 8192;
+  char uerr_msg[UERR_MSG_MAX_LEN + 1];
+  va_list argp;
+
+  va_start(argp, uerr_msg_fmt);
+  vsnprintf(uerr_msg, UERR_MSG_MAX_LEN, uerr_msg_fmt, argp);
+  va_end(argp);
+
+  /* If logging is in use, log an error message. */
+  LOG((1, "ERROR: %s. %s err_num = %d fname = %s line = %d", uerr_msg, err_msg, err_num, fname ? fname : "\0", line));
+
+  /* What error handler should we use? */
+  if(file){
+    ios = file->iosystem;
+    err_handler = ios->error_handler;
+  }
+  else if(ios){
+    err_handler = ios->error_handler;
+  }
+
+  LOG((2, "pio_err chose error handler = %d", err_handler));
+
+  /* Should we abort? */
+  if(err_handler == PIO_INTERNAL_ERROR){
+    /* For debugging only, this will print a traceback of the call tree.  */
+    piodie(fname, line, "An error occured, %s. %s (err=%d). Aborting since the error handler was set to PIO_INTERNAL_ERROR...", uerr_msg, err_msg, err_num);
+  }
+  else if(err_handler != PIO_RETURN_ERROR){
+    /* If the user does not explicitly ask to return error, print
+     * the error message in stderr on the root IO proc
      */
-    const int UERR_MSG_MAX_LEN = 8192;
-    char uerr_msg[UERR_MSG_MAX_LEN + 1];
-    va_list argp;
-    va_start(argp, uerr_msg_fmt);
-    vsnprintf(uerr_msg, UERR_MSG_MAX_LEN, uerr_msg_fmt, argp);
-    va_end(argp);
-
-    /* If logging is in use, log an error message. */
-    LOG((1, "ERROR: %s. %s err_num = %d fname = %s line = %d", uerr_msg, err_msg, err_num, fname ? fname : "\0", line));
-
-    /* What error handler should we use? */
-    if (file)
-    {
-        ios = file->iosystem;
-        err_handler = ios->error_handler;
+    bool print_err_msg = true;
+    if(ios){
+      if(ios->tcomm_info->get_union_comm() != MPI_COMM_NULL){
+        print_err_msg = (ios->tcomm_info->get_union_comm_rank() == ios->tcomm_info->get_union_comm_io_root()) ? true : false;
+      }
+      else if(ios->tcomm_info->get_io_comm() != MPI_COMM_NULL){
+        print_err_msg = (ios->tcomm_info->get_io_comm_rank() == 0) ? true : false;
+      }
     }
-    else if (ios)
-        err_handler = ios->error_handler;
 
-    LOG((2, "pio_err chose error handler = %d", err_handler));
-
-    /* Should we abort? */
-    if (err_handler == PIO_INTERNAL_ERROR)
-    {
-        /* For debugging only, this will print a traceback of the call tree.  */
-        piodie(fname, line, "An error occured, %s. %s (err=%d). Aborting since the error handler was set to PIO_INTERNAL_ERROR...", uerr_msg, err_msg, err_num);
-    }
-    else if (err_handler != PIO_RETURN_ERROR)
-    {
-        /* If the user does not explicitly ask to return error, print
-         * the error message in stderr on the root IO proc
-         */
-        bool print_err_msg = (ios) ? (ios->tcomm_info->get_union_comm_rank() == ios->tcomm_info->get_union_comm_io_root()) : true;
-
-        if (print_err_msg)
-        {
-            fprintf(stderr, "PIO: ERROR: %s. %s (error num=%d), (%s:%d)\n", uerr_msg, err_msg, err_num, (fname) ? fname : "\0", line);
+    if(print_err_msg){
+      fprintf(stderr, "PIO: ERROR: %s. %s (error num=%d), (%s:%d)\n", uerr_msg, err_msg, err_num, (fname) ? fname : "\0", line);
 #ifdef _HDF5
-            H5Eprint2(H5E_DEFAULT, stderr);
+      H5Eprint2(H5E_DEFAULT, stderr);
 #endif
-            fflush(stderr);
-        }
+      fflush(stderr);
     }
+  }
 
-    /* For PIO_BCAST_ERROR and PIO_RETURN_ERROR error handlers
-     * just return the error code back to the caller
-     */
-    return err_num;
+  /* For PIO_BCAST_ERROR and PIO_RETURN_ERROR error handlers
+   * just return the error code back to the caller
+   */
+  return err_num;
 }
 
 /**
@@ -1525,6 +1532,33 @@ void PIOc_warn(int iosysid, int ncid,
 
   bool print_warn_msg = (ios) ? (ios->tcomm_info->get_union_comm_rank() == ios->tcomm_info->get_union_comm_io_root()) : true;
   if(print_warn_msg){
+    fprintf(stderr, "PIO: WARNING: %s, (%s:%d)\n", uwarn_msg, (fname) ? fname : "\0", line);
+    fflush(stderr);
+  }
+}
+
+/**
+ * Print warning message (Can be used when there are no valid I/O systems to use)
+ * (Not a collective call)
+ *
+ * @param comm The MPI communicator for the group of processes
+ * @param fname The name of source code file where the warning occured.
+ * @param line The line number of source code where the warning occurred.
+ * @param uwarn_msg The user warning message
+ */
+void PIOc_warn(MPI_Comm comm,
+                const char *fname, int line,
+                const char *uwarn_msg)
+{
+  static const int ROOT_RANK = 0;
+  int rank = -1;
+  int ret;
+
+  if(comm != MPI_COMM_NULL){
+    ret = MPI_Comm_rank(comm, &rank); assert(ret == MPI_SUCCESS);
+  }
+
+  if((comm == MPI_COMM_NULL) || (rank == ROOT_RANK)){
     fprintf(stderr, "PIO: WARNING: %s, (%s:%d)\n", uwarn_msg, (fname) ? fname : "\0", line);
     fflush(stderr);
   }
@@ -1907,12 +1941,12 @@ int PIOc_write_nc_decomp_impl(int iosysid, const char *filename, int cmode, int 
 
     /* Gather maplens from all computation tasks and fill the
      * task_maplen array on all tasks. */
-    if ((mpierr = MPI_Allgather(&iodesc->maplen, 1, MPI_INT, task_maplen, 1, MPI_INT,
+    if ((mpierr = MPI_Allgather(&iodesc->sync_io_desc_info.maplen, 1, MPI_INT, task_maplen, 1, MPI_INT,
                                 ios->comp_comm)))
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
 
     /* Find the max maxplen. */
-    if ((mpierr = MPI_Allreduce(&iodesc->maplen, &max_maplen, 1, MPI_INT, MPI_MAX,
+    if ((mpierr = MPI_Allreduce(&iodesc->sync_io_desc_info.maplen, &max_maplen, 1, MPI_INT, MPI_MAX,
                                 ios->comp_comm)))
         return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
     LOG((3, "max_maplen = %d", max_maplen));
@@ -1923,11 +1957,11 @@ int PIOc_write_nc_decomp_impl(int iosysid, const char *filename, int cmode, int 
 
     /* Fill local array with my map. Use the fill value for unused */
     /* elements at the end if max_maplen is longer than maplen. Also
-     * subtract 1 because the iodesc->map is 1-based. */
+     * subtract 1 because the iodesc->sync_io_desc_info.map is 1-based. */
     int my_map[max_maplen];
     for (int e = 0; e < max_maplen; e++)
     {
-        my_map[e] = e < iodesc->maplen ? iodesc->map[e] - 1 : NC_FILL_INT;
+        my_map[e] = e < iodesc->sync_io_desc_info.maplen ? iodesc->sync_io_desc_info.map[e] - 1 : NC_FILL_INT;
         LOG((3, "my_map[%d] = %d", e, my_map[e]));
     }
     
@@ -1941,7 +1975,7 @@ int PIOc_write_nc_decomp_impl(int iosysid, const char *filename, int cmode, int 
             LOG((3, "full_map[%d][%d] = %d", p, e, full_map[p][e]));
 
     /* Write the netCDF decomp file. */
-    if ((ret = spio_write_nc_decomp_int(ios, filename, cmode, iodesc->ndims, iodesc->dimlen,
+    if ((ret = spio_write_nc_decomp_int(ios, filename, cmode, iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen,
                                         ios->num_comptasks, task_maplen, (int *)full_map, title,
                                         history, fortran_order)))
     {
@@ -2608,7 +2642,7 @@ int PIOc_write_decomp_impl(const char *file, int iosysid, int ioid, MPI_Comm com
                         "Write I/O decomposition to file (%s) failed. Invalid io descriptor id (%d) provided (iosysid=%d)", (file) ? file : "UNKNOWN", ioid, iosysid);
     }
 
-    return PIOc_writemap_impl(file, iodesc->ioid, iodesc->ndims, iodesc->dimlen, iodesc->maplen, iodesc->map,
+    return PIOc_writemap_impl(file, iodesc->ioid, iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map,
                          comm);
 }
 
@@ -2853,7 +2887,6 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 
 #if PIO_USE_ASYNC_WR_THREAD
     /* FIXME: Relax this wait */
-    /*
     if((*iotype != PIO_IOTYPE_HDF5) && (*iotype != PIO_IOTYPE_HDF5C)){
       ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
       if(ierr != PIO_NOERR){
@@ -2861,7 +2894,6 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                         "Creating file (%s) failed. Error waiting on all pending asynchronous HDF5 ops", filename);
       }
     }
-    */
 
     ierr = spio_close_soft_closed_file(filename);
     if(ierr != PIO_NOERR){
@@ -2943,11 +2975,45 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     }
     file->mode = mode;
 
+    /* spio_createfile_int() only ever creates a file for writing - netCDF/HDF5
+     * "create" semantics imply write access regardless of cmode flags like
+     * PIO_CLOBBER/PIO_NOCLOBBER (this is the same write-capable implication that
+     * the file->mode |= PIO_WRITE fixup below documents for file->mode itself).
+     * So, unlike the open path, the write-mode condition used elsewhere for
+     * computing uses_async_io can be dropped entirely here. This must be computed
+     * before the is_sync_io_proc() dispatch block below (which, for HDF5 iotypes,
+     * enqueues the actual file creation onto the async write thread pool based on
+     * this field) - computing it after that block/enqueue (as was done previously)
+     * is an ordering bug: the enqueue decision would read whatever value happened
+     * to be in a freshly calloc'd file_desc_t (i.e. false) rather than the final,
+     * correct value.
+     *
+     * The iotype test is not redundant. uses_async_io also gates
+     * spio_create_async_lock_file() further down in this function, while the
+     * matching spio_remove_async_lock_file() in spio_hard_closefile()
+     * (pio_file.cpp) additionally sits inside an "iotype is HDF5/HDF5C"
+     * block. Without the test here, every write-capable PnetCDF,
+     * NetCDF4P and NetCDF-classic file created in an async-write-thread
+     * build left behind a *.spio_lock file that nothing ever removed - and a
+     * later read-only open of that same filename in the same run then
+     * stalled on it for the full SPIO_ASYNC_OP_WAIT_TIMEOUT before warning
+     * and proceeding. It also makes uses_async_io mean what its own doc
+     * comment (pio_types.hpp) says it means. The same test is applied at the
+     * corresponding computation in PIOc_openfile_retry_impl(). */
+#ifdef _HDF5
+#if PIO_USE_ASYNC_WR_THREAD
+    file->uses_async_io = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)) &&
+                           !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
+#else
+    file->uses_async_io = false;
+#endif
+#endif
+
     /* Set to true if this task should participate in IO (only true for
      * one task with netcdf serial files. */
     if (file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR ||
         file->iotype == PIO_IOTYPE_PNETCDF ||
-        ios->io_rank == 0)
+        ios->io_comm_info->get_sync_io_comm_rank() == 0)
         file->do_io = 1;
 
     LOG((2, "file->do_io = %d ios->async = %d", file->do_io, ios->async));
@@ -2973,12 +3039,12 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     /* Append ".bp" to output filename for the corresponding ADIOS BP filename */
     static const char adios_bp_filename_extn[] = ".bp";
     size_t adios_bp_filename_len = strlen(filename) + sizeof(adios_bp_filename_extn) + 1;
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
         if (!(file->mode & PIO_NOCLOBBER))
         {
             /* If PIO_NOCLOBBER is not set, i.e., CLOBBER mode, delete any ADIOS BP files with the same name */
-            if (ios->io_rank == 0)
+            if (ios->io_comm_info->get_sync_io_comm_rank() == 0)
             {
                 char *adios_bp_filename = (char *) calloc(adios_bp_filename_len, sizeof(char));
                 if (adios_bp_filename == NULL)
@@ -3030,7 +3096,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
     {
 #ifdef SPIO_NO_CXX_REGEX
-        if (ios->io_rank == 0)
+        if (ios->io_comm_info->get_sync_io_comm_rank() == 0)
         {
             printf("PIO: WARNING: C++11 regex support is not available; skipping override of ADIOS with PnetCDF for creating file %s\n", filename);
         }
@@ -3039,7 +3105,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
         if (std::regex_match(filename, rgx))
         {
 #ifdef _PNETCDF
-            if (ios->io_rank == 0)
+            if (ios->io_comm_info->get_sync_io_comm_rank() == 0)
             {
                 printf("PIO: WARNING: Creating file %s with PnetCDF (CDF-5 format) instead of ADIOS (matched regex: %s)\n",
                        filename, SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX);
@@ -3051,7 +3117,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
             file->mode &= ~(NC_CLASSIC_MODEL | NC_64BIT_OFFSET | NC_NETCDF4);
             file->mode |= NC_64BIT_DATA;
 #else
-            if (ios->io_rank == 0)
+            if (ios->io_comm_info->get_sync_io_comm_rank() == 0)
             {
                 printf("PIO: WARNING: PnetCDF is not available; skipping override of ADIOS with PnetCDF for creating file %s (matched regex: %s)\n",
                        filename, SPIO_OVERRIDE_ADIOS_WITH_PNETCDF_FNAME_REGEX);
@@ -3316,8 +3382,19 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     }
 #endif
 
-    /* If this task is in the IO component, do the IO. */
-    if (ios->ioproc)
+    /* If this task is in the IO component, do the IO.
+     * For HDF5/HDF5C files, the task that owns the actual I/O work may be an
+     * async-write-thread-pool-owning rank rather than a sync I/O rank (see
+     * file->uses_async_io, computed above); for every other iotype, behavior
+     * is unchanged (sync I/O rank only). */
+#ifdef _HDF5
+    bool enter_io_proc_block = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)
+        : ios->io_comm_info->is_sync_io_proc();
+#else
+    bool enter_io_proc_block = ios->io_comm_info->is_sync_io_proc();
+#endif
+    if (enter_io_proc_block)
     {
 #ifdef _NETCDF4
         /* All NetCDF4 files use the CDF5 file format by default,
@@ -3357,21 +3434,21 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
             file->mode |= NC_NODIMSCALE_ATTACH;
 #endif
             LOG((2, "Calling nc_create_par io_comm = %d mode = %d fh = %d",
-                 ios->io_comm, file->mode, file->fh));
-            ierr = nc_create_par(filename, file->mode, ios->io_comm, ios->info, &file->fh);
+                 ios->io_comm_info->get_sync_io_comm(), file->mode, file->fh));
+            ierr = nc_create_par(filename, file->mode, ios->io_comm_info->get_sync_io_comm(), ios->info, &file->fh);
             LOG((2, "nc_create_par returned %d file->fh = %d", ierr, file->fh));
             break;
         case PIO_IOTYPE_NETCDF4P_NCZARR:
             file->mode = file->mode |  NC_NETCDF4;
             LOG((2, "Calling nc_create_par (nczarr) io_comm = %d mode = %d fh = %d",
-                 ios->io_comm, file->mode, file->fh));
+                 ios->io_comm_info->get_sync_io_comm(), file->mode, file->fh));
             ierr = PIO_ENOTBUILT;
 #if PIO_USE_NETCDF4_NCZARR
             {
               std::string filename_nczarr = spio_get_nczarr_fname(filename);
               if(!filename_nczarr.empty()){
                 ierr = nc_create_par(filename_nczarr.c_str(), file->mode,
-                                      ios->io_comm, ios->info, &file->fh);
+                                      ios->io_comm_info->get_sync_io_comm(), ios->info, &file->fh);
               }
             }
             LOG((2, "nc_create_par returned %d file->fh = %d", ierr, file->fh));
@@ -3384,7 +3461,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
 #ifdef _NETCDF
         case PIO_IOTYPE_NETCDF:
-            if (!ios->io_rank)
+            if (!ios->io_comm_info->get_sync_io_comm_rank())
             {
                 LOG((2, "Calling nc_create mode = %d", file->mode));
                 ierr = nc_create(filename, file->mode, &file->fh);
@@ -3471,7 +3548,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
             MPI_Info_get(ios->info, "striping_factor", PIO_MAX_NAME, info_striping_factor, &flag_striping_factor);
             if (!flag_striping_factor)
             {
-                int striping_factor_size = (ios->num_iotasks < PIO_MAX_LUSTRE_OSTS)? ios->num_iotasks : PIO_MAX_LUSTRE_OSTS;
+                int striping_factor_size = (ios->io_comm_info->get_sync_io_comm_sz() < PIO_MAX_LUSTRE_OSTS)? ios->io_comm_info->get_sync_io_comm_sz() : PIO_MAX_LUSTRE_OSTS;
                 char striping_factor_str[PIO_MAX_NAME];
                 snprintf(striping_factor_str, PIO_MAX_NAME, "%d", striping_factor_size);
 
@@ -3551,7 +3628,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
              */
             MPI_Info_set(ios->info, "nc_ibuf_size", "67108864");
 
-            ierr = ncmpi_create(ios->io_comm, filename, file->mode, ios->info, &file->fh);
+            ierr = ncmpi_create(ios->io_comm_info->get_sync_io_comm(), filename, file->mode, ios->info, &file->fh);
             if (!ierr)
             {
                 /* When using buffered put APIs in PnetCDF, we must explicitly specify the size of the internal buffer.
@@ -3572,6 +3649,30 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
         case PIO_IOTYPE_HDF5C:
 #if PIO_USE_ASYNC_WR_THREAD
             ierr = spio_iosys_async_hdf5_create_op_add(file, filename);
+            /* spio_iosys_async_hdf5_create_op_add() enqueues spio_hdf5_create()
+             * onto the async thread pool and returns immediately, before the
+             * worker thread has run it. spio_hdf5_create() issues its own
+             * collective (MPI_Barrier, plus H5Pset_fapl_mpio) on this rank's
+             * dup'd async I/O comm (a distinct MPI_Comm object per
+             * TComm_info, see spio_async_tcomm.cpp), concurrently with the
+             * MPI_Bcast on union_comm just below. This used to crash every
+             * rank inside the MPI library (SEGV in poll_active_fboxes(),
+             * MPICH 4.1.2 ch3:nemesis) whenever the topology made the two
+             * collectives' participant sets overlap (e.g. SUBSET rearranger
+             * with every task also an I/O task) - but the root cause was
+             * that the process had never requested MPI_THREAD_MULTIPLE
+             * (plain MPI_Init()), so MPICH's progress engine had no
+             * obligation to make genuinely concurrent cross-thread
+             * collectives safe. Now that every caller is required to have
+             * called MPI_Init_thread()/MPI_THREAD_MULTIPLE before using the
+             * library (see pio_test_mpi_init() in tests/cunit/pio_tests.h
+             * for the cunit harness's side of this), the two collectives
+             * running concurrently is no longer a correctness problem, so
+             * there is no need to drain this op before the Bcast below -
+             * draining it would only give up the thread-pool overlap this
+             * async path exists for. Confirmed via 20 consecutive runs of
+             * test_subset_createfile_all_io_procs_no_race() with the drain
+             * removed and MPI_THREAD_MULTIPLE in effect: 0 failures. */
 #else
             ierr = spio_hdf5_create(ios, file, filename);
 #endif
@@ -3581,7 +3682,7 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     }
 
     /* Broadcast mode to all tasks. */
-    if ((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->ioroot, ios->union_comm)))
+    if ((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->union_comm)))
     {
 #ifdef _ADIOS2
         if ((file->iotype == PIO_IOTYPE_ADIOS) || (file->iotype == PIO_IOTYPE_ADIOSC))
@@ -3633,6 +3734,10 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
        to know if its set. */
     file->mode = file->mode | PIO_WRITE;
 
+    /* Note: file->uses_async_io is computed earlier in this function (right
+     * after file->mode = mode;), before the is_sync_io_proc() dispatch block
+     * that depends on it for HDF5 create. See the comment there for why. */
+
     /* Add the struct with this files info to the global list of
      * open files. */
     MPI_Comm comm = MPI_COMM_NULL;
@@ -3659,6 +3764,15 @@ int spio_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 
     LOG((2, "Created file %s file->fh = %d file->pio_ncid = %d", filename,
          file->fh, file->pio_ncid));
+
+#ifdef _HDF5
+    /* Create the cross-comm async-write lock file for this file (a no-op
+     * unless file->uses_async_io, and only on the async I/O root rank) - see
+     * spio_create_async_lock_file() in pio_file.cpp. By this point ierr is
+     * guaranteed PIO_NOERR (checked a few lines above), so this is file's
+     * one and only successful create point. */
+    spio_create_async_lock_file(ios, file);
+#endif
 
     spio_ltimer_stop(file->io_fstats->wr_timer_name);
     spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -4583,13 +4697,32 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
                     "Creating file (%s) failed. Error closing previous soft closed file", filename);
   }
 
-  //if(((*iotype == PIO_IOTYPE_HDF5) || (*iotype == PIO_IOTYPE_HDF5C)) && !(mode & PIO_WRITE)){
-  if((*iotype == PIO_IOTYPE_HDF5) || (*iotype == PIO_IOTYPE_HDF5C)){
-    ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+  /* A read-only reopen of an existing file (!(mode & PIO_WRITE)) must not
+   * race a disjoint async-comm pending write/close on the same file - wait
+   * (bounded) for the asynchronous write lock file, if any, to be removed
+   * first. A write-capable reopen does not need this: it will itself become
+   * the async-routed owner of the file and has no lock file of its own yet
+   * to wait on.
+   *
+   * Note: PIO_NOWRITE is NC_NOWRITE == 0x0000, so "mode & PIO_NOWRITE" is
+   * always false and must not be used as a read-only test here - check for
+   * the *absence* of the PIO_WRITE bit instead (see the PIO_NOWRITE == 0
+   * gotcha documented in tests/cunit/test_spio_iodesc_utils.cpp). */
+  if(!(mode & PIO_WRITE)){
+    ierr = spio_wait_on_async_lock_file(ios, filename);
     if(ierr != PIO_NOERR){
       return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                      "Creating file (%s) failed. Error waiting on all pending asynchronous HDF5 ops", filename);
+                      "Opening file (%s) failed. Error waiting on the asynchronous write lock file", filename);
     }
+  }
+
+  /* To wait on all hdf5 async ops (for debugging),
+   * ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+   */
+  ierr = spio_wait_all_hdf5_async_ops(ios->iosysid);
+  if(ierr != PIO_NOERR){
+    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                    "Creating file (%s) failed. Error waiting on async ops", filename);
   }
 #endif
 
@@ -4752,43 +4885,162 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   }
 #endif
 
+  file->iosystem = ios;
+  file->mode = mode;
+
+  /* file->mode and file->uses_async_io are established HERE - before the
+   * native HDF5 reopen block below - rather than after it, because
+   * spio_hdf5_reopen() is now a consumer of both: a write-capable reopen
+   * upgrades its serial recognition probe to a real collective MPI-IO
+   * handle, and the comm it builds that handle's fapl from is chosen by
+   * file->uses_async_io (exactly as spio_hdf5_create() does for a fresh
+   * create). Computing them afterwards, as was done previously, meant
+   * spio_hdf5_reopen() read them out of a freshly calloc'd file_desc_t -
+   * i.e. mode == 0 and uses_async_io == false - regardless of what the
+   * caller asked for.
+   *
+   * This is also after the ADIOS block above, which is where file->iotype
+   * reaches its final value (an ADIOS open can fall back and reassign it),
+   * so the iotype test below sees the iotype this file will actually use.
+   *
+   * The iotype test itself matters beyond HDF5: file->uses_async_io also
+   * gates spio_create_async_lock_file()/spio_remove_async_lock_file(), and
+   * the removal side is additionally gated on an HDF5 iotype. Without the
+   * iotype test here, every write-capable PnetCDF/NetCDF file would create
+   * a lock file that nothing ever removes (and that a later read-only open
+   * of the same name would then stall on for the full
+   * SPIO_ASYNC_OP_WAIT_TIMEOUT). */
+#ifdef _HDF5
+#if PIO_USE_ASYNC_WR_THREAD
+  file->uses_async_io = (file->mode & PIO_WRITE) &&
+                         ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)) &&
+                         !SPIO_Util::Iosys_Util::iosys_uses_async_io_service(ios);
+#else
+  file->uses_async_io = false;
+#endif
+#endif
+
 #ifdef _HDF5
   if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
-    if(H5Fis_hdf5(filename) > 0){
+    /* Try a native HDF5 reopen first (no switch-away to NETCDF4/PNETCDF/
+     * NETCDF) - only a file spio_hdf5_is_scorpio_written() recognizes as
+     * SCORPIO-written can take this path; everything else (a file that
+     * predates this feature, or was written by some other HDF5 writer)
+     * falls through to the historical switch-iotype-away logic below,
+     * unchanged. A genuine error reopening a *recognized* file (as opposed
+     * to simply not recognizing it) is propagated like any other ierr
+     * check in this function, not silently downgraded to a fallback.
+     *
+     * Deliberately NOT stored in `ierr`: `ierr` is read again, much further
+     * down in this function, by an MPI_Allreduce(..., MPI_MIN, ios->my_comm)
+     * (via spio_handle_err(..., PIO_REDUCE_ERROR, ...)) that spans every
+     * rank in the union comm - not just the sync I/O rank(s) that run the
+     * switch(file->iotype) open-call block between here and there. This
+     * block itself runs on every rank unconditionally (it is not guarded by
+     * is_sync_io_proc()), so if its result were left sitting in `ierr`, the
+     * PIO_EBADIOTYPE a non-recognized-file fallback leaves behind would
+     * still be sitting in `ierr` on every rank that is not a sync I/O rank
+     * when that later reduce runs - even though the fallback itself
+     * succeeded and the real open's own `ierr` (PIO_NOERR) is what the sync
+     * I/O rank(s) computed. MPI_MIN over negative error codes would then
+     * pick up that stale -500 and fail the whole open. Using a local
+     * variable here instead keeps this block's result out of `ierr`
+     * entirely, exactly as the pre-existing switch-iotype-away code it
+     * replaces also never touched `ierr`.
+     *
+     * On rank divergence. spio_hdf5_reopen()'s recognition probes
+     * (H5Fis_hdf5(), the probe H5Fopen(), spio_hdf5_is_scorpio_written())
+     * are per-rank, serial and non-collective, so ranks can legitimately
+     * disagree about the same file on a parallel filesystem. For a
+     * write-capable reopen that would be fatal rather than merely
+     * inconsistent - the recognizing ranks enter a COLLECTIVE H5Fopen() the
+     * non-recognizing ranks never join - so spio_hdf5_reopen() now agrees on
+     * recognition across the file's I/O communicator before any rank commits
+     * to that collective open; see the consensus block at the top of that
+     * function. That consensus deliberately excludes non-owning ranks (they
+     * never join the collective open), so a non-owning rank's own
+     * recognition result can still diverge from every owning rank's - see
+     * the first KNOWN RESIDUAL LIMITATION at that consensus block.
+     *
+     * KNOWN RESIDUAL LIMITATION: that consensus covers divergent
+     * *recognition* among owning ranks only. If spio_hdf5_reopen()'s metadata scan, or its
+     * collective H5Fopen()/H5Dopen2(), fails on some owning ranks and not
+     * others, the failing ranks take the `else` (genuine error) branch below
+     * and return from this function immediately - skipping the
+     * MPI_Allreduce(..., MPI_MIN, ios->my_comm) further down - while every
+     * rank that got PIO_NOERR (in particular every non-owning rank, which
+     * returns early from that block without touching HDF5 at all) falls
+     * through and reaches it. The result is a hang rather than a uniform
+     * error. Closing it requires a second consensus point over ios->my_comm
+     * after the collective open, which in turn requires that function's
+     * several genuine-error early returns to be restructured into a single
+     * agreed exit.
+     */
+    int hdf5_reopen_ierr = spio_hdf5_reopen(ios, file, filename, mode);
+    if(hdf5_reopen_ierr == PIO_NOERR){
+      /* Native reopen succeeded - keep file->iotype as HDF5/HDF5C and skip
+       * the switch-away logic entirely. */
+    }
+    else if(hdf5_reopen_ierr == PIO_EBADIOTYPE){
+      /* Not recognized as a SCORPIO-written HDF5 file - fall back to the
+       * existing switch-iotype-away behavior, unchanged. */
+      if(H5Fis_hdf5(filename) > 0){
 #ifdef _NETCDF4
-      /* Use NETCDF4 IO type to read files generated with HDF5 IO type so far */
+        /* Use NETCDF4 IO type to read files generated with HDF5 IO type so far */
 #ifdef _MPISERIAL
-      file->iotype = PIO_IOTYPE_NETCDF4C;
+        file->iotype = PIO_IOTYPE_NETCDF4C;
 #else
-      file->iotype = PIO_IOTYPE_NETCDF4P;
+        file->iotype = PIO_IOTYPE_NETCDF4P;
 #endif
 #else
+        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                        "Opening file (%s) with PIO_IOTYPE_HDF5 failed. HDF5 IO type currently requires NETCDF4 (not configured for SCORPIO) to support read operations", filename);
+#endif
+      }
+      else{
+#ifdef _PNETCDF
+        file->iotype = PIO_IOTYPE_PNETCDF;
+#else
+#ifdef _NETCDF
+        file->iotype = PIO_IOTYPE_NETCDF;
+#endif
+#endif
+      }
+      std::string warn_msg = std::string("Opening files with the HDF5 library is currently not supported.") +
+        std::string(" Switching from PIO_IOTYPE_HDF5 to ") +  pio_iotype_to_string(file->iotype) +
+        std::string(" for file, ") + filename;
+      PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, warn_msg.c_str());
+    }
+    else{
+      /* A genuine error occurred trying to reopen a file we did recognize
+       * as SCORPIO-written - propagate it, do not fall back. */
       spio_ltimer_stop(ios->io_fstats->rd_timer_name);
       spio_ltimer_stop(ios->io_fstats->tot_timer_name);
       spio_ltimer_stop(file->io_fstats->rd_timer_name);
       spio_ltimer_stop(file->io_fstats->tot_timer_name);
-      return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
-                      "Opening file (%s) with PIO_IOTYPE_HDF5 failed. HDF5 IO type currently requires NETCDF4 (not configured for SCORPIO) to support read operations", filename);
-#endif
+
+      /* Release the partially-populated file_desc_t, the same way the
+       * default: case of the open switch further down does - this error
+       * return happens before pio_add_to_file_list(), so nothing else will
+       * ever see or free it. */
+      delete(file->pmtx);
+      delete(file->io_desc_refs);
+      free(file->io_fstats);
+      free(file);
+
+      return pio_err(ios, NULL, hdf5_reopen_ierr, __FILE__, __LINE__,
+                      "Opening file (%s) with PIO_IOTYPE_HDF5 failed. Native HDF5 reopen failed", filename);
     }
-    else{
-#ifdef _PNETCDF
-      file->iotype = PIO_IOTYPE_PNETCDF;
-#else
-#ifdef _NETCDF
-      file->iotype = PIO_IOTYPE_NETCDF;
-#endif
-#endif
-    }
-    std::string warn_msg = std::string("Opening files with the HDF5 library is currently not supported.") +
-      std::string(" Switching from PIO_IOTYPE_HDF5 to ") +  pio_iotype_to_string(file->iotype) +
-      std::string(" for file, ") + filename;
-    PIOc_warn(ios->iosysid, file->fh, __FILE__, __LINE__, warn_msg.c_str());
   }
 #endif
 
-  file->iosystem = ios;
-  file->mode = mode;
+  /* Note: file->iosystem, file->mode and file->uses_async_io are assigned
+   * earlier in this function, just above the native HDF5 reopen block -
+   * see the comment there for why that ordering is required. */
   /*
   file->num_unlim_dimids = 0;
   file->unlim_dimids = NULL;
@@ -4829,7 +5081,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
    * for one task with netcdf serial files. */
   if(file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR ||
       file->iotype == PIO_IOTYPE_PNETCDF ||
-      ios->io_rank == 0) { file->do_io = 1; }
+      ios->io_comm_info->get_sync_io_comm_rank() == 0) { file->do_io = 1; }
 
   /* If async is in use, bcast the parameters from compute to I/O procs. */
   if(ios->async){
@@ -5083,7 +5335,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #endif
 
   /* If this is an IO task, then call the netCDF function. */
-  if(ios->ioproc){
+  if(ios->io_comm_info->is_sync_io_proc()){
     switch(file->iotype){
 #ifdef _NETCDF4
 
@@ -5092,7 +5344,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
       ierr = nc_open(filename, file->mode, &file->fh);
 #else
       imode = file->mode |  NC_MPIIO;
-      if ((ierr = nc_open_par(filename, imode, ios->io_comm, ios->info, &file->fh))) { break; }
+      if ((ierr = nc_open_par(filename, imode, ios->io_comm_info->get_sync_io_comm(), ios->info, &file->fh))) { break; }
       file->mode = imode;
 
       /* Check the vars for valid use of unlim dims. */
@@ -5105,7 +5357,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   case PIO_IOTYPE_NETCDF4P_NCZARR:
       file->mode = file->mode |  NC_NETCDF4;
       LOG((2, "Calling nc_open_par (nczarr) io_comm = %d mode = %d fh = %d",
-           ios->io_comm, file->mode, file->fh));
+           ios->io_comm_info->get_sync_io_comm(), file->mode, file->fh));
       ierr = PIO_ENOTBUILT;
 #ifndef _MPISERIAL
 #if PIO_USE_NETCDF4_NCZARR
@@ -5113,11 +5365,11 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
         std::string filename_nczarr = spio_get_nczarr_fname(filename);
         if(!filename_nczarr.empty()){
           ierr = nc_open_par(filename_nczarr.c_str(), file->mode,
-                                ios->io_comm, ios->info, &file->fh);
+                                ios->io_comm_info->get_sync_io_comm(), ios->info, &file->fh);
           if(ierr != NC_NOERR){
             /* The file being opened may not be NCZarr, for now retry with NetCDF4 */
             file->iotype = PIO_IOTYPE_NETCDF4P;
-            ierr = nc_open_par(filename, file->mode, ios->io_comm, ios->info, &file->fh);
+            ierr = nc_open_par(filename, file->mode, ios->io_comm_info->get_sync_io_comm(), ios->info, &file->fh);
           }
         }
       }
@@ -5128,7 +5380,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #endif
       break;
   case PIO_IOTYPE_NETCDF4C:
-      if(ios->io_rank == 0){
+      if(ios->io_comm_info->get_sync_io_comm_rank() == 0){
         imode = file->mode | NC_NETCDF4;
         if((ierr = nc_open(filename, imode, &file->fh))) { break; }
         file->mode = imode;
@@ -5140,7 +5392,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 
 #ifdef _NETCDF
   case PIO_IOTYPE_NETCDF:
-      if(ios->io_rank == 0){
+      if(ios->io_comm_info->get_sync_io_comm_rank() == 0){
           ierr = nc_open(filename, file->mode, &file->fh);
       }
       break;
@@ -5148,11 +5400,11 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 
 #ifdef _PNETCDF
   case PIO_IOTYPE_PNETCDF:
-      ierr = ncmpi_open(ios->io_comm, filename, file->mode, ios->info, &file->fh);
+      ierr = ncmpi_open(ios->io_comm_info->get_sync_io_comm(), filename, file->mode, ios->info, &file->fh);
 
       // This should only be done with a file opened to append
       if(ierr == PIO_NOERR && (file->mode & PIO_WRITE)){
-        if(ios->iomaster == MPI_ROOT) { LOG((2, "%d Setting IO buffer %ld", __LINE__, pio_buffer_size_limit)); }
+        if(ios->io_comm_info->get_sync_io_master() == MPI_ROOT) { LOG((2, "%d Setting IO buffer %ld", __LINE__, pio_buffer_size_limit)); }
 
         /* Please refer to a previous related comment for why we ensure a minimum buffer size (16 MiB) for
            buffered put APIs in PnetCDF.
@@ -5167,6 +5419,27 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
   case PIO_IOTYPE_ADIOS:
   case PIO_IOTYPE_ADIOSC:
       break; /* This case has been handled above */
+#endif
+#ifdef _HDF5
+  case PIO_IOTYPE_HDF5:
+  case PIO_IOTYPE_HDF5C:
+      /* This case has been handled above: by the time execution reaches
+       * this switch, either spio_hdf5_reopen() already fully reopened the
+       * file natively (file->iotype deliberately left as HDF5/HDF5C, see
+       * the switch-iotype-away comment block above) and there is nothing
+       * left to do here, or the native reopen fell back and reassigned
+       * file->iotype away from HDF5/HDF5C to NETCDF4P/PNETCDF/NETCDF
+       * already (in which case this case label is simply never reached).
+       * Before the native reopen feature existed, file->iotype could never
+       * still be HDF5/HDF5C at this point - the fallback always ran first
+       * - so this case was never needed; omitting it made a successful
+       * native reopen fall into `default` below and return PIO_EBADIOTYPE
+       * from only the sync I/O proc (this switch is gated by
+       * is_sync_io_proc()), bypassing the unconditional
+       * "Broadcast open mode to all tasks" MPI_Bcast just below this
+       * switch that every other rank still reaches - a collective
+       * mismatch/hang, not a real error. */
+      break;
 #endif
   default:
       {
@@ -5193,9 +5466,9 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
        with just plain old basic NetCDF. */
     if(retry){
 #ifdef _NETCDF
-      LOG((2, "retry error code ierr = %d io_rank %d", ierr, ios->io_rank));
+      LOG((2, "retry error code ierr = %d io_rank %d", ierr, ios->io_comm_info->get_sync_io_comm_rank()));
       /* Bcast error code from io rank 0 to all io procs */
-      mpierr = MPI_Bcast(&ierr, 1, MPI_INT, 0, ios->io_comm);
+      mpierr = MPI_Bcast(&ierr, 1, MPI_INT, 0, ios->io_comm_info->get_sync_io_comm());
       if(mpierr != MPI_SUCCESS){
           spio_ltimer_stop(ios->io_fstats->rd_timer_name);
           spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -5223,7 +5496,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
         /* *iotype = PIO_IOTYPE_NETCDF; */
 
         /* open netcdf file serially on main task */
-        if(ios->io_rank == 0){
+        if(ios->io_comm_info->get_sync_io_comm_rank() == 0){
           char errmsg[PIO_MAX_NAME];
 
           ierr2 = PIOc_strerror_impl(ierr, errmsg, PIO_MAX_NAME);
@@ -5245,10 +5518,10 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
            filename, file->fh, file->iotype, file->do_io, ierr));
 #endif /* _NETCDF */
     } // if(retry)
-  } // if(ios->ioproc)
+  } // if(ios->io_comm_info->is_sync_io_proc())
 
   /* Broadcast open mode to all tasks. */
-  if((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->ioroot, ios->my_comm))){
+  if((mpierr = MPI_Bcast(&file->mode, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm))){
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -5262,7 +5535,7 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 
   if(retry){
     /* Broadcast IO type (might be switched on IO tasks) to all tasks. */
-    if((mpierr = MPI_Bcast(&file->iotype, 1, MPI_INT, ios->ioroot, ios->my_comm))){
+    if((mpierr = MPI_Bcast(&file->iotype, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm))){
       spio_ltimer_stop(ios->io_fstats->rd_timer_name);
       spio_ltimer_stop(ios->io_fstats->tot_timer_name);
       spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -5328,13 +5601,25 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
 #endif
   }
 
+  /* Set ncid to HDF5 attributes. A native HDF5 reopen (spio_hdf5_reopen(),
+   * called above this function's HDF5-iotype open path before *ncidp/
+   * file->pio_ncid are known) fills in file->hdf5_attrs[].att_ncid with
+   * whatever file->pio_ncid held at that point (0, for a freshly-constructed
+   * file_desc_t) - backfill it with the real ncid now, the same way the
+   * ADIOS path above does for file->adios_attrs[].att_ncid. */
+  if((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C)){
+#ifdef _HDF5
+    for(int i = 0; i < file->hdf5_num_attrs; i++) { file->hdf5_attrs[i].att_ncid = *ncidp; }
+#endif
+  }
+
   spio_ltimer_stop(ios->io_fstats->rd_timer_name);
   spio_ltimer_stop(ios->io_fstats->tot_timer_name);
   spio_ltimer_stop(file->io_fstats->rd_timer_name);
   spio_ltimer_stop(file->io_fstats->tot_timer_name);
 
   /* Check if the file has unlimited dimensions */
-  if(!ios->async || !ios->ioproc){
+  if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
     ierr = PIOc_inq_unlimdims_impl(*ncidp, &(file->num_unlim_dimids), NULL);
     if(ierr != PIO_NOERR){
       ierr = pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -5363,6 +5648,19 @@ int PIOc_openfile_retry_impl(int iosysid, int *ncidp, int *iotype, const char *f
       LOG((3, "File has %d unlimited dimensions", file->num_unlim_dimids));
     }
   }
+
+#ifdef _HDF5
+  /* Create the cross-comm async-write lock file for this file (a no-op
+   * unless file->uses_async_io - which is only ever set when this open is
+   * write-capable, see its computation earlier in this function - and only
+   * on the async I/O root rank) - see spio_create_async_lock_file() in
+   * pio_file.cpp. Guarded on ierr == PIO_NOERR: on failure above,
+   * pio_delete_file_from_list() already freed *file*, so touching it here
+   * would be a use-after-free. */
+  if(ierr == PIO_NOERR){
+    spio_create_async_lock_file(ios, file);
+  }
+#endif
 
   return ierr;
 }
@@ -5837,7 +6135,7 @@ int calc_var_rec_sz(int ncid, int varid)
         }
     }
     mpierr = MPI_Bcast(&(file->varlist[varid].vrsize), 1, MPI_OFFSET,
-                        ios->ioroot, ios->my_comm);
+                        ios->io_comm_info->get_sync_io_root(), ios->my_comm);
     if(mpierr != MPI_SUCCESS)
     {
         LOG((1, "Unable to bcast vrsize"));

@@ -311,17 +311,17 @@ int test_decomp_read_write(int iosysid, int ioid, int num_flavors, int *flavor, 
                 /* Get the IO desc, which describes the decomposition. */
                 if (!(iodesc = pio_get_iodesc_from_id(ioid2)))
                     return pio_err(ios, NULL, PIO_EBADID, __FILE__, __LINE__, "Getting I/O decomposition from id failed");
-                if (iodesc->ioid != ioid2 || iodesc->maplen != TARGET_NTASKS || iodesc->ndims != NDIM2 ||
-                    iodesc->nrecvs != 1 || iodesc->ndof != TARGET_NTASKS || iodesc->num_aiotasks != TARGET_NTASKS
-                    || iodesc->rearranger != PIO_REARR_SUBSET || iodesc->maxregions != 1 ||
-                    iodesc->needsfill || iodesc->mpitype != MPI_INT)
+                if (iodesc->ioid != ioid2 || iodesc->sync_io_desc_info.maplen != TARGET_NTASKS || iodesc->sync_io_desc_info.ndims != NDIM2 ||
+                    iodesc->sync_io_desc_info.nrecvs != 1 || iodesc->sync_io_desc_info.ndof != TARGET_NTASKS || iodesc->sync_io_desc_info.num_aiotasks != TARGET_NTASKS
+                    || iodesc->sync_io_desc_info.rearranger != PIO_REARR_SUBSET || iodesc->sync_io_desc_info.maxregions != 1 ||
+                    iodesc->sync_io_desc_info.needsfill || iodesc->sync_io_desc_info.mpitype != MPI_INT)
                     return ERR_WRONG;
-                for (int e = 0; e < iodesc->maplen; e++)
-                    if (iodesc->map[e] != my_rank * iodesc->maplen + e + 1)
+                for (int e = 0; e < iodesc->sync_io_desc_info.maplen; e++)
+                    if (iodesc->sync_io_desc_info.map[e] != my_rank * iodesc->sync_io_desc_info.maplen + e + 1)
                         return ERR_WRONG;
-                if (iodesc->dimlen[0] != X_DIM_LEN || iodesc->dimlen[1] != Y_DIM_LEN)
+                if (iodesc->sync_io_desc_info.dimlen[0] != X_DIM_LEN || iodesc->sync_io_desc_info.dimlen[1] != Y_DIM_LEN)
                     return ERR_WRONG;
-                printf("%d in my test iodesc->maxiobuflen = %lld\n", my_rank, (unsigned long long) (iodesc->maxiobuflen));
+                printf("%d in my test iodesc->sync_io_desc_info.maxiobuflen = %lld\n", my_rank, (unsigned long long) (iodesc->sync_io_desc_info.maxiobuflen));
             }
         
 

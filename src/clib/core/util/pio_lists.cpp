@@ -94,10 +94,22 @@ int pio_get_file(int ncid, file_desc_t **pfile)
   }
 
   try{
-    file = SPIO_Util::SPIO_Lists::GVars::pio_file_list.at(ncid);  
+    file = SPIO_Util::SPIO_Lists::GVars::pio_file_list.at(ncid);
   } catch(const std::out_of_range &e){
-    return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
-                    "Searching for file (ncid=%d) in internal file list failed. Invalid file id provided", ncid);
+    /* Don't handle the error (pio_err()) here, for the same reason as the
+     * PIO_GLOBAL case above: some callers (e.g. PIOc_warn(),
+     * PIOc_File_is_Open_impl(), PIOc_get_iosystem(), get_var_desc_str())
+     * intentionally tolerate this lookup failing and never want it to
+     * invoke the globally configured error handler - calling pio_err(NULL,
+     * NULL, ...) here would always use default_error_handler (since there
+     * is no file/iosystem to use instead), which defaults to
+     * PIO_INTERNAL_ERROR and aborts the whole application even for those
+     * callers. Every caller that checks this function's return value
+     * already calls pio_err() itself, with a more specific message, when
+     * it wants the failure to be escalated - see pio_get_iosystem_from_id()
+     * just below for the same pattern on iosystem ids. */
+    LOG((1, "Searching for file (ncid=%d) in internal file list failed. Invalid file id provided", ncid));
+    return PIO_EBADID;
   }
 
   if(pfile){
@@ -519,12 +531,18 @@ int pio_delete_iodesc_from_list(int ioid)
 
 static int spio_wait_async_iodesc_ops(io_desc_t *iodesc)
 {
-  const int SLEEP_TIME_IN_MILLISECONDS = 500;
-  while(iodesc->nasync_pend_ops > 0){
-    std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME_IN_MILLISECONDS));
-  }
-
-  return PIO_NOERR;
+  /* Forwards to the bounded, warning-emitting drain (pio_file.cpp) instead
+   * of looping unboundedly/silently - see its doc comment for why an
+   * unbounded wait here is undesirable (a stuck/failed async op would hang
+   * this call, and thus pio_delete_all_iodescs()/PIOc_finalize(), forever).
+   * A timeout (PIO_EINTERNAL) is forwarded as-is: pio_delete_all_iodescs(),
+   * the only caller, already turns a non-PIO_NOERR return here into a hard
+   * pio_err() failure of the whole finalize - that was previously
+   * unreachable dead code, since the old unbounded loop could never return
+   * anything but PIO_NOERR (or hang forever). Never freeing a decomposition
+   * whose async ops did not drain in time is safer than freeing it under an
+   * in-flight op. */
+  return spio_wait_iodesc_async_pend_ops(iodesc);
 }
 
 int pio_delete_all_iodescs(int iosysid)

@@ -8,6 +8,7 @@
 #include <pio.h>
 #include <pio_tests.h>
 #include <pio_internal.h>
+#include "spio_iosys_utils.hpp"
 #if SIZEOF_PIO_OFFSET >= 8
 #include <stdint.h>
 #endif
@@ -317,27 +318,27 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
         io_region *ior1;
         int ndims = 1;
 
-        iodesc.free_all_regions();
+        iodesc.sync_io_desc_info.free_all_regions();
         /* This is how we allocate a region. */
         if ((ret = alloc_region2(NULL, ndims, &ior1)))
             return ret;
         ior1->next = NULL;
         ior1->count[0] = 1;
 
-        iodesc.firstregion = ior1;
-        iodesc.ndims = 1;
+        iodesc.sync_io_desc_info.firstregion = ior1;
+        iodesc.sync_io_desc_info.ndims = 1;
 
         /* Run the function. Simplest possible case. */
-        if ((ret = compute_maxIObuffersize(test_comm, &iodesc)))
+        if ((ret = compute_maxIObuffersize(test_comm, iodesc.sync_io_desc_info)))
             return ret;
-        if (iodesc.maxiobuflen != 1)
+        if (iodesc.sync_io_desc_info.maxiobuflen != 1)
             return ERR_WRONG;
 
         /* Free resources for the region. */
         free(ior1->start);
         free(ior1->count);
         free(ior1);
-        iodesc.firstregion = NULL; 
+        iodesc.sync_io_desc_info.firstregion = NULL; 
     }
 
     {
@@ -347,7 +348,7 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
         io_region *ior2;
         int ndims = 2;
 
-        iodesc.free_all_regions();
+        iodesc.sync_io_desc_info.free_all_regions();
         /* This is how we allocate a region. */
         if ((ret = alloc_region2(NULL, ndims, &ior2)))
             return ret;
@@ -361,20 +362,20 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
         ior2->count[0] = 10;
         ior2->count[1] = 2;
 
-        iodesc.firstregion = ior2;
-        iodesc.ndims = 2;
+        iodesc.sync_io_desc_info.firstregion = ior2;
+        iodesc.sync_io_desc_info.ndims = 2;
 
         /* Run the function. */
-        if ((ret = compute_maxIObuffersize(test_comm, &iodesc)))
+        if ((ret = compute_maxIObuffersize(test_comm, iodesc.sync_io_desc_info)))
             return ret;
-        if (iodesc.maxiobuflen != 20)
+        if (iodesc.sync_io_desc_info.maxiobuflen != 20)
             return ERR_WRONG;
 
         /* Free resources for the region. */
         free(ior2->start);
         free(ior2->count);
         free(ior2);
-        iodesc.firstregion = NULL;
+        iodesc.sync_io_desc_info.firstregion = NULL;
     }
 
     {
@@ -384,7 +385,7 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
         io_region *ior4;
         int ndims = 2;
 
-        iodesc.free_all_regions();
+        iodesc.sync_io_desc_info.free_all_regions();
         /* This is how we allocate a region. */
         if ((ret = alloc_region2(NULL, ndims, &ior4)))
             return ret;
@@ -398,14 +399,14 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
         ior3->count[0] = 100;
         ior3->count[1] = 5;
 
-        iodesc.firstregion = ior3;
-        iodesc.ndims = 2;
+        iodesc.sync_io_desc_info.firstregion = ior3;
+        iodesc.sync_io_desc_info.ndims = 2;
 
         /* Run the function. */
-        if ((ret = compute_maxIObuffersize(test_comm, &iodesc)))
+        if ((ret = compute_maxIObuffersize(test_comm, iodesc.sync_io_desc_info)))
             return ret;
-        printf("iodesc.maxiobuflen = %lld\n", (unsigned long long) (iodesc.maxiobuflen));
-        if (iodesc.maxiobuflen != 520)
+        printf("iodesc.sync_io_desc_info.maxiobuflen = %lld\n", (unsigned long long) (iodesc.sync_io_desc_info.maxiobuflen));
+        if (iodesc.sync_io_desc_info.maxiobuflen != 520)
             return ERR_WRONG;
 
         /* Free resources for the region. */
@@ -415,7 +416,7 @@ int test_compute_maxIObuffersize(MPI_Comm test_comm, int my_rank)
         free(ior3->start);
         free(ior3->count);
         free(ior3);
-        iodesc.firstregion = NULL;
+        iodesc.sync_io_desc_info.firstregion = NULL;
     }
 
     free(ios);
@@ -438,21 +439,21 @@ int test_determine_fill(MPI_Comm test_comm)
 
     io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
     /* Set up iodesc for test. */
-    iodesc->ndims = 1;
-    iodesc->rearranger = PIO_REARR_SUBSET;
-    iodesc->llen = 1;
+    iodesc->sync_io_desc_info.ndims = 1;
+    iodesc->sync_io_desc_info.rearranger = PIO_REARR_SUBSET;
+    iodesc->sync_io_desc_info.llen = 1;
 
     /* We don't need fill. */
-    if ((ret = determine_fill(ios, iodesc, gsize, compmap)))
+    if ((ret = determine_fill(ios, iodesc->sync_io_desc_info, gsize, compmap)))
         return ret;
-    if (iodesc->needsfill)
+    if (iodesc->sync_io_desc_info.needsfill)
         return ERR_WRONG;
 
     /* Change settings, so now we do need fill. */
-    iodesc->llen = 0;
-    if ((ret = determine_fill(ios, iodesc, gsize, compmap)))
+    iodesc->sync_io_desc_info.llen = 0;
+    if ((ret = determine_fill(ios, iodesc->sync_io_desc_info, gsize, compmap)))
         return ret;
-    if (!iodesc->needsfill)
+    if (!iodesc->sync_io_desc_info.needsfill)
         return ERR_WRONG;
 
     /* Free test resources. */
@@ -551,64 +552,66 @@ int test_define_iodesc_datatypes()
     for (int r = 0; r < NUM_REARRANGERS; r++)
     {
         iosystem_desc_t ios;
+        ios.io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(MPI_COMM_NULL, 0, 4,
+            MPI_GROUP_NULL, std::vector<int>(), true, 0, 0, false);
         io_desc_t iodesc(&ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
 
         /* Set up test for IO task with BOX rearranger to create one type. */
-        ios.ioproc = 1; /* this is IO proc. */
         ios.compproc = 1; /* this is also compute proc. */
-        ios.num_iotasks = 4; /* The number of IO tasks. */
-        iodesc.rtype = NULL; /* Array of MPI types will be created here. */
-        iodesc.nrecvs = 1; /* Number of types created. */
-        iodesc.mpitype = MPI_INT;
-        iodesc.stype = NULL; /* Array of MPI types will be created here. */
+        iodesc.sync_io_desc_info.rtype = NULL; /* Array of MPI types will be created here. */
+        iodesc.sync_io_desc_info.nrecvs = 1; /* Number of types created. */
+        iodesc.sync_io_desc_info.mpitype = MPI_INT;
+        iodesc.sync_io_desc_info.stype = NULL; /* Array of MPI types will be created here. */
 
         /* Allocate space for arrays in iodesc that will be filled in
          * define_iodesc_datatypes(). */
-        if (!(iodesc.rcount = (int *) malloc(iodesc.nrecvs * sizeof(int))))
+        if (!(iodesc.sync_io_desc_info.rcount = (int *) malloc(iodesc.sync_io_desc_info.nrecvs * sizeof(int))))
             return PIO_ENOMEM;
-        if (!(iodesc.rfrom = (int *) malloc(iodesc.nrecvs * sizeof(int))))
+        if (!(iodesc.sync_io_desc_info.rfrom = (int *) malloc(iodesc.sync_io_desc_info.nrecvs * sizeof(int))))
             return PIO_ENOMEM;
-        if (!(iodesc.rindex = (PIO_Offset *) malloc(1 * sizeof(PIO_Offset))))
+        if (!(iodesc.sync_io_desc_info.rindex = (PIO_Offset *) malloc(1 * sizeof(PIO_Offset))))
             return PIO_ENOMEM;
-        iodesc.rindex[0] = 0;
-        iodesc.rcount[0] = 1;
+        iodesc.sync_io_desc_info.rindex[0] = 0;
+        iodesc.sync_io_desc_info.rcount[0] = 1;
 
-        iodesc.rearranger = rearranger[r];
+        iodesc.sync_io_desc_info.rearranger = rearranger[r];
 
         /* The two rearrangers create a different number of send types. */
-        int num_send_types = iodesc.rearranger == PIO_REARR_BOX ? ios.num_iotasks : 1;
+        int num_send_types = iodesc.sync_io_desc_info.rearranger == PIO_REARR_BOX ? ios.io_comm_info->get_sync_io_comm_sz() : 1;
 
-        if (!(iodesc.sindex = (PIO_Offset *) malloc(num_send_types * sizeof(PIO_Offset))))
+        if (!(iodesc.sync_io_desc_info.sindex = (PIO_Offset *) malloc(num_send_types * sizeof(PIO_Offset))))
             return PIO_ENOMEM;
-        if (!(iodesc.scount = (int *) malloc(num_send_types * sizeof(int))))
+        if (!(iodesc.sync_io_desc_info.scount = (int *) malloc(num_send_types * sizeof(int))))
             return PIO_ENOMEM;
         for (int st = 0; st < num_send_types; st++)
         {
-            iodesc.sindex[st] = 0;
-            iodesc.scount[st] = 1;
+            iodesc.sync_io_desc_info.sindex[st] = 0;
+            iodesc.sync_io_desc_info.scount[st] = 1;
         }
 
         /* Run the test function. */
-        if ((ret = define_iodesc_datatypes(&ios, &iodesc)))
+        if ((ret = define_iodesc_datatypes(&ios, &iodesc, iodesc.sync_io_desc_info,
+                                           SPIO_Util::Iosys_Util::make_sync_io_comm_target(&ios))))
             return ret;
 
         /* We created send types, so free them. */
         for (int st = 0; st < num_send_types; st++)
-            if ((mpierr = MPI_Type_free(&iodesc.stype[st])))
+            if ((mpierr = MPI_Type_free(&iodesc.sync_io_desc_info.stype[st])))
                 MPIERR(mpierr);
 
         /* We created one receive type, so free it. */
-        if ((mpierr = MPI_Type_free(&iodesc.rtype[0])))
+        if ((mpierr = MPI_Type_free(&iodesc.sync_io_desc_info.rtype[0])))
             MPIERR(mpierr);
 
         /* Free resources. */
-        free(iodesc.rtype); iodesc.rtype = NULL;
-        free(iodesc.sindex); iodesc.sindex = NULL;
-        free(iodesc.scount); iodesc.scount = NULL;
-        free(iodesc.stype); iodesc.stype = NULL;
-        free(iodesc.rcount); iodesc.rcount = NULL;
-        free(iodesc.rfrom); iodesc.rfrom = NULL;
-        free(iodesc.rindex); iodesc.rindex = NULL;
+        free(iodesc.sync_io_desc_info.rtype); iodesc.sync_io_desc_info.rtype = NULL;
+        free(iodesc.sync_io_desc_info.sindex); iodesc.sync_io_desc_info.sindex = NULL;
+        free(iodesc.sync_io_desc_info.scount); iodesc.sync_io_desc_info.scount = NULL;
+        free(iodesc.sync_io_desc_info.stype); iodesc.sync_io_desc_info.stype = NULL;
+        free(iodesc.sync_io_desc_info.rcount); iodesc.sync_io_desc_info.rcount = NULL;
+        free(iodesc.sync_io_desc_info.rfrom); iodesc.sync_io_desc_info.rfrom = NULL;
+        free(iodesc.sync_io_desc_info.rindex); iodesc.sync_io_desc_info.rindex = NULL;
+        delete(ios.io_comm_info);
     }
 
     return 0;
@@ -626,16 +629,17 @@ int test_compute_counts(MPI_Comm test_comm, int my_rank)
     if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
         return PIO_ENOMEM;
 
-    ios->num_iotasks = TARGET_NTASKS;
     ios->num_comptasks = TARGET_NTASKS;
     ios->num_uniontasks = TARGET_NTASKS;
-    ios->ioproc = 1;
     ios->compproc = 1;
     ios->union_comm = test_comm;
-    if (!(ios->ioranks = (int *) malloc(TARGET_NTASKS * sizeof(int))))
-        return PIO_ENOMEM;
-    for (int t = 0; t < TARGET_NTASKS; t++)
-        ios->ioranks[t] = t;
+    {
+        std::vector<int> sync_io_ranks(TARGET_NTASKS);
+        for (int t = 0; t < TARGET_NTASKS; t++)
+            sync_io_ranks[t] = t;
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(MPI_COMM_NULL, 0,
+            TARGET_NTASKS, MPI_GROUP_NULL, sync_io_ranks, true, 0, 0, false);
+    }
     if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for comp ranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
@@ -644,35 +648,37 @@ int test_compute_counts(MPI_Comm test_comm, int my_rank)
     /* Initialize iodesc. */
     io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
     assert(iodesc);
-    iodesc->rearranger = PIO_REARR_BOX;
-    iodesc->ndof = TARGET_NTASKS;
-    iodesc->llen = TARGET_NTASKS;
-    iodesc->rearr_opts.comm_type = PIO_REARR_COMM_COLL;
-    iodesc->rearr_opts.fcd = PIO_REARR_COMM_FC_2D_DISABLE;
+    iodesc->sync_io_desc_info.rearranger = PIO_REARR_BOX;
+    iodesc->sync_io_desc_info.ndof = TARGET_NTASKS;
+    iodesc->sync_io_desc_info.llen = TARGET_NTASKS;
+    iodesc->sync_io_desc_info.rearr_opts.comm_type = PIO_REARR_COMM_COLL;
+    iodesc->sync_io_desc_info.rearr_opts.fcd = PIO_REARR_COMM_FC_2D_DISABLE;
 
     /* Test the function. */
-    if ((ret = compute_counts(ios, iodesc, dest_ioproc, dest_ioindex)))
+    if ((ret = compute_counts(ios, iodesc, iodesc->sync_io_desc_info,
+                              SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios),
+                              dest_ioproc, dest_ioindex)))
         return ret;
 
     /* Check results. */
-    for (int i = 0; i < ios->num_iotasks; i++)
-        if (iodesc->scount[i] != 1 || iodesc->sindex[i] != i)
+    for (int i = 0; i < ios->io_comm_info->get_sync_io_comm_sz(); i++)
+        if (iodesc->sync_io_desc_info.scount[i] != 1 || iodesc->sync_io_desc_info.sindex[i] != i)
             return ERR_WRONG;
 
-    for (int i = 0; i < iodesc->ndof; i++)
-        if (iodesc->rcount[i] != 1 || iodesc->rfrom[i] != i ||
-            iodesc->rindex[i] != my_rank)
+    for (int i = 0; i < iodesc->sync_io_desc_info.ndof; i++)
+        if (iodesc->sync_io_desc_info.rcount[i] != 1 || iodesc->sync_io_desc_info.rfrom[i] != i ||
+            iodesc->sync_io_desc_info.rindex[i] != my_rank)
             return ERR_WRONG;
 
     /* Free resources allocated in compute_counts(). */
-    free(iodesc->scount); iodesc->scount = NULL;
-    free(iodesc->sindex); iodesc->sindex = NULL;
-    free(iodesc->rcount); iodesc->rcount = NULL;
-    free(iodesc->rfrom); iodesc->rfrom = NULL;
-    free(iodesc->rindex); iodesc->rindex = NULL;
+    free(iodesc->sync_io_desc_info.scount); iodesc->sync_io_desc_info.scount = NULL;
+    free(iodesc->sync_io_desc_info.sindex); iodesc->sync_io_desc_info.sindex = NULL;
+    free(iodesc->sync_io_desc_info.rcount); iodesc->sync_io_desc_info.rcount = NULL;
+    free(iodesc->sync_io_desc_info.rfrom); iodesc->sync_io_desc_info.rfrom = NULL;
+    free(iodesc->sync_io_desc_info.rindex); iodesc->sync_io_desc_info.rindex = NULL;
 
     /* Free test resources. */
-    free(ios->ioranks);
+    delete(ios->io_comm_info);
     free(ios->compranks);
     delete(iodesc);
     free(ios);
@@ -720,29 +726,31 @@ int test_box_rearrange_create(MPI_Comm test_comm, int my_rank)
     /* Allocate IO desc struct for this test. */
     io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
     assert(iodesc);
-    iodesc->free_all_regions();
+    iodesc->sync_io_desc_info.free_all_regions();
 
     /* Default rearranger options. */
-    iodesc->rearr_opts.comm_type = PIO_REARR_COMM_COLL;
-    iodesc->rearr_opts.fcd = PIO_REARR_COMM_FC_2D_DISABLE;
+    iodesc->sync_io_desc_info.rearr_opts.comm_type = PIO_REARR_COMM_COLL;
+    iodesc->sync_io_desc_info.rearr_opts.fcd = PIO_REARR_COMM_FC_2D_DISABLE;
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
-    ios->io_comm = test_comm;
-    iodesc->ndims = NDIM1;
-    iodesc->rearranger = PIO_REARR_BOX;
+    iodesc->sync_io_desc_info.ndims = NDIM1;
+    iodesc->sync_io_desc_info.rearranger = PIO_REARR_BOX;
 
     /* Set up the IO task info for the test. */
-    ios->ioproc = 1;
     ios->compproc = 1;
     ios->union_rank = my_rank;
-    ios->num_iotasks = 4;
     ios->num_comptasks = 4;
     ios->num_uniontasks = 4;
-    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
-    for (int i = 0; i < TARGET_NTASKS; i++)
-        ios->ioranks[i] = i;
+    {
+        const int nio = 4;
+        std::vector<int> sync_io_ranks(nio);
+        for (int i = 0; i < nio; i++)
+            sync_io_ranks[i] = i;
+        /* io_comm aliases test_comm (owned/freed by the caller) - owns_resources = false */
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(test_comm, 0, nio,
+            MPI_GROUP_NULL, sync_io_ranks, true, 0, 0, false);
+    }
     if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
@@ -754,61 +762,62 @@ int test_box_rearrange_create(MPI_Comm test_comm, int my_rank)
     if (my_rank == 0)
         ior1->count[0] = 8;
 
-    iodesc->firstregion = ior1;
+    iodesc->sync_io_desc_info.firstregion = ior1;
 
     /* We are finally ready to run the code under test. */
-    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc)))
+    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc,
+                                    iodesc->sync_io_desc_info, SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios))))
         return ret;
 
     /* Check some results. */
-    if (iodesc->rearranger != PIO_REARR_BOX || iodesc->ndof != maplen ||
-        iodesc->llen != my_rank ? 0 : 8 || !iodesc->needsfill)
+    if (iodesc->sync_io_desc_info.rearranger != PIO_REARR_BOX || iodesc->sync_io_desc_info.ndof != maplen ||
+        iodesc->sync_io_desc_info.llen != my_rank ? 0 : 8 || !iodesc->sync_io_desc_info.needsfill)
         return ERR_WRONG;
 
     /* for (int i = 0; i < ios->num_iotasks; i++) */
     /* { */
     /*     /\* sindex is only allocated if scount[i] > 0. *\/ */
-    /*     if (iodesc->scount[i] != i ? 0 : 1 || */
-    /*         (iodesc->scount[i] && iodesc->sindex[i] != 0)) */
+    /*     if (iodesc->sync_io_desc_info.scount[i] != i ? 0 : 1 || */
+    /*         (iodesc->sync_io_desc_info.scount[i] && iodesc->sync_io_desc_info.sindex[i] != 0)) */
     /*         return ERR_WRONG; */
     /* } */
 
-    /* for (int i = 0; i < iodesc->ndof; i++) */
+    /* for (int i = 0; i < iodesc->sync_io_desc_info.ndof; i++) */
     /* { */
     /*     /\* rcount is 1 for rank 0, 0 on other tasks. *\/ */
-    /*     if (iodesc->rcount[i] != my_rank ? 0 : 1) */
+    /*     if (iodesc->sync_io_desc_info.rcount[i] != my_rank ? 0 : 1) */
     /*         return ERR_WRONG; */
 
     /*     /\* rfrom is 0 everywhere, except task 0, array elemnt 1. *\/ */
     /*     if (my_rank == 0 && i == 1) */
     /*     { */
-    /*         if (iodesc->rfrom[i] != 1) */
+    /*         if (iodesc->sync_io_desc_info.rfrom[i] != 1) */
     /*             return ERR_WRONG; */
     /*     } */
     /*     else */
     /*     { */
-    /*         if (iodesc->rfrom[i] != 0) */
+    /*         if (iodesc->sync_io_desc_info.rfrom[i] != 0) */
     /*             return ERR_WRONG; */
     /*     } */
 
     /*     /\* rindex is only allocated where there is a non-zero count. *\/ */
-    /*     if (iodesc->rcount[i]) */
-    /*         if (iodesc->rindex[i] != 0) */
+    /*     if (iodesc->sync_io_desc_info.rcount[i]) */
+    /*         if (iodesc->sync_io_desc_info.rindex[i] != 0) */
     /*             return ERR_WRONG; */
     /* } */
 
     /* Free resources allocated in compute_counts(). */
-    free(iodesc->scount); iodesc->scount = NULL;
-    free(iodesc->sindex); iodesc->sindex = NULL;
-    free(iodesc->rcount); iodesc->rcount = NULL;
-    free(iodesc->rfrom); iodesc->rfrom = NULL;
-    free(iodesc->rindex); iodesc->rindex = NULL;
+    free(iodesc->sync_io_desc_info.scount); iodesc->sync_io_desc_info.scount = NULL;
+    free(iodesc->sync_io_desc_info.sindex); iodesc->sync_io_desc_info.sindex = NULL;
+    free(iodesc->sync_io_desc_info.rcount); iodesc->sync_io_desc_info.rcount = NULL;
+    free(iodesc->sync_io_desc_info.rfrom); iodesc->sync_io_desc_info.rfrom = NULL;
+    free(iodesc->sync_io_desc_info.rindex); iodesc->sync_io_desc_info.rindex = NULL;
 
     /* Free resources from test. */
     free(ior1->start);
     free(ior1->count);
-    free(ior1); iodesc->firstregion = NULL;
-    free(ios->ioranks);
+    free(ior1); iodesc->sync_io_desc_info.firstregion = NULL;
+    delete(ios->io_comm_info);
     free(ios->compranks);
     delete(iodesc);
     free(ios);
@@ -835,32 +844,34 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
     /* Allocate IO desc struct for this test. */
     io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
     assert(iodesc);
-    iodesc->free_all_regions();
+    iodesc->sync_io_desc_info.free_all_regions();
 
     /* Default rearranger options. */
-    iodesc->rearr_opts.comm_type = PIO_REARR_COMM_COLL;
-    iodesc->rearr_opts.fcd = PIO_REARR_COMM_FC_2D_DISABLE;
+    iodesc->sync_io_desc_info.rearr_opts.comm_type = PIO_REARR_COMM_COLL;
+    iodesc->sync_io_desc_info.rearr_opts.fcd = PIO_REARR_COMM_FC_2D_DISABLE;
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
-    ios->io_comm = test_comm;
-    iodesc->ndims = NDIM1;
-    iodesc->rearranger = PIO_REARR_BOX;
+    iodesc->sync_io_desc_info.ndims = NDIM1;
+    iodesc->sync_io_desc_info.rearranger = PIO_REARR_BOX;
 
     /* This is the size of the map in computation tasks. */
-    iodesc->ndof = 2;
+    iodesc->sync_io_desc_info.ndof = 2;
 
     /* Set up the IO task info for the test. */
-    ios->ioproc = 1;
     ios->compproc = 1;
     ios->union_rank = my_rank;
-    ios->num_iotasks = 4;
     ios->num_comptasks = 4;
     ios->num_uniontasks = 4;
-    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
-    for (int i = 0; i < TARGET_NTASKS; i++)
-        ios->ioranks[i] = i;
+    {
+        const int nio = 4;
+        std::vector<int> sync_io_ranks(nio);
+        for (int i = 0; i < nio; i++)
+            sync_io_ranks[i] = i;
+        /* io_comm aliases test_comm (owned/freed by the caller) - owns_resources = false */
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(test_comm, 0, nio,
+            MPI_GROUP_NULL, sync_io_ranks, true, 0, 0, false);
+    }
     if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
@@ -873,57 +884,58 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
     if (my_rank == 0)
         ior1->count[0] = 8;
 
-    iodesc->firstregion = ior1;
+    iodesc->sync_io_desc_info.firstregion = ior1;
 
     /* We are finally ready to run the code under test. */
-    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc)))
+    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc,
+                                    iodesc->sync_io_desc_info, SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios))))
         return ret;
 
     /* Check some results. */
-    if (iodesc->rearranger != PIO_REARR_BOX || iodesc->ndof != maplen ||
-        iodesc->llen != my_rank ? 0 : 8 || !iodesc->needsfill)
+    if (iodesc->sync_io_desc_info.rearranger != PIO_REARR_BOX || iodesc->sync_io_desc_info.ndof != maplen ||
+        iodesc->sync_io_desc_info.llen != my_rank ? 0 : 8 || !iodesc->sync_io_desc_info.needsfill)
         return ERR_WRONG;
 
-    for (int i = 0; i < ios->num_iotasks; i++)
+    for (int i = 0; i < ios->io_comm_info->get_sync_io_comm_sz(); i++)
     {
         /* sindex is only allocated if scount[i] > 0. */
-        if (iodesc->scount[i] != i ? 0 : 1 ||
-            (iodesc->scount[i] && iodesc->sindex[i] != 0))
+        if (iodesc->sync_io_desc_info.scount[i] != i ? 0 : 1 ||
+            (iodesc->sync_io_desc_info.scount[i] && iodesc->sync_io_desc_info.sindex[i] != 0))
             return ERR_WRONG;
     }
 
     if (my_rank == 0)
     {
-        for (int i = 0; i < iodesc->ndof; i++)
+        for (int i = 0; i < iodesc->sync_io_desc_info.ndof; i++)
         {
             /* rcount is 1 for rank 0, 0 on other tasks. */
-            if (iodesc->rcount[i] != 1)
+            if (iodesc->sync_io_desc_info.rcount[i] != 1)
                 return ERR_WRONG;
 
             /* rfrom only matters if there is a non-zero count. */
-            if (iodesc->rcount[i])
-                if (iodesc->rfrom[i] != i ? 1 : 0)
+            if (iodesc->sync_io_desc_info.rcount[i])
+                if (iodesc->sync_io_desc_info.rfrom[i] != i ? 1 : 0)
                     return ERR_WRONG;
 
             /* rindex is only allocated where there is a non-zero count. */
-            if (iodesc->rcount[i])
-                if (iodesc->rindex[i] != 0)
+            if (iodesc->sync_io_desc_info.rcount[i])
+                if (iodesc->sync_io_desc_info.rindex[i] != 0)
                     return ERR_WRONG;
         }
     }
 
     /* Free resources allocated in compute_counts(). */
-    free(iodesc->scount); iodesc->scount = NULL;
-    free(iodesc->sindex); iodesc->sindex = NULL;
-    free(iodesc->rcount); iodesc->rcount = NULL;
-    free(iodesc->rfrom); iodesc->rfrom = NULL;
-    free(iodesc->rindex); iodesc->rindex = NULL;
+    free(iodesc->sync_io_desc_info.scount); iodesc->sync_io_desc_info.scount = NULL;
+    free(iodesc->sync_io_desc_info.sindex); iodesc->sync_io_desc_info.sindex = NULL;
+    free(iodesc->sync_io_desc_info.rcount); iodesc->sync_io_desc_info.rcount = NULL;
+    free(iodesc->sync_io_desc_info.rfrom); iodesc->sync_io_desc_info.rfrom = NULL;
+    free(iodesc->sync_io_desc_info.rindex); iodesc->sync_io_desc_info.rindex = NULL;
 
     /* Free resources from test. */
     free(ior1->start);
     free(ior1->count);
-    free(ior1); iodesc->firstregion = NULL;
-    free(ios->ioranks);
+    free(ior1); iodesc->sync_io_desc_info.firstregion = NULL;
+    delete(ios->io_comm_info);
     free(ios->compranks);
     delete(iodesc);
     free(ios);
@@ -932,7 +944,7 @@ int test_box_rearrange_create_2(MPI_Comm test_comm, int my_rank)
 }
 
 /* Test for the box_rearrange_create() function.
- * Test totalrecv > iodesc->llen case in compute_counts(). */
+ * Test totalrecv > iodesc->sync_io_desc_info.llen case in compute_counts(). */
 int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
 {
 #define MAPLEN1 1
@@ -951,32 +963,34 @@ int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
     /* Allocate IO desc struct for this test. */
     io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
     assert(iodesc);
-    iodesc->free_all_regions();
+    iodesc->sync_io_desc_info.free_all_regions();
 
     /* Default rearranger options. */
-    iodesc->rearr_opts.comm_type = PIO_REARR_COMM_COLL;
-    iodesc->rearr_opts.fcd = PIO_REARR_COMM_FC_2D_DISABLE;
+    iodesc->sync_io_desc_info.rearr_opts.comm_type = PIO_REARR_COMM_COLL;
+    iodesc->sync_io_desc_info.rearr_opts.fcd = PIO_REARR_COMM_FC_2D_DISABLE;
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
-    ios->io_comm = test_comm;
-    iodesc->ndims = NDIM1;
-    iodesc->rearranger = PIO_REARR_BOX;
+    iodesc->sync_io_desc_info.ndims = NDIM1;
+    iodesc->sync_io_desc_info.rearranger = PIO_REARR_BOX;
 
     /* This is the size of the map in computation tasks. */
-    iodesc->ndof = 1;
+    iodesc->sync_io_desc_info.ndof = 1;
 
     /* Set up the IO task info for the test. */
-    ios->ioproc = 1;
     ios->compproc = 1;
     ios->union_rank = my_rank;
-    ios->num_iotasks = TARGET_NTASKS;
     ios->num_comptasks = TARGET_NTASKS;
     ios->num_uniontasks = TARGET_NTASKS;
-    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
-    for (int i = 0; i < ios->num_iotasks; i++)
-        ios->ioranks[i] = i;
+    {
+        const int nio = TARGET_NTASKS;
+        std::vector<int> sync_io_ranks(nio);
+        for (int i = 0; i < nio; i++)
+            sync_io_ranks[i] = i;
+        /* io_comm aliases test_comm (owned/freed by the caller) - owns_resources = false */
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(test_comm, 0, nio,
+            MPI_GROUP_NULL, sync_io_ranks, true, 0, 0, false);
+    }
     if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < ios->num_comptasks; i++)
@@ -989,37 +1003,136 @@ int test_box_rearrange_create_3(MPI_Comm test_comm, int my_rank)
     if (my_rank == 0)
         ior1->count[0] = 1;
 
-    iodesc->firstregion = ior1;
+    iodesc->sync_io_desc_info.firstregion = ior1;
 
     /* Two computation tasks contain duplicate data element to be transfered */
     if (my_rank == 0 || my_rank == 2)
         compmap[0] = 1;
 
     /* We are finally ready to run the code under test. */
-    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc)))
+    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc,
+                                    iodesc->sync_io_desc_info, SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios))))
         return ret;
 
     /* Check some results. */
-    if (iodesc->rearranger != PIO_REARR_BOX || iodesc->ndof != maplen ||
-        (iodesc->llen != my_rank ? 0 : 1) || iodesc->needsfill)
+    if (iodesc->sync_io_desc_info.rearranger != PIO_REARR_BOX || iodesc->sync_io_desc_info.ndof != maplen ||
+        (iodesc->sync_io_desc_info.llen != my_rank ? 0 : 1) || iodesc->sync_io_desc_info.needsfill)
         return ERR_WRONG;
 
     /* Free resources allocated in compute_counts(). */
-    free(iodesc->scount); iodesc->scount = NULL;
-    free(iodesc->sindex); iodesc->sindex = NULL;
-    free(iodesc->rcount); iodesc->rcount = NULL;
-    free(iodesc->rfrom); iodesc->rfrom = NULL;
-    free(iodesc->rindex); iodesc->rindex = NULL;
+    free(iodesc->sync_io_desc_info.scount); iodesc->sync_io_desc_info.scount = NULL;
+    free(iodesc->sync_io_desc_info.sindex); iodesc->sync_io_desc_info.sindex = NULL;
+    free(iodesc->sync_io_desc_info.rcount); iodesc->sync_io_desc_info.rcount = NULL;
+    free(iodesc->sync_io_desc_info.rfrom); iodesc->sync_io_desc_info.rfrom = NULL;
+    free(iodesc->sync_io_desc_info.rindex); iodesc->sync_io_desc_info.rindex = NULL;
 
     /* Free resources from test. */
     free(ior1->start);
     free(ior1->count);
-    free(ior1); iodesc->firstregion = NULL;
-    free(ios->ioranks);
+    free(ior1); iodesc->sync_io_desc_info.firstregion = NULL;
+    delete(ios->io_comm_info);
     free(ios->compranks);
     delete(iodesc);
     free(ios);
 
+    return 0;
+}
+
+/* Test that box_rearranger_init() (and subset_rearranger_init()) eagerly
+ * allocate iodesc->async_io_desc_info when PIO_USE_ASYNC_WR_THREAD is on,
+ * mirroring what contig_rearranger_init() already does for CONTIG. This
+ * only compiles the assertion in when the flag is actually on, since
+ * async_io_desc_info is guaranteed NULL (by io_desc_t's constructor) and
+ * untouched when the flag is off - see pio_darray.cpp Review Focus: "a BOX
+ * or SUBSET decomposition built with PIO_USE_ASYNC_WR_THREAD off must still
+ * build and run correctly". */
+int test_async_io_desc_info_allocated(MPI_Comm test_comm, int my_rank)
+{
+#if PIO_USE_ASYNC_WR_THREAD
+    iosystem_desc_t *ios;
+    int maplen = 2;
+    PIO_Offset compmap[2] = {my_rank * 2 + 1, my_rank * 2 + 2};
+    const int gdimlen[NDIM1] = {8};
+    int ndims = NDIM1;
+    int ret;
+
+    if (!(ios = (iosystem_desc_t *) calloc(1, sizeof(iosystem_desc_t))))
+        return PIO_ENOMEM;
+
+    ios->compproc = 1;
+    ios->union_comm = test_comm;
+    ios->my_comm = test_comm;
+    ios->num_uniontasks = TARGET_NTASKS;
+    ios->union_rank = my_rank;
+    ios->num_comptasks = TARGET_NTASKS;
+    if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
+        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
+    for (int i = 0; i < TARGET_NTASKS; i++)
+        ios->compranks[i] = i;
+
+    MPI_Comm sync_comm_dup = MPI_COMM_NULL, async_comm_dup = MPI_COMM_NULL;
+    MPI_Comm_dup(test_comm, &sync_comm_dup);
+    MPI_Comm_dup(test_comm, &async_comm_dup);
+
+    {
+        std::vector<int> sync_io_ranks(TARGET_NTASKS);
+        for (int i = 0; i < TARGET_NTASKS; i++)
+            sync_io_ranks[i] = i;
+        /* Sync and async I/O share the same rank membership for this test.
+         * This is IO_comm_info's test-only "both comms explicitly provided"
+         * mock constructor (spio_iosys_utils.hpp - the 10-arg overload, not
+         * the 9-arg single-role one used elsewhere in this file, which has no
+         * async role at all): it unconditionally owns/frees both comms it is
+         * given (owns_resources=true, hardcoded), so each role is handed its
+         * own MPI_Comm_dup() of test_comm rather than test_comm itself -
+         * freeing test_comm here (owned by the caller) or double-freeing one
+         * handle under two roles would corrupt the caller's communicator. */
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(
+            sync_comm_dup, my_rank, TARGET_NTASKS, MPI_GROUP_NULL, sync_io_ranks,
+            async_comm_dup, my_rank, TARGET_NTASKS, MPI_GROUP_NULL, sync_io_ranks);
+    }
+
+    io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, ndims, gdimlen, maplen, compmap, PIO_REARR_BOX, true);
+    SPIO_Util::Iosys_Util::Io_comm_target sync_target = SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios);
+    if ((ret = CalcStartandCount(iodesc->sync_io_desc_info.piotype, iodesc->sync_io_desc_info.ndims,
+                                  iodesc->sync_io_desc_info.dimlen, sync_target.get_comm_sz(), sync_target.get_comm_rank(),
+                                  iodesc->sync_io_desc_info.firstregion->start, iodesc->sync_io_desc_info.firstregion->count,
+                                  &iodesc->sync_io_desc_info.num_aiotasks)))
+        return ret;
+    if ((ret = box_rearrange_create(ios, iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map,
+                                     iodesc->sync_io_desc_info.dimlen, iodesc->sync_io_desc_info.ndims, iodesc,
+                                     iodesc->sync_io_desc_info, sync_target)))
+        return ret;
+
+    iodesc->async_io_desc_info = new io_desc_info_t(ios, iodesc->sync_io_desc_info.piotype,
+        iodesc->sync_io_desc_info.ndims, iodesc->sync_io_desc_info.dimlen,
+        iodesc->sync_io_desc_info.maplen, iodesc->sync_io_desc_info.map,
+        iodesc->sync_io_desc_info.rearranger, /*map_zero_based=*/false);
+    SPIO_Util::Iosys_Util::Io_comm_target async_target = SPIO_Util::Iosys_Util::make_async_io_comm_target(ios);
+    if ((ret = CalcStartandCount(iodesc->async_io_desc_info->piotype, iodesc->async_io_desc_info->ndims,
+                                  iodesc->async_io_desc_info->dimlen, async_target.get_comm_sz(), async_target.get_comm_rank(),
+                                  iodesc->async_io_desc_info->firstregion->start, iodesc->async_io_desc_info->firstregion->count,
+                                  &iodesc->async_io_desc_info->num_aiotasks)))
+        return ret;
+    if ((ret = box_rearrange_create(ios, iodesc->async_io_desc_info->maplen, iodesc->async_io_desc_info->map,
+                                     iodesc->async_io_desc_info->dimlen, iodesc->async_io_desc_info->ndims, iodesc,
+                                     *(iodesc->async_io_desc_info), async_target)))
+        return ret;
+
+    if (iodesc->async_io_desc_info->maplen != iodesc->sync_io_desc_info.maplen)
+        return ERR_WRONG;
+    for (int i = 0; i < iodesc->sync_io_desc_info.maplen; i++)
+        if (iodesc->async_io_desc_info->map[i] != iodesc->sync_io_desc_info.map[i])
+            return ERR_WRONG;
+
+    delete(ios->io_comm_info);
+    free(ios->compranks);
+    delete(iodesc);
+    free(ios);
+#else
+    (void)test_comm;
+    (void)my_rank;
+#endif
     return 0;
 }
 
@@ -1038,23 +1151,24 @@ int test_default_subset_partition(MPI_Comm test_comm, int my_rank)
     io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
     assert(iodesc);
 
-    ios->ioproc = 1;
-    ios->io_rank = my_rank;
+    ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(MPI_COMM_NULL, my_rank,
+        TARGET_NTASKS, MPI_GROUP_NULL, std::vector<int>(), true, 0, 0, false);
     ios->comp_rank = my_rank;
-    ios->num_iotasks = TARGET_NTASKS;
     ios->num_comptasks = TARGET_NTASKS;
     ios->comp_comm = test_comm;
     ios->union_comm = test_comm;
 
     /* Run the function to test. */
-    if ((ret = default_subset_partition(ios, iodesc)))
+    if ((ret = default_subset_partition(ios, iodesc, iodesc->sync_io_desc_info,
+                                        SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios))))
         return ret;
 
     /* Free the created communicator. */
-    if ((mpierr = MPI_Comm_free(&iodesc->subset_comm)))
+    if ((mpierr = MPI_Comm_free(&iodesc->sync_io_desc_info.subset_comm)))
         MPIERR(mpierr);
 
     /* Free resources from test. */
+    delete(ios->io_comm_info);
     delete(iodesc);
     free(ios);
 
@@ -1090,51 +1204,51 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
     /* Allocate IO desc struct for this test. */
     io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
     assert(iodesc);
-    iodesc->free_all_regions();
+    iodesc->sync_io_desc_info.free_all_regions();
 
     if (!(file = (file_desc_t *) calloc(1, sizeof(file_desc_t))))
         return PIO_ENOMEM;
 
-    ios->ioproc = 1;
     ios->compproc = 1;
-    ios->io_rank = my_rank;
     ios->union_comm = test_comm;
-    ios->num_iotasks = TARGET_NTASKS;
     ios->num_uniontasks = TARGET_NTASKS;
-    iodesc->rearranger = PIO_REARR_BOX;
-    iodesc->mpitype = MPI_INT;
+    {
+        std::vector<int> sync_io_ranks(TARGET_NTASKS);
+        for (int i = 0; i < TARGET_NTASKS; i++)
+            sync_io_ranks[i] = i;
+        /* io_comm aliases test_comm (owned/freed by the caller) - owns_resources = false */
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(test_comm, my_rank,
+            TARGET_NTASKS, MPI_GROUP_NULL, sync_io_ranks, true, 0, 0, false);
+    }
+    iodesc->sync_io_desc_info.rearranger = PIO_REARR_BOX;
+    iodesc->sync_io_desc_info.mpitype = MPI_INT;
 
     /* Set up test for IO task with BOX rearranger to create one type. */
-    iodesc->rtype = NULL; /* Array of MPI types will be created here. */
-    iodesc->nrecvs = 1; /* Number of types created. */
-    iodesc->mpitype = MPI_INT;
-    iodesc->stype = NULL; /* Array of MPI types will be created here. */
+    iodesc->sync_io_desc_info.rtype = NULL; /* Array of MPI types will be created here. */
+    iodesc->sync_io_desc_info.nrecvs = 1; /* Number of types created. */
+    iodesc->sync_io_desc_info.mpitype = MPI_INT;
+    iodesc->sync_io_desc_info.stype = NULL; /* Array of MPI types will be created here. */
 
     file->iosystem = ios;
     file->fh = -1;
 
     /* The two rearrangers create a different number of send types. */
-    int num_send_types = iodesc->rearranger == PIO_REARR_BOX ? ios->num_iotasks : 1;
+    int num_send_types = iodesc->sync_io_desc_info.rearranger == PIO_REARR_BOX ? ios->io_comm_info->get_sync_io_comm_sz() : 1;
 
     /* Default rearranger options. */
-    iodesc->rearr_opts.comm_type = PIO_REARR_COMM_COLL;
-    iodesc->rearr_opts.fcd = PIO_REARR_COMM_FC_2D_DISABLE;
+    iodesc->sync_io_desc_info.rearr_opts.comm_type = PIO_REARR_COMM_COLL;
+    iodesc->sync_io_desc_info.rearr_opts.fcd = PIO_REARR_COMM_FC_2D_DISABLE;
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
-    ios->io_comm = test_comm;
-    iodesc->ndims = NDIM1;
-    iodesc->rearranger = PIO_REARR_BOX;
+    iodesc->sync_io_desc_info.ndims = NDIM1;
+    iodesc->sync_io_desc_info.rearranger = PIO_REARR_BOX;
 
-    iodesc->ndof = 4;
+    iodesc->sync_io_desc_info.ndof = 4;
 
     /* Set up the IO task info for the test. */
     ios->union_rank = my_rank;
     ios->num_comptasks = 4;
-    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
-    for (int i = 0; i < TARGET_NTASKS; i++)
-        ios->ioranks[i] = i;
     if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
@@ -1147,44 +1261,46 @@ int test_rearrange_comp2io(MPI_Comm test_comm, int my_rank)
     if (my_rank == 0)
         ior1->count[0] = 8;
 
-    iodesc->firstregion = ior1;
+    iodesc->sync_io_desc_info.firstregion = ior1;
 
     /* Create the box rearranger. */
-    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc)))
+    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc,
+                                    iodesc->sync_io_desc_info, SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios))))
         return ret;
 
     /* Run the function to test. */
-    if ((ret = rearrange_comp2io(ios, iodesc, file, sbuf, rbuf, nvars)))
+    if ((ret = rearrange_comp2io(ios, iodesc, iodesc->sync_io_desc_info,
+                                 SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios), file, sbuf, rbuf, nvars)))
         return ret;
     printf("returned from rearrange_comp2io\n");
 
     /* We created send types, so free them. */
     for (int st = 0; st < num_send_types; st++)
-        if (iodesc->stype[st] != MPI_DATATYPE_NULL)
-            if ((mpierr = MPI_Type_free(&iodesc->stype[st])))
+        if (iodesc->sync_io_desc_info.stype[st] != MPI_DATATYPE_NULL)
+            if ((mpierr = MPI_Type_free(&iodesc->sync_io_desc_info.stype[st])))
                 MPIERR(mpierr);
 
     /* We created one receive type, so free it. */
-    if (iodesc->rtype)
-        for (int r = 0; r < iodesc->nrecvs; r++)
-            if (iodesc->rtype[r] != MPI_DATATYPE_NULL)
-                if ((mpierr = MPI_Type_free(&iodesc->rtype[r])))
+    if (iodesc->sync_io_desc_info.rtype)
+        for (int r = 0; r < iodesc->sync_io_desc_info.nrecvs; r++)
+            if (iodesc->sync_io_desc_info.rtype[r] != MPI_DATATYPE_NULL)
+                if ((mpierr = MPI_Type_free(&iodesc->sync_io_desc_info.rtype[r])))
                     MPIERR(mpierr);
 
     /* Free resources allocated in library code. */
-    free(iodesc->rtype); iodesc->rtype = NULL;
-    free(iodesc->sindex); iodesc->sindex = NULL;
-    free(iodesc->scount); iodesc->scount = NULL;
-    free(iodesc->stype); iodesc->stype = NULL;
-    free(iodesc->rcount); iodesc->rcount = NULL;
-    free(iodesc->rfrom); iodesc->rfrom = NULL;
-    free(iodesc->rindex); iodesc->rindex = NULL;
+    free(iodesc->sync_io_desc_info.rtype); iodesc->sync_io_desc_info.rtype = NULL;
+    free(iodesc->sync_io_desc_info.sindex); iodesc->sync_io_desc_info.sindex = NULL;
+    free(iodesc->sync_io_desc_info.scount); iodesc->sync_io_desc_info.scount = NULL;
+    free(iodesc->sync_io_desc_info.stype); iodesc->sync_io_desc_info.stype = NULL;
+    free(iodesc->sync_io_desc_info.rcount); iodesc->sync_io_desc_info.rcount = NULL;
+    free(iodesc->sync_io_desc_info.rfrom); iodesc->sync_io_desc_info.rfrom = NULL;
+    free(iodesc->sync_io_desc_info.rindex); iodesc->sync_io_desc_info.rindex = NULL;
 
     /* Free resources from test. */
     free(ior1->start);
     free(ior1->count);
-    free(ior1); iodesc->firstregion = NULL;
-    free(ios->ioranks);
+    free(ior1); iodesc->sync_io_desc_info.firstregion = NULL;
+    delete(ios->io_comm_info);
     free(ios->compranks);
     free(file);
     delete(iodesc);
@@ -1222,49 +1338,45 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
     /* Allocate IO desc struct for this test. */
     io_desc_t *iodesc = new io_desc_t(ios, PIO_INT, 0, NULL, 0, NULL, PIO_REARR_BOX, false);
     assert(iodesc);
-    iodesc->free_all_regions();
+    iodesc->sync_io_desc_info.free_all_regions();
 
-    ios->ioproc = 1;
-    ios->io_rank = my_rank;
     ios->union_comm = test_comm;
-    ios->num_iotasks = TARGET_NTASKS;
-    iodesc->rearranger = PIO_REARR_BOX;
-    iodesc->mpitype = MPI_INT;
+    {
+        std::vector<int> sync_io_ranks(TARGET_NTASKS);
+        for (int i = 0; i < TARGET_NTASKS; i++)
+            sync_io_ranks[i] = i;
+        /* io_comm aliases test_comm (owned/freed by the caller) - owns_resources = false */
+        ios->io_comm_info = new SPIO_Util::Iosys_Util::IO_comm_info(test_comm, my_rank,
+            TARGET_NTASKS, MPI_GROUP_NULL, sync_io_ranks, true, 0, 0, false);
+    }
+    iodesc->sync_io_desc_info.rearranger = PIO_REARR_BOX;
+    iodesc->sync_io_desc_info.mpitype = MPI_INT;
 
     /* Set up test for IO task with BOX rearranger to create one type. */
-    ios->ioproc = 1; /* this is IO proc. */
-    ios->num_iotasks = 4; /* The number of IO tasks. */
-    iodesc->rtype = NULL; /* Array of MPI types will be created here. */
-    iodesc->nrecvs = 1; /* Number of types created. */
-    iodesc->mpitype = MPI_INT;
-    iodesc->stype = NULL; /* Array of MPI types will be created here. */
+    iodesc->sync_io_desc_info.rtype = NULL; /* Array of MPI types will be created here. */
+    iodesc->sync_io_desc_info.nrecvs = 1; /* Number of types created. */
+    iodesc->sync_io_desc_info.mpitype = MPI_INT;
+    iodesc->sync_io_desc_info.stype = NULL; /* Array of MPI types will be created here. */
 
     /* The two rearrangers create a different number of send types. */
-    int num_send_types = iodesc->rearranger == PIO_REARR_BOX ? ios->num_iotasks : 1;
+    int num_send_types = iodesc->sync_io_desc_info.rearranger == PIO_REARR_BOX ? ios->io_comm_info->get_sync_io_comm_sz() : 1;
 
     /* Default rearranger options. */
-    iodesc->rearr_opts.comm_type = PIO_REARR_COMM_COLL;
-    iodesc->rearr_opts.fcd = PIO_REARR_COMM_FC_2D_DISABLE;
+    iodesc->sync_io_desc_info.rearr_opts.comm_type = PIO_REARR_COMM_COLL;
+    iodesc->sync_io_desc_info.rearr_opts.fcd = PIO_REARR_COMM_FC_2D_DISABLE;
 
     /* Set up for determine_fill(). */
     ios->union_comm = test_comm;
-    ios->io_comm = test_comm;
-    iodesc->ndims = NDIM1;
-    iodesc->rearranger = PIO_REARR_BOX;
+    iodesc->sync_io_desc_info.ndims = NDIM1;
+    iodesc->sync_io_desc_info.rearranger = PIO_REARR_BOX;
 
-    iodesc->ndof = 4;
+    iodesc->sync_io_desc_info.ndof = 4;
 
     /* Set up the IO task info for the test. */
-    ios->ioproc = 1;
     ios->compproc = 1;
     ios->union_rank = my_rank;
-    ios->num_iotasks = 4;
     ios->num_comptasks = 4;
     ios->num_uniontasks = 4;
-    if (!(ios->ioranks = (int *) calloc(ios->num_iotasks, sizeof(int))))
-        return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for ioranks");
-    for (int i = 0; i < TARGET_NTASKS; i++)
-        ios->ioranks[i] = i;
     if (!(ios->compranks = (int *) calloc(ios->num_comptasks, sizeof(int))))
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__, "Error allocating memory for compranks");
     for (int i = 0; i < TARGET_NTASKS; i++)
@@ -1277,10 +1389,11 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
     if (my_rank == 0)
         ior1->count[0] = 8;
 
-    iodesc->firstregion = ior1;
+    iodesc->sync_io_desc_info.firstregion = ior1;
 
     /* Create the box rearranger. */
-    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc)))
+    if ((ret = box_rearrange_create(ios, maplen, compmap, gdimlen, ndims, iodesc,
+                                    iodesc->sync_io_desc_info, SPIO_Util::Iosys_Util::make_sync_io_comm_target(ios))))
         return ret;
 
     /* Run the function to test. */
@@ -1290,31 +1403,31 @@ int test_rearrange_io2comp(MPI_Comm test_comm, int my_rank)
 
     /* We created send types, so free them. */
     for (int st = 0; st < num_send_types; st++)
-        if (iodesc->stype[st] != MPI_DATATYPE_NULL)
-            if ((mpierr = MPI_Type_free(&iodesc->stype[st])))
+        if (iodesc->sync_io_desc_info.stype[st] != MPI_DATATYPE_NULL)
+            if ((mpierr = MPI_Type_free(&iodesc->sync_io_desc_info.stype[st])))
                 MPIERR(mpierr);
 
     /* We created one receive type, so free it. */
-    if (iodesc->rtype)
-        for (int r = 0; r < iodesc->nrecvs; r++)
-            if (iodesc->rtype[r] != MPI_DATATYPE_NULL)
-                if ((mpierr = MPI_Type_free(&iodesc->rtype[r])))
+    if (iodesc->sync_io_desc_info.rtype)
+        for (int r = 0; r < iodesc->sync_io_desc_info.nrecvs; r++)
+            if (iodesc->sync_io_desc_info.rtype[r] != MPI_DATATYPE_NULL)
+                if ((mpierr = MPI_Type_free(&iodesc->sync_io_desc_info.rtype[r])))
                     MPIERR(mpierr);
 
     /* Free resources allocated in library code. */
-    free(iodesc->rtype); iodesc->rtype = NULL;
-    free(iodesc->sindex); iodesc->sindex = NULL;
-    free(iodesc->scount); iodesc->scount = NULL;
-    free(iodesc->stype); iodesc->stype = NULL;
-    free(iodesc->rcount); iodesc->rcount = NULL;
-    free(iodesc->rfrom); iodesc->rfrom = NULL;
-    free(iodesc->rindex); iodesc->rindex = NULL;
+    free(iodesc->sync_io_desc_info.rtype); iodesc->sync_io_desc_info.rtype = NULL;
+    free(iodesc->sync_io_desc_info.sindex); iodesc->sync_io_desc_info.sindex = NULL;
+    free(iodesc->sync_io_desc_info.scount); iodesc->sync_io_desc_info.scount = NULL;
+    free(iodesc->sync_io_desc_info.stype); iodesc->sync_io_desc_info.stype = NULL;
+    free(iodesc->sync_io_desc_info.rcount); iodesc->sync_io_desc_info.rcount = NULL;
+    free(iodesc->sync_io_desc_info.rfrom); iodesc->sync_io_desc_info.rfrom = NULL;
+    free(iodesc->sync_io_desc_info.rindex); iodesc->sync_io_desc_info.rindex = NULL;
 
     /* Free resources from test. */
     free(ior1->start);
     free(ior1->count);
-    free(ior1); iodesc->firstregion = NULL;
-    free(ios->ioranks);
+    free(ior1); iodesc->sync_io_desc_info.firstregion = NULL;
+    delete(ios->io_comm_info);
     free(ios->compranks);
     delete(iodesc);
     free(ios);
@@ -1375,6 +1488,12 @@ int run_no_iosys_tests(int my_rank, MPI_Comm test_comm)
 
     if ((ret = test_box_rearrange_create_3(test_comm, my_rank)))
         return ret;
+
+    if ((ret = test_async_io_desc_info_allocated(test_comm, my_rank)))
+    {
+        printf("test_async_io_desc_info_allocated FAILED!\n");
+        return ret;
+    }
 
     printf("%d running tests for default_subset_partition\n", my_rank);
     if ((ret = test_default_subset_partition(test_comm, my_rank)))

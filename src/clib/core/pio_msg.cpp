@@ -11,6 +11,7 @@
 #include <stdarg.h>
 #include <pio.h>
 #include <pio_internal.h>
+#include "spio_iosys_utils.hpp"
 
 #ifdef PIO_ENABLE_LOGGING
 extern int my_rank;
@@ -875,11 +876,11 @@ static int send_async_msg_hdr(iosystem_desc_t *ios, int msg, int seq_num, int pr
 {
     int mpierr = MPI_SUCCESS;
 
-    assert(ios && ((msg > PIO_MSG_INVALID) && (msg < PIO_MAX_MSGS)) && !ios->ioproc);
+    assert(ios && ((msg > PIO_MSG_INVALID) && (msg < PIO_MAX_MSGS)) && !ios->io_comm_info->is_sync_io_proc());
     assert((prev_msg >= PIO_MSG_INVALID) && (prev_msg < PIO_MAX_MSGS));
     if(ios->compmaster == MPI_ROOT)
     {
-        mpierr = MPI_Send(&msg, 1, MPI_INT, ios->ioroot, PIO_ASYNC_MSG_HDR_TAG, ios->union_comm);
+        mpierr = MPI_Send(&msg, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), PIO_ASYNC_MSG_HDR_TAG, ios->union_comm);
     }
 
     if(mpierr == MPI_SUCCESS)
@@ -908,7 +909,7 @@ int send_async_msg(iosystem_desc_t *ios, int msg, ...)
     assert(ios->async);
 
 
-    if(!ios->ioproc)
+    if(!ios->io_comm_info->is_sync_io_proc())
     {
         int seq_num = ios->async_ios_msg_info.seq_num;
         int prev_msg = ios->async_ios_msg_info.prev_msg;
@@ -958,7 +959,7 @@ static int recv_async_msg_hdr(iosystem_desc_t *ios, int msg, int eseq_num, int e
 {
     int mpierr = MPI_SUCCESS;
 
-    assert(ios && ((msg > PIO_MSG_INVALID) && (msg < PIO_MAX_MSGS)) && ios->ioproc);
+    assert(ios && ((msg > PIO_MSG_INVALID) && (msg < PIO_MAX_MSGS)) && ios->io_comm_info->is_sync_io_proc());
     assert(eseq_num >= PIO_MSG_START_SEQ_NUM);
     assert((eprev_msg >= PIO_MSG_INVALID) && (eprev_msg < PIO_MAX_MSGS));
 
@@ -988,7 +989,7 @@ int recv_async_msg(iosystem_desc_t *ios, int msg, ...)
     
     assert(ios && (msg > PIO_MSG_INVALID) && (msg < PIO_MAX_MSGS));
     assert(strlen(pio_async_msg_sign[msg]) > 0);
-    assert(ios->async && ios->ioproc);
+    assert(ios->async && ios->io_comm_info->is_sync_io_proc());
 
     /* Recv message header */
 
@@ -3594,8 +3595,8 @@ int pio_msg_handler2(int io_rank, int component_count, iosystem_desc_t **iosys,
         msg = msgs[index];
 
         /* Broadcast the msg value to the rest of the IO tasks. */
-        LOG((3, "about to call msg MPI_Bcast my_iosys->io_comm = %d", my_iosys->io_comm));
-        if ((mpierr = MPI_Bcast(&msg, 1, MPI_INT, 0, my_iosys->io_comm)))
+        LOG((3, "about to call msg MPI_Bcast my_iosys->io_comm_info->get_sync_io_comm() = %d", my_iosys->io_comm_info->get_sync_io_comm()));
+        if ((mpierr = MPI_Bcast(&msg, 1, MPI_INT, 0, my_iosys->io_comm_info->get_sync_io_comm())))
             return check_mpi(NULL, NULL, mpierr, __FILE__, __LINE__);
         LOG((1, "pio_msg_handler2 msg MPI_Bcast complete msg = %d", msg));
 

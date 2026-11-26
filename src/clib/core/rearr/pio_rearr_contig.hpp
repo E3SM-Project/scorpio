@@ -6,6 +6,7 @@
 #include "pio_internal.h"
 #include "pio_types.hpp"
 #include "spio_map_sorter.hpp"
+#include "spio_iosys_utils.hpp"
 
 #include <vector>
 #include <utility>
@@ -57,11 +58,7 @@ namespace SPIO{
      */
     class Contig_rearr{
       public:
-        Contig_rearr(iosystem_desc_t *ios):is_init_(false), ios_(ios), iodesc_(NULL),
-          lcompmap_sz_(0), elem_pio_type_(PIO_NAT), elem_mpi_type_(MPI_DATATYPE_NULL),
-          elem_mpi_type_sz_(0), agg_comm_(MPI_COMM_NULL), is_agg_root_(false),
-          agg_comm_sz_(0), agg_iochunk_sz_(0), rearr_comm_(MPI_COMM_NULL), rearr_comm_sz_(0),
-          rearr_comm_iochunk_sz_(0){}
+        Contig_rearr(iosystem_desc_t *ios, bool targets_async_comm = false);
         /* Initialize the rearranger */
         int init(int pio_type, const PIO_Offset *compmap, std::size_t compmap_sz,
                   const int *gdimlen, int ndims, io_desc_t *iodesc);
@@ -82,7 +79,7 @@ namespace SPIO{
         /* Get rearrange info */
         std::size_t get_rearrange_buf_sz(void ) const{
           assert(is_init_ && ios_);
-          if(!ios_->ioproc){
+          if(!role_is_io_proc()){
             return 0;
           }
 
@@ -121,11 +118,60 @@ namespace SPIO{
                               void *rbuf, std::size_t rbuf_sz, int nvars);
         int rearrange_io2comp(const void *sbuf, std::size_t sbuf_sz,
                               void *rbuf, std::size_t rbuf_sz, int nvars);
+
+        /* True on exactly the I/O proc that owns/aggregates data for the
+         * "local range" of compute procs grouped with it in agg_comm_ (see
+         * create_agg_comm()) - i.e. the proc that aggregate_comp2io() hands
+         * a non-NULL agg_buf to, and the proc that must call
+         * rearrange_aggregated_to_io() for this decomposition. False on
+         * every compute proc, for which rearrange_data() (and so
+         * rearrange_aggregated_to_io()) is always a local no-op, since
+         * rearr_comm_ is MPI_COMM_NULL there (see create_rearr_comm()). */
+        bool is_agg_root(void ) const{ return is_agg_root_; }
+
+        /* rearrange_comp2io() split into its two phases, so a caller can
+         * take the cheap phase (aggregation) synchronously and defer the
+         * costly phase (rearrangement) elsewhere (e.g. PIO_USE_ASYNC_WR_REARR).
+         * rearrange_comp2io() itself is unchanged for every other caller -
+         * it is now just a wrapper calling both phases in sequence.
+         *
+         * aggregate_comp2io() is COLLECTIVE on agg_comm_ and must be called
+         * by every rank of ios_->union_comm (agg_comm_ spans compute AND I/O
+         * ranks - see create_agg_comm()). Where is_agg_root() is true (the
+         * one I/O proc per aggregation group), it mallocs the aggregation
+         * buffer, fills it via aggregate_data(), and TRANSFERS OWNERSHIP of
+         * it to the caller via agg_buf_out; everywhere else agg_buf_out is
+         * set to NULL. agg_buf_sz_out is set to the same value
+         * (nvars * agg_iochunk_sz_ * elem_mpi_type_sz_) on every rank,
+         * matching what the fused implementation always computed, whether
+         * or not this rank is an agg root. The caller must std::free() a
+         * non-NULL agg_buf_out (or pass that ownership on to something that
+         * will) - this function never frees it itself on success. On
+         * failure *agg_buf_out is left NULL (any partial allocation freed
+         * here) and *agg_buf_sz_out is left 0. */
+        int aggregate_comp2io(const void *sbuf, std::size_t sbuf_sz,
+                              void *&agg_buf_out, std::size_t &agg_buf_sz_out, int nvars);
+
+        /* The second (costly) phase: rearranges the aggregated buffer
+         * produced by aggregate_comp2io() across just the I/O ranks. Does
+         * NOT take ownership of agg_buf and does not free it - the caller
+         * still owns it after this returns (success or failure). COLLECTIVE
+         * on rearr_comm_, which only ever has I/O ranks as members
+         * (create_rearr_comm() leaves it MPI_COMM_NULL on compute ranks) -
+         * rearrange_data() itself opens with a local, no-MPI early return
+         * when !role_is_io_proc(), so this is always a cheap no-op on
+         * compute ranks. */
+        int rearrange_aggregated_to_io(void *agg_buf, std::size_t agg_buf_sz,
+                              void *rbuf, std::size_t rbuf_sz, int nvars);
+
         /* Finalize the rearranger */
         int finalize(void );
       private:
         bool is_init_;
         iosystem_desc_t *ios_;
+        /* If true, this rearranger targets the async I/O comm (ios_->io_comm_info's
+         * async_* accessors) instead of the sync I/O comm (the default) */
+        bool targets_async_comm_;
         io_desc_t *iodesc_;
 
         /* The size of the compmap local to this process */
@@ -251,6 +297,14 @@ namespace SPIO{
         void get_contig_ranges_from_off_range(std::vector<std::pair<PIO_Offset, PIO_Offset> > &contig_map_ranges,
                                               PIO_Offset start_off, PIO_Offset count);
         std::size_t get_ncontig_ranges_from_off_range(PIO_Offset start_off, PIO_Offset count) const;
+
+        /* Dispatch helpers: pick the sync or async I/O comm accessor on ios_->io_comm_info,
+         * depending on targets_async_comm_ */
+        MPI_Comm role_io_comm(void ) const;
+        bool role_is_io_proc(void ) const;
+        int role_io_comm_sz(void ) const;
+        int role_io_comm_rank(void ) const;
+
         int create_agg_comm(void );
         static void get_non_fval_lcompmap_counts_displs(const PIO_Offset *lcompmap,
               std::size_t lcompmap_sz,

@@ -17,6 +17,7 @@
 #include "spio_tracer_mdata.hpp"
 #include "spio_tracer_decomp.hpp"
 #include "spio_logger.hpp"
+#include "../core/util/spio_iosys_utils.hpp"
 
 namespace SPIO_Util{
   namespace Tracer{
@@ -57,7 +58,7 @@ SPIO_Util::Tracer::Timed_func_call_tracer &SPIO_Util::Tracer::Timed_func_call_tr
       to other compute comms are mostly just placeholders, all comms are
       NULL here - just ignore these */
     assert( (mpi_comm_ != MPI_COMM_NULL) ||
-            ( (iosys->io_comm == MPI_COMM_NULL) &&
+            ( (iosys->io_comm_info->get_sync_io_comm() == MPI_COMM_NULL) &&
               (iosys->comp_comm == MPI_COMM_NULL) &&
               (iosys->async)  ) );
   }

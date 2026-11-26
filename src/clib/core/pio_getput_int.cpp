@@ -12,6 +12,7 @@
 #include "spio_io_summary.h"
 #include "spio_hash.h"
 #include "spio_hdf5_utils.hpp"
+#include "spio_iosys_utils.hpp"
 #include <vector>
 #include <algorithm>
 #if PIO_USE_ASYNC_WR_THREAD
@@ -122,7 +123,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 
     /* Run these on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         /* Get the length (in bytes) of the type in file. */
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -290,7 +291,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         file->adios_attrs[num_attrs].adios_type = adios_type;
         file->num_attrs++;
 
-        if (ios->iomaster == MPI_ROOT)
+        if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
         {
             ios->io_fstats->wb += len * atttype_len;
             file->io_fstats->wb += len * atttype_len;
@@ -388,13 +389,24 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
     }
 #endif /* _HDF5 */
 
-    /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    /* If this is an IO task, then call the netCDF function.
+     * For HDF5/HDF5C files, the task that owns the actual I/O work may be an
+     * async-write-thread-pool-owning rank rather than a sync I/O rank (see
+     * file->uses_async_io); for every other iotype, behavior is unchanged
+     * (sync I/O rank only). */
+#ifdef _HDF5
+    bool enter_io_proc_block = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)
+        : ios->io_comm_info->is_sync_io_proc();
+#else
+    bool enter_io_proc_block = ios->io_comm_info->is_sync_io_proc();
+#endif
+    if (enter_io_proc_block)
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
         {
-            if (ios->iomaster == MPI_ROOT)
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
             {
                 ios->io_fstats->wb += len * atttype_len;
                 file->io_fstats->wb += len * atttype_len;
@@ -453,7 +465,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
 #ifdef _HDF5
     if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
-        if (ios->iomaster == MPI_ROOT)
+        if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
         {
             ios->io_fstats->wb += len * atttype_len;
             file->io_fstats->wb += len * atttype_len;
@@ -471,7 +483,7 @@ int spio_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC &&
             file->iotype != PIO_IOTYPE_HDF5 && file->iotype != PIO_IOTYPE_HDF5C && file->do_io)
         {
-            if (ios->iomaster == MPI_ROOT)
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
             {
                 ios->io_fstats->wb += len * atttype_len;
                 file->io_fstats->wb += len * atttype_len;
@@ -612,7 +624,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 
     /* Run these on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         /* Get the type and length of the attribute. */
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -814,8 +826,19 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     }
 #endif
 
-    /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    /* If this is an IO task, then call the netCDF function.
+     * For HDF5/HDF5C files, the task that owns the actual I/O work may be an
+     * async-write-thread-pool-owning rank rather than a sync I/O rank (see
+     * file->uses_async_io); for every other iotype, behavior is unchanged
+     * (sync I/O rank only). */
+#ifdef _HDF5
+    bool enter_io_proc_block = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)
+        : ios->io_comm_info->is_sync_io_proc();
+#else
+    bool enter_io_proc_block = ios->io_comm_info->is_sync_io_proc();
+#endif
+    if (enter_io_proc_block)
     {
         LOG((2, "calling pnetcdf/netcdf"));
 #ifdef _PNETCDF
@@ -870,7 +893,15 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC && file->do_io)
+#ifdef _HDF5
+        if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        {
+            ierr = spio_hdf5_get_att(ios, file, varid, name, memtype, ip);
+        }
+#endif /* _HDF5 */
+
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC &&
+            file->iotype != PIO_IOTYPE_HDF5 && file->iotype != PIO_IOTYPE_HDF5C && file->do_io)
         {
             switch(memtype)
             {
@@ -940,7 +971,7 @@ int spio_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 
     /* Broadcast results to all tasks. */
     LOG((2, "bcasting att values attlen = %d memtype_len = %d", attlen, memtype_len));
-    if ((mpierr = MPI_Bcast(ip, (int)attlen * memtype_len, MPI_BYTE, ios->ioroot,
+    if ((mpierr = MPI_Bcast(ip, (int)attlen * memtype_len, MPI_BYTE, ios->io_comm_info->get_sync_io_root(),
                             ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -1039,7 +1070,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
     /* Run these on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         /* Get the type of this var. */
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -1181,8 +1212,19 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
     }
 
-    /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    /* If this is an IO task, then call the netCDF function.
+     * For HDF5/HDF5C files, the task that owns the actual I/O work may be an
+     * async-write-thread-pool-owning rank rather than a sync I/O rank (see
+     * file->uses_async_io); for every other iotype, behavior is unchanged
+     * (sync I/O rank only). */
+#ifdef _HDF5
+    bool enter_io_proc_block = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)
+        : ios->io_comm_info->is_sync_io_proc();
+#else
+    bool enter_io_proc_block = ios->io_comm_info->is_sync_io_proc();
+#endif
+    if (enter_io_proc_block)
     {
         LOG((2, "file->iotype = %d xtype = %d file->do_io = %d", file->iotype, xtype, file->do_io));
 #ifdef _PNETCDF
@@ -1203,7 +1245,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
             /* Only the IO master does the IO, so we are not really
              * getting parallel IO here. */
-            if (ios->iomaster == MPI_ROOT)
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
             {
                 switch(xtype)
                 {
@@ -1265,7 +1307,7 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             }
 #else
             PIO_Offset *cnt;
-            if (ios->iomaster == MPI_ROOT)
+            if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
                 cnt = (PIO_Offset*)count;
             else
             {
@@ -1335,13 +1377,36 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Unsupported variable type (type=%x)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, xtype);
             }
 
-            if (ios->iomaster != MPI_ROOT)
+            if (ios->io_comm_info->get_sync_io_master() != MPI_ROOT)
                 free(cnt);
 #endif /* PIO_USE_INDEP_MODE */
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC && file->do_io)
+#ifdef _HDF5
+        if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        {
+            /* SCORPIO does not guarantee that a read sees a prior write on
+             * the same file within the same program unless the caller
+             * explicitly calls PIOc_sync() (or closes and reopens the file)
+             * between the write and the read - PIOc_sync_impl() (pio_file.cpp)
+             * and spio_hard_closefile() (pio_file.cpp) are what actually drain
+             * this file's pending async writes via spio_wait_file_async_pend_ops().
+             * A wait used to be duplicated here as well, making every read
+             * (not only ones that follow a write) block on this file's pending
+             * async ops even though the documented contract never promised
+             * that visibility without an explicit sync - removed in favor of
+             * relying solely on PIOc_sync()/PIOc_closefile()'s existing drains.
+             * See tests/cunit/test_putget_hdf5.cpp and
+             * tests/cunit/test_hdf5_async_full_lifecycle.cpp's
+             * test_read_write_interleaved_no_race(), both updated to call
+             * PIOc_sync() between a write and a same-file read. */
+            ierr = spio_hdf5_get_var(ios, file, varid, start, count, stride, xtype, buf);
+        }
+#endif /* _HDF5 */
+
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_ADIOSC &&
+            file->iotype != PIO_IOTYPE_HDF5 && file->iotype != PIO_IOTYPE_HDF5C && file->do_io)
             switch(xtype)
             {
 #ifdef _NETCDF
@@ -2185,8 +2250,8 @@ int spio_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
     /* Send the data. */
     LOG((2, "spio_get_vars_tc bcasting data num_elem = %d typelen = %d ios->ioroot = %d", num_elem,
-         typelen, ios->ioroot));
-    if ((mpierr = MPI_Bcast(buf, num_elem * typelen, MPI_BYTE, ios->ioroot, ios->my_comm)))
+         typelen, ios->io_comm_info->get_sync_io_root()));
+    if ((mpierr = MPI_Bcast(buf, num_elem * typelen, MPI_BYTE, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -2333,39 +2398,6 @@ int spio_get_var_tc(int ncid, int varid, nc_type xtype, void *buf)
     return spio_get_vars_tc(ncid, varid, startp, countp, NULL, xtype, buf);
 }
 
-/* Returns true if a variable has unlimited dimensions, false otherwise (and on error) */
-static bool spio_var_has_unlimited_dims(file_desc_t *file, int varid, int &ret)
-{
-  ret = PIO_NOERR;
-  assert(file && (varid >= 0));
-
-  /* Get the unlimited dimension in the file
-   * Note: We assume that we have just one unlimited dimension (no longer valid for
-   * NetCDF4 files) in a file
-   */
-  int unlim_dimid = -1;
-  ret = PIOc_inq_unlimdim_impl(file->pio_ncid, &unlim_dimid);
-  if((ret != PIO_NOERR) || (unlim_dimid == -1)) { return false; }
-
-  /* Get the number of dimensions in the variable */
-  int ndims = -1;
-  ret = PIOc_inq_varndims_impl(file->pio_ncid, varid, &ndims);
-  if((ret != PIO_NOERR) || (ndims <= 0)) { return false; }
-
-  /* Get the variable dimensions */
-  std::vector<int> vdims(ndims);
-  ret = PIOc_inq_vardimid_impl(file->pio_ncid, varid, vdims.data());
-  if(ret != PIO_NOERR) { return false; }
-
-  /* Check if any variable dimension is an unlimited dimension */
-  std::vector<int>::const_iterator iter =
-    std::find_if(vdims.cbegin(), vdims.cend(),
-      [unlim_dimid](int vdim){ return vdim == unlim_dimid; });
-  if(iter != vdims.cend()) { return true; }
-
-  return false;
-}
-
 /**
  * Internal PIO function which provides a type-neutral interface to
  * nc_put_vars.
@@ -2484,7 +2516,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
     /* Run these on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         /* Get the type of this var. */
         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
@@ -3081,8 +3113,19 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     }
 #endif
 
-    /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    /* If this is an IO task, then call the netCDF function.
+     * For HDF5/HDF5C files, the task that owns the actual I/O work may be an
+     * async-write-thread-pool-owning rank rather than a sync I/O rank (see
+     * file->uses_async_io); for every other iotype, behavior is unchanged
+     * (sync I/O rank only). */
+#ifdef _HDF5
+    bool enter_io_proc_block = ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
+        ? SPIO_Util::Iosys_Util::is_file_owning_io_proc(ios, file)
+        : ios->io_comm_info->is_sync_io_proc();
+#else
+    bool enter_io_proc_block = ios->io_comm_info->is_sync_io_proc();
+#endif
+    if (enter_io_proc_block)
     {
 #ifdef _PNETCDF
         if (file->iotype == PIO_IOTYPE_PNETCDF)
@@ -3131,7 +3174,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
                 /* Only the IO master does the IO, so we are not really
                  * getting parallel IO here. */
-                if (ios->iomaster == MPI_ROOT)
+                if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
                 {
                     if (start)
                     {
@@ -3249,7 +3292,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     fake_stride = (PIO_Offset *)stride;
 
                 /* Only the IO master actually does the call. */
-                if (ios->iomaster == MPI_ROOT)
+                if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
                 {
                     ios->io_fstats->wb += num_elem * typelen;
                     file->io_fstats->wb += num_elem * typelen;
@@ -3326,7 +3369,7 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 #ifdef _HDF5
     if ((file->iotype == PIO_IOTYPE_HDF5) || (file->iotype == PIO_IOTYPE_HDF5C))
     {
-        if (ios->iomaster == MPI_ROOT)
+        if (ios->io_comm_info->get_sync_io_master() == MPI_ROOT)
         {
             ios->io_fstats->wb += num_elem * typelen;
             file->io_fstats->wb += num_elem * typelen;
@@ -3334,6 +3377,44 @@ int spio_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
 #if PIO_USE_ASYNC_WR_THREAD
         ierr = spio_iosys_async_hdf5_put_var_op_add(file, varid, start, count, stride, xtype, buf);
+        /* No drain needed here, for a variable with an unlimited (record)
+         * dimension or otherwise. A prior version of this comment argued
+         * that removing the drain risks mismatched collective H5Dextend()
+         * calls across ranks (the dataset's record dimension growing to a
+         * different extent on different ranks) - that argument does not
+         * hold, for two independent reasons:
+         *
+         *  - spio_iosys_async_hdf5_put_var_op_add() enqueues onto THIS rank's
+         *    async thread pool queue from the calling (application) thread,
+         *    synchronously, before PIOc_put_var() returns - a rank's queue
+         *    contents and their order are determined entirely by that rank's
+         *    own control flow, never by worker-thread scheduling. Every
+         *    owning rank runs the same SPMD program, so every rank's queue
+         *    receives the identical sequence of ops in the identical order;
+         *    timing skew between ranks can change when each rank's worker
+         *    thread drains its queue, never the relative order of what is in
+         *    it.
+         *  - H5Dextend(), like H5Dwrite() itself (both collective here - see
+         *    the H5FD_MPIO_COLLECTIVE transfer mode on file->dxplid_indep in
+         *    spio_hdf5_utils.cpp, despite the "independent" name), is
+         *    self-synchronizing: a rank's worker thread blocks inside a
+         *    collective call until every other owning rank's worker reaches
+         *    the matching call. A worker cannot race ahead to record N+1's
+         *    op while another rank's worker is still on record N, because
+         *    its own FIFO queue - built in the same order as every other
+         *    rank's - dequeues and blocks on record N's collective call
+         *    before record N+1's op is even looked at.
+         *
+         * So the Nth collective HDF5 call on this file's communicator always
+         * matches the Nth collective call made by every other owning rank,
+         * regardless of relative timing between ranks' worker threads. This
+         * is the same class of H5Dextend() call as PIOc_setframe_impl()'s
+         * (see pioc.cpp), whose equivalent drain was removed after stress
+         * testing found no reproductions; removing this one rests on the
+         * structural argument above, not only on the absence of failures in
+         * test_subset_put_var_record_dim_no_race() (test_hdf5_async_full_
+         * lifecycle.cpp), which already exercises this exact scenario with
+         * all 4 ranks simultaneously I/O-owning. */
 #else
         ierr = spio_hdf5_put_var(ios, file, varid, start, count, stride, xtype, buf);
 #endif

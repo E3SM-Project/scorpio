@@ -14,7 +14,7 @@ add_library (spio_core_rearr OBJECT
 
 target_include_directories(spio_core_rearr
   PUBLIC .
-  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../.. ${CMAKE_CURRENT_BINARY_DIR}/../.. ${CMAKE_CURRENT_SOURCE_DIR}/../../util)
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../.. ${CMAKE_CURRENT_BINARY_DIR}/../.. ${CMAKE_CURRENT_SOURCE_DIR}/../../util ${CMAKE_CURRENT_SOURCE_DIR}/../util)
 
 target_link_libraries(spio_core_rearr
   PUBLIC spio_default_public_options

@@ -7,6 +7,7 @@
 #include <pio.h>
 #include <pio_internal.h>
 #include "spio_io_summary.h"
+#include "spio_iosys_utils.hpp"
 
 /**
  * Set deflate (zlib) settings for a variable.
@@ -73,7 +74,7 @@ int PIOc_def_var_deflate_impl(int ncid, int varid, int shuffle, int deflate,
         }
     }
 
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _NETCDF4
         if (file->iotype == PIO_IOTYPE_NETCDF4P || file->iotype == PIO_IOTYPE_NETCDF4P_NCZARR)
@@ -182,7 +183,7 @@ int PIOc_inq_var_deflate_impl(int ncid, int varid, int *shufflep, int *deflatep,
         }
     }
 
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _NETCDF4
         if (file->do_io)
@@ -200,21 +201,21 @@ int PIOc_inq_var_deflate_impl(int ncid, int varid, int *shufflep, int *deflatep,
 
     /* Broadcast results to all tasks. */
     if (shufflep)
-        if ((mpierr = MPI_Bcast(shufflep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(shufflep, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (deflatep)
-        if ((mpierr = MPI_Bcast(deflatep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(deflatep, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (deflate_levelp)
-        if ((mpierr = MPI_Bcast(deflate_levelp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(deflate_levelp, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -284,7 +285,7 @@ int PIOc_def_var_chunking_impl(int ncid, int varid, int storage, const PIO_Offse
     /* Run this on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. Get the number of
      * dimensions. */
-    if(!ios->async || !ios->ioproc){
+    if(!ios->async || !ios->io_comm_info->is_sync_io_proc()){
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         ierr = PIOc_inq_varndims_impl(ncid, varid, &ndims);
@@ -336,7 +337,7 @@ int PIOc_def_var_chunking_impl(int ncid, int varid, int storage, const PIO_Offse
     LOG((2, "PIOc_def_var_chunking ndims = %d", ndims));
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _NETCDF4
         if (file->do_io)
@@ -425,7 +426,7 @@ int PIOc_inq_var_chunking_impl(int ncid, int varid, int *storagep, PIO_Offset *c
 
     /* Run these on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
+    if (!ios->async || !ios->io_comm_info->is_sync_io_proc())
     {
         /* Find the number of dimensions of this variable. */
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -467,7 +468,7 @@ int PIOc_inq_var_chunking_impl(int ncid, int varid, int *storagep, PIO_Offset *c
     }
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _NETCDF4
         if (file->do_io)
@@ -498,21 +499,21 @@ int PIOc_inq_var_chunking_impl(int ncid, int varid, int *storagep, PIO_Offset *c
     }
 
     /* Broadcast results to all tasks. */
-    if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+    if ((mpierr = MPI_Bcast(&ndims, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
     {
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
     }
     if (storagep)
-        if ((mpierr = MPI_Bcast(storagep, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(storagep, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (chunksizesp)
-        if ((mpierr = MPI_Bcast(chunksizesp, ndims, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(chunksizesp, ndims, MPI_OFFSET, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -588,7 +589,7 @@ int PIOc_def_var_endian_impl(int ncid, int varid, int endian)
         }
     }
 
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _NETCDF4
         if (file->do_io)
@@ -674,7 +675,7 @@ int PIOc_inq_var_endian_impl(int ncid, int varid, int *endianp)
     }
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _NETCDF4
         if (file->do_io)
@@ -692,7 +693,7 @@ int PIOc_inq_var_endian_impl(int ncid, int varid, int *endianp)
 
     /* Broadcast results to all tasks. */
     if (endianp)
-        if ((mpierr = MPI_Bcast(endianp, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(endianp, 1, MPI_INT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
@@ -771,14 +772,14 @@ int PIOc_set_chunk_cache_impl(int iosysid, int iotype, PIO_Offset size, PIO_Offs
     }
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _NETCDF4
         LOG((2, "calling nc_chunk_cache"));
         if (iotype == PIO_IOTYPE_NETCDF4P || iotype == PIO_IOTYPE_NETCDF4P_NCZARR)
             ierr = nc_set_chunk_cache(size, nelems, preemption);
         else
-            if (!ios->io_rank)
+            if (!ios->io_comm_info->get_sync_io_comm_rank())
                 ierr = nc_set_chunk_cache(size, nelems, preemption);
 #endif
     }
@@ -869,13 +870,13 @@ int PIOc_get_chunk_cache_impl(int iosysid, int iotype, PIO_Offset *sizep, PIO_Of
     }
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _NETCDF4
         if (iotype == PIO_IOTYPE_NETCDF4P || iotype == PIO_IOTYPE_NETCDF4P_NCZARR)
             ierr = nc_get_chunk_cache((size_t *)sizep, (size_t *)nelemsp, preemptionp);
         else
-            if (!ios->io_rank)
+            if (!ios->io_comm_info->get_sync_io_comm_rank())
                 ierr = nc_get_chunk_cache((size_t *)sizep, (size_t *)nelemsp, preemptionp);
 #endif
         LOG((2, "nc_get_chunk_cache called ierr = %d", ierr));
@@ -891,8 +892,8 @@ int PIOc_get_chunk_cache_impl(int iosysid, int iotype, PIO_Offset *sizep, PIO_Of
 
     if (sizep)
     {
-        LOG((2, "bcasting size = %d ios->ioroot = %d", *sizep, ios->ioroot));
-        if ((mpierr = MPI_Bcast(sizep, 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        LOG((2, "bcasting size = %d ios->io_comm_info->get_sync_io_root() = %d", *sizep, ios->io_comm_info->get_sync_io_root()));
+        if ((mpierr = MPI_Bcast(sizep, 1, MPI_OFFSET, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
@@ -901,7 +902,7 @@ int PIOc_get_chunk_cache_impl(int iosysid, int iotype, PIO_Offset *sizep, PIO_Of
     }
     if (nelemsp)
     {
-        if ((mpierr = MPI_Bcast(nelemsp, 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(nelemsp, 1, MPI_OFFSET, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
@@ -910,7 +911,7 @@ int PIOc_get_chunk_cache_impl(int iosysid, int iotype, PIO_Offset *sizep, PIO_Of
     }
     if (preemptionp)
     {
-        if ((mpierr = MPI_Bcast(preemptionp, 1, MPI_FLOAT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(preemptionp, 1, MPI_FLOAT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
@@ -988,7 +989,7 @@ int PIOc_set_var_chunk_cache_impl(int ncid, int varid, PIO_Offset size, PIO_Offs
         }
     }
 
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _NETCDF4
         if (file->do_io)
@@ -1082,7 +1083,7 @@ int PIOc_get_var_chunk_cache_impl(int ncid, int varid, PIO_Offset *sizep, PIO_Of
     }
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
+    if (ios->io_comm_info->is_sync_io_proc())
     {
 #ifdef _NETCDF4
         if (file->do_io)
@@ -1101,21 +1102,21 @@ int PIOc_get_var_chunk_cache_impl(int ncid, int varid, PIO_Offset *sizep, PIO_Of
 
     /* Broadcast results to all tasks. */
     if (sizep && !ierr)
-        if ((mpierr = MPI_Bcast(sizep, 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(sizep, 1, MPI_OFFSET, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (nelemsp && !ierr)
-        if ((mpierr = MPI_Bcast(nelemsp, 1, MPI_OFFSET, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(nelemsp, 1, MPI_OFFSET, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
     if (preemptionp && !ierr)
-        if ((mpierr = MPI_Bcast(preemptionp, 1, MPI_FLOAT, ios->ioroot, ios->my_comm)))
+        if ((mpierr = MPI_Bcast(preemptionp, 1, MPI_FLOAT, ios->io_comm_info->get_sync_io_root(), ios->my_comm)))
         {
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);

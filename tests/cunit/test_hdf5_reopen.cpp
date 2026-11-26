@@ -1,0 +1,1122 @@
+/*
+ * Test the detection/fallback skeleton for native HDF5 reopen:
+ *  - spio_hdf5_is_scorpio_written() correctly distinguishes a file written
+ *    by SCORPIO's own HDF5 writer (spio_hdf5_create()/spio_hdf5_def_var()/
+ *    spio_hdf5_enddef()) from a plain HDF5 file with none of SCORPIO's
+ *    markers.
+ *  - spio_hdf5_reopen() reports the "not recognized, fall back" sentinel
+ *    (PIO_EBADIOTYPE) for a file it does not recognize, without crashing
+ *    and without leaking the probe H5Fopen() handle it used to check.
+ *
+ * This is a single-task test - none of what is being tested here depends
+ * on a distributed-array decomposition or a multi-rank I/O topology.
+ */
+#include "pio_config.h"
+
+#ifdef _HDF5
+
+#include <cstdio>
+#include <string>
+
+#include <hdf5.h>
+#include <hdf5_hl.h>
+
+#include "pio.h"
+#include "pio_tests.h"
+#include "pio_internal.h"
+#include "spio_hdf5_reopen.hpp"
+
+#define LOG_RANK0(rank, ...)                     \
+            do{                                   \
+                if(rank == 0)                     \
+                {                                 \
+                    fprintf(stderr, __VA_ARGS__); \
+                }                                 \
+            }while(0);
+
+static const int FAIL = -1;
+
+/* Reserved/internal HDF5 attribute names that spio_hdf5_reopen.cpp's
+ * introspection must never surface in file->hdf5_attrs[] - mirrors the
+ * (internal, anonymous-namespace) list in spio_hdf5_reopen.cpp plus the two
+ * shared externs in spio_hdf5_utils.hpp. Kept here, independently, so this
+ * test verifies the *visible* behavior (no reserved name ever appears in
+ * hdf5_attrs[]) rather than reaching into spio_hdf5_reopen.cpp's internals.
+ */
+static bool test_is_reserved_attr_name(const char *name)
+{
+  static const char *reserved[] = {
+    "_Netcdf4Dimid", "_Netcdf4Coordinates",
+    "CLASS", "NAME", "DIMENSION_LIST", "REFERENCE_LIST", "_NCProperties"
+  };
+
+  if(!name){
+    return false;
+  }
+
+  for(size_t i = 0; i < sizeof(reserved) / sizeof(reserved[0]); i++){
+    if(strcmp(name, reserved[i]) == 0){
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/* A successful spio_hdf5_reopen() heap-allocates file->hdf5_dims[].name,
+ * file->hdf5_vars[].name/alt_name/hdf5_dimids and file->hdf5_attrs[].att_name
+ * (via spio_strdup()/malloc()), exactly like spio_hdf5_def_var()/
+ * spio_hdf5_sync_defs()/spio_hdf5_put_att() do for a freshly-defined file.
+ * In production these are released by the generic file_desc_t cleanup in
+ * pio_lists.cpp's pio_free_file() (reached via PIOc_closefile() ->
+ * pio_delete_file_from_list()). These tests call spio_hdf5_reopen()
+ * directly on a bare file_desc_t, bypassing that normal
+ * pio_add_to_file_list()/pio_delete_file_from_list() lifecycle (there is no
+ * ncid to register under), so this mirrors just the HDF5-specific part of
+ * that cleanup to avoid leaking the allocations spio_hdf5_reopen() made.
+ */
+static void test_free_hdf5_reopen_allocs(file_desc_t *file)
+{
+  for(int i = 0; i < file->hdf5_num_dims; i++){
+    if(file->hdf5_dims[i].name) { free(file->hdf5_dims[i].name); }
+  }
+
+  for(int i = 0; i < file->hdf5_num_vars; i++){
+    if(file->hdf5_vars[i].name) { free(file->hdf5_vars[i].name); }
+    if(file->hdf5_vars[i].alt_name) { free(file->hdf5_vars[i].alt_name); }
+    if(file->hdf5_vars[i].hdf5_dimids) { free(file->hdf5_vars[i].hdf5_dimids); }
+  }
+
+  for(int i = 0; i < file->hdf5_num_attrs; i++){
+    if(file->hdf5_attrs[i].att_name) { free(file->hdf5_attrs[i].att_name); }
+  }
+}
+
+/* A successful spio_hdf5_reopen() also H5Fopen()s file->hdf5_file_id,
+ * H5Pcreate()s file->dxplid_coll/dxplid_indep, and H5Dopen2()s a dataset id
+ * per dim/var (aliased for a has_coord_var dim, exactly like
+ * spio_hdf5_utils.cpp:891 on the writer side) - all real, refcounted HDF5
+ * handles that production code closes via spio_hdf5_close() through the
+ * PIOc_openfile()/PIOc_closefile() lifecycle. These tests call
+ * spio_hdf5_reopen() directly, bypassing that lifecycle, so they must close
+ * those handles themselves: left open, they are only reclaimed when
+ * PIOc_finalize()'s H5close() force-closes every still-open HDF5 object as
+ * the library terminates, and force-closing more than one leaked handle on
+ * the same underlying file can wedge indefinitely in the file system's
+ * advisory locking (observed as a hang in fcntl()/ADIOI_GEN_SetLock()).
+ * Mirrors spio_hdf5_close()'s own close loop/ordering
+ * (src/clib/core/iolib/hdf5/spio_hdf5_utils.cpp:1679).
+ */
+static void test_close_hdf5_reopen_handles(file_desc_t *file)
+{
+  if(file->dxplid_coll != H5I_INVALID_HID) { H5Pclose(file->dxplid_coll); }
+  if(file->dxplid_indep != H5I_INVALID_HID) { H5Pclose(file->dxplid_indep); }
+
+  for(int i = 0; i < file->hdf5_num_dims; i++){
+    if(!file->hdf5_dims[i].has_coord_var &&
+       (file->hdf5_dims[i].hdf5_dataset_id != H5I_INVALID_HID)){
+      H5Dclose(file->hdf5_dims[i].hdf5_dataset_id);
+    }
+  }
+
+  for(int i = 0; i < file->hdf5_num_vars; i++){
+    if(file->hdf5_vars[i].hdf5_dataset_id != H5I_INVALID_HID){
+      H5Dclose(file->hdf5_vars[i].hdf5_dataset_id);
+    }
+    if((file->hdf5_vars[i].nc_type == NC_CHAR) &&
+       (file->hdf5_vars[i].hdf5_type != H5I_INVALID_HID)){
+      H5Tclose(file->hdf5_vars[i].hdf5_type);
+    }
+  }
+
+  if(file->hdf5_file_id != H5I_INVALID_HID) { H5Fclose(file->hdf5_file_id); }
+}
+
+/* Create a SCORPIO-written HDF5 file (via the real PIOc API, so it goes
+ * through spio_hdf5_create()/spio_hdf5_def_var()/spio_hdf5_enddef() exactly
+ * like production code) with a single dimension and no coordinate variable,
+ * so spio_hdf5_utils.cpp's spio_hdf5_enddef() creates a pure-dimension
+ * dimension-scale dataset for it - the marker spio_hdf5_is_scorpio_written()
+ * looks for.
+ */
+static int make_scorpio_written_hdf5_file(MPI_Comm comm, const char *fname)
+{
+  int ret;
+  int iosysid = -1;
+  int ncid = -1;
+  int dimid = -1;
+  int format = PIO_IOTYPE_HDF5;
+
+  if((ret = PIOc_Init_Intracomm(comm, 1, 1, 0, PIO_REARR_SUBSET, &iosysid))){
+    return ret;
+  }
+
+  if((ret = PIOc_createfile(iosysid, &ncid, &format, fname, PIO_CLOBBER))){
+    PIOc_finalize(iosysid);
+    return ret;
+  }
+
+  if((ret = PIOc_def_dim(ncid, "x", (PIO_Offset) 4, &dimid))){
+    PIOc_closefile(ncid);
+    PIOc_finalize(iosysid);
+    return ret;
+  }
+
+  if((ret = PIOc_enddef(ncid))){
+    PIOc_closefile(ncid);
+    PIOc_finalize(iosysid);
+    return ret;
+  }
+
+  if((ret = PIOc_closefile(ncid))){
+    PIOc_finalize(iosysid);
+    return ret;
+  }
+
+  PIOc_finalize(iosysid);
+  return PIO_NOERR;
+}
+
+/* Create a plain HDF5 file with no SCORPIO-specific markers at all: no
+ * H5Pset_link_creation_order() on its creation property list, no
+ * H5DSset_scale()'d dataset - just a single ordinary dataset, created
+ * directly through the HDF5 C API (not through any SCORPIO code path).
+ */
+static int make_plain_hdf5_file(const char *fname)
+{
+  hid_t fid = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+  if(fid == H5I_INVALID_HID){
+    return FAIL;
+  }
+
+  hsize_t dims[1] = { 4 };
+  hid_t sid = H5Screate_simple(1, dims, NULL);
+  if(sid == H5I_INVALID_HID){
+    H5Fclose(fid);
+    return FAIL;
+  }
+
+  hid_t did = H5Dcreate2(fid, "plain_var", H5T_NATIVE_INT, sid, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  if(did == H5I_INVALID_HID){
+    H5Sclose(sid);
+    H5Fclose(fid);
+    return FAIL;
+  }
+
+  H5Dclose(did);
+  H5Sclose(sid);
+  H5Fclose(fid);
+
+  return PIO_NOERR;
+}
+
+/* Step 1(a)/1(b): spio_hdf5_is_scorpio_written() returns true for a
+ * SCORPIO-written file and false for a plain HDF5 file with none of
+ * SCORPIO's markers.
+ */
+static int test_is_scorpio_written(MPI_Comm comm, int wrank)
+{
+  int ret = PIO_NOERR;
+  const char *scorpio_fname = "test_hdf5_reopen_scorpio_written.nc";
+  const char *plain_fname = "test_hdf5_reopen_plain.nc";
+
+  if((ret = make_scorpio_written_hdf5_file(comm, scorpio_fname))){
+    LOG_RANK0(wrank, "test_is_scorpio_written() FAILED: could not create the SCORPIO-written "
+      "fixture file (ret = %d)\n", ret);
+    return PIO_EINTERNAL;
+  }
+
+  if((ret = make_plain_hdf5_file(plain_fname))){
+    LOG_RANK0(wrank, "test_is_scorpio_written() FAILED: could not create the plain HDF5 "
+      "fixture file (ret = %d)\n", ret);
+    return PIO_EINTERNAL;
+  }
+
+  int nerrs = 0;
+
+  hid_t scorpio_fid = H5Fopen(scorpio_fname, H5F_ACC_RDONLY, H5P_DEFAULT);
+  if(scorpio_fid == H5I_INVALID_HID){
+    LOG_RANK0(wrank, "test_is_scorpio_written() FAILED: H5Fopen(\"%s\") failed\n", scorpio_fname);
+    nerrs++;
+  }
+  else{
+    bool is_scorpio = spio_hdf5_is_scorpio_written(scorpio_fid);
+    if(!is_scorpio){
+      LOG_RANK0(wrank, "test_is_scorpio_written() FAILED: spio_hdf5_is_scorpio_written() "
+        "returned false for a file actually written via spio_hdf5_create()/spio_hdf5_def_var()/"
+        "spio_hdf5_enddef() (\"%s\")\n", scorpio_fname);
+      nerrs++;
+    }
+    H5Fclose(scorpio_fid);
+  }
+
+  hid_t plain_fid = H5Fopen(plain_fname, H5F_ACC_RDONLY, H5P_DEFAULT);
+  if(plain_fid == H5I_INVALID_HID){
+    LOG_RANK0(wrank, "test_is_scorpio_written() FAILED: H5Fopen(\"%s\") failed\n", plain_fname);
+    nerrs++;
+  }
+  else{
+    bool is_scorpio = spio_hdf5_is_scorpio_written(plain_fid);
+    if(is_scorpio){
+      LOG_RANK0(wrank, "test_is_scorpio_written() FAILED: spio_hdf5_is_scorpio_written() "
+        "returned true for a plain HDF5 file with none of SCORPIO's markers (\"%s\")\n",
+        plain_fname);
+      nerrs++;
+    }
+    H5Fclose(plain_fid);
+  }
+
+  remove(scorpio_fname);
+  remove(plain_fname);
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* Step 5-8: spio_hdf5_reopen() on a plain (non-SCORPIO-written) HDF5 file
+ * returns the "not recognized, fall back" sentinel (PIO_EBADIOTYPE),
+ * without crashing, and without leaking the probe H5Fopen() handle it used
+ * internally to check recognition (verified via the global open-file-object
+ * count, H5Fget_obj_count(H5F_OBJ_ALL, H5F_OBJ_FILE), which must be
+ * unchanged by the call).
+ */
+static int test_reopen_fallback_sentinel(MPI_Comm comm, int wrank)
+{
+  int ret = PIO_NOERR;
+  const char *plain_fname = "test_hdf5_reopen_fallback.nc";
+
+  if((ret = make_plain_hdf5_file(plain_fname))){
+    LOG_RANK0(wrank, "test_reopen_fallback_sentinel() FAILED: could not create the plain HDF5 "
+      "fixture file (ret = %d)\n", ret);
+    return PIO_EINTERNAL;
+  }
+
+  int iosysid = -1;
+  if((ret = PIOc_Init_Intracomm(comm, 1, 1, 0, PIO_REARR_SUBSET, &iosysid))){
+    LOG_RANK0(wrank, "test_reopen_fallback_sentinel() FAILED: PIOc_Init_Intracomm() returned %d\n", ret);
+    remove(plain_fname);
+    return PIO_EINTERNAL;
+  }
+
+  iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
+  if(!ios){
+    LOG_RANK0(wrank, "test_reopen_fallback_sentinel() FAILED: pio_get_iosystem_from_id() returned NULL\n");
+    PIOc_finalize(iosysid);
+    remove(plain_fname);
+    return PIO_EINTERNAL;
+  }
+
+  file_desc_t fake_file{};
+  fake_file.iotype = PIO_IOTYPE_HDF5;
+  strncpy(fake_file.fname, plain_fname, PIO_MAX_NAME);
+  fake_file.fname[PIO_MAX_NAME] = '\0';
+
+  ssize_t nopen_before = H5Fget_obj_count(H5F_OBJ_ALL, H5F_OBJ_FILE);
+
+  int reopen_ret = spio_hdf5_reopen(ios, &fake_file, plain_fname, PIO_NOWRITE);
+
+  ssize_t nopen_after = H5Fget_obj_count(H5F_OBJ_ALL, H5F_OBJ_FILE);
+
+  int nerrs = 0;
+  if(reopen_ret != PIO_EBADIOTYPE){
+    LOG_RANK0(wrank, "test_reopen_fallback_sentinel() FAILED: spio_hdf5_reopen() returned %d, "
+      "expected PIO_EBADIOTYPE (%d), for a file it should not recognize\n", reopen_ret, PIO_EBADIOTYPE);
+    nerrs++;
+  }
+
+  if(nopen_after != nopen_before){
+    LOG_RANK0(wrank, "test_reopen_fallback_sentinel() FAILED: the number of globally open HDF5 "
+      "file objects changed from %lld to %lld across the spio_hdf5_reopen() call - its internal "
+      "probe H5Fopen() handle was not closed before returning\n",
+      (long long) nopen_before, (long long) nopen_after);
+    nerrs++;
+  }
+
+  PIOc_finalize(iosysid);
+  remove(plain_fname);
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* Create a SCORPIO-written HDF5 file with a schema rich enough to exercise
+ * every case spio_hdf5_reopen()'s introspection has to handle:
+ *  - dim "x" (dimid 0): a "pure" dimension, no coordinate variable.
+ *  - dim "y" (dimid 1): has a coordinate variable (var "y", varid 0).
+ *  - var "v1" (varid 1): uses both dims (x, y).
+ *  - var "v2" (varid 2): uses only the coordinate-variable dim (y).
+ *  - global attributes of mixed nc_type (NC_INT, NC_FLOAT, NC_CHAR).
+ *  - a variable attribute (on v1) of nc_type NC_INT.
+ * Variable ids are assigned in def_var() call order: y, then v1, then v2 -
+ * this is relied on below to assert the "same index order" requirement.
+ */
+static int make_scorpio_written_hdf5_file_full(MPI_Comm comm, const char *fname)
+{
+  int ret;
+  int iosysid = -1;
+  int ncid = -1;
+  int x_dimid = -1, y_dimid = -1;
+  int y_varid = -1, v1_varid = -1, v2_varid = -1;
+  int format = PIO_IOTYPE_HDF5;
+
+  if((ret = PIOc_Init_Intracomm(comm, 1, 1, 0, PIO_REARR_SUBSET, &iosysid))){
+    return ret;
+  }
+
+  if((ret = PIOc_createfile(iosysid, &ncid, &format, fname, PIO_CLOBBER))){
+    PIOc_finalize(iosysid);
+    return ret;
+  }
+
+  if((ret = PIOc_def_dim(ncid, "x", (PIO_Offset) 4, &x_dimid)) ||
+     (ret = PIOc_def_dim(ncid, "y", (PIO_Offset) 3, &y_dimid))){
+    PIOc_closefile(ncid);
+    PIOc_finalize(iosysid);
+    return ret;
+  }
+
+  int y_dimids[1] = { y_dimid };
+  if((ret = PIOc_def_var(ncid, "y", PIO_INT, 1, y_dimids, &y_varid))){
+    PIOc_closefile(ncid);
+    PIOc_finalize(iosysid);
+    return ret;
+  }
+
+  int v1_dimids[2] = { x_dimid, y_dimid };
+  if((ret = PIOc_def_var(ncid, "v1", PIO_FLOAT, 2, v1_dimids, &v1_varid))){
+    PIOc_closefile(ncid);
+    PIOc_finalize(iosysid);
+    return ret;
+  }
+
+  int v2_dimids[1] = { y_dimid };
+  if((ret = PIOc_def_var(ncid, "v2", PIO_INT, 1, v2_dimids, &v2_varid))){
+    PIOc_closefile(ncid);
+    PIOc_finalize(iosysid);
+    return ret;
+  }
+
+  int g_int_val = 42;
+  float g_float_val = 1.5f;
+  const char *g_text_val = "hello";
+  if((ret = PIOc_put_att(ncid, PIO_GLOBAL, "g_int", PIO_INT, 1, &g_int_val)) ||
+     (ret = PIOc_put_att(ncid, PIO_GLOBAL, "g_float", PIO_FLOAT, 1, &g_float_val)) ||
+     (ret = PIOc_put_att_text(ncid, PIO_GLOBAL, "g_text", strlen(g_text_val), g_text_val))){
+    PIOc_closefile(ncid);
+    PIOc_finalize(iosysid);
+    return ret;
+  }
+
+  int v1_att_val = 7;
+  if((ret = PIOc_put_att(ncid, v1_varid, "v1_int", PIO_INT, 1, &v1_att_val))){
+    PIOc_closefile(ncid);
+    PIOc_finalize(iosysid);
+    return ret;
+  }
+
+  if((ret = PIOc_enddef(ncid))){
+    PIOc_closefile(ncid);
+    PIOc_finalize(iosysid);
+    return ret;
+  }
+
+  if((ret = PIOc_closefile(ncid))){
+    PIOc_finalize(iosysid);
+    return ret;
+  }
+
+  PIOc_finalize(iosysid);
+  return PIO_NOERR;
+}
+
+/* Step 1/4: the full round-trip - spio_hdf5_reopen() on a file written via
+ * make_scorpio_written_hdf5_file_full() must reconstruct file->hdf5_dims/
+ * hdf5_vars/hdf5_attrs (and their counts) to match exactly what the original
+ * def_dim()/def_var()/put_att() calls produced, in the same index order, with
+ * no reserved/internal attribute names leaking into hdf5_attrs[].
+ */
+static int test_reopen_introspection_round_trip(MPI_Comm comm, int wrank)
+{
+  int ret = PIO_NOERR;
+  const char *fname = "test_hdf5_reopen_round_trip.nc";
+
+  if((ret = make_scorpio_written_hdf5_file_full(comm, fname))){
+    LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: could not create the "
+      "fixture file (ret = %d)\n", ret);
+    return PIO_EINTERNAL;
+  }
+
+  int iosysid = -1;
+  if((ret = PIOc_Init_Intracomm(comm, 1, 1, 0, PIO_REARR_SUBSET, &iosysid))){
+    LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: PIOc_Init_Intracomm() "
+      "returned %d\n", ret);
+    remove(fname);
+    return PIO_EINTERNAL;
+  }
+
+  iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
+  if(!ios){
+    LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: "
+      "pio_get_iosystem_from_id() returned NULL\n");
+    PIOc_finalize(iosysid);
+    remove(fname);
+    return PIO_EINTERNAL;
+  }
+
+  int nerrs = 0;
+
+  file_desc_t fake_file{};
+  fake_file.iotype = PIO_IOTYPE_HDF5;
+  strncpy(fake_file.fname, fname, PIO_MAX_NAME);
+  fake_file.fname[PIO_MAX_NAME] = '\0';
+
+  int reopen_ret = spio_hdf5_reopen(ios, &fake_file, fname, PIO_WRITE);
+  if(reopen_ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: spio_hdf5_reopen() "
+      "returned %d, expected PIO_NOERR\n", reopen_ret);
+    nerrs++;
+  }
+  else{
+    /* Dimensions: dimid 0 = "x" (pure), dimid 1 = "y" (has coord var) */
+    if(fake_file.hdf5_num_dims != 2){
+      LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: hdf5_num_dims = %d, "
+        "expected 2\n", fake_file.hdf5_num_dims);
+      nerrs++;
+    }
+    else{
+      if(!fake_file.hdf5_dims[0].name || strcmp(fake_file.hdf5_dims[0].name, "x") != 0 ||
+         (fake_file.hdf5_dims[0].len != 4) || fake_file.hdf5_dims[0].has_coord_var){
+        LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: hdf5_dims[0] "
+          "(name=%s, len=%lld, has_coord_var=%d) does not match expected (x, 4, false)\n",
+          (fake_file.hdf5_dims[0].name) ? fake_file.hdf5_dims[0].name : "(null)",
+          (long long) fake_file.hdf5_dims[0].len, (int) fake_file.hdf5_dims[0].has_coord_var);
+        nerrs++;
+      }
+
+      if(!fake_file.hdf5_dims[1].name || strcmp(fake_file.hdf5_dims[1].name, "y") != 0 ||
+         (fake_file.hdf5_dims[1].len != 3) || !fake_file.hdf5_dims[1].has_coord_var){
+        LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: hdf5_dims[1] "
+          "(name=%s, len=%lld, has_coord_var=%d) does not match expected (y, 3, true)\n",
+          (fake_file.hdf5_dims[1].name) ? fake_file.hdf5_dims[1].name : "(null)",
+          (long long) fake_file.hdf5_dims[1].len, (int) fake_file.hdf5_dims[1].has_coord_var);
+        nerrs++;
+      }
+    }
+
+    /* Variables: varid 0 = "y" (coord var, ndims=1, dimids={1}),
+     * varid 1 = "v1" (ndims=2, dimids={0,1}), varid 2 = "v2" (ndims=1, dimids={1})
+     */
+    if(fake_file.hdf5_num_vars != 3){
+      LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: hdf5_num_vars = %d, "
+        "expected 3\n", fake_file.hdf5_num_vars);
+      nerrs++;
+    }
+    else{
+      struct{
+        const char *name;
+        int nc_type;
+        int ndims;
+        int dimids[2];
+      } expected_vars[3] = {
+        { "y",  PIO_INT,   1, { 1, -1 } },
+        { "v1", PIO_FLOAT, 2, { 0, 1 } },
+        { "v2", PIO_INT,   1, { 1, -1 } }
+      };
+
+      for(int i = 0; i < 3; i++){
+        hdf5_var_desc_t *v = &(fake_file.hdf5_vars[i]);
+        bool var_ok = v->name && (strcmp(v->name, expected_vars[i].name) == 0) &&
+                      (v->nc_type == expected_vars[i].nc_type) &&
+                      (v->ndims == expected_vars[i].ndims) && v->hdf5_dimids;
+        if(var_ok){
+          for(int d = 0; d < expected_vars[i].ndims; d++){
+            if(v->hdf5_dimids[d] != expected_vars[i].dimids[d]){
+              var_ok = false;
+            }
+          }
+        }
+
+        if(!var_ok){
+          LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: hdf5_vars[%d] "
+            "(name=%s, nc_type=%d, ndims=%d) does not match expected (%s, %d, %d)\n",
+            i, (v->name) ? v->name : "(null)", v->nc_type, v->ndims,
+            expected_vars[i].name, expected_vars[i].nc_type, expected_vars[i].ndims);
+          nerrs++;
+        }
+      }
+    }
+
+    /* Attributes: 3 global (g_int/g_float/g_text) + 1 on var "v1" (v1_int) */
+    if((fake_file.hdf5_num_attrs != 4) || (fake_file.hdf5_num_gattrs != 3)){
+      LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: hdf5_num_attrs = %d, "
+        "hdf5_num_gattrs = %d, expected 4 and 3\n",
+        fake_file.hdf5_num_attrs, fake_file.hdf5_num_gattrs);
+      nerrs++;
+    }
+    else{
+      struct{
+        const char *name;
+        int nc_type;
+        PIO_Offset len;
+        int varid;
+        bool found;
+      } expected_attrs[4] = {
+        { "g_int",   PIO_INT,   1, PIO_GLOBAL, false },
+        { "g_float", PIO_FLOAT, 1, PIO_GLOBAL, false },
+        { "g_text",  PIO_CHAR,  5, PIO_GLOBAL, false },
+        { "v1_int",  PIO_INT,   1, 1,          false }
+      };
+
+      for(int i = 0; i < fake_file.hdf5_num_attrs; i++){
+        hdf5_att_desc_t *a = &(fake_file.hdf5_attrs[i]);
+        if(test_is_reserved_attr_name(a->att_name)){
+          LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: reserved "
+            "attribute name (%s) leaked into hdf5_attrs[]\n",
+            (a->att_name) ? a->att_name : "(null)");
+          nerrs++;
+          continue;
+        }
+
+        bool matched_one = false;
+        for(int j = 0; j < 4; j++){
+          if(a->att_name && (strcmp(a->att_name, expected_attrs[j].name) == 0)){
+            matched_one = true;
+            if(expected_attrs[j].found){
+              LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: "
+                "attribute (%s) appears more than once in hdf5_attrs[]\n", a->att_name);
+              nerrs++;
+            }
+            expected_attrs[j].found = true;
+
+            if((a->att_type != expected_attrs[j].nc_type) ||
+               (a->att_len != expected_attrs[j].len) ||
+               (a->att_varid != expected_attrs[j].varid)){
+              LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: "
+                "attribute (%s) (type=%d, len=%lld, varid=%d) does not match "
+                "expected (%d, %lld, %d)\n",
+                a->att_name, a->att_type, (long long) a->att_len, a->att_varid,
+                expected_attrs[j].nc_type, (long long) expected_attrs[j].len,
+                expected_attrs[j].varid);
+              nerrs++;
+            }
+            break;
+          }
+        }
+
+        if(!matched_one){
+          LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: "
+            "unexpected attribute (%s) in hdf5_attrs[]\n",
+            (a->att_name) ? a->att_name : "(null)");
+          nerrs++;
+        }
+      }
+
+      for(int j = 0; j < 4; j++){
+        if(!expected_attrs[j].found){
+          LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED: "
+            "expected attribute (%s) not found in hdf5_attrs[]\n", expected_attrs[j].name);
+          nerrs++;
+        }
+      }
+    }
+  }
+
+  test_close_hdf5_reopen_handles(&fake_file);
+  test_free_hdf5_reopen_allocs(&fake_file);
+  PIOc_finalize(iosysid);
+  remove(fname);
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* Step 5/6: reopen a write-capable file natively, close it, then reopen the
+ * *same* file a second time with PIO_NOWRITE on a second, independent
+ * file_desc_t - the second open must succeed and must not see any state
+ * left over from the first (no accidental shared/static state in the new
+ * reopen code).
+ *
+ * The two reopens are done sequentially, with the first handle fully closed
+ * before the second is opened, rather than keeping both open at once: a
+ * write-capable and a read-only spio_hdf5_reopen() both collectively
+ * H5Fopen() the same file via HDF5's MPI-IO (H5FD_MPIO) driver, and on this
+ * (NFS) filesystem, having both handles open simultaneously in the same
+ * process deadlocks when either one is closed - its H5Fclose() blocks
+ * forever in fcntl()/ADIOI_GEN_SetLock() trying to flush/lock the file while
+ * the other handle's conflicting lock (held by the very same process/thread)
+ * can never be released to unblock it. Doing the opens sequentially avoids
+ * that overlap entirely; it still exercises the "no shared/static state"
+ * property this test is after, since a real static-caching bug would show up
+ * in the second open's state regardless of whether the first handle is still
+ * open or already closed.
+ */
+static int test_reopen_then_readonly_reopen(MPI_Comm comm, int wrank)
+{
+  int ret = PIO_NOERR;
+  const char *fname = "test_hdf5_reopen_then_readonly.nc";
+
+  if((ret = make_scorpio_written_hdf5_file_full(comm, fname))){
+    LOG_RANK0(wrank, "test_reopen_then_readonly_reopen() FAILED: could not create the "
+      "fixture file (ret = %d)\n", ret);
+    return PIO_EINTERNAL;
+  }
+
+  int iosysid = -1;
+  if((ret = PIOc_Init_Intracomm(comm, 1, 1, 0, PIO_REARR_SUBSET, &iosysid))){
+    LOG_RANK0(wrank, "test_reopen_then_readonly_reopen() FAILED: PIOc_Init_Intracomm() "
+      "returned %d\n", ret);
+    remove(fname);
+    return PIO_EINTERNAL;
+  }
+
+  iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
+  if(!ios){
+    LOG_RANK0(wrank, "test_reopen_then_readonly_reopen() FAILED: "
+      "pio_get_iosystem_from_id() returned NULL\n");
+    PIOc_finalize(iosysid);
+    remove(fname);
+    return PIO_EINTERNAL;
+  }
+
+  int nerrs = 0;
+
+  /* file_desc_t embeds fixed-size hdf5_dims[PIO_MAX_DIMS]/hdf5_vars[PIO_MAX_VARS]/
+   * hdf5_attrs[PIO_MAX_ATTRS] arrays directly (not as dynamically-allocated
+   * arrays), so a single instance is already large; two of them as plain
+   * stack locals in the same frame overflow the (ASan-instrumented) default
+   * stack. Heap-allocate both instead.
+   */
+  file_desc_t *write_file = new file_desc_t();
+  write_file->iotype = PIO_IOTYPE_HDF5;
+  strncpy(write_file->fname, fname, PIO_MAX_NAME);
+  write_file->fname[PIO_MAX_NAME] = '\0';
+
+  int write_reopen_ret = spio_hdf5_reopen(ios, write_file, fname, PIO_WRITE);
+  if(write_reopen_ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_reopen_then_readonly_reopen() FAILED: the first (write-capable) "
+      "spio_hdf5_reopen() returned %d, expected PIO_NOERR\n", write_reopen_ret);
+    nerrs++;
+  }
+
+  /* Record the first open's state, then fully close it before opening the
+   * second handle (see the function comment for why).
+   */
+  int write_num_dims = write_file->hdf5_num_dims;
+  int write_num_vars = write_file->hdf5_num_vars;
+  int write_num_attrs = write_file->hdf5_num_attrs;
+  int write_num_gattrs = write_file->hdf5_num_gattrs;
+  hid_t write_file_id = write_file->hdf5_file_id;
+
+  test_close_hdf5_reopen_handles(write_file);
+  test_free_hdf5_reopen_allocs(write_file);
+  delete write_file;
+
+  file_desc_t *readonly_file = new file_desc_t();
+  readonly_file->iotype = PIO_IOTYPE_HDF5;
+  strncpy(readonly_file->fname, fname, PIO_MAX_NAME);
+  readonly_file->fname[PIO_MAX_NAME] = '\0';
+
+  int readonly_reopen_ret = spio_hdf5_reopen(ios, readonly_file, fname, PIO_NOWRITE);
+  if(readonly_reopen_ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_reopen_then_readonly_reopen() FAILED: the second (read-only) "
+      "spio_hdf5_reopen() returned %d, expected PIO_NOERR\n", readonly_reopen_ret);
+    nerrs++;
+  }
+  else{
+    if((readonly_file->hdf5_num_dims != write_num_dims) ||
+       (readonly_file->hdf5_num_vars != write_num_vars) ||
+       (readonly_file->hdf5_num_attrs != write_num_attrs) ||
+       (readonly_file->hdf5_num_gattrs != write_num_gattrs)){
+      LOG_RANK0(wrank, "test_reopen_then_readonly_reopen() FAILED: the second file_desc_t's "
+        "counts (dims=%d, vars=%d, attrs=%d, gattrs=%d) do not match the first's "
+        "(dims=%d, vars=%d, attrs=%d, gattrs=%d) - independent opens of the same file "
+        "should see the same schema exactly once each, not a doubled/corrupted one\n",
+        readonly_file->hdf5_num_dims, readonly_file->hdf5_num_vars,
+        readonly_file->hdf5_num_attrs, readonly_file->hdf5_num_gattrs,
+        write_num_dims, write_num_vars, write_num_attrs, write_num_gattrs);
+      nerrs++;
+    }
+
+    /* The first handle is already closed, so HDF5 is free to recycle its
+     * integer id for the second open; a match here is not by itself proof
+     * of shared state. It is still worth asserting: spio_hdf5_reopen()
+     * unconditionally calling H5Fopen() (rather than, say, short-circuiting
+     * and handing back a cached id) would most likely NOT happen to collide
+     * with the just-freed id, so a mismatch remains the expected, meaningful
+     * signal, while a match is treated as inconclusive rather than failing
+     * the test outright.
+     */
+    if(readonly_file->hdf5_file_id == write_file_id){
+      LOG_RANK0(wrank, "test_reopen_then_readonly_reopen() NOTE: the second "
+        "spio_hdf5_reopen() reused the first (already-closed) call's hdf5_file_id "
+        "value (%lld) - inconclusive on its own since HDF5 may recycle a freed id, "
+        "not treated as a failure\n", (long long) readonly_file->hdf5_file_id);
+    }
+  }
+
+  test_close_hdf5_reopen_handles(readonly_file);
+  test_free_hdf5_reopen_allocs(readonly_file);
+  delete readonly_file;
+
+  PIOc_finalize(iosysid);
+  remove(fname);
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* Step 7/8: a non-SCORPIO HDF5 file opened read-write (PIO_WRITE, not just
+ * PIO_NOWRITE as in test_reopen_fallback_sentinel()) still falls back
+ * correctly (PIO_EBADIOTYPE) and does not populate/corrupt file->hdf5_*
+ * fields with partial introspection state.
+ */
+static int test_reopen_fallback_write_mode(MPI_Comm comm, int wrank)
+{
+  int ret = PIO_NOERR;
+  const char *plain_fname = "test_hdf5_reopen_fallback_write_mode.nc";
+
+  if((ret = make_plain_hdf5_file(plain_fname))){
+    LOG_RANK0(wrank, "test_reopen_fallback_write_mode() FAILED: could not create the plain "
+      "HDF5 fixture file (ret = %d)\n", ret);
+    return PIO_EINTERNAL;
+  }
+
+  int iosysid = -1;
+  if((ret = PIOc_Init_Intracomm(comm, 1, 1, 0, PIO_REARR_SUBSET, &iosysid))){
+    LOG_RANK0(wrank, "test_reopen_fallback_write_mode() FAILED: PIOc_Init_Intracomm() "
+      "returned %d\n", ret);
+    remove(plain_fname);
+    return PIO_EINTERNAL;
+  }
+
+  iosystem_desc_t *ios = pio_get_iosystem_from_id(iosysid);
+  if(!ios){
+    LOG_RANK0(wrank, "test_reopen_fallback_write_mode() FAILED: "
+      "pio_get_iosystem_from_id() returned NULL\n");
+    PIOc_finalize(iosysid);
+    remove(plain_fname);
+    return PIO_EINTERNAL;
+  }
+
+  file_desc_t fake_file{};
+  fake_file.iotype = PIO_IOTYPE_HDF5;
+  strncpy(fake_file.fname, plain_fname, PIO_MAX_NAME);
+  fake_file.fname[PIO_MAX_NAME] = '\0';
+
+  /* fake_file.hdf5_file_id is whatever file_desc_t{}'s value-initialization
+   * zeroed it to (not necessarily H5I_INVALID_HID, which is -1) - capture
+   * that as the "untouched" baseline rather than assuming a specific sentinel.
+   */
+  hid_t hdf5_file_id_before = fake_file.hdf5_file_id;
+
+  int nerrs = 0;
+
+  int reopen_ret = spio_hdf5_reopen(ios, &fake_file, plain_fname, PIO_WRITE);
+  if(reopen_ret != PIO_EBADIOTYPE){
+    LOG_RANK0(wrank, "test_reopen_fallback_write_mode() FAILED: spio_hdf5_reopen() "
+      "returned %d, expected PIO_EBADIOTYPE (%d), for a file it should not recognize, "
+      "opened with PIO_WRITE\n", reopen_ret, PIO_EBADIOTYPE);
+    nerrs++;
+  }
+
+  if((fake_file.iotype != PIO_IOTYPE_HDF5) || (fake_file.hdf5_num_dims != 0) ||
+     (fake_file.hdf5_num_vars != 0) || (fake_file.hdf5_num_attrs != 0) ||
+     (fake_file.hdf5_num_gattrs != 0) || (fake_file.hdf5_file_id != hdf5_file_id_before)){
+    LOG_RANK0(wrank, "test_reopen_fallback_write_mode() FAILED: the fallback path left "
+      "file->iotype/hdf5_* fields in an unexpected, possibly-corrupted state "
+      "(iotype=%d, hdf5_num_dims=%d, hdf5_num_vars=%d, hdf5_num_attrs=%d, "
+      "hdf5_num_gattrs=%d, hdf5_file_id=%lld, expected hdf5_file_id=%lld)\n",
+      fake_file.iotype, fake_file.hdf5_num_dims, fake_file.hdf5_num_vars,
+      fake_file.hdf5_num_attrs, fake_file.hdf5_num_gattrs,
+      (long long) fake_file.hdf5_file_id, (long long) hdf5_file_id_before);
+    nerrs++;
+  }
+
+  test_free_hdf5_reopen_allocs(&fake_file);
+
+  PIOc_finalize(iosysid);
+  remove(plain_fname);
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+/* Fix round 2 (R1/R4): a write-capable native HDF5 reopen of a file that
+ * contains a coordinate variable must survive the *production* close path.
+ *
+ * Every other test in this file drives spio_hdf5_reopen() directly on a bare
+ * file_desc_t and tears the result down with test_free_hdf5_reopen_allocs(),
+ * which never touches the HDF5 ids at all - so none of them can observe what
+ * spio_hdf5_close() makes of the dataset ids the reopen left behind.
+ *
+ * For a dimension that is also a coordinate variable, file->hdf5_dims[dimid]
+ * .hdf5_dataset_id and file->hdf5_vars[varid].hdf5_dataset_id must hold the
+ * *same* hid_t (see spio_hdf5_utils.cpp:891 on the writer side) - that
+ * aliasing is exactly why spio_hdf5_close() skips the dims-array close for a
+ * has_coord_var dim. If the write-capable reopen instead H5Dopen2()'s the
+ * coordinate variable's dataset twice (two distinct, independently
+ * reference-counted ids), the dims-array copy is never closed, and the
+ * reopened MPI-IO file handle - whose fclose degree is H5F_CLOSE_SEMI, not
+ * H5F_CLOSE_WEAK - makes H5Fclose() fail with an object still open, so
+ * PIOc_closefile() returns PIO_EHDF5ERR.
+ *
+ * This test goes through the real PIOc_openfile()/PIOc_closefile() entry
+ * points (so spio_hdf5_reopen() runs from PIOc_openfile_retry_impl() and the
+ * teardown is the production spio_hdf5_close()) and asserts the close
+ * succeeds.
+ */
+static int test_write_reopen_coord_var_production_close(MPI_Comm comm, int wrank)
+{
+  int ret = PIO_NOERR;
+  const char *fname = "test_hdf5_reopen_coord_var_close.nc";
+
+  /* The "full" fixture's dim "y" has a coordinate variable (var "y"). */
+  if((ret = make_scorpio_written_hdf5_file_full(comm, fname))){
+    LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: could not "
+      "create the fixture file (ret = %d)\n", ret);
+    return PIO_EINTERNAL;
+  }
+
+  int iosysid = -1;
+  if((ret = PIOc_Init_Intracomm(comm, 1, 1, 0, PIO_REARR_SUBSET, &iosysid))){
+    LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: "
+      "PIOc_Init_Intracomm() returned %d\n", ret);
+    remove(fname);
+    return PIO_EINTERNAL;
+  }
+
+  int nerrs = 0;
+  int ncid = -1;
+  int format = PIO_IOTYPE_HDF5;
+
+  /* In a PIO_USE_ASYNC_WR_THREAD build PIOc_closefile() is a *soft* close -
+   * it hands the real close to an async-op worker and returns PIO_NOERR
+   * regardless of what H5Fclose() later makes of it - so its return code
+   * alone cannot catch the leak in that configuration. Bracket the whole
+   * open/close/finalize sequence with the global HDF5 open-object count
+   * instead: once PIOc_finalize() has drained everything, no HDF5 file or
+   * dataset object from this sequence may still be open. This is the
+   * assertion that catches the leak in both configurations. */
+  ssize_t nobj_before = H5Fget_obj_count(H5F_OBJ_ALL, H5F_OBJ_FILE | H5F_OBJ_DATASET);
+
+  ret = PIOc_openfile(iosysid, &ncid, &format, fname, PIO_WRITE);
+  if(ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: the "
+      "write-capable PIOc_openfile() returned %d, expected PIO_NOERR\n", ret);
+    nerrs++;
+  }
+  else{
+    /* Guard against the test silently proving nothing: if the native HDF5
+     * reopen had not been taken, PIOc_openfile_retry_impl() would have
+     * switched file->iotype away to NETCDF4P/PNETCDF and the close below
+     * would never reach spio_hdf5_close() at all. */
+    file_desc_t *file = NULL;
+    if((pio_get_file(ncid, &file) != PIO_NOERR) || !file){
+      LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: "
+        "pio_get_file() could not find the just-opened file (ncid = %d)\n", ncid);
+      nerrs++;
+    }
+    else if((file->iotype != PIO_IOTYPE_HDF5) && (file->iotype != PIO_IOTYPE_HDF5C)){
+      LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: the "
+        "write-capable open of a SCORPIO-written HDF5 file switched the iotype away "
+        "(iotype = %d) instead of taking the native HDF5 reopen path - this test would "
+        "prove nothing\n", file->iotype);
+      nerrs++;
+    }
+    else{
+      /* Assert the invariant directly, before the close consumes it: for a
+       * dimension that has a coordinate variable, the dims-array entry and
+       * the coordinate variable's vars-array entry must hold the *same*
+       * hid_t (spio_hdf5_utils.cpp:891 is where the writer establishes
+       * this). spio_hdf5_close() relies on it - it skips the dims-array
+       * close for a has_coord_var dim - so two distinct ids here means one
+       * of them is never closed. This check is what makes the test
+       * deterministic in a PIO_USE_ASYNC_WR_THREAD build, where
+       * PIOc_closefile()'s own return code cannot report the failure. */
+      for(int d = 0; d < file->hdf5_num_dims; d++){
+        if(!file->hdf5_dims[d].has_coord_var){
+          continue;
+        }
+
+        bool aliased = false;
+        for(int v = 0; v < file->hdf5_num_vars; v++){
+          if(file->hdf5_vars[v].is_coord_var &&
+             (file->hdf5_vars[v].hdf5_dataset_id == file->hdf5_dims[d].hdf5_dataset_id)){
+            aliased = true;
+            break;
+          }
+        }
+
+        if(!aliased){
+          LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: after a "
+            "write-capable native HDF5 reopen, dimension (%s, dimid = %d) has a coordinate "
+            "variable but its hdf5_dataset_id (%lld) is not the same id as any coordinate "
+            "variable's - the dataset was opened twice instead of once with the id shared, "
+            "so spio_hdf5_close() (which skips the dims-array id for a has_coord_var dim) "
+            "will leave one of the two open\n",
+            (file->hdf5_dims[d].name) ? file->hdf5_dims[d].name : "(null)", d,
+            (long long) file->hdf5_dims[d].hdf5_dataset_id);
+          nerrs++;
+        }
+      }
+    }
+
+    int close_ret = PIOc_closefile(ncid);
+    if(close_ret != PIO_NOERR){
+      LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: "
+        "PIOc_closefile() returned %d, expected PIO_NOERR - a write-capable native HDF5 "
+        "reopen of a file containing a coordinate variable left a dataset id open (the "
+        "coordinate variable's dims-array/vars-array ids must be the same id, opened "
+        "once), so H5Fclose() failed on the MPI-IO (H5F_CLOSE_SEMI) handle\n", close_ret);
+      nerrs++;
+    }
+  }
+
+  PIOc_finalize(iosysid);
+
+  ssize_t nobj_after = H5Fget_obj_count(H5F_OBJ_ALL, H5F_OBJ_FILE | H5F_OBJ_DATASET);
+  if(nobj_after != nobj_before){
+    LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED: the number of "
+      "globally open HDF5 file/dataset objects changed from %lld to %lld across a "
+      "write-capable native HDF5 open and close of a file containing a coordinate "
+      "variable - the coordinate variable's dataset was opened twice (once per array) and "
+      "only closed once, so neither it nor the file handle holding it could be released\n",
+      (long long) nobj_before, (long long) nobj_after);
+    nerrs++;
+  }
+
+  remove(fname);
+
+  return (nerrs == 0) ? PIO_NOERR : PIO_EINTERNAL;
+}
+
+int test_driver(MPI_Comm comm, int wrank, int wsz, int *num_errors)
+{
+  int nerrs = 0, ret = PIO_NOERR;
+  assert((comm != MPI_COMM_NULL) && (wrank >= 0) && (wsz > 0) && num_errors);
+
+  ret = test_is_scorpio_written(comm, wrank);
+  if(ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_is_scorpio_written() FAILED, ret = %d\n", ret);
+    nerrs++;
+  }
+  else{
+    LOG_RANK0(wrank, "test_is_scorpio_written() PASSED\n");
+  }
+
+  ret = test_reopen_fallback_sentinel(comm, wrank);
+  if(ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_reopen_fallback_sentinel() FAILED, ret = %d\n", ret);
+    nerrs++;
+  }
+  else{
+    LOG_RANK0(wrank, "test_reopen_fallback_sentinel() PASSED\n");
+  }
+
+  ret = test_reopen_introspection_round_trip(comm, wrank);
+  if(ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_reopen_introspection_round_trip() FAILED, ret = %d\n", ret);
+    nerrs++;
+  }
+  else{
+    LOG_RANK0(wrank, "test_reopen_introspection_round_trip() PASSED\n");
+  }
+
+  ret = test_reopen_then_readonly_reopen(comm, wrank);
+  if(ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_reopen_then_readonly_reopen() FAILED, ret = %d\n", ret);
+    nerrs++;
+  }
+  else{
+    LOG_RANK0(wrank, "test_reopen_then_readonly_reopen() PASSED\n");
+  }
+
+  ret = test_reopen_fallback_write_mode(comm, wrank);
+  if(ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_reopen_fallback_write_mode() FAILED, ret = %d\n", ret);
+    nerrs++;
+  }
+  else{
+    LOG_RANK0(wrank, "test_reopen_fallback_write_mode() PASSED\n");
+  }
+
+  ret = test_write_reopen_coord_var_production_close(comm, wrank);
+  if(ret != PIO_NOERR){
+    LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() FAILED, ret = %d\n", ret);
+    nerrs++;
+  }
+  else{
+    LOG_RANK0(wrank, "test_write_reopen_coord_var_production_close() PASSED\n");
+  }
+
+  *num_errors += nerrs;
+  return nerrs;
+}
+
+int main(int argc, char *argv[])
+{
+  int ret;
+  int wrank, wsz;
+  int num_errors;
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
+  ret = GPTLinitialize();
+  if(ret != 0){
+    fprintf(stderr, "GPTLinitialize() FAILED, ret = %d\n", ret);
+    return ret;
+  }
+#endif /* TIMING_INTERNAL */
+#endif /* TIMING */
+
+  ret = pio_test_mpi_init(&argc, &argv);
+  if(ret != MPI_SUCCESS){
+    fprintf(stderr, "MPI_Init() FAILED, ret = %d\n", ret);
+    return ret;
+  }
+
+  ret = MPI_Comm_rank(MPI_COMM_WORLD, &wrank);
+  if(ret != MPI_SUCCESS){
+    fprintf(stderr, "MPI_Comm_rank() FAILED, ret = %d\n", ret);
+    return ret;
+  }
+  ret = MPI_Comm_size(MPI_COMM_WORLD, &wsz);
+  if(ret != MPI_SUCCESS){
+    fprintf(stderr, "MPI_Comm_size() FAILED, ret = %d\n", ret);
+    return ret;
+  }
+
+  /* The library's default error handler (PIO_INTERNAL_ERROR) aborts the job
+   * from inside pio_err(). These tests assert on returned error codes - in
+   * particular test_write_reopen_coord_var_production_close() asserts that
+   * PIOc_closefile() returns PIO_NOERR - so the returned-error handler is
+   * what lets a failure be reported rather than abort the process. */
+  ret = PIOc_set_iosystem_error_handling(PIO_DEFAULT, PIO_RETURN_ERROR, NULL);
+  if(ret != PIO_NOERR){
+    fprintf(stderr, "PIOc_set_iosystem_error_handling() FAILED, ret = %d\n", ret);
+    return ret;
+  }
+
+  num_errors = 0;
+  ret = test_driver(MPI_COMM_WORLD, wrank, wsz, &num_errors);
+  if(ret != 0){
+    LOG_RANK0(wrank, "Test driver FAILED\n");
+  }
+  else{
+    LOG_RANK0(wrank, "All tests PASSED\n");
+  }
+
+  MPI_Finalize();
+
+#ifdef SPIO_ENABLE_GPTL_TIMING
+#ifndef SPIO_ENABLE_GPTL_TIMING_INTERNAL
+  ret = GPTLfinalize();
+  if(ret != 0){
+    fprintf(stderr, "GPTLfinalize() FAILED, ret = %d\n", ret);
+    return ret;
+  }
+#endif /* TIMING_INTERNAL */
+#endif /* TIMING */
+
+  if(num_errors != 0){
+    LOG_RANK0(wrank, "Total errors = %d\n", num_errors);
+    return FAIL;
+  }
+  return 0;
+}
+
+#endif /* _HDF5 */

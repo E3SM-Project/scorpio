@@ -25,6 +25,8 @@ class Async_op{
       SPIO_ASYNC_HDF5_SET_FRAME_OP,
       SPIO_ASYNC_HDF5_PUT_VAR_OP,
       SPIO_ASYNC_HDF5_WRITE_OP,
+      SPIO_ASYNC_HDF5_REARR_WRITE_OP,
+      SPIO_ASYNC_HDF5_REARR_READ_OP,
       SPIO_ASYNC_FILE_WRITE_OPS,
       SPIO_ASYNC_FILE_CLOSE_OP
     };
@@ -42,6 +44,8 @@ class Async_op{
         case Op_type::SPIO_ASYNC_HDF5_SET_FRAME_OP : return "SPIO_ASYNC_HDF5_SET_FRAME_OP";
         case Op_type::SPIO_ASYNC_HDF5_PUT_VAR_OP : return "SPIO_ASYNC_HDF5_PUT_VAR_OP";
         case Op_type::SPIO_ASYNC_HDF5_WRITE_OP : return "SPIO_ASYNC_HDF5_WRITE_OP";
+        case Op_type::SPIO_ASYNC_HDF5_REARR_WRITE_OP : return "SPIO_ASYNC_HDF5_REARR_WRITE_OP";
+        case Op_type::SPIO_ASYNC_HDF5_REARR_READ_OP : return "SPIO_ASYNC_HDF5_REARR_READ_OP";
         case Op_type::SPIO_ASYNC_FILE_WRITE_OPS : return "SPIO_ASYNC_FILE_WRITE_OPS";
         case Op_type::SPIO_ASYNC_FILE_CLOSE_OP : return "SPIO_ASYNC_FILE_CLOSE_OP";
         default : return UNKNOWN_OP;

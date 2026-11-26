@@ -155,7 +155,7 @@ int pio_test_init2(int argc, char **argv, int *my_rank, int *ntasks,
 #endif
 
     /* Initialize MPI. */
-    if ((ret = MPI_Init(&argc, &argv)))
+    if ((ret = pio_test_mpi_init(&argc, &argv)))
         MPIERR(ret);
 
     /* Learn my rank and the total number of processors. */
