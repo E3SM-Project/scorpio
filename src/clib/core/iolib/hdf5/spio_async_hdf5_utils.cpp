@@ -1278,4 +1278,146 @@ int pio_iosys_async_hdf5_rearr_write_op_add(file_desc_t *file, int nvars, int fn
   return PIO_EINTERNAL;
 #endif // _HDF5
 }
+
+Hdf5_rearr_rcache::~Hdf5_rearr_rcache()
+{
+  if(iobuf){ std::free(iobuf); iobuf = NULL; }
+}
+
+/* Async CONTIG rearrange_io2comp() op - DELIBERATELY NEVER QUEUED by any
+ * production code path (see the doc comment on Hdf5_rearr_rcache and on
+ * pio_iosys_async_hdf5_rearr_read_op_add() below). Implemented for
+ * symmetry with the write side above, and because requirement 2 of the
+ * plan this was added for (docs/superpowers/plans/2026-11-25-async-contig-
+ * rearrangement-plan.md) asks for both directions to exist as real,
+ * compiling code.
+ *
+ * Unlike the write side, this is NOT phase-split into a synchronous prefix
+ * and a deferred suffix: rearrange_io2comp() runs the costly, I/O-only
+ * rearrange_data() FIRST and the cheap, compute+I/O disperse_data() SECOND.
+ * The write side's split works because its cheap phase (aggregation) is a
+ * synchronous PREFIX feeding the deferred, costly phase; here the
+ * deferrable (costly) phase would be the prefix and the cheap phase
+ * consumes ITS output, so splitting would just force the application
+ * thread to block on the async op before running disperse_data() anyway -
+ * zero gain, for the cost of a second op type and hand-off buffer. One
+ * call wraps the whole thing instead. */
+int pio_iosys_async_op_hdf5_rearr_read_impl(void *pdata)
+{
+  int ret = PIO_NOERR;
+  Hdf5_rearr_rcache *rcache = static_cast<Hdf5_rearr_rcache *>(pdata);
+  assert(rcache && rcache->io_desc_info && rcache->io_desc_info->rearr &&
+         rcache->io_desc_info->rearr->is_init());
+
+  ret = rcache->io_desc_info->rearr->rearrange_io2comp(rcache->iobuf, rcache->iobuf_sz,
+          rcache->array, rcache->array_sz, rcache->nvars);
+  if(ret != PIO_NOERR){
+    return pio_err(NULL, rcache->file, ret, __FILE__, __LINE__,
+                    "Asynchronously rearranging data (number of variables = %d) from I/O tasks to compute tasks using PIO_IOTYPE_HDF5x failed. Rearranging I/O data to compute tasks (rearrange_io2comp()) failed", rcache->nvars);
+  }
+
+  return PIO_NOERR;
+}
+
+int pio_iosys_async_op_hdf5_rearr_read(void *pdata)
+{
+  Hdf5_rearr_rcache *rcache = static_cast<Hdf5_rearr_rcache *>(pdata);
+  assert(rcache);
+
+  int ret = pio_iosys_async_op_hdf5_rearr_read_impl(pdata);
+
+  /* One less pending op using this iodesc - decremented here, on every exit
+   * path (success or failure), matching the write op's own discipline. Not
+   * reached by any production path (this op is never queued), but kept
+   * consistent so pio_iosys_async_hdf5_rearr_read_op_add() below is
+   * genuinely usable, not just a stub. */
+  if(rcache->iodesc){
+    rcache->iodesc->nasync_pend_ops--;
+  }
+  if(rcache->file){
+    rcache->file->npend_ops--;
+  }
+  SPIO_Util::GVars::npend_hdf5_async_ops--;
+
+  return ret;
+}
+
+void pio_iosys_async_op_hdf5_rearr_read_free(void *pdata)
+{
+  Hdf5_rearr_rcache *rcache = static_cast<Hdf5_rearr_rcache *>(pdata);
+  assert(rcache);
+
+  delete(rcache);
+}
+
+/* op-add for the async CONTIG rearrange_io2comp() op above.
+ *
+ * NEVER CALLED BY ANY PRODUCTION CODE PATH. Exists for symmetry with the
+ * write side's op-add and as a possible building block for a future
+ * batched/deferred read API. Two hard constraints are why no production
+ * caller exists today:
+ *
+ * (1) `array` is the CALLER's buffer and the read API (PIOc_read_darray())
+ * must return it filled before the application can safely use it - there
+ * is no point at which a read can be correctly left in flight across the
+ * read call's return. Any future caller of this op-add would need to
+ * immediately follow it with a drain (e.g. spio_wait_iodesc_async_pend_ops())
+ * before returning to the application, making the "async" queueing here
+ * pure overhead for a single read - it would only pay off batched across
+ * several reads sharing one drain.
+ *
+ * (2) This op's _impl calls rearrange_io2comp(), which includes
+ * disperse_data() on agg_comm_ - a communicator spanning compute AND I/O
+ * ranks (see Contig_rearr::create_agg_comm()). It is therefore the one
+ * piece of this whole feature that would put an agg_comm_ collective on a
+ * worker thread if ever queued for real. Wiring it into a production read
+ * path would break the Global Constraints invariant - that only
+ * I/O-owning ranks ever hold a pending asynchronous rearrange op - relied
+ * on by Tasks 7, 8 and 9 of the plan this op was added for (the
+ * I/O-rank-gated drains, and PIOc_freedecomp()'s defer-to-finalize
+ * agreement), and would require revisiting all three before doing so.
+ *
+ * Takes ownership of iobuf unconditionally (including on its own failure
+ * paths), matching pio_iosys_async_hdf5_rearr_write_op_add()'s discipline
+ * for agg_buf. Does NOT take ownership of array - the caller's buffer is
+ * never freed by this op. */
+int pio_iosys_async_hdf5_rearr_read_op_add(file_desc_t *file, int varid, int nvars,
+      std::shared_ptr<io_desc_t> iodesc, void *iobuf, std::size_t iobuf_sz,
+      void *array, std::size_t array_sz)
+{
+  int ret = PIO_NOERR;
+
+  assert(iodesc && (nvars > 0) && array);
+
+  Hdf5_rearr_rcache *rcache = new Hdf5_rearr_rcache();
+  rcache->file = file;
+  rcache->varid = varid;
+  rcache->iodesc = iodesc;
+  rcache->io_desc_info = (file) ? &(iodesc->select_io_desc_info(file->iotype, file)) :
+                                   &(iodesc->sync_io_desc_info);
+  rcache->iobuf = iobuf;
+  rcache->iobuf_sz = iobuf_sz;
+  rcache->array = array;
+  rcache->array_sz = array_sz;
+  rcache->nvars = nvars;
+
+  iodesc->nasync_pend_ops++;
+  if(file){ file->npend_ops++; }
+  SPIO_Util::GVars::npend_hdf5_async_ops++;
+
+  SPIO_Util::Async_op op = {SPIO_Util::Async_op::Op_type::SPIO_ASYNC_HDF5_REARR_READ_OP,
+                            static_cast<void *>(rcache),
+                            pio_iosys_async_op_hdf5_rearr_read,
+                            pio_async_poke_func_unavail,
+                            pio_iosys_async_op_hdf5_rearr_read_free};
+
+  ret = pio_async_tpool_op_add(op);
+  if(ret != PIO_NOERR){
+    LOG((1, "Adding file pending ops to tpool failed, ret = %d", ret));
+    return pio_err(NULL, file, ret, __FILE__, __LINE__,
+                    "Internal error while adding asynchronous pending operation (to rearrange %d variables from I/O to compute tasks) to the thread pool. Adding the asynchronous operation failed", nvars);
+  }
+
+  return PIO_NOERR;
+}
 #endif /* PIO_USE_ASYNC_WR_REARR */
