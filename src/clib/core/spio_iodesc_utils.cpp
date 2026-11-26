@@ -323,7 +323,27 @@ int PIOc_freedecomp_impl(int iosysid, int ioid)
   }
 
   if(iodesc->nasync_pend_ops > 0){
-    /* Let I/O desc be freed during finalize */
+    /* Let I/O desc be freed during finalize.
+     *
+     * This is a purely LOCAL, per-rank decision - under PIO_USE_ASYNC_WR_REARR,
+     * only agg-root/I/O ranks (Contig_rearr::is_agg_root()) ever observe
+     * nasync_pend_ops > 0, since only they ever queue an async CONTIG
+     * rearrange+write op; compute ranks always see 0 here and free
+     * immediately, below. That is safe even though this iodesc's
+     * ~io_desc_info_t() eventually calls Contig_rearr::finalize(), which
+     * calls MPI_Comm_free() on agg_comm_/rearr_comm_ - communicators every
+     * rank must eventually free, but NOT a synchronizing collective like
+     * MPI_Allreduce or MPI_Barrier (MPI 3.1 Sec 6.4.2): every member of a
+     * communicator's group must eventually call MPI_Comm_free() on it
+     * exactly once, but there is no requirement that the calls happen at
+     * coordinated times - one rank may free its handle long before another
+     * frees the same communicator's handle. pio_delete_all_iodescs(),
+     * called from PIOc_finalize_impl() once this is the last remaining
+     * iosystem in the process, is the backstop that guarantees every
+     * deferring rank eventually does call free - a point all ranks are
+     * guaranteed to reach together. No MPI_Allreduce (or other collective)
+     * is needed here to make every rank agree on free-vs-defer; do not
+     * add one. */
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     return PIO_NOERR;
   }
